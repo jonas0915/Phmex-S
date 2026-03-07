@@ -1,0 +1,9 @@
+ccxt==4.2.25
+pandas==2.1.4
+numpy==1.26.3
+pandas-ta==0.3.14b0
+python-dotenv==1.0.0
+requests==2.31.0
+websocket-client==1.7.0
+schedule==1.2.1
+colorlog==6.8.0
