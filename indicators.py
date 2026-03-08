@@ -59,6 +59,11 @@ def volume_sma(volume: pd.Series, period: int = 20) -> pd.Series:
     return sma(volume, period)
 
 
+def vwap(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series) -> pd.Series:
+    typical_price = (high + low + close) / 3
+    return (typical_price * volume).cumsum() / volume.cumsum()
+
+
 def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     close = df["close"]
@@ -66,11 +71,18 @@ def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     low = df["low"]
     volume = df["volume"]
 
-    # Trend
+    # Trend EMAs
     df["ema_9"] = ema(close, 9)
     df["ema_21"] = ema(close, 21)
     df["ema_50"] = ema(close, 50)
     df["ema_200"] = ema(close, 200)
+
+    # SMAs for test & retest strategy
+    df["sma_9"] = sma(close, 9)
+    df["sma_15"] = sma(close, 15)
+
+    # VWAP (cumulative intraday proxy)
+    df["vwap"] = vwap(high, low, close, volume)
 
     # Momentum
     df["rsi"] = rsi(close, 14)

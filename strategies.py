@@ -144,29 +144,133 @@ def breakout_strategy(df: pd.DataFrame) -> TradeSignal:
     return TradeSignal(Signal.HOLD, "No breakout detected", 0.0)
 
 
-def combined_strategy(df: pd.DataFrame) -> TradeSignal:
+def sma_vwap_strategy(df: pd.DataFrame, orderbook: dict = None) -> TradeSignal:
     """
-    Combine all strategies with voting. Requires 2 out of 3 to agree.
+    9 SMA & 15 SMA + VWAP test & retest strategy with volume & L2 confirmation.
+
+    Entry requires ALL of:
+      1. Trend  : 9 SMA > 15 SMA (long) or < (short)
+      2. Bias   : Price above/below VWAP
+      3. Retest : Price recently tested 9 SMA or VWAP within 0.5%
+      4. Bounce : Current candle closed back above/below the level
+      5. Volume : Pullback candle had LOW volume (<0.9x avg) — healthy retest
+                  Bounce candle has HIGH volume (>1.1x avg) — buyers/sellers in
+      6. L2     : Order book imbalance confirms direction (>+0.1 for long, <-0.1 for short)
+                  No large wall blocking within 1% of price
+    """
+    if len(df) < 20:
+        return TradeSignal(Signal.HOLD, "Not enough data", 0.0)
+
+    last  = df.iloc[-1]
+    close = last["close"]
+    sma9  = last["sma_9"]
+    sma15 = last["sma_15"]
+    vwap  = last["vwap"]
+
+    if pd.isna(sma9) or pd.isna(sma15) or pd.isna(vwap):
+        return TradeSignal(Signal.HOLD, "Indicators not ready", 0.0)
+
+    tolerance = 0.005   # 0.5% proximity for "test"
+    lookback  = df.iloc[-6:-1]  # last 5 closed candles
+
+    # Volume analysis
+    vol_avg        = df["volume"].iloc[-20:].mean()
+    bounce_vol     = last["volume"]
+    pullback_vols  = lookback["volume"].values
+    low_vol_retest = any(v < vol_avg * 0.9 for v in pullback_vols)
+    high_vol_bounce = bounce_vol > vol_avg * 1.1
+
+    # L2 order book
+    ob_imbalance  = orderbook["imbalance"]  if orderbook else 0.0
+    ask_walls     = orderbook["ask_walls"]  if orderbook else []
+    bid_walls     = orderbook["bid_walls"]  if orderbook else []
+    best_ask      = orderbook["best_ask"]   if orderbook else close * 1.99
+    best_bid      = orderbook["best_bid"]   if orderbook else 0
+
+    # Wall proximity check (within 1% of close)
+    ask_wall_nearby = any(w[0] <= close * 1.01 for w in ask_walls)
+    bid_wall_nearby = any(w[0] >= close * 0.99 for w in bid_walls)
+
+    # ── LONG setup ───────────────────────────────────────────────────────────
+    if sma9 > sma15 and close > vwap and close > sma9:
+        tested_sma9  = any(abs(row["low"] - row["sma_9"]) / row["sma_9"] <= tolerance for _, row in lookback.iterrows())
+        tested_vwap  = any(abs(row["low"] - row["vwap"])  / row["vwap"]  <= tolerance for _, row in lookback.iterrows())
+        crossed_back = any(row["close"] > row["sma_9"] and row["close"] > row["vwap"] for _, row in lookback.iterrows())
+
+        if (tested_sma9 or tested_vwap) and crossed_back:
+            level = "9SMA" if tested_sma9 else "VWAP"
+            vol_ok = low_vol_retest and high_vol_bounce
+            ob_ok  = ob_imbalance > 0.1 and not ask_wall_nearby
+
+            reasons = [f"Retest {level}", f"9SMA>{sma9:.4f}>15SMA={sma15:.4f}", f"VWAP={vwap:.4f}"]
+            if vol_ok:
+                reasons.append(f"Vol confirmed (bounce={bounce_vol/vol_avg:.1f}x)")
+            if orderbook:
+                reasons.append(f"OB imbalance={ob_imbalance:+.2f}")
+
+            # Score: base 0.6, +0.15 for volume, +0.15 for OB
+            strength = 0.6 + (0.15 if vol_ok else 0) + (0.15 if ob_ok else 0)
+
+            if not vol_ok:
+                reasons.append("⚠ weak vol")
+            if orderbook and not ob_ok:
+                reasons.append("⚠ OB bearish or ask wall nearby")
+
+            return TradeSignal(Signal.BUY, " | ".join(reasons), strength)
+
+    # ── SHORT setup ──────────────────────────────────────────────────────────
+    if sma9 < sma15 and close < vwap and close < sma9:
+        tested_sma9  = any(abs(row["high"] - row["sma_9"]) / row["sma_9"] <= tolerance for _, row in lookback.iterrows())
+        tested_vwap  = any(abs(row["high"] - row["vwap"])  / row["vwap"]  <= tolerance for _, row in lookback.iterrows())
+        crossed_back = any(row["close"] < row["sma_9"] and row["close"] < row["vwap"] for _, row in lookback.iterrows())
+
+        if (tested_sma9 or tested_vwap) and crossed_back:
+            level = "9SMA" if tested_sma9 else "VWAP"
+            vol_ok = low_vol_retest and high_vol_bounce
+            ob_ok  = ob_imbalance < -0.1 and not bid_wall_nearby
+
+            reasons = [f"Retest {level}", f"9SMA<{sma9:.4f}<15SMA={sma15:.4f}", f"VWAP={vwap:.4f}"]
+            if vol_ok:
+                reasons.append(f"Vol confirmed (bounce={bounce_vol/vol_avg:.1f}x)")
+            if orderbook:
+                reasons.append(f"OB imbalance={ob_imbalance:+.2f}")
+
+            strength = 0.6 + (0.15 if vol_ok else 0) + (0.15 if ob_ok else 0)
+
+            if not vol_ok:
+                reasons.append("⚠ weak vol")
+            if orderbook and not ob_ok:
+                reasons.append("⚠ OB bullish or bid wall nearby")
+
+            return TradeSignal(Signal.SELL, " | ".join(reasons), strength)
+
+    return TradeSignal(Signal.HOLD, "No test & retest setup", 0.0)
+
+
+def combined_strategy(df: pd.DataFrame, orderbook: dict = None) -> TradeSignal:
+    """
+    Combine all strategies with voting. Requires 2 out of 4 to agree.
     """
     signals = [
         momentum_strategy(df),
         mean_reversion_strategy(df),
         breakout_strategy(df),
+        sma_vwap_strategy(df, orderbook),
     ]
 
-    buy_votes = sum(1 for s in signals if s.signal == Signal.BUY)
+    buy_votes  = sum(1 for s in signals if s.signal == Signal.BUY)
     sell_votes = sum(1 for s in signals if s.signal == Signal.SELL)
 
-    buy_reasons = [s.reason for s in signals if s.signal == Signal.BUY]
+    buy_reasons  = [s.reason for s in signals if s.signal == Signal.BUY]
     sell_reasons = [s.reason for s in signals if s.signal == Signal.SELL]
 
     if buy_votes >= 2:
         avg_strength = sum(s.strength for s in signals if s.signal == Signal.BUY) / buy_votes
-        return TradeSignal(Signal.BUY, f"[{buy_votes}/3 strategies] " + " | ".join(buy_reasons), avg_strength)
+        return TradeSignal(Signal.BUY, f"[{buy_votes}/4 strategies] " + " | ".join(buy_reasons), avg_strength)
 
     if sell_votes >= 2:
         avg_strength = sum(s.strength for s in signals if s.signal == Signal.SELL) / sell_votes
-        return TradeSignal(Signal.SELL, f"[{sell_votes}/3 strategies] " + " | ".join(sell_reasons), avg_strength)
+        return TradeSignal(Signal.SELL, f"[{sell_votes}/4 strategies] " + " | ".join(sell_reasons), avg_strength)
 
     return TradeSignal(Signal.HOLD, "No consensus between strategies", 0.0)
 
@@ -175,5 +279,6 @@ STRATEGIES = {
     "momentum": momentum_strategy,
     "mean_reversion": mean_reversion_strategy,
     "breakout": breakout_strategy,
+    "sma_vwap": sma_vwap_strategy,
     "combined": combined_strategy,
 }

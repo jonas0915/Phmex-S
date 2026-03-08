@@ -10,13 +10,17 @@ class Config:
     API_KEY = os.getenv("API_KEY", "")
     API_SECRET = os.getenv("API_SECRET", "")
 
-    # Trading pairs
-    TRADING_PAIRS = os.getenv("TRADING_PAIRS", "BTC/USDT,ETH/USDT").split(",")
+    # Trading pairs (futures format: BTC/USDT:USDT)
+    TRADING_PAIRS = os.getenv("TRADING_PAIRS", "BTC/USDT:USDT,ETH/USDT:USDT").split(",")
     BASE_CURRENCY = os.getenv("BASE_CURRENCY", "USDT")
     TIMEFRAME = os.getenv("TIMEFRAME", "15m")
 
-    # Position sizing
-    TRADE_AMOUNT_PERCENT = float(os.getenv("TRADE_AMOUNT_PERCENT", "2.0"))
+    # Leverage
+    LEVERAGE = int(os.getenv("LEVERAGE", "1"))
+
+    # Position sizing — fixed USDT margin per trade
+    TRADE_AMOUNT_USDT = float(os.getenv("TRADE_AMOUNT_USDT", "70.0"))
+    TRADE_AMOUNT_PERCENT = float(os.getenv("TRADE_AMOUNT_PERCENT", "2.0"))  # fallback if fixed not set
     MAX_OPEN_TRADES = int(os.getenv("MAX_OPEN_TRADES", "3"))
     MAX_DRAWDOWN_PERCENT = float(os.getenv("MAX_DRAWDOWN_PERCENT", "10.0"))
 
@@ -37,10 +41,16 @@ class Config:
     LOG_FILE = os.getenv("LOG_FILE", "logs/bot.log")
 
     # Candle lookback for indicators
-    CANDLE_LOOKBACK = 200
+    CANDLE_LOOKBACK = 100
 
     # Loop interval in seconds
-    LOOP_INTERVAL = 60
+    LOOP_INTERVAL = int(os.getenv("LOOP_INTERVAL", "10"))
+
+    # Dynamic scanner
+    SCANNER_ENABLED = os.getenv("SCANNER_ENABLED", "true").lower() == "true"
+    SCANNER_TOP_N = int(os.getenv("SCANNER_TOP_N", "5"))           # top N gainers to trade
+    SCANNER_MIN_VOLUME = float(os.getenv("SCANNER_MIN_VOLUME", "500000"))  # min 24h USDT volume
+    SCANNER_REFRESH_CYCLES = int(os.getenv("SCANNER_REFRESH_CYCLES", "10"))  # refresh every N cycles
 
     @classmethod
     def is_live(cls):
