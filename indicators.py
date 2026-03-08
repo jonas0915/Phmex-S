@@ -60,8 +60,18 @@ def volume_sma(volume: pd.Series, period: int = 20) -> pd.Series:
 
 
 def vwap(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series) -> pd.Series:
+    """Session-anchored VWAP — resets at midnight UTC each day."""
     typical_price = (high + low + close) / 3
-    return (typical_price * volume).cumsum() / volume.cumsum()
+    df_temp = pd.DataFrame({
+        "tp": typical_price,
+        "vol": volume,
+        "date": typical_price.index.normalize()  # midnight UTC date for each candle
+    })
+    tpv = df_temp["tp"] * df_temp["vol"]
+    # Cumulative sum within each day group
+    cum_tpv = tpv.groupby(df_temp["date"]).cumsum()
+    cum_vol = df_temp["vol"].groupby(df_temp["date"]).cumsum()
+    return cum_tpv / cum_vol.replace(0, float("nan"))
 
 
 def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
@@ -81,7 +91,7 @@ def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["sma_9"] = sma(close, 9)
     df["sma_15"] = sma(close, 15)
 
-    # VWAP (cumulative intraday proxy)
+    # VWAP (session-anchored, resets daily at midnight UTC)
     df["vwap"] = vwap(high, low, close, volume)
 
     # Momentum

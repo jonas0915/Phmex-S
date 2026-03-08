@@ -19,17 +19,17 @@ class Config:
     LEVERAGE = int(os.getenv("LEVERAGE", "1"))
 
     # Position sizing — fixed USDT margin per trade
-    TRADE_AMOUNT_USDT = float(os.getenv("TRADE_AMOUNT_USDT", "70.0"))
-    TRADE_AMOUNT_PERCENT = float(os.getenv("TRADE_AMOUNT_PERCENT", "2.0"))  # fallback if fixed not set
-    MAX_OPEN_TRADES = int(os.getenv("MAX_OPEN_TRADES", "3"))
+    TRADE_AMOUNT_USDT = float(os.getenv("TRADE_AMOUNT_USDT", "50.0"))
+    TRADE_AMOUNT_PERCENT = float(os.getenv("TRADE_AMOUNT_PERCENT", "2.0"))  # fallback if fixed not set — not currently used by the sizing logic
+    MAX_OPEN_TRADES = int(os.getenv("MAX_OPEN_TRADES", "2"))
     MAX_DRAWDOWN_PERCENT = float(os.getenv("MAX_DRAWDOWN_PERCENT", "10.0"))
 
     # Strategy
     STRATEGY = os.getenv("STRATEGY", "combined")
 
     # Risk management
-    STOP_LOSS_PERCENT = float(os.getenv("STOP_LOSS_PERCENT", "2.0"))
-    TAKE_PROFIT_PERCENT = float(os.getenv("TAKE_PROFIT_PERCENT", "4.0"))
+    STOP_LOSS_PERCENT = float(os.getenv("STOP_LOSS_PERCENT", "3.0"))
+    TAKE_PROFIT_PERCENT = float(os.getenv("TAKE_PROFIT_PERCENT", "6.0"))
     TRAILING_STOP = os.getenv("TRAILING_STOP", "true").lower() == "true"
     TRAILING_STOP_OFFSET = float(os.getenv("TRAILING_STOP_OFFSET", "1.0"))
 
@@ -44,13 +44,13 @@ class Config:
     CANDLE_LOOKBACK = 100
 
     # Loop interval in seconds
-    LOOP_INTERVAL = int(os.getenv("LOOP_INTERVAL", "10"))
+    LOOP_INTERVAL = float(os.getenv("LOOP_INTERVAL", "0.2"))
 
     # Dynamic scanner
     SCANNER_ENABLED = os.getenv("SCANNER_ENABLED", "true").lower() == "true"
     SCANNER_TOP_N = int(os.getenv("SCANNER_TOP_N", "5"))           # top N gainers to trade
-    SCANNER_MIN_VOLUME = float(os.getenv("SCANNER_MIN_VOLUME", "500000"))  # min 24h USDT volume
-    SCANNER_REFRESH_CYCLES = int(os.getenv("SCANNER_REFRESH_CYCLES", "10"))  # refresh every N cycles
+    SCANNER_MIN_VOLUME = float(os.getenv("SCANNER_MIN_VOLUME", "5000000"))  # min 24h USDT volume
+    SCANNER_REFRESH_CYCLES = int(os.getenv("SCANNER_REFRESH_CYCLES", "300"))  # refresh every N cycles
 
     @classmethod
     def is_live(cls):

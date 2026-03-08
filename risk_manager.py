@@ -1,9 +1,13 @@
+import json
+import os
 from dataclasses import dataclass
 from typing import Optional
 from config import Config
 from logger import setup_logger
 
 logger = setup_logger()
+
+PERSISTENCE_FILE = os.path.join(os.path.dirname(__file__), "trading_state.json")
 
 
 @dataclass
@@ -17,6 +21,8 @@ class Position:
     take_profit: float
     trailing_stop_price: Optional[float] = None
     peak_price: float = 0.0
+    sl_order_id: str = None
+    tp_order_id: str = None
 
     def update_trailing_stop(self, current_price: float):
         if not Config.TRAILING_STOP:
@@ -62,10 +68,31 @@ class RiskManager:
         self.initial_balance: float = 0.0
         self.peak_balance: float = 0.0
         self.closed_trades: list = []
+        self._load_state()
+
+    def _load_state(self):
+        if os.path.exists(PERSISTENCE_FILE):
+            try:
+                with open(PERSISTENCE_FILE) as f:
+                    data = json.load(f)
+                self.peak_balance = data.get("peak_balance", 0.0)
+                self.closed_trades = data.get("closed_trades", [])
+                logger.info(f"Loaded state: peak_balance={self.peak_balance:.2f}, trades={len(self.closed_trades)}")
+            except Exception as e:
+                logger.warning(f"Could not load state: {e}")
+
+    def _save_state(self):
+        try:
+            with open(PERSISTENCE_FILE, "w") as f:
+                json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades}, f)
+        except Exception as e:
+            logger.warning(f"Could not save state: {e}")
 
     def set_initial_balance(self, balance: float):
         self.initial_balance = balance
-        self.peak_balance = balance
+        if balance > self.peak_balance:
+            self.peak_balance = balance
+        self._save_state()
 
     def can_open_trade(self, balance: float) -> bool:
         if len(self.positions) >= Config.MAX_OPEN_TRADES:
@@ -74,6 +101,10 @@ class RiskManager:
         drawdown = self._drawdown_percent(balance)
         if drawdown >= Config.MAX_DRAWDOWN_PERCENT:
             logger.warning(f"Max drawdown reached ({drawdown:.1f}%). Trading halted.")
+            return False
+        min_margin = 10.0  # minimum $10 USDT margin to trade
+        if balance < min_margin:
+            logger.warning(f"Balance too low to trade safely: {balance:.2f} USDT (min {min_margin})")
             return False
         return True
 
@@ -112,6 +143,42 @@ class RiskManager:
         )
         return position
 
+    def sync_positions(self, open_positions: list[dict]):
+        """Load exchange positions into self.positions on startup."""
+        for p in open_positions:
+            symbol      = p["symbol"]
+            side        = p["side"]
+            entry_price = p["entry_price"]
+            amount      = p["amount"]
+            margin      = p["margin"]
+
+            if side == "long":
+                stop_loss   = entry_price * (1 - Config.STOP_LOSS_PERCENT / 100)
+                take_profit = entry_price * (1 + Config.TAKE_PROFIT_PERCENT / 100)
+                trailing_start = entry_price * (1 - Config.TRAILING_STOP_OFFSET / 100) if Config.TRAILING_STOP else None
+            else:
+                stop_loss   = entry_price * (1 + Config.STOP_LOSS_PERCENT / 100)
+                take_profit = entry_price * (1 - Config.TAKE_PROFIT_PERCENT / 100)
+                trailing_start = entry_price * (1 + Config.TRAILING_STOP_OFFSET / 100) if Config.TRAILING_STOP else None
+
+            position = Position(
+                symbol=symbol,
+                side=side,
+                entry_price=entry_price,
+                amount=amount,
+                margin=margin,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                peak_price=entry_price,
+                trailing_stop_price=trailing_start,
+            )
+            self.positions[symbol] = position
+            logger.info(
+                f"[SYNC] Loaded {side.upper()} {symbol} | Entry: {entry_price:.4f} | "
+                f"SL: {stop_loss:.4f} | TP: {take_profit:.4f} | "
+                f"Amount: {amount:.6f} | Margin: {margin:.2f} USDT"
+            )
+
     def close_position(self, symbol: str, exit_price: float, reason: str):
         if symbol not in self.positions:
             return
@@ -131,6 +198,7 @@ class RiskManager:
             "reason":   reason,
         }
         self.closed_trades.append(trade)
+        self._save_state()
 
         sign = "+" if pnl >= 0 else ""
         logger.info(
@@ -154,6 +222,7 @@ class RiskManager:
     def update_peak_balance(self, balance: float):
         if balance > self.peak_balance:
             self.peak_balance = balance
+            self._save_state()
 
     def _drawdown_percent(self, current_balance: float) -> float:
         if self.peak_balance == 0:

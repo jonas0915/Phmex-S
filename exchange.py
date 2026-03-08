@@ -1,4 +1,5 @@
 import ccxt
+import time
 import pandas as pd
 from typing import Optional
 from config import Config
@@ -26,13 +27,18 @@ class Exchange:
             logger.info("Paper trading mode: using simulated balances")
             self.paper_balances = {Config.BASE_CURRENCY: 10000.0}
         else:
-            # Set leverage for each pair on the exchange
+            # Set leverage and margin mode for each pair on the exchange
             for symbol in Config.TRADING_PAIRS:
                 try:
                     self.client.set_leverage(Config.LEVERAGE, symbol)
                     logger.info(f"Leverage set to {Config.LEVERAGE}x for {symbol}")
                 except Exception as e:
                     logger.warning(f"Could not set leverage for {symbol}: {e}")
+                try:
+                    self.client.set_margin_mode("isolated", symbol)
+                    logger.info(f"Margin mode set to isolated for {symbol}")
+                except Exception as e:
+                    logger.warning(f"Could not set margin mode for {symbol}: {e}")
 
     def get_balance(self, currency: str) -> float:
         if not Config.is_live():
@@ -103,57 +109,175 @@ class Exchange:
 
     # ── Long ─────────────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _is_rate_limit_error(e: Exception) -> bool:
+        err = str(e).lower()
+        return "429" in err or "rate" in err or "ratelimit" in err
+
     def open_long(self, symbol: str, margin_usdt: float) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_open(symbol, margin_usdt, side="long")
-        try:
-            ticker = self.get_ticker(symbol)
-            price = ticker["last"] if ticker else 1
-            amount = self._coin_amount(symbol, margin_usdt, price)
-            order = self.client.create_market_buy_order(symbol, amount)
-            logger.info(f"[LIVE] LONG {amount:.6f} {symbol} @ market (margin: {margin_usdt:.2f} USDT, {Config.LEVERAGE}x)")
-            return order
-        except Exception as e:
-            logger.error(f"Failed to open long for {symbol}: {e}")
-            return None
+        ticker = self.get_ticker(symbol)
+        price = ticker["last"] if ticker else 1
+        amount = self._coin_amount(symbol, margin_usdt, price)
+        for attempt in range(3):
+            try:
+                order = self.client.create_market_buy_order(symbol, amount, params={"marginMode": "isolated"})
+                logger.info(f"[LIVE] LONG {amount:.6f} {symbol} @ market (margin: {margin_usdt:.2f} USDT, {Config.LEVERAGE}x)")
+                return order
+            except Exception as e:
+                if self._is_rate_limit_error(e):
+                    logger.warning(f"Rate limited on open_long {symbol} (attempt {attempt+1}/3): {e}")
+                    time.sleep(1)
+                else:
+                    logger.error(f"Failed to open long for {symbol}: {e}")
+                    return None
+        logger.error(f"open_long {symbol} failed after 3 rate-limit retries")
+        return None
 
     def close_long(self, symbol: str, coin_amount: float) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_close(symbol, coin_amount, side="long")
-        try:
-            order = self.client.create_market_sell_order(symbol, coin_amount, params={"reduceOnly": True})
-            logger.info(f"[LIVE] CLOSE LONG {coin_amount:.6f} {symbol}")
-            return order
-        except Exception as e:
-            logger.error(f"Failed to close long for {symbol}: {e}")
-            return None
+        for attempt in range(3):
+            try:
+                order = self.client.create_market_sell_order(symbol, coin_amount, params={"reduceOnly": True})
+                logger.info(f"[LIVE] CLOSE LONG {coin_amount:.6f} {symbol}")
+                return order
+            except Exception as e:
+                if self._is_rate_limit_error(e):
+                    logger.warning(f"Rate limited on close_long {symbol} (attempt {attempt+1}/3): {e}")
+                    time.sleep(1)
+                else:
+                    logger.error(f"Failed to close long for {symbol}: {e}")
+                    return None
+        logger.error(f"close_long {symbol} failed after 3 rate-limit retries")
+        return None
 
     # ── Short ────────────────────────────────────────────────────────────────
 
     def open_short(self, symbol: str, margin_usdt: float) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_open(symbol, margin_usdt, side="short")
-        try:
-            ticker = self.get_ticker(symbol)
-            price = ticker["last"] if ticker else 1
-            amount = self._coin_amount(symbol, margin_usdt, price)
-            order = self.client.create_market_sell_order(symbol, amount)
-            logger.info(f"[LIVE] SHORT {amount:.6f} {symbol} @ market (margin: {margin_usdt:.2f} USDT, {Config.LEVERAGE}x)")
-            return order
-        except Exception as e:
-            logger.error(f"Failed to open short for {symbol}: {e}")
-            return None
+        ticker = self.get_ticker(symbol)
+        price = ticker["last"] if ticker else 1
+        amount = self._coin_amount(symbol, margin_usdt, price)
+        for attempt in range(3):
+            try:
+                order = self.client.create_market_sell_order(symbol, amount, params={"marginMode": "isolated"})
+                logger.info(f"[LIVE] SHORT {amount:.6f} {symbol} @ market (margin: {margin_usdt:.2f} USDT, {Config.LEVERAGE}x)")
+                return order
+            except Exception as e:
+                if self._is_rate_limit_error(e):
+                    logger.warning(f"Rate limited on open_short {symbol} (attempt {attempt+1}/3): {e}")
+                    time.sleep(1)
+                else:
+                    logger.error(f"Failed to open short for {symbol}: {e}")
+                    return None
+        logger.error(f"open_short {symbol} failed after 3 rate-limit retries")
+        return None
 
     def close_short(self, symbol: str, coin_amount: float) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_close(symbol, coin_amount, side="short")
+        for attempt in range(3):
+            try:
+                order = self.client.create_market_buy_order(symbol, coin_amount, params={"reduceOnly": True})
+                logger.info(f"[LIVE] CLOSE SHORT {coin_amount:.6f} {symbol}")
+                return order
+            except Exception as e:
+                if self._is_rate_limit_error(e):
+                    logger.warning(f"Rate limited on close_short {symbol} (attempt {attempt+1}/3): {e}")
+                    time.sleep(1)
+                else:
+                    logger.error(f"Failed to close short for {symbol}: {e}")
+                    return None
+        logger.error(f"close_short {symbol} failed after 3 rate-limit retries")
+        return None
+
+    def place_sl_tp(self, symbol: str, side: str, amount: float, sl_price: float, tp_price: float) -> dict:
+        """Place stop-loss and take-profit orders on exchange. Returns order IDs."""
+        order_side = "sell" if side == "long" else "buy"
+        results = {"sl_order_id": None, "tp_order_id": None}
+
+        # Stop Loss — market stop order
+        for attempt in range(3):
+            try:
+                sl_params = {"reduceOnly": True, "triggerPrice": sl_price, "triggerType": "ByLastPrice"}
+                sl_order = self.client.create_order(symbol, "stop_market", order_side, amount, None, params=sl_params)
+                results["sl_order_id"] = sl_order.get("id")
+                logger.info(f"SL order placed: {symbol} {order_side} @ {sl_price:.4f} (id={results['sl_order_id']})")
+                break
+            except Exception as e:
+                if self._is_rate_limit_error(e) and attempt < 2:
+                    time.sleep(1)
+                else:
+                    logger.error(f"Failed to place SL for {symbol}: {e}")
+                    break
+
+        # Take Profit — limit order
+        for attempt in range(3):
+            try:
+                tp_params = {"reduceOnly": True}
+                tp_order = self.client.create_order(symbol, "limit", order_side, amount, tp_price, params=tp_params)
+                results["tp_order_id"] = tp_order.get("id")
+                logger.info(f"TP order placed: {symbol} {order_side} @ {tp_price:.4f} (id={results['tp_order_id']})")
+                break
+            except Exception as e:
+                if self._is_rate_limit_error(e) and attempt < 2:
+                    time.sleep(1)
+                else:
+                    logger.error(f"Failed to place TP for {symbol}: {e}")
+                    break
+
+        return results
+
+    def cancel_open_orders(self, symbol: str):
+        """Cancel all open orders for a symbol — cleans up orphaned SL/TP after close."""
+        if not Config.is_live():
+            return
         try:
-            order = self.client.create_market_buy_order(symbol, coin_amount, params={"reduceOnly": True})
-            logger.info(f"[LIVE] CLOSE SHORT {coin_amount:.6f} {symbol}")
-            return order
+            open_orders = self.client.fetch_open_orders(symbol)
+            for order in open_orders:
+                try:
+                    self.client.cancel_order(order["id"], symbol)
+                    logger.info(f"Cancelled order {order['id']} for {symbol}")
+                except Exception as e:
+                    logger.warning(f"Could not cancel order {order['id']} for {symbol}: {e}")
         except Exception as e:
-            logger.error(f"Failed to close short for {symbol}: {e}")
-            return None
+            logger.warning(f"Could not fetch open orders for {symbol}: {e}")
+
+    def ensure_leverage(self, symbol: str):
+        """Set leverage for a symbol if not already configured."""
+        if not Config.is_live():
+            return
+        try:
+            self.client.set_leverage(Config.LEVERAGE, symbol)
+            logger.info(f"Leverage set to {Config.LEVERAGE}x for {symbol}")
+        except Exception as e:
+            logger.warning(f"Could not set leverage for {symbol}: {e}")
+
+    def get_open_positions(self) -> list[dict]:
+        """Fetch open positions from the exchange (live mode only)."""
+        try:
+            raw = self.client.fetch_positions()
+            result = []
+            for p in raw:
+                contracts = abs(p.get("contracts") or 0)
+                if contracts <= 0:
+                    continue
+                side_raw = p.get("side", "")
+                side = "long" if side_raw == "long" else "short"
+                result.append({
+                    "symbol":      p.get("symbol"),
+                    "side":        side,
+                    "entry_price": float(p.get("entryPrice") or 0),
+                    "amount":      float(contracts),
+                    "margin":      float(p.get("initialMargin") or 0),
+                })
+            return result
+        except Exception as e:
+            logger.error(f"Failed to fetch open positions: {e}")
+            return []
 
     # ── Paper trading ────────────────────────────────────────────────────────
 

@@ -19,6 +19,7 @@ class Phmex2Bot:
         self.running = False
         self.cycle_count = 0
         self.active_pairs = Config.TRADING_PAIRS[:]
+        self._leverage_set: set = set()  # track symbols that already have leverage configured
 
     def start(self):
         logger.info(f"Phmex2 Bot starting | Mode: {Config.MODE.upper()} | Strategy: {Config.STRATEGY}")
@@ -31,6 +32,12 @@ class Phmex2Bot:
         balance = self.exchange.get_balance(Config.BASE_CURRENCY)
         self.risk.set_initial_balance(balance)
         logger.info(f"Starting balance: {balance:.2f} {Config.BASE_CURRENCY}")
+
+        if Config.is_live():
+            open_pos = self.exchange.get_open_positions()
+            if open_pos:
+                self.risk.sync_positions(open_pos)
+                logger.info(f"Synced {len(open_pos)} open position(s) from exchange")
 
         self.running = True
         try:
@@ -72,18 +79,23 @@ class Phmex2Bot:
                     else:
                         self.exchange.close_short(symbol, pos.amount)
                     self.risk.close_position(symbol, price, reason)
+                    self.exchange.cancel_open_orders(symbol)
 
         # Check for new entry signals
-        balance = self.exchange.get_balance(Config.BASE_CURRENCY)
-        self.risk.update_peak_balance(balance)
+        real_balance = self.exchange.get_balance(Config.BASE_CURRENCY)
+        self.risk.update_peak_balance(real_balance)
+        available = real_balance  # local decrement for multi-trade cap within one cycle
 
         for symbol in self.active_pairs:
             if symbol in self.risk.positions:
                 continue
 
-            if not self.risk.can_open_trade(balance):
+            if not self.risk.can_open_trade(available):
                 break
 
+            if symbol not in self._leverage_set:
+                self.exchange.ensure_leverage(symbol)
+                self._leverage_set.add(symbol)
             df = self.exchange.get_ohlcv(symbol, Config.TIMEFRAME, limit=Config.CANDLE_LOOKBACK)
             if df is None or len(df) < 50:
                 logger.warning(f"Not enough data for {symbol}, skipping.")
@@ -98,31 +110,44 @@ class Phmex2Bot:
                 signal = self.strategy_fn(df, orderbook)
             except TypeError:
                 signal = self.strategy_fn(df)
+
+            if signal.signal != Signal.HOLD and signal.strength < 0.65:
+                logger.debug(f"Signal too weak for {symbol}: {signal.strength:.2f}, skipping")
+                continue
+
             price = prices.get(symbol, df.iloc[-1]["close"])
-            margin = self.risk.calculate_margin(balance)
+            margin = self.risk.calculate_margin(available)
 
             if signal.signal == Signal.BUY:
-                if margin > balance:
-                    logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {balance:.2f}")
+                if margin > available:
+                    logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {available:.2f}")
                     continue
                 order = self.exchange.open_long(symbol, margin)
                 if order:
                     self.risk.open_position(symbol, price, margin, side="long")
-                    balance -= margin
+                    pos = self.risk.positions[symbol]
+                    sl_tp = self.exchange.place_sl_tp(symbol, "long", pos.amount, pos.stop_loss, pos.take_profit)
+                    pos.sl_order_id = sl_tp.get("sl_order_id")
+                    pos.tp_order_id = sl_tp.get("tp_order_id")
+                    available -= margin
                     logger.info(f"LONG ENTRY: {symbol} | {signal.reason} | Strength: {signal.strength:.2f}")
 
             elif signal.signal == Signal.SELL:
-                if margin > balance:
-                    logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {balance:.2f}")
+                if margin > available:
+                    logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {available:.2f}")
                     continue
                 order = self.exchange.open_short(symbol, margin)
                 if order:
                     self.risk.open_position(symbol, price, margin, side="short")
-                    balance -= margin
+                    pos = self.risk.positions[symbol]
+                    sl_tp = self.exchange.place_sl_tp(symbol, "short", pos.amount, pos.stop_loss, pos.take_profit)
+                    pos.sl_order_id = sl_tp.get("sl_order_id")
+                    pos.tp_order_id = sl_tp.get("tp_order_id")
+                    available -= margin
                     logger.info(f"SHORT ENTRY: {symbol} | {signal.reason} | Strength: {signal.strength:.2f}")
 
         if self.cycle_count % 10 == 0:
-            self.risk.print_stats(balance)
+            self.risk.print_stats(real_balance)
 
     def _shutdown(self):
         balance = self.exchange.get_balance(Config.BASE_CURRENCY)
