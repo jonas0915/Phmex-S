@@ -18,37 +18,50 @@ class Exchange:
             params["secret"] = Config.API_SECRET
 
         self.client = exchange_class(params)
-        self.client.load_markets()
 
         self.paper_balances: dict = {}
         self.paper_orders: list = []
+        self._last_balance: dict = {}   # value cache for failed fetches
+        self._balance_fetch_ts: float = 0  # timestamp of last successful fetch
+        self._BALANCE_TTL: float = 30.0    # only hit the API every 30 seconds
 
         if not Config.is_live():
             logger.info("Paper trading mode: using simulated balances")
             self.paper_balances = {Config.BASE_CURRENCY: 10000.0}
         else:
-            # Set leverage and margin mode for each pair on the exchange
-            for symbol in Config.TRADING_PAIRS:
+            # Load markets once so ccxt caches symbol mappings — prevents auto
+            # load_markets() calls on every fetch_ticker() which would hammer the CDN.
+            for attempt in range(3):
                 try:
-                    self.client.set_leverage(Config.LEVERAGE, symbol)
-                    logger.info(f"Leverage set to {Config.LEVERAGE}x for {symbol}")
+                    self.client.load_markets()
+                    logger.info(f"Markets loaded ({len(self.client.markets)} symbols)")
+                    break
                 except Exception as e:
-                    logger.warning(f"Could not set leverage for {symbol}: {e}")
-                try:
-                    self.client.set_margin_mode("isolated", symbol)
-                    logger.info(f"Margin mode set to isolated for {symbol}")
-                except Exception as e:
-                    logger.warning(f"Could not set margin mode for {symbol}: {e}")
+                    if attempt < 2:
+                        logger.warning(f"Could not load markets (attempt {attempt+1}/3), retrying in 10s: {e}")
+                        time.sleep(10)
+                    else:
+                        logger.warning(f"Could not load markets after 3 attempts — CDN may be blocked: {e}")
 
     def get_balance(self, currency: str) -> float:
         if not Config.is_live():
             return self.paper_balances.get(currency, 0.0)
         try:
             balance = self.client.fetch_balance()
-            return float(balance["free"].get(currency, 0.0))
+            free  = float(balance["free"].get(currency, 0.0))
+            total = float(balance["total"].get(currency, 0.0))
+            self._last_balance[currency] = free
+            self._last_balance[f"equity_{currency}"] = total  # cache equity in the same call
+            return free
         except Exception as e:
             logger.error(f"Failed to fetch balance: {e}")
-            return 0.0
+            return self._last_balance.get(currency, 0.0)
+
+    def get_equity(self, currency: str) -> float:
+        """Total equity (free + margin in use). Reads from cache set by get_balance()."""
+        if not Config.is_live():
+            return self.paper_balances.get(currency, 0.0)
+        return self._last_balance.get(f"equity_{currency}", 0.0)
 
     def get_ohlcv(self, symbol: str, timeframe: str, limit: int = 100) -> Optional[pd.DataFrame]:
         try:
@@ -82,16 +95,20 @@ class Exchange:
             best_bid = bids[0][0] if bids else 0
             best_ask = asks[0][0] if asks else 0
 
-            return {
+            spread_pct = (best_ask - best_bid) / best_bid * 100 if best_bid else 0
+            result = {
                 "imbalance":  imbalance,
                 "bid_vol":    bid_vol,
                 "ask_vol":    ask_vol,
                 "best_bid":   best_bid,
                 "best_ask":   best_ask,
-                "spread_pct": (best_ask - best_bid) / best_bid * 100 if best_bid else 0,
+                "spread_pct": spread_pct,
                 "bid_walls":  bid_walls,
                 "ask_walls":  ask_walls,
             }
+            if spread_pct > 0.3:
+                result["illiquid"] = True
+            return result
         except Exception as e:
             logger.error(f"Failed to fetch order book for {symbol}: {e}")
             return None
@@ -114,11 +131,36 @@ class Exchange:
         err = str(e).lower()
         return "429" in err or "rate" in err or "ratelimit" in err
 
-    def open_long(self, symbol: str, margin_usdt: float) -> Optional[dict]:
+    @staticmethod
+    def _is_cloudfront_block(e: Exception) -> bool:
+        err = str(e)
+        return "403" in err or "cloudfront" in err.lower() or "request blocked" in err.lower()
+
+    def _api_call_with_backoff(self, fn, *args, **kwargs):
+        delays = [2, 4, 8, 16, 32]
+        for attempt, delay in enumerate(delays):
+            try:
+                return fn(*args, **kwargs)
+            except Exception as e:
+                if self._is_cloudfront_block(e) or self._is_rate_limit_error(e):
+                    if attempt < len(delays) - 1:
+                        logger.warning(f"API blocked (attempt {attempt+1}/{len(delays)}), retrying in {delay}s")
+                        time.sleep(delay)
+                    else:
+                        logger.error(f"API blocked after {len(delays)} attempts: {e}")
+                        raise
+                else:
+                    raise
+
+    def open_long(self, symbol: str, margin_usdt: float, price: float = None) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_open(symbol, margin_usdt, side="long")
-        ticker = self.get_ticker(symbol)
-        price = ticker["last"] if ticker else 1
+        if price is None:
+            ticker = self.get_ticker(symbol)
+            price = ticker["last"] if ticker else None
+        if not price:
+            logger.error(f"Cannot open long for {symbol}: no valid price")
+            return None
         amount = self._coin_amount(symbol, margin_usdt, price)
         for attempt in range(3):
             try:
@@ -155,11 +197,15 @@ class Exchange:
 
     # ── Short ────────────────────────────────────────────────────────────────
 
-    def open_short(self, symbol: str, margin_usdt: float) -> Optional[dict]:
+    def open_short(self, symbol: str, margin_usdt: float, price: float = None) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_open(symbol, margin_usdt, side="short")
-        ticker = self.get_ticker(symbol)
-        price = ticker["last"] if ticker else 1
+        if price is None:
+            ticker = self.get_ticker(symbol)
+            price = ticker["last"] if ticker else None
+        if not price:
+            logger.error(f"Cannot open short for {symbol}: no valid price")
+            return None
         amount = self._coin_amount(symbol, margin_usdt, price)
         for attempt in range(3):
             try:
@@ -202,8 +248,9 @@ class Exchange:
         # Stop Loss — market stop order
         for attempt in range(3):
             try:
-                sl_params = {"reduceOnly": True, "triggerPrice": sl_price, "triggerType": "ByLastPrice"}
-                sl_order = self.client.create_order(symbol, "stop_market", order_side, amount, None, params=sl_params)
+                trigger_dir = "descending" if side == "long" else "ascending"
+                sl_params = {"reduceOnly": True, "stopPrice": sl_price, "triggerType": "ByLastPrice", "triggerDirection": trigger_dir}
+                sl_order = self.client.create_order(symbol, "stop_market", order_side, amount, sl_price, params=sl_params)
                 results["sl_order_id"] = sl_order.get("id")
                 logger.info(f"SL order placed: {symbol} {order_side} @ {sl_price:.4f} (id={results['sl_order_id']})")
                 break
@@ -277,7 +324,7 @@ class Exchange:
             return result
         except Exception as e:
             logger.error(f"Failed to fetch open positions: {e}")
-            return []
+            return None
 
     # ── Paper trading ────────────────────────────────────────────────────────
 

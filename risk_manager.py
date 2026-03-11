@@ -46,10 +46,46 @@ class Position:
             return current_price >= self.stop_loss
 
     def should_take_profit(self, current_price: float) -> bool:
+        if self.take_profit is None:
+            return False
         if self.side == "long":
             return current_price >= self.take_profit
         else:
             return current_price <= self.take_profit
+
+    def should_exit_early(self, current_price: float, df) -> bool:
+        """Exit early if momentum has reversed and we're in profit."""
+        try:
+            pnl_pct = self.pnl_percent(current_price)
+            if pnl_pct < 0.8:
+                return False
+
+            last = df.iloc[-1]
+            prev = df.iloc[-2]
+            signals = 0
+
+            if self.side == "long":
+                if last.get("rsi", 50) < 45:
+                    signals += 1
+                if "macd" in last and "macd_signal" in last:
+                    if last["macd"] < last["macd_signal"] and prev["macd"] >= prev["macd_signal"]:
+                        signals += 1
+                if "ema_9" in last and "ema_9" in prev:
+                    if last["close"] < last["ema_9"] and prev["close"] < prev["ema_9"]:
+                        signals += 1
+            else:
+                if last.get("rsi", 50) > 55:
+                    signals += 1
+                if "macd" in last and "macd_signal" in last:
+                    if last["macd"] > last["macd_signal"] and prev["macd"] <= prev["macd_signal"]:
+                        signals += 1
+                if "ema_9" in last and "ema_9" in prev:
+                    if last["close"] > last["ema_9"] and prev["close"] > prev["ema_9"]:
+                        signals += 1
+
+            return signals >= 2
+        except Exception:
+            return False
 
     def pnl_usdt(self, current_price: float) -> float:
         if self.side == "long":
@@ -102,27 +138,44 @@ class RiskManager:
         if drawdown >= Config.MAX_DRAWDOWN_PERCENT:
             logger.warning(f"Max drawdown reached ({drawdown:.1f}%). Trading halted.")
             return False
-        min_margin = 10.0  # minimum $10 USDT margin to trade
+        min_margin = Config.TRADE_AMOUNT_USDT  # must have full margin available
         if balance < min_margin:
             logger.warning(f"Balance too low to trade safely: {balance:.2f} USDT (min {min_margin})")
             return False
         return True
 
     def calculate_margin(self, balance: float) -> float:
-        """Returns USDT margin to use per trade (fixed amount)."""
-        return min(Config.TRADE_AMOUNT_USDT, balance)
+        """Returns USDT margin to use per trade (fixed amount — always exact, never partial)."""
+        return Config.TRADE_AMOUNT_USDT
 
-    def open_position(self, symbol: str, entry_price: float, margin: float, side: str) -> Position:
+    def open_position(self, symbol: str, entry_price: float, margin: float, side: str, atr: float = 0.0) -> Position:
         coin_amount = (margin * Config.LEVERAGE) / entry_price
 
-        if side == "long":
-            stop_loss   = entry_price * (1 - Config.STOP_LOSS_PERCENT / 100)
-            take_profit = entry_price * (1 + Config.TAKE_PROFIT_PERCENT / 100)
-            trailing_start = entry_price * (1 - Config.TRAILING_STOP_OFFSET / 100) if Config.TRAILING_STOP else None
+        if atr > 0:
+            sl_dist = 1.5 * atr
+            tp_dist = 3.0 * atr
+            # Cap SL at 2% of entry price — prevents absurd ATR-based stops on volatile alts
+            max_sl_dist = entry_price * (Config.STOP_LOSS_PERCENT / 100)
+            if sl_dist > max_sl_dist:
+                sl_dist = max_sl_dist
+                tp_dist = max_sl_dist * 2  # maintain 2:1 R:R
+            if side == "long":
+                stop_loss   = entry_price - sl_dist
+                take_profit = entry_price + tp_dist
+                trailing_start = entry_price * (1 - Config.TRAILING_STOP_OFFSET / 100) if Config.TRAILING_STOP else None
+            else:
+                stop_loss   = entry_price + sl_dist
+                take_profit = entry_price - tp_dist
+                trailing_start = entry_price * (1 + Config.TRAILING_STOP_OFFSET / 100) if Config.TRAILING_STOP else None
         else:
-            stop_loss   = entry_price * (1 + Config.STOP_LOSS_PERCENT / 100)
-            take_profit = entry_price * (1 - Config.TAKE_PROFIT_PERCENT / 100)
-            trailing_start = entry_price * (1 + Config.TRAILING_STOP_OFFSET / 100) if Config.TRAILING_STOP else None
+            if side == "long":
+                stop_loss   = entry_price * (1 - Config.STOP_LOSS_PERCENT / 100)
+                take_profit = entry_price * (1 + Config.TAKE_PROFIT_PERCENT / 100)
+                trailing_start = entry_price * (1 - Config.TRAILING_STOP_OFFSET / 100) if Config.TRAILING_STOP else None
+            else:
+                stop_loss   = entry_price * (1 + Config.STOP_LOSS_PERCENT / 100)
+                take_profit = entry_price * (1 - Config.TAKE_PROFIT_PERCENT / 100)
+                trailing_start = entry_price * (1 + Config.TRAILING_STOP_OFFSET / 100) if Config.TRAILING_STOP else None
 
         position = Position(
             symbol=symbol,
@@ -136,10 +189,11 @@ class RiskManager:
             trailing_stop_price=trailing_start,
         )
         self.positions[symbol] = position
+        sl_mode = f"ATR×1.5({atr:.5f})" if atr > 0 else "fixed%"
         logger.info(
             f"Position opened: {side.upper()} {symbol} | Entry: {entry_price:.4f} | "
             f"SL: {stop_loss:.4f} | TP: {take_profit:.4f} | "
-            f"Margin: {margin:.2f} USDT | Size: {coin_amount:.6f} ({Config.LEVERAGE}x)"
+            f"Margin: {margin:.2f} USDT | Size: {coin_amount:.6f} ({Config.LEVERAGE}x) | {sl_mode}"
         )
         return position
 
@@ -184,7 +238,11 @@ class RiskManager:
             return
         pos = self.positions.pop(symbol)
         pnl      = pos.pnl_usdt(exit_price)
-        pnl_pct  = pos.pnl_percent(exit_price)
+        notional = pos.amount * exit_price
+        fee = notional * (Config.TAKER_FEE_PERCENT / 100) * 2  # entry + exit
+        slippage_cost = notional * (Config.SLIPPAGE_PERCENT / 100)
+        pnl = pnl - fee - slippage_cost
+        pnl_pct  = pnl / pos.margin * 100
 
         trade = {
             "symbol":   symbol,
@@ -214,10 +272,32 @@ class RiskManager:
                 continue
             pos.update_trailing_stop(price)
             if pos.should_take_profit(price):
-                to_close.append((symbol, "take_profit"))
+                to_close.append((symbol, "partial_tp"))
             elif pos.should_stop_loss(price):
                 to_close.append((symbol, "stop_loss"))
         return to_close
+
+    def partial_close_position(self, symbol: str, exit_price: float):
+        """Close half the position, move SL to breakeven, let remainder run."""
+        if symbol not in self.positions:
+            return None
+        pos = self.positions[symbol]
+        half_amount = pos.amount / 2
+        pos.amount = half_amount
+        pos.margin = pos.margin / 2
+        pos.stop_loss = pos.entry_price
+        pos.take_profit = None
+        pos.trailing_stop_price = None
+        pos.peak_price = exit_price
+
+        pnl = (exit_price - pos.entry_price) * half_amount if pos.side == "long" else (pos.entry_price - exit_price) * half_amount
+        pnl_pct = pnl / (pos.margin / 2) * 100
+        sign = "+" if pnl >= 0 else ""
+        logger.info(
+            f"[PARTIAL TP] {pos.side.upper()} {symbol} | Closed half @ {exit_price:.4f} | "
+            f"PnL on half: {sign}{pnl:.2f} USDT ({sign}{pnl_pct:.2f}%) | Remainder running with SL @ entry"
+        )
+        return half_amount
 
     def update_peak_balance(self, balance: float):
         if balance > self.peak_balance:

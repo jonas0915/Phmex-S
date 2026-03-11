@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Phmex2 - Active Cryptocurrency Futures Trading Bot
+Phmex-S - Scalp Futures Trading Bot
 """
 import sys
 import argparse
@@ -11,7 +11,7 @@ logger = setup_logger()
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Phmex2 Active Futures Trading Bot")
+    parser = argparse.ArgumentParser(description="Phmex-S Scalp Futures Trading Bot")
     parser.add_argument("--mode", choices=["live", "paper"], help="Override trading mode")
     parser.add_argument("--strategy", choices=["momentum", "mean_reversion", "breakout", "combined"],
                         help="Override strategy")
@@ -35,7 +35,7 @@ def main():
         Config.TIMEFRAME = args.timeframe
 
     logger.info("=" * 60)
-    logger.info("   Phmex2 - Active Crypto Futures Trading Bot")
+    logger.info("   Phmex-S - Scalp Futures Trading Bot")
     logger.info("=" * 60)
 
     try:

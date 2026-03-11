@@ -72,7 +72,7 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
     try:
         tickers = client.fetch_tickers()
     except Exception as e:
-        logger.error(f"[VOLSCAN] Failed to fetch tickers: {e}")
+        logger.error(f"[SCALPSCAN] Failed to fetch tickers: {e}")
         return Config.TRADING_PAIRS
 
     universe = []
@@ -91,16 +91,17 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
         except Exception:
             continue
 
-    # Pre-filter: take top 30 by 24h change to limit API calls
-    universe.sort(key=lambda x: abs(x["change_24h"]), reverse=True)
-    universe = universe[:30]
+    # Pre-filter: take top 40 gainers (positive 24h change only) to focus on small-cap movers
+    universe = [x for x in universe if x["change_24h"] > 0]
+    universe.sort(key=lambda x: x["change_24h"], reverse=True)
+    universe = universe[:15]
 
     # Step 2: Score each on real-time 5m data
     scored = []
     for item in universe:
         symbol = item["symbol"]
         try:
-            ohlcv = client.fetch_ohlcv(symbol, "5m", limit=50)
+            ohlcv = client.fetch_ohlcv(symbol, "1m", limit=50)
             if not ohlcv or len(ohlcv) < 20:
                 continue
 
@@ -140,11 +141,11 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
 
             # Composite score (weighted)
             score = (
-                abs(momentum_10) * 2.0 +   # short-term move
-                vol_spike        * 1.5 +   # volume spike
-                atr_pct          * 1.5 +   # volatility
-                abs(item["change_24h"]) * 0.5 +  # 24h context
-                trend_score      * 1.0     # trend aligned
+                item["change_24h"] * 2.0 +  # top gainers are the primary target
+                vol_spike          * 2.5 +  # volume confirmation
+                atr_pct            * 2.0 +  # volatility = opportunity
+                momentum_10        * 1.5 +  # short-term continuation
+                trend_score        * 0.5    # trend alignment bonus
             )
 
             scored.append({
@@ -157,7 +158,7 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
                 "price":       closes[-1],
                 "trend":       "↑" if ema9 > ema21 else "↓",
             })
-            time.sleep(0.15)  # rate limit friendly
+            time.sleep(10)  # rate limit friendly
         except Exception:
             continue
 
@@ -165,7 +166,7 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
     top = scored[:top_n]
 
     if top:
-        logger.info(f"[VOLSCAN] Top {len(top)} opportunities:")
+        logger.info(f"[SCALPSCAN] Top {len(top)} opportunities:")
         for c in top:
             logger.info(
                 f"  {c['symbol']:<25} score={c['score']:.1f} | "
@@ -173,7 +174,7 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
                 f"atr={c['atr_pct']:.2f}% | 24h={c['change_24h']:>+5.1f}% {c['trend']}"
             )
     else:
-        logger.warning("[VOLSCAN] No results, keeping current pairs.")
+        logger.warning("[SCALPSCAN] No results, keeping current pairs.")
         return Config.TRADING_PAIRS
 
     return [c["symbol"] for c in top]
