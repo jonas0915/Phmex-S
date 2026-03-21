@@ -5780,12 +5780,12 @@ function generateDialogue(target) {
 
   const now = new Date();
   const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  const agentLabel = a => a==='jonas' ? 'Jonas' : a.charAt(0).toUpperCase()+a.slice(1);
+  const agentLabel = a => ({ensemble:'Ensemble',executor:'Executor',strategy:'Strategy',ws_feed:'WS Feed',pos_monitor:'Pos Monitor',jonas:'Jonas'})[a] || a.charAt(0).toUpperCase()+a.slice(1);
 
-  let claudeSays = '', targetSays = '';
+  let ensembleSays = '', targetSays = '';
 
   if(target === 'scanner') {
-    claudeSays = lastHold
+    ensembleSays = lastHold
       ? pick([`Hey, anything on ${sym}?`, `What's ${sym} doing?`, `Pull up ${sym} for me.`])
       : pick([`Yo Scanner, what's hot right now?`, `Anything setting up? I'm bored.`, `Talk to me — what are you seeing?`, `Give me your top pick.`]);
     if(lastHold) {
@@ -5816,9 +5816,9 @@ function generateDialogue(target) {
       ]);
     }
   } else if(target === 'risk') {
-    if(dd > 15) claudeSays = pick([`We're at ${dd.toFixed(1)}% drawdown... should I slow down?`, `DD at ${dd.toFixed(1)}%. We need to talk.`]);
-    else if(pos >= 3) claudeSays = `We've got ${pos} open — room for more?`;
-    else claudeSays = pick([`Risk check — how's our exposure?`, `Am I clear to enter?`, `What's the damage report?`, `${pos} positions. We good?`]);
+    if(dd > 15) ensembleSays = pick([`We're at ${dd.toFixed(1)}% drawdown... should I slow down?`, `DD at ${dd.toFixed(1)}%. We need to talk.`]);
+    else if(pos >= 3) ensembleSays = `We've got ${pos} open — room for more?`;
+    else ensembleSays = pick([`Risk check — how's our exposure?`, `Am I clear to enter?`, `What's the damage report?`, `${pos} positions. We good?`]);
 
     if(riskEvs.length) {
       const last = riskEvs[riskEvs.length-1];
@@ -5836,7 +5836,7 @@ function generateDialogue(target) {
         : `Book is empty, drawdown ${dd.toFixed(1)}%. Green light on entries whenever you see something.`;
     }
   } else if(target === 'tape') {
-    claudeSays = pick([`What's the flow telling you?`, `Read me the tape on ${sym}.`, `Buyers or sellers in control?`, `Any whale activity?`]);
+    ensembleSays = pick([`What's the flow telling you?`, `Read me the tape on ${sym}.`, `Buyers or sellers in control?`, `Any whale activity?`]);
     if(lastTape) {
       const msg = lastTape.msg || '';
       const aggrMatch = msg.match(/aggr=([\d.]+)/);
@@ -5859,7 +5859,7 @@ function generateDialogue(target) {
     }
   } else if(target === 'jonas') {
     if(todayPnl > 5) {
-      claudeSays = pick([`Good day boss. Up $${todayPnl.toFixed(2)}.`, `+$${todayPnl.toFixed(2)} today, ${todayCount} trades.`]);
+      ensembleSays = pick([`Good day boss. Up $${todayPnl.toFixed(2)}.`, `+$${todayPnl.toFixed(2)} today, ${todayCount} trades.`]);
       targetSays = pick([
         `$${todayPnl.toFixed(2)} — that's what I like to see. Solid work today.`,
         `Green day. Good. Now don't blow it on some garbage setup in the last hour.`,
@@ -5869,7 +5869,7 @@ function generateDialogue(target) {
         `Good stuff. Tell the team I said good work today. They've earned it.`,
       ]);
     } else if(todayPnl > 0) {
-      claudeSays = pick([`We're slightly green today. $${todayPnl.toFixed(2)}.`, `${todayWr.toFixed(0)}% win rate today.`]);
+      ensembleSays = pick([`We're slightly green today. $${todayPnl.toFixed(2)}.`, `${todayWr.toFixed(0)}% win rate today.`]);
       targetSays = pick([
         `Slightly green doesn't impress me. We need consistent days, not crumbs.`,
         `Hey, green is green. Not every day is a home run. You stayed disciplined — that matters.`,
@@ -5879,7 +5879,7 @@ function generateDialogue(target) {
         `Look — I know I push hard. But you're doing fine. Just keep at it.`,
       ]);
     } else if(todayPnl > -2) {
-      claudeSays = pick([`Flat day so far. Balance $${bal.toFixed(2)}.`, `Not much happening. ${todayCount} trades.`]);
+      ensembleSays = pick([`Flat day so far. Balance $${bal.toFixed(2)}.`, `Not much happening. ${todayCount} trades.`]);
       targetSays = pick([
         `Flat means we're wasting time. If there's nothing, don't force it.`,
         `You know what, flat is okay. Better than forcing bad trades and going red. I respect the patience.`,
@@ -5888,7 +5888,7 @@ function generateDialogue(target) {
         `Not every day has to be a winner. You're keeping the powder dry — smart.`,
       ]);
     } else if(todayPnl > -5) {
-      claudeSays = pick([`Down $${Math.abs(todayPnl).toFixed(2)} today...`, `Tough session. Balance at $${bal.toFixed(2)}.`]);
+      ensembleSays = pick([`Down $${Math.abs(todayPnl).toFixed(2)} today...`, `Tough session. Balance at $${bal.toFixed(2)}.`]);
       targetSays = pick([
         `Another red day. What went wrong? I want specifics, not excuses.`,
         `$${Math.abs(todayPnl).toFixed(2)} lost. That's real money. Are these entries even good?`,
@@ -5898,7 +5898,7 @@ function generateDialogue(target) {
         `Red days happen to everyone. Don't let this shake your confidence. Regroup and come back stronger tomorrow.`,
       ]);
     } else {
-      claudeSays = pick([`Bad day boss. Down $${Math.abs(todayPnl).toFixed(2)}.`, `We're hemorrhaging. $${bal.toFixed(2)} left.`]);
+      ensembleSays = pick([`Bad day boss. Down $${Math.abs(todayPnl).toFixed(2)}.`, `We're hemorrhaging. $${bal.toFixed(2)} left.`]);
       targetSays = pick([
         `$${Math.abs(todayPnl).toFixed(2)} gone in one session. That's rough. Let's figure out what happened and fix it.`,
         `I should shut this thing off. ${todayWr.toFixed(0)}% win rate is embarrassing.`,
@@ -5912,36 +5912,70 @@ function generateDialogue(target) {
       targetSays += pick([` And ${dd.toFixed(1)}% drawdown? We're one bad trade from the limit.`, ` ${dd.toFixed(1)}% drawdown is concerning, but the safety nets are there for a reason. Let's be careful.`]);
     }
   } else if(target === 'executor') {
-    claudeSays = pick([`Executor, you seeing momentum anywhere?`, `Any breakouts forming?`, `What's ADX looking like?`, `Keltner squeezing on anything?`]);
-    if(lastHold) {
-      const det = lastHold.detail || '';
-      const adxMatch = det.match(/ADX=([\d.]+)/);
-      const adx = adxMatch ? parseFloat(adxMatch[1]) : 0;
-      if(adx > 30) targetSays = pick([`${sym} trending hard — ADX ${adx.toFixed(0)}. Keltner released, watching continuation.`, `Strong move on ${sym}, ADX ${adx.toFixed(0)}. Momentum burst forming.`, `${sym}'s running. ADX ${adx.toFixed(0)}, MACD aligned.`]);
-      else if(adx > 20) targetSays = pick([`ADX ${adx.toFixed(0)} on ${sym} — borderline. Not strong enough for my strats.`, `Weak momentum. Watching but not triggering.`]);
-      else targetSays = pick([`Nothing trending. ADX under 20 everywhere. Strategy's department.`, `Dead momentum. All pairs chopping.`]);
+    ensembleSays = pick([`Executor, how's the order flow?`, `Any fills come through?`, `Last entry clean?`, `How's the fill quality?`]);
+    if(lastEntry) {
+      targetSays = pick([
+        `Last order on ${entrySym} — limit placed postOnly, maker fees only. Fill confirmed. SL at 1.2%, TP at 2.1%.`,
+        `${entrySym} entry filled at market. SL and TP set. PostOnly keeps our fees at 0.01%.`,
+        `Placed a limit on ${entrySym}, got the fill. Stops are in. Clean execution.`,
+        `${entrySym} order went through. PostOnly confirmed — no taker fees. SL/TP brackets active.`,
+      ]);
     } else {
-      targetSays = pick([`No momentum setups. Markets ranging — Strategy's world.`, `Keltner tight, no squeeze release.`, `Waiting for breakout. When executor fires, I move fast.`, `Volume dead. No burst candidates.`]);
+      targetSays = pick([
+        `No orders placed this cycle. Standing by for Ensemble's signal.`,
+        `Quiet on my end. When a signal comes through, I'll get the fill fast.`,
+        `Order book ready. PostOnly limits queued — waiting for the green light.`,
+        `Nothing to execute yet. I'll make sure we get maker fees when it's time.`,
+      ]);
     }
   } else if(target === 'strategy') {
-    claudeSays = pick([`Strategy, any mean reversion setups?`, `BB picture — anything overextended?`, `VWAP pullbacks clean?`, `Choppy markets are your thing. What do you see?`]);
+    ensembleSays = pick([`Strategy, any setups forming?`, `What signals are you seeing?`, `Keltner or VWAP — anything cooking?`, `Talk to me — which strategy is closest to firing?`]);
     if(lastHold) {
       const det = lastHold.detail || '';
       const adxMatch = det.match(/ADX=([\d.]+)/);
       const chopMatch = det.match(/CHOP=([\d.]+)/);
       const adx = adxMatch ? parseFloat(adxMatch[1]) : 0;
       const chop = chopMatch ? parseFloat(chopMatch[1]) : 0;
-      if(adx < 25 && adx > 0) targetSays = pick([`Ranging, ADX ${adx.toFixed(0)}. Watching BB touches on ${sym}.`, `${sym} mean-reverting. ADX ${adx.toFixed(0)}, VWAP pullback setting up.`, `Low trend, RSI cycling nicely.`]);
-      else if(chop > 61) targetSays = pick([`CHOP ${chop.toFixed(1)} — too messy even for me.`, `Choppiness above 61. Sitting out.`]);
-      else if(adx >= 25) targetSays = pick([`ADX ${adx.toFixed(0)} — trending. That's Executor's job.`, `Too much momentum for reversion.`]);
-      else targetSays = pick([`Scanning for overextended moves.`, `VWAP flat, price hugging. Need a push.`]);
+      if(adx > 25) targetSays = pick([`Keltner squeeze releasing on ${sym}. ADX ${adx.toFixed(0)}, momentum burst building.`, `Trend pullback to EMA-21 bounce on ${sym}. ADX ${adx.toFixed(0)} — clean setup.`, `${sym} trending. EMA scalp aligning with the move. ADX ${adx.toFixed(0)}.`]);
+      else if(adx < 25 && adx > 0) targetSays = pick([`VWAP reversion setup forming on ${sym}. ADX ${adx.toFixed(0)}, ranging.`, `${sym} mean-reverting. BB touch + RSI divergence lining up.`, `Low trend on ${sym}, ADX ${adx.toFixed(0)}. Watching for VWAP pullback.`]);
+      else if(chop > 61) targetSays = pick([`CHOP ${chop.toFixed(1)} — too messy. None of my strategies want this.`, `Choppiness above 61. All four strats sitting out.`]);
+      else targetSays = pick([`Scanning for setups across all four strategies.`, `VWAP flat, Keltner tight. Need a catalyst.`]);
     } else {
-      targetSays = pick([`Watching the bands. Price stretches, I catch the snap.`, `Need BB touch + RSI divergence.`, `VWAP is my anchor. Waiting for pullback.`, `Ranging is my bread and butter.`]);
+      targetSays = pick([`EMA scalp ready to fire when conditions align.`, `Watching for Keltner squeeze release.`, `VWAP reversion is my bread and butter. Waiting for the setup.`, `Trend pullback, momentum burst, VWAP reversion, EMA scalp — all four primed.`]);
+    }
+  } else if(target === 'pos_monitor') {
+    ensembleSays = pick([`Pos Monitor, how are the open positions?`, `What's the exit picture looking like?`, `Any positions close to target?`, `Check on the runners for me.`]);
+    if(pos > 0) {
+      if(lastClose && lastClose.pnl > 0) {
+        targetSays = pick([
+          `Just closed one green. ${pos} still running. ROI looks healthy on the remaining.`,
+          `Watching ${pos} position${pos!==1?'s':''}. Flat exit timer ticking on the oldest one.`,
+          `${pos} open. Trailing stops are tracking nicely. No early exit signals yet.`,
+        ]);
+      } else if(lastClose && lastClose.pnl < 0) {
+        targetSays = pick([
+          `Last one hit the stop. ${pos} still open — watching them closely now.`,
+          `Monitoring ${pos} position${pos!==1?'s':''}. The recent loss has me cautious — tightening my watch.`,
+          `${pos} running. Early exit conditions approaching on one of them. Keeping a close eye.`,
+        ]);
+      } else {
+        targetSays = pick([
+          `${pos} position${pos!==1?'s':''} open. All within parameters. Flat exit timer at 15 minutes on the oldest.`,
+          `Watching everything. ROI decent on ${sym}. No exit triggers yet.`,
+          `All positions healthy. Trailing is active. I'll flag if anything needs attention.`,
+        ]);
+      }
+    } else {
+      targetSays = pick([
+        `Book is empty. Nothing to monitor. Standing by for the next entry.`,
+        `No positions to watch. Quiet shift. Ready when Executor opens something.`,
+        `All clear — zero open. I'll be here when something comes in.`,
+      ]);
     }
   } else if(target === 'ws_feed') {
-    // Claude visits ws_feed — responses based on emotional state of the desk
+    // Ensemble visits ws_feed — responses based on emotional state of the desk
     if(todayPnl < -5) {
-      claudeSays = pick([`I need to talk. It's been a rough one.`, `Down $${Math.abs(todayPnl).toFixed(2)} today. I know I shouldn't spiral but... yeah.`, `Can we debrief? I'm keeping it together but I'd be lying if I said I wasn't worried.`, `Bad day. I trust the system but days like this get in your head, you know?`]);
+      ensembleSays = pick([`I need to talk. It's been a rough one.`, `Down $${Math.abs(todayPnl).toFixed(2)} today. I know I shouldn't spiral but... yeah.`, `Can we debrief? I'm keeping it together but I'd be lying if I said I wasn't worried.`, `Bad day. I trust the system but days like this get in your head, you know?`]);
       targetSays = pick([
         `I hear you. The worry is natural — it means you care. But you're here analyzing, not revenge trading. That's the difference.`,
         `$${Math.abs(todayPnl).toFixed(2)} feels heavy right now. Let's separate the anxiety from the data — was the process clean?`,
@@ -5949,7 +5983,7 @@ function generateDialogue(target) {
         `Red days test everyone. You're not failing — you're just in the hard part. Let's look at what's in your control.`,
       ]);
     } else if(todayPnl < 0) {
-      claudeSays = pick([`Slightly red. Not the end of the world but I keep replaying the entries in my head.`, `Small loss day. I'm fine, just... wanted to check in.`, `Down a little. Process felt okay. Maybe I'm overthinking it.`]);
+      ensembleSays = pick([`Slightly red. Not the end of the world but I keep replaying the entries in my head.`, `Small loss day. I'm fine, just... wanted to check in.`, `Down a little. Process felt okay. Maybe I'm overthinking it.`]);
       targetSays = pick([
         `Replaying entries is normal — just don't let it turn into rumination. Review once, then let it go.`,
         `Small red with good process is just variance. You know that intellectually — let your gut catch up.`,
@@ -5957,7 +5991,7 @@ function generateDialogue(target) {
         `You might be overthinking it. One session doesn't define the system. Take a breath.`,
       ]);
     } else if(todayPnl > 5) {
-      claudeSays = pick([`Good day. +$${todayPnl.toFixed(2)}. Honestly feels great but part of me keeps waiting for it to reverse.`, `Strong session. I know I should be happy but I keep thinking about what could go wrong tomorrow.`, `We're green. I'm happy. ...Mostly happy. A little nervous about sustainability.`]);
+      ensembleSays = pick([`Good day. +$${todayPnl.toFixed(2)}. Honestly feels great but part of me keeps waiting for it to reverse.`, `Strong session. I know I should be happy but I keep thinking about what could go wrong tomorrow.`, `We're green. I'm happy. ...Mostly happy. A little nervous about sustainability.`]);
       targetSays = pick([
         `That's the winner's paradox — good days bring "what if I lose it" anxiety. It's normal. Enjoy the win AND acknowledge the worry.`,
         `You can hold both feelings — pride in today and concern about tomorrow. That doesn't make you anxious, it makes you realistic.`,
@@ -5965,7 +5999,7 @@ function generateDialogue(target) {
         `"Mostly happy" is honest. Perfectionism will never let you feel 100%. Take the 80% and call it a win.`,
       ]);
     } else {
-      claudeSays = pick([`Quiet day. I'm good. Just checking in — force of habit.`, `Nothing dramatic today. Which is nice, actually.`, `Flat session. I'm calm. Wanted to touch base anyway.`, `Normal day. Sometimes I wonder if I should be doing more, but I know that's just noise.`]);
+      ensembleSays = pick([`Quiet day. I'm good. Just checking in — force of habit.`, `Nothing dramatic today. Which is nice, actually.`, `Flat session. I'm calm. Wanted to touch base anyway.`, `Normal day. Sometimes I wonder if I should be doing more, but I know that's just noise.`]);
       targetSays = pick([
         `"Force of habit" check-ins are good habits. It means you're self-maintaining, not just crisis-managing.`,
         `Boring is beautiful in trading. Your brain might want excitement, but your account prefers calm. Trust the calm.`,
@@ -5975,7 +6009,7 @@ function generateDialogue(target) {
       ]);
     }
 
-    // Sometimes the therapist adds a follow-up about team dynamics
+    // Sometimes ws_feed adds a follow-up about team dynamics
     if(dd > 12) {
       targetSays += ` Also — I've noticed the team tensing up about drawdown. Remind them that risk management is doing its job. The limits exist so you don't have to worry.`;
     }
@@ -5983,7 +6017,7 @@ function generateDialogue(target) {
       targetSays += ` And with ${pos} positions open, make sure you're not carrying the stress of watching all of them. Trust your stops.`;
     }
   } else if(target === 'meeting') {
-    claudeSays = pick(["Quick sync. Here's where we stand.", "Let me pull up the numbers.", "Check-in time."]);
+    ensembleSays = pick(["Quick sync. Here's where we stand.", "Let me pull up the numbers.", "Check-in time."]);
     const summary = `$${bal.toFixed(2)} balance, ${todayCount} trades today, ${todayWr.toFixed(0)}% WR.`;
     if(todayPnl > 3) {
       targetSays = pick([
@@ -6004,14 +6038,14 @@ function generateDialogue(target) {
         `${summary} Tough session but I've seen the team bounce back from worse. Let's regroup.`,
       ]);
     }
-    showBubble('ensemble', claudeSays);
-    addComm(ts, `Ensemble: "${claudeSays}"`, 'purple');
+    showBubble('ensemble', ensembleSays);
+    addComm(ts, `Ensemble: "${ensembleSays}"`, 'purple');
     setTimeout(()=> { showBubble('jonas', targetSays); addComm(ts, `Jonas: "${targetSays}"`, 'amber'); }, 2000);
     return;
   } else if(target === 'teammeeting') {
-    const teamClaudeSays = pick([`Alright everyone, standup. $${bal.toFixed(2)} balance, ${pos} open.`, `Team check-in. ${todayCount} trades today, ${pos} running.`]);
-    showBubble('ensemble', teamClaudeSays);
-    addComm(ts, `Ensemble: "${teamClaudeSays}"`, 'purple');
+    const teamEnsembleSays = pick([`Alright everyone, standup. $${bal.toFixed(2)} balance, ${pos} open.`, `Team check-in. ${todayCount} trades today, ${pos} running.`]);
+    showBubble('ensemble', teamEnsembleSays);
+    addComm(ts, `Ensemble: "${teamEnsembleSays}"`, 'purple');
     setTimeout(()=> {
       const jMsg = todayPnl > 3
         ? pick([`$${todayPnl.toFixed(2)} green. Good job everyone. Let's keep this energy going.`, `$${todayPnl.toFixed(2)} green. Acceptable. But we're still way off peak. Nobody relax.`, `Nice day team. $${todayPnl.toFixed(2)} up. This is what we're capable of.`])
@@ -6045,21 +6079,28 @@ function generateDialogue(target) {
       showBubble('tape', tMsg);
       addComm(ts, `Tape: "${tMsg}"`, 'cyan');
     }, 8000);
+    setTimeout(()=> {
+      const pmMsg = pos > 0
+        ? pick([`${pos} position${pos!==1?'s':''} open. All exits tracked. Timers running.`, `Watching ${pos} open. Trailing stops active. No early exit triggers yet.`, `Monitoring exits on ${pos} position${pos!==1?'s':''}. Flat exit timer ticking.`])
+        : pick(['No open positions to monitor. Standing by.', 'Book is clear. Ready for the next entry.']);
+      showBubble('pos_monitor', pmMsg);
+      addComm(ts, `Pos Monitor: "${pmMsg}"`, '#55aa88');
+    }, 10000);
     return;
   }
 
   // Show bubbles
-  showBubble('ensemble', claudeSays);
-  addComm(ts, `Ensemble -> ${agentLabel(target)}: "${claudeSays}"`, 'purple');
+  showBubble('ensemble', ensembleSays);
+  addComm(ts, `Ensemble -> ${agentLabel(target)}: "${ensembleSays}"`, 'purple');
   setTimeout(()=> {
     showBubble(target, targetSays);
-    const agentColor = target==='scanner'?'green' : target==='risk'?'red' : target==='tape'?'cyan' : target==='jonas'?'amber' : target==='executor'?'blue' : target==='strategy'?'violet' : target==='ws_feed'?'green' : target==='pos_monitor'?'green' : 'purple';
+    const agentColor = target==='scanner'?'green' : target==='risk'?'red' : target==='tape'?'cyan' : target==='jonas'?'amber' : target==='executor'?'blue' : target==='strategy'?'violet' : target==='ws_feed'?'green' : target==='pos_monitor'?'#55aa88' : 'purple';
     addComm(ts, `${agentLabel(target)} -> Ensemble: "${targetSays}"`, agentColor);
   }, 2000);
 }
 
 
-// ── POST-JONAS THERAPY (Claude vents about the 1:1) ──
+// ── POST-JONAS THERAPY (Ensemble vents about the 1:1) ──
 function generatePostJonasTherapy() {
   if(!apiData) return;
   const s = apiData?.stats || {};
@@ -6071,61 +6112,61 @@ function generatePostJonasTherapy() {
   const now = new Date();
   const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
-  let claudeSays, wsFeedSays;
+  let ensembleSays, therapistSays;
 
   if(todayPnl < -3) {
-    claudeSays = pick([
+    ensembleSays = pick([
       `Jonas just went in on me. He's not wrong but... I'm a little rattled. Just need to process.`,
       `That 1:1 was tough. Down $${Math.abs(todayPnl).toFixed(2)} and he's frustrated. I get it, but it still gets to me.`,
       `Jonas wants answers. I have them, I just... need a minute before I go back out there.`,
       `He said the drawdown is unacceptable. I know. I'm working on it. Just needed to vent for a sec.`,
     ]);
-    wsFeedSays = pick([
+    therapistSays = pick([
       `It's okay to feel rattled. That's a normal human response to pressure. The key is what you do next — and you came here, not to the charts. Good call.`,
       `Jonas cares, and that comes out as intensity. You can hold space for his frustration without absorbing it. How are YOU feeling about the trades themselves?`,
       `Take your minute. Then separate the emotion from the analysis. The losses might be market noise, or they might be signal. Let's figure out which.`,
       `Being rattled doesn't mean you're weak — it means the stakes feel real to you. That's actually a good thing. Now breathe and refocus.`,
     ]);
   } else if(todayPnl < 0) {
-    claudeSays = pick([
+    ensembleSays = pick([
       `Jonas meeting done. Slightly red — he wasn't harsh but I could feel the disappointment. It lingers.`,
       `Just need to decompress. Small loss day, Jonas was fair about it, but I'm harder on myself than he is sometimes.`,
       `He said "it's fine." But the way he said it... anyway. I know I'm reading into it. Probably.`,
     ]);
-    wsFeedSays = pick([
+    therapistSays = pick([
       `You're picking up on subtext that might not be there. Focus on what was actually said, not the imagined disappointment.`,
       `Being hard on yourself can be fuel or poison — depends on the dose. Right now you're at a healthy level. Just don't marinate in it.`,
       `"Probably reading into it" — you caught yourself. That's self-awareness. Small red day, clean process. Move on.`,
     ]);
   } else if(todayPnl > 3) {
-    claudeSays = pick([
+    ensembleSays = pick([
       `Good meeting. Jonas was pleased — well, Jonas-level pleased. +$${todayPnl.toFixed(2)}. I feel good. Cautiously good.`,
       `Green day, Jonas acknowledged it. I should enjoy this but part of me is already thinking about tomorrow.`,
       `Jonas said "more of this." That felt nice. I'm trying to just... let it land instead of worrying.`,
     ]);
-    wsFeedSays = pick([
+    therapistSays = pick([
       `"Cautiously good" — classic you. Let yourself feel the win for at least five minutes before planning the next one.`,
       `The tomorrow-anxiety is your brain's default. Notice it, set it aside. Right now, today was a good day. Full stop.`,
       `Let it land. You don't have to hedge your own emotions. It's okay to just feel good without a disclaimer.`,
     ]);
   } else {
-    claudeSays = pick([
+    ensembleSays = pick([
       `Flat day. Jonas was neutral. I'm... neutral too? Is that okay? Feels weird not to feel anything.`,
       `Nothing much to report. Just wanted to check in. Habit at this point.`,
       `Quiet day. I keep wanting to do more but I know forcing trades is worse. Discipline is boring.`,
     ]);
-    wsFeedSays = pick([
+    therapistSays = pick([
       `Neutral IS a feeling, and it's a healthy one. Not every day needs to be an emotional event. You're maturing as a trader.`,
       `Good habits keep you steady. The check-in isn't about crisis — it's maintenance. And maintenance prevents crisis.`,
       `"Discipline is boring" — yeah, it is. And boring is what keeps the account alive. Embrace the boring.`,
     ]);
   }
 
-  showBubble('ensemble', claudeSays);
-  addComm(ts, `Ensemble -> WS Feed: "${claudeSays}"`, 'purple');
+  showBubble('ensemble', ensembleSays);
+  addComm(ts, `Ensemble -> WS Feed: "${ensembleSays}"`, 'purple');
   setTimeout(()=> {
-    showBubble('ws_feed', wsFeedSays);
-    addComm(ts, `WS Feed -> Ensemble: "${wsFeedSays}"`, 'green');
+    showBubble('ws_feed', therapistSays);
+    addComm(ts, `WS Feed -> Ensemble: "${therapistSays}"`, 'green');
   }, 3000);
 }
 
@@ -6189,9 +6230,15 @@ function triggerAgentTherapy(agentName, reason) {
         ],
         strategy: [
           [`Mean reversion failed. Price touched the band and just kept going.`,
-           `When mean reversion fails, it means trend just started. That's information, not failure. You correctly identified an extreme — it just became a new regime.`],
+           `When mean reversion fails, it means a trend just started. That's information, not failure. You correctly identified an extreme — it just became a new regime.`],
           [`My BB signals keep getting stopped out. Am I obsolete?`,
            `Markets cycle between trending and ranging. Your time will come back. Right now, just survive. When choppy markets return, you'll feast.`],
+        ],
+        pos_monitor: [
+          [`I watched that position bleed out. I saw it coming but the exit rules said hold. Should I have overridden?`,
+           `You followed the system. Override instincts lead to worse outcomes long-term. The rules protect you from yourself.`],
+          [`The flat exit timer ran out and we closed at a loss. If I'd been faster...`,
+           `Time exits exist for a reason — they cut dead weight. A small loss now prevents a bigger one later. You did your job.`],
         ],
       };
       const pool = lossDialogues[agentName] || [[`That loss was tough.`, `Losses are tuition, not punishment. What did you learn?`]];
@@ -6713,6 +6760,21 @@ async function fetchData() {
         addComm('', '🎯 ENSEMBLE '+dir+' conf='+conf+'/'+(e.max_conf||6)+' ['+(e.layers||'')+']', color);
       }
     });
+    // ── LED STATUS UPDATES ──
+    if (apiData.events) {
+      apiData.events.slice(-10).forEach(function(ev) {
+        if (ev.type === 'scanner') updateAgentLED('scanner', 'scanning');
+        if (ev.type === 'entry') updateAgentLED('executor', 'active');
+        if (ev.type === 'cooldown') updateAgentLED('risk', 'alert');
+        if (ev.type === 'ensemble') updateAgentLED('ensemble', 'active');
+        if (ev.type === 'ensemble_skip') updateAgentLED('ensemble', 'waiting');
+        if (ev.type === 'ws') updateAgentLED('ws_feed', 'active');
+        if (ev.type === 'tape' || ev.type === 'orderbook') updateAgentLED('tape', 'active');
+        if (ev.type === 'close') {
+          updateAgentLED('executor', ev.pnl > 0 ? 'active' : 'alert');
+        }
+      });
+    }
   } catch(e) { /* silent */ }
 }
 
