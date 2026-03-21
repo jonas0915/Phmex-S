@@ -478,6 +478,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // SSAOPass and ShaderPass removed — too heavy for integrated GPU
 
 // ── GLOBALS ──
@@ -7221,6 +7222,13 @@ function animate() {
     wPos.needsUpdate = true;
   }
 
+  // Update GLTF animation mixers
+  scene.traverse(function(obj) {
+    if (obj.userData && obj.userData.mixer) {
+      obj.userData.mixer.update(1/30);
+    }
+  });
+
   controls.update();
   composer.render();
   css2dRenderer.render(scene, camera);
@@ -7240,6 +7248,66 @@ window.addEventListener('resize', () => {
 fetchData();
 setInterval(fetchData, 3000);
 animate();
+
+// ── BACKGROUND GLTF CHARACTER LOADING ──
+(function loadGLTFCharacters() {
+  var gltfLoader = new GLTFLoader();
+  var agentFiles = {
+    jonas: 'jonas', scanner: 'scanner', risk: 'risk_manager',
+    ensemble: 'ensemble', executor: 'executor', strategy: 'strategy',
+    tape: 'tape_reader', ws_feed: 'ws_feed', pos_monitor: 'pos_monitor'
+  };
+
+  Object.entries(agentFiles).forEach(function([agentName, fileName]) {
+    gltfLoader.load(
+      '/assets/characters/' + fileName + '.glb',
+      function(gltf) {
+        console.log('Loaded GLTF for ' + agentName);
+        var model = gltf.scene;
+
+        // Scale to match scene (these models are ~1.8m, scene chars are ~1.35 units)
+        model.scale.set(0.75, 0.75, 0.75);
+
+        // Enable shadows
+        model.traverse(function(child) {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+
+        // Find the existing procedural character group
+        var existing = charGroups[agentName];
+        if (!existing) return;
+
+        // Position the GLTF model at the same position
+        model.position.copy(existing.position);
+        model.rotation.copy(existing.rotation);
+
+        // Hide procedural character, show GLTF
+        existing.visible = false;
+        scene.add(model);
+
+        // Store reference
+        model.userData.agentName = agentName;
+        model.userData.isGLTF = true;
+
+        // If model has animations, set up mixer
+        if (gltf.animations && gltf.animations.length > 0) {
+          var mixer = new THREE.AnimationMixer(model);
+          // Play the first animation (usually idle)
+          var action = mixer.clipAction(gltf.animations[0]);
+          action.play();
+          model.userData.mixer = mixer;
+        }
+      },
+      undefined, // progress
+      function(err) {
+        console.warn('Failed to load GLTF for ' + agentName + ':', err.message || err);
+      }
+    );
+  });
+})();
 </script>
 </body>
 </html>"""
