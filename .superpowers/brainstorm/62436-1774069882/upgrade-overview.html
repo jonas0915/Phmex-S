@@ -1,0 +1,116 @@
+<h2>Design Section 1: What Changes vs. What Stays</h2>
+<p class="subtitle">The upgrade preserves your scene structure and swaps the rendering quality</p>
+
+<div class="section">
+  <h3 style="color: #4caf50;">STAYS THE SAME (Structure)</h3>
+  <div style="background: rgba(76,175,80,0.08); border: 1px solid rgba(76,175,80,0.2); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+    <ul style="color: #ccc; line-height: 2; margin: 0; padding-left: 20px;">
+      <li><strong>Scene layout</strong> — same desk positions, room dimensions (12×10×4), stairwell, conference room, break room</li>
+      <li><strong>Camera</strong> — same isometric angle (2, 6, 9), OrbitControls, double-click reset</li>
+      <li><strong>8 agents + Jonas</strong> — same positions, same roles, same desk assignments</li>
+      <li><strong>Event system</strong> — coffee breaks, meetings, facility visits, team events (same intervals)</li>
+      <li><strong>HUD layout</strong> — bottom status bar, right comms panel, left intel panel</li>
+      <li><strong>Data pipeline</strong> — reads trading_state.json + bot.log only, zero API calls</li>
+      <li><strong>Sleep system</strong> — 11pm-6am behavior</li>
+      <li><strong>Lower floors</strong> — gym, cafeteria, rec room, bar, bedrooms, jacuzzi</li>
+      <li><strong>Dialogue/speech bubble system</strong></li>
+    </ul>
+  </div>
+</div>
+
+<div class="section">
+  <h3 style="color: #ff9800;">UPGRADES (Visual Quality)</h3>
+  <div style="background: rgba(255,152,0,0.08); border: 1px solid rgba(255,152,0,0.2); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+    <table style="width: 100%; border-collapse: collapse; color: #ccc; font-size: 13px;">
+      <thead>
+        <tr style="border-bottom: 1px solid #444;">
+          <th style="text-align: left; padding: 8px; color: #ff9800; width: 30%;">Component</th>
+          <th style="text-align: left; padding: 8px; color: #888; width: 35%;">Current (Sims)</th>
+          <th style="text-align: left; padding: 8px; color: #4fc3f7; width: 35%;">Upgraded (COD-quality)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid #2a2a2a;">
+          <td style="padding: 8px; font-weight: bold;">Characters</td>
+          <td style="padding: 8px; color: #888;">Procedural spheres/cylinders, chunky Sims proportions, ~50 meshes each</td>
+          <td style="padding: 8px;">GLTF rigged humanoid models from Mixamo, realistic proportions, PBR skin/clothing materials, bone-based animation</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #2a2a2a;">
+          <td style="padding: 8px; font-weight: bold;">Animations</td>
+          <td style="padding: 8px; color: #888;">Manual sine-wave arm/leg rotation, basic walk cycle</td>
+          <td style="padding: 8px;">Mixamo motion-capture animations: idle-seated, typing, walking, standing-up, celebrating, head-in-hands, pointing</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #2a2a2a;">
+          <td style="padding: 8px; font-weight: bold;">Faces</td>
+          <td style="padding: 8px; color: #888;">Sphere head + sphere eyes/nose/lips, painted-on features</td>
+          <td style="padding: 8px;">Detailed mesh faces with proper topology, blend shapes for expressions (smile on wins, frown on losses)</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #2a2a2a;">
+          <td style="padding: 8px; font-weight: bold;">Hair</td>
+          <td style="padding: 8px; color: #888;">Capsule/sphere combos (swept, crew, bun, etc.)</td>
+          <td style="padding: 8px;">Mesh-based hair geometry baked into GLTF models, proper shading</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #2a2a2a;">
+          <td style="padding: 8px; font-weight: bold;">Clothing</td>
+          <td style="padding: 8px; color: #888;">Colored cylinder/capsule body parts</td>
+          <td style="padding: 8px;">Textured clothing meshes — suits, hoodies, casual wear with fabric materials</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #2a2a2a;">
+          <td style="padding: 8px; font-weight: bold;">Lighting</td>
+          <td style="padding: 8px; color: #888;">7 lights, 1024×1024 shadow map, basic ACESFilmic</td>
+          <td style="padding: 8px;">Same light count but upgraded: 2048×2048 shadows, SSAO (ambient occlusion), contact shadows, improved bloom</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #2a2a2a;">
+          <td style="padding: 8px; font-weight: bold;">SF Bay Panorama</td>
+          <td style="padding: 8px; color: #888;">Procedural canvas (2048×768), flat building silhouettes</td>
+          <td style="padding: 8px;">HDRI-quality panoramic skybox (4096+ res), detailed SF landmarks (Golden Gate, Transamerica, Salesforce Tower), realistic water reflections</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #2a2a2a;">
+          <td style="padding: 8px; font-weight: bold;">Furniture</td>
+          <td style="padding: 8px; color: #888;">Procedural boxes/cylinders for desks/chairs</td>
+          <td style="padding: 8px;">GLTF models: proper office furniture with bevels, curves, realistic materials</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #2a2a2a;">
+          <td style="padding: 8px; font-weight: bold;">Post-Processing</td>
+          <td style="padding: 8px; color: #888;">UnrealBloom + SMAA</td>
+          <td style="padding: 8px;">Bloom + SMAA + SSAO + screen-space reflections + color grading + vignette</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">Floor/Walls</td>
+          <td style="padding: 8px; color: #888;">Flat color planes, glass opacity 0.04</td>
+          <td style="padding: 8px;">Normal-mapped concrete floor, physically-correct glass with reflections, proper mullion detail</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <h3 style="color: #f44336;">NEW ADDITIONS</h3>
+  <div style="background: rgba(244,67,54,0.08); border: 1px solid rgba(244,67,54,0.2); border-radius: 8px; padding: 16px;">
+    <ul style="color: #ccc; line-height: 2; margin: 0; padding-left: 20px;">
+      <li><strong>Jonas character</strong> — modeled from jonas_avatar.jpg reference, casual tech CEO look (hoodie + jeans), standing desk command station</li>
+      <li><strong>Dramatic event reactions</strong> — high-five on win streaks, desk slam on stop losses, team huddle on big decisions</li>
+      <li><strong>Agent remapping</strong> — 8 agents mapped to real bot subsystems (Scanner, Risk, Ensemble, Executor, Strategy, Tape, WS Feed, Position Monitor) replacing decorative roles (Therapist → Position Monitor, etc.)</li>
+      <li><strong>Asset loading system</strong> — GLTFLoader pipeline for models, textures, animations (~15-20MB total)</li>
+      <li><strong>LOD system</strong> — level-of-detail to maintain 30+ FPS</li>
+    </ul>
+  </div>
+</div>
+
+<div class="options" style="margin-top: 24px;">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>This is the right scope</h3>
+      <p>Move on to the next design section</p>
+    </div>
+  </div>
+  <div class="option" data-choice="changes" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Needs adjustments</h3>
+      <p>I'll describe what to add/remove/change</p>
+    </div>
+  </div>
+</div>

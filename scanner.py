@@ -1,19 +1,39 @@
 """
-Phmex2 Volatility Scanner
-Continuously scans Phemex USDT perpetuals for high-volatility opportunities.
-
-Scores each market on:
-  - 24h price change %
-  - Short-term momentum (last 10 candles % move)
-  - Volume spike (current vs average)
-  - ATR relative to price (volatility %)
-  - Active trend alignment (EMA 9 > EMA 21 > EMA 50)
+Phmex2 Volume Scanner
+Continuously scans Phemex USDT perpetuals for the highest-volume pairs.
+Ranks by 24h turnover, applies spread filter, returns top N.
 """
 import time
+import threading
+import ccxt
 from config import Config
 from logger import setup_logger
 
 logger = setup_logger()
+
+# Background scanner state
+_scan_lock = threading.Lock()
+_scan_result: list[str] | None = None
+_scan_running = False
+_scanner_client = None  # dedicated ccxt client for background thread
+
+
+def _get_scanner_client():
+    """Create a dedicated ccxt client for the scanner thread (ccxt is NOT thread-safe)."""
+    global _scanner_client
+    if _scanner_client is None:
+        exchange_class = getattr(ccxt, Config.EXCHANGE)
+        params = {"enableRateLimit": True, "options": {"defaultType": "swap"}}
+        if Config.is_live():
+            params["apiKey"] = Config.API_KEY
+            params["secret"] = Config.API_SECRET
+        _scanner_client = exchange_class(params)
+        try:
+            _scanner_client.load_markets()
+            logger.info("[SCANNER BG] Dedicated scanner client initialized")
+        except Exception as e:
+            logger.warning(f"[SCANNER BG] Could not load markets for scanner client: {e}")
+    return _scanner_client
 
 
 def scan_top_gainers(client, top_n: int = None, min_volume: float = None) -> list[str]:
@@ -42,6 +62,8 @@ def scan_top_gainers(client, top_n: int = None, min_volume: float = None) -> lis
         except Exception:
             continue
 
+    # Remove blacklisted pairs
+    candidates = [c for c in candidates if c["symbol"] not in Config.SCANNER_BLACKLIST]
     candidates.sort(key=lambda x: x["change"], reverse=True)
     top = candidates[:top_n]
 
@@ -58,12 +80,9 @@ def scan_top_gainers(client, top_n: int = None, min_volume: float = None) -> lis
 
 def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list[str]:
     """
-    Deep real-time scan — fetches 5m candles for top candidates and scores on:
-      - Short-term momentum (last 10 candles)
-      - Volume spike
-      - ATR %
-      - Trend alignment
-    Returns top_n symbols by composite volatility score.
+    Volume-based scan — ranks all USDT perpetuals by 24h volume.
+    Applies spread filter to reject illiquid pairs.
+    Returns top_n symbols by highest 24h volume.
     """
     top_n = top_n or Config.SCANNER_TOP_N
     min_volume = min_volume or Config.SCANNER_MIN_VOLUME
@@ -73,7 +92,7 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
         tickers = client.fetch_tickers()
     except Exception as e:
         logger.error(f"[SCALPSCAN] Failed to fetch tickers: {e}")
-        return Config.TRADING_PAIRS
+        return None  # signal failure so caller keeps current pairs
 
     universe = []
     for symbol, t in tickers.items():
@@ -91,90 +110,85 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
         except Exception:
             continue
 
-    # Pre-filter: take top 40 gainers (positive 24h change only) to focus on small-cap movers
-    universe = [x for x in universe if x["change_24h"] > 0]
-    universe.sort(key=lambda x: x["change_24h"], reverse=True)
-    universe = universe[:15]
+    # Pre-filter: remove blacklisted pairs (keep both up and down movers for long/short)
+    universe = [x for x in universe if x["symbol"] not in Config.SCANNER_BLACKLIST]
 
-    # Step 2: Score each on real-time 5m data
-    scored = []
-    for item in universe:
+    # Rank by 24h volume — highest volume = most liquid, most volatile
+    universe.sort(key=lambda x: x["volume"], reverse=True)
+    # Take extra candidates for spread filtering
+    candidates = universe[:top_n * 2]
+
+    # Spread filter: reject illiquid pairs with wide bid-ask spread
+    filtered = []
+    for item in candidates:
         symbol = item["symbol"]
         try:
-            ohlcv = client.fetch_ohlcv(symbol, "1m", limit=50)
-            if not ohlcv or len(ohlcv) < 20:
-                continue
-
-            closes  = [c[4] for c in ohlcv]
-            volumes = [c[5] for c in ohlcv]
-            highs   = [c[2] for c in ohlcv]
-            lows    = [c[3] for c in ohlcv]
-
-            # Short-term momentum: % move over last 10 candles
-            momentum_10 = (closes[-1] - closes[-11]) / closes[-11] * 100
-
-            # Volume spike: last candle vs 20-candle avg
-            vol_avg = sum(volumes[-20:]) / 20 if len(volumes) >= 20 else 1
-            vol_spike = volumes[-1] / vol_avg if vol_avg > 0 else 0
-
-            # ATR % (volatility relative to price)
-            trs = []
-            for i in range(1, len(closes)):
-                tr = max(highs[i] - lows[i],
-                         abs(highs[i] - closes[i-1]),
-                         abs(lows[i]  - closes[i-1]))
-                trs.append(tr)
-            atr = sum(trs[-14:]) / 14 if len(trs) >= 14 else 0
-            atr_pct = (atr / closes[-1]) * 100 if closes[-1] > 0 else 0
-
-            # Trend alignment: EMA 9 > EMA 21
-            def ema(data, period):
-                k = 2 / (period + 1)
-                e = data[0]
-                for v in data[1:]:
-                    e = v * k + e * (1 - k)
-                return e
-
-            ema9  = ema(closes, 9)
-            ema21 = ema(closes, 21)
-            trend_score = 1.0 if ema9 > ema21 else 0.0
-
-            # Composite score (weighted)
-            score = (
-                item["change_24h"] * 2.0 +  # top gainers are the primary target
-                vol_spike          * 2.5 +  # volume confirmation
-                atr_pct            * 2.0 +  # volatility = opportunity
-                momentum_10        * 1.5 +  # short-term continuation
-                trend_score        * 0.5    # trend alignment bonus
-            )
-
-            scored.append({
-                "symbol":      symbol,
-                "score":       score,
-                "momentum_10": momentum_10,
-                "vol_spike":   vol_spike,
-                "atr_pct":     atr_pct,
-                "change_24h":  item["change_24h"],
-                "price":       closes[-1],
-                "trend":       "↑" if ema9 > ema21 else "↓",
-            })
-            time.sleep(10)  # rate limit friendly
+            ob = client.fetch_order_book(symbol, limit=5)
+            if ob and ob.get("bids") and ob.get("asks"):
+                best_bid = ob["bids"][0][0]
+                best_ask = ob["asks"][0][0]
+                spread_pct = (best_ask - best_bid) / best_bid * 100
+                if spread_pct > 0.15:
+                    logger.debug(f"[SCANNER] {symbol} spread too wide ({spread_pct:.3f}%), skipping")
+                    continue
+            filtered.append(item)
+            time.sleep(1)  # rate limit friendly
         except Exception:
-            continue
+            filtered.append(item)  # if OB fetch fails, keep the pair
+        if len(filtered) >= top_n:
+            break
 
-    scored.sort(key=lambda x: x["score"], reverse=True)
-    top = scored[:top_n]
+    top = filtered[:top_n]
 
     if top:
-        logger.info(f"[SCALPSCAN] Top {len(top)} opportunities:")
+        logger.info(f"[SCALPSCAN] Top {len(top)} by volume:")
         for c in top:
             logger.info(
-                f"  {c['symbol']:<25} score={c['score']:.1f} | "
-                f"10c={c['momentum_10']:>+5.2f}% | vol={c['vol_spike']:.1f}x | "
-                f"atr={c['atr_pct']:.2f}% | 24h={c['change_24h']:>+5.1f}% {c['trend']}"
+                f"  {c['symbol']:<25} vol=${c['volume']:,.0f} | "
+                f"24h={c['change_24h']:>+5.1f}%"
             )
     else:
         logger.warning("[SCALPSCAN] No results, keeping current pairs.")
-        return Config.TRADING_PAIRS
+        return None  # signal failure so caller keeps current pairs
 
     return [c["symbol"] for c in top]
+
+
+def start_background_scan(client=None, top_n: int = None, min_volume: float = None):
+    """Launch volatility_scan in a background thread with its own ccxt client (thread-safe)."""
+    global _scan_running
+    with _scan_lock:
+        if _scan_running:
+            return  # already scanning
+        _scan_running = True
+
+    def _run():
+        global _scan_result, _scan_running
+        try:
+            scanner_client = _get_scanner_client()
+            result = volatility_scan(scanner_client, top_n, min_volume)
+            with _scan_lock:
+                _scan_result = result
+        except Exception as e:
+            logger.error(f"[SCANNER BG] Background scan failed: {e}")
+        finally:
+            with _scan_lock:
+                _scan_running = False
+
+    t = threading.Thread(target=_run, daemon=True, name="scanner-bg")
+    t.start()
+    logger.info("[SCANNER BG] Background scan started")
+
+
+def get_scan_result() -> list[str] | None:
+    """Retrieve the latest background scan result (or None if not ready)."""
+    global _scan_result
+    with _scan_lock:
+        result = _scan_result
+        _scan_result = None  # consume it
+        return result
+
+
+def is_scan_running() -> bool:
+    with _scan_lock:
+        return _scan_running

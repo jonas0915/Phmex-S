@@ -6,12 +6,12 @@ load_dotenv()
 
 class Config:
     # Exchange
-    EXCHANGE = os.getenv("EXCHANGE", "binance")
+    EXCHANGE = os.getenv("EXCHANGE", "phemex")
     API_KEY = os.getenv("API_KEY", "")
     API_SECRET = os.getenv("API_SECRET", "")
 
     # Trading pairs (futures format: BTC/USDT:USDT)
-    TRADING_PAIRS = os.getenv("TRADING_PAIRS", "BTC/USDT:USDT,ETH/USDT:USDT").split(",")
+    TRADING_PAIRS = [s.strip() for s in os.getenv("TRADING_PAIRS", "").split(",") if s.strip()]
     BASE_CURRENCY = os.getenv("BASE_CURRENCY", "USDT")
     TIMEFRAME = os.getenv("TIMEFRAME", "1m")
 
@@ -19,22 +19,22 @@ class Config:
     LEVERAGE = int(os.getenv("LEVERAGE", "1"))
 
     # Position sizing — fixed USDT margin per trade
-    TRADE_AMOUNT_USDT = float(os.getenv("TRADE_AMOUNT_USDT", "50.0"))
+    TRADE_AMOUNT_USDT = float(os.getenv("TRADE_AMOUNT_USDT", "8.0"))
     TRADE_AMOUNT_PERCENT = float(os.getenv("TRADE_AMOUNT_PERCENT", "2.0"))  # fallback if fixed not set — not currently used by the sizing logic
     MAX_OPEN_TRADES = int(os.getenv("MAX_OPEN_TRADES", "3"))
     MAX_DRAWDOWN_PERCENT = float(os.getenv("MAX_DRAWDOWN_PERCENT", "10.0"))
 
     # Strategy
-    STRATEGY = os.getenv("STRATEGY", "combined")
+    STRATEGY = os.getenv("STRATEGY", "adaptive")
 
     # Risk management
-    STOP_LOSS_PERCENT = float(os.getenv("STOP_LOSS_PERCENT", "0.5"))
-    TAKE_PROFIT_PERCENT = float(os.getenv("TAKE_PROFIT_PERCENT", "0.8"))
+    STOP_LOSS_PERCENT = float(os.getenv("STOP_LOSS_PERCENT", "1.2"))
+    TAKE_PROFIT_PERCENT = float(os.getenv("TAKE_PROFIT_PERCENT", "1.8"))
     TRAILING_STOP = os.getenv("TRAILING_STOP", "true").lower() == "true"
-    TRAILING_STOP_OFFSET = float(os.getenv("TRAILING_STOP_OFFSET", "0.2"))
+    TRAILING_STOP_OFFSET = float(os.getenv("TRAILING_STOP_OFFSET", "1.0"))
 
     # Mode
-    MODE = os.getenv("MODE", "paper")  # "live" or "paper"
+    MODE = os.getenv("MODE", "paper")  # "live" or "paper" — default paper for safety
 
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -51,13 +51,18 @@ class Config:
     SLIPPAGE_PERCENT = float(os.getenv("SLIPPAGE_PERCENT", "0.05"))
 
     # Loop interval in seconds
-    LOOP_INTERVAL = float(os.getenv("LOOP_INTERVAL", "0.05"))
+    LOOP_INTERVAL = float(os.getenv("LOOP_INTERVAL", "60"))
+
+    # Adverse exit — bail out of wrong-direction trades early
+    ADVERSE_EXIT_CYCLES = int(os.getenv("ADVERSE_EXIT_CYCLES", "10"))
+    ADVERSE_EXIT_THRESHOLD = float(os.getenv("ADVERSE_EXIT_THRESHOLD", "-3.0"))
 
     # Dynamic scanner
     SCANNER_ENABLED = os.getenv("SCANNER_ENABLED", "true").lower() == "true"
     SCANNER_TOP_N = int(os.getenv("SCANNER_TOP_N", "5"))           # top N gainers to trade
     SCANNER_MIN_VOLUME = float(os.getenv("SCANNER_MIN_VOLUME", "5000000"))  # min 24h USDT volume
     SCANNER_REFRESH_CYCLES = int(os.getenv("SCANNER_REFRESH_CYCLES", "100"))  # refresh every N cycles
+    SCANNER_BLACKLIST = [s.strip() for s in os.getenv("SCANNER_BLACKLIST", "").split(",") if s.strip()]
 
     @classmethod
     def is_live(cls):

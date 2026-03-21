@@ -1,0 +1,287 @@
+<h2>Section 3: Rendering & Post-Processing Pipeline</h2>
+<p class="subtitle">Visual comparison of current vs. upgraded rendering for each component</p>
+
+<!-- Renderer Settings -->
+<div class="section">
+  <h3>Renderer Settings</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header" style="color: #888;">Current</div>
+      <div class="mockup-body" style="background: #111; padding: 16px; font-family: monospace; font-size: 12px; color: #aaa; line-height: 1.8;">
+        Shadow Map: <span style="color: #ff9800;">1024 × 1024</span><br>
+        Pixel Ratio: <span style="color: #ff9800;">1.0 (no retina)</span><br>
+        Tone Mapping: <span style="color: #888;">ACESFilmic @ 1.1</span><br>
+        FPS: <span style="color: #888;">~30 (skip frames)</span><br>
+        Anti-aliasing: <span style="color: #888;">SMAA</span>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header" style="color: #4fc3f7;">Upgraded</div>
+      <div class="mockup-body" style="background: #111; padding: 16px; font-family: monospace; font-size: 12px; color: #ccc; line-height: 1.8;">
+        Shadow Map: <span style="color: #4caf50;">2048 × 2048</span> (4× detail)<br>
+        Pixel Ratio: <span style="color: #4caf50;">min(devicePixelRatio, 2)</span> (retina)<br>
+        Tone Mapping: <span style="color: #888;">ACESFilmic @ 1.0</span> (natural)<br>
+        FPS: <span style="color: #888;">~30 (same budget)</span><br>
+        Anti-aliasing: <span style="color: #888;">SMAA (same)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Post-Processing Stack -->
+<div class="section">
+  <h3>Post-Processing Stack</h3>
+  <div style="background: #0a0e17; border: 1px solid #1a2a3a; border-radius: 8px; padding: 20px; position: relative;">
+    <!-- Pipeline visualization -->
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <!-- Step 1 -->
+      <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 6px; padding: 12px 16px; text-align: center; min-width: 110px;">
+        <div style="color: #888; font-size: 9px; margin-bottom: 4px;">STEP 1</div>
+        <div style="color: #ccc; font-size: 12px; font-weight: bold;">RenderPass</div>
+        <div style="color: #666; font-size: 10px; margin-top: 4px;">Base scene</div>
+        <div style="color: #444; font-size: 9px; margin-top: 2px;">EXISTING</div>
+      </div>
+      <div style="color: #444; font-size: 18px;">→</div>
+      <!-- Step 2 - NEW -->
+      <div style="background: #1a2e1a; border: 1px solid #4caf50; border-radius: 6px; padding: 12px 16px; text-align: center; min-width: 110px; box-shadow: 0 0 10px rgba(76,175,80,0.15);">
+        <div style="color: #4caf50; font-size: 9px; margin-bottom: 4px;">STEP 2 — NEW</div>
+        <div style="color: #a5d6a7; font-size: 12px; font-weight: bold;">SSAO</div>
+        <div style="color: #81c784; font-size: 10px; margin-top: 4px;">Ambient occlusion</div>
+        <div style="color: #66bb6a; font-size: 9px; margin-top: 2px;">Soft crevice shadows</div>
+      </div>
+      <div style="color: #444; font-size: 18px;">→</div>
+      <!-- Step 3 -->
+      <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 6px; padding: 12px 16px; text-align: center; min-width: 110px;">
+        <div style="color: #888; font-size: 9px; margin-bottom: 4px;">STEP 3</div>
+        <div style="color: #ccc; font-size: 12px; font-weight: bold;">Bloom</div>
+        <div style="color: #666; font-size: 10px; margin-top: 4px;">0.15 → 0.08</div>
+        <div style="color: #444; font-size: 9px; margin-top: 2px;">TUNED DOWN</div>
+      </div>
+      <div style="color: #444; font-size: 18px;">→</div>
+      <!-- Step 4 -->
+      <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 6px; padding: 12px 16px; text-align: center; min-width: 110px;">
+        <div style="color: #888; font-size: 9px; margin-bottom: 4px;">STEP 4</div>
+        <div style="color: #ccc; font-size: 12px; font-weight: bold;">SMAA</div>
+        <div style="color: #666; font-size: 10px; margin-top: 4px;">Anti-aliasing</div>
+        <div style="color: #444; font-size: 9px; margin-top: 2px;">EXISTING</div>
+      </div>
+      <div style="color: #444; font-size: 18px;">→</div>
+      <!-- Step 5 - NEW -->
+      <div style="background: #1a2e1a; border: 1px solid #4caf50; border-radius: 6px; padding: 12px 16px; text-align: center; min-width: 110px; box-shadow: 0 0 10px rgba(76,175,80,0.15);">
+        <div style="color: #4caf50; font-size: 9px; margin-bottom: 4px;">STEP 5 — NEW</div>
+        <div style="color: #a5d6a7; font-size: 12px; font-weight: bold;">Color Grade</div>
+        <div style="color: #81c784; font-size: 10px; margin-top: 4px;">Cinematic LUT</div>
+        <div style="color: #66bb6a; font-size: 9px; margin-top: 2px;">Warm + vignette</div>
+      </div>
+      <div style="color: #444; font-size: 18px;">→</div>
+      <!-- Output -->
+      <div style="background: linear-gradient(135deg, #1a237e, #283593); border: 1px solid #5c6bc0; border-radius: 6px; padding: 12px 16px; text-align: center; min-width: 80px;">
+        <div style="color: #9fa8da; font-size: 9px; margin-bottom: 4px;">OUTPUT</div>
+        <div style="color: #fff; font-size: 12px; font-weight: bold;">Screen</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Material Upgrades - Visual comparison -->
+<div class="section">
+  <h3>Material Upgrades</h3>
+
+  <!-- Floor -->
+  <div style="margin-bottom: 16px;">
+    <div style="color: #aaa; font-size: 11px; margin-bottom: 6px; font-weight: bold;">FLOOR</div>
+    <div class="split">
+      <div class="mockup">
+        <div class="mockup-header" style="color: #888;">Current: Flat Color</div>
+        <div class="mockup-body" style="height: 80px; background: #6a6560; display: flex; align-items: center; justify-content: center;">
+          <div style="color: rgba(0,0,0,0.3); font-size: 11px;">Flat #6a6560 — no texture</div>
+        </div>
+      </div>
+      <div class="mockup">
+        <div class="mockup-header" style="color: #4fc3f7;">Upgraded: Polished Concrete</div>
+        <div class="mockup-body" style="height: 80px; background: repeating-conic-gradient(#6a6560 0% 25%, #6e6963 0% 50%) 0 0 / 8px 8px; position: relative; display: flex; align-items: center; justify-content: center;">
+          <div style="position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.05), transparent 40%, rgba(0,0,0,0.1));"></div>
+          <div style="color: rgba(255,255,255,0.4); font-size: 11px; position: relative;">Normal-mapped grain + subtle reflection</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Glass Walls -->
+  <div style="margin-bottom: 16px;">
+    <div style="color: #aaa; font-size: 11px; margin-bottom: 6px; font-weight: bold;">GLASS WALLS</div>
+    <div class="split">
+      <div class="mockup">
+        <div class="mockup-header" style="color: #888;">Current: Near-Invisible (4% opacity)</div>
+        <div class="mockup-body" style="height: 100px; position: relative; overflow: hidden;">
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, #5588aa 0%, #334455 60%, #1a2a3a 100%);"></div>
+          <div style="position: absolute; inset: 0; background: rgba(136,170,204,0.04);"></div>
+          <div style="position: absolute; bottom: 8px; left: 8px; color: rgba(255,255,255,0.3); font-size: 10px;">Barely visible flat plane</div>
+        </div>
+      </div>
+      <div class="mockup">
+        <div class="mockup-header" style="color: #4fc3f7;">Upgraded: Physical Glass (transmission + IOR)</div>
+        <div class="mockup-body" style="height: 100px; position: relative; overflow: hidden;">
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, #5588aa 0%, #334455 60%, #1a2a3a 100%);"></div>
+          <div style="position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.02) 30%, rgba(136,170,204,0.08) 60%, rgba(255,255,255,0.15) 100%);"></div>
+          <div style="position: absolute; top: 0; bottom: 0; width: 2px; left: 25%; background: rgba(255,255,255,0.06);"></div>
+          <div style="position: absolute; top: 0; bottom: 0; width: 2px; left: 50%; background: rgba(255,255,255,0.06);"></div>
+          <div style="position: absolute; top: 0; bottom: 0; width: 2px; left: 75%; background: rgba(255,255,255,0.06);"></div>
+          <div style="position: absolute; bottom: 8px; left: 8px; color: rgba(255,255,255,0.5); font-size: 10px;">Real refraction + edge reflections + mullions</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shadows -->
+  <div style="margin-bottom: 16px;">
+    <div style="color: #aaa; font-size: 11px; margin-bottom: 6px; font-weight: bold;">SHADOWS & AMBIENT OCCLUSION</div>
+    <div class="split">
+      <div class="mockup">
+        <div class="mockup-header" style="color: #888;">Current: Basic Shadow Map</div>
+        <div class="mockup-body" style="height: 100px; background: #3a3a3a; position: relative; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px;">
+          <!-- Simple desk with basic shadow -->
+          <div style="position: relative;">
+            <div style="width: 120px; height: 8px; background: #5a4a3a; border-radius: 2px;"></div>
+            <div style="position: absolute; bottom: -12px; left: 10px; right: 10px; height: 10px; background: rgba(0,0,0,0.25); border-radius: 50%; filter: blur(3px);"></div>
+          </div>
+          <div style="position: absolute; top: 8px; right: 8px; color: #666; font-size: 10px;">Hard edges, no crevice detail</div>
+        </div>
+      </div>
+      <div class="mockup">
+        <div class="mockup-header" style="color: #4fc3f7;">Upgraded: Shadow Map + SSAO</div>
+        <div class="mockup-body" style="height: 100px; background: #3a3a3a; position: relative; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px;">
+          <!-- Desk with SSAO-style shadow -->
+          <div style="position: relative;">
+            <div style="width: 120px; height: 8px; background: #5a4a3a; border-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset 0 -1px 2px rgba(0,0,0,0.2);"></div>
+            <div style="position: absolute; bottom: -14px; left: 5px; right: 5px; height: 12px; background: rgba(0,0,0,0.35); border-radius: 50%; filter: blur(5px);"></div>
+            <!-- Contact shadow / AO -->
+            <div style="position: absolute; bottom: -4px; left: 0; right: 0; height: 4px; background: linear-gradient(180deg, rgba(0,0,0,0.3), transparent); filter: blur(2px);"></div>
+          </div>
+          <div style="position: absolute; top: 8px; right: 8px; color: #4fc3f7; font-size: 10px;">Soft edges + crevice darkening + contact shadows</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SF Bay Panorama -->
+<div class="section">
+  <h3>SF Bay Area Panorama</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header" style="color: #888;">Current: Procedural Canvas (2048×768)</div>
+      <div class="mockup-body" style="height: 120px; position: relative; overflow: hidden;">
+        <!-- Simple flat buildings -->
+        <div style="position: absolute; inset: 0; background: linear-gradient(180deg, #5588aa 0%, #88bbdd 40%, #aaccdd 100%);"></div>
+        <!-- Flat building silhouettes -->
+        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 50px; display: flex; align-items: flex-end; gap: 3px; padding: 0 10px;">
+          <div style="width: 15px; height: 35px; background: #556677;"></div>
+          <div style="width: 10px; height: 45px; background: #4a5a6a;"></div>
+          <div style="width: 20px; height: 30px; background: #5a6a7a;"></div>
+          <div style="width: 8px; height: 50px; background: #4a5a6a;"></div>
+          <div style="width: 18px; height: 25px; background: #556677;"></div>
+          <div style="width: 12px; height: 40px; background: #5a6a7a;"></div>
+          <div style="width: 15px; height: 20px; background: #556677;"></div>
+          <div style="width: 10px; height: 48px; background: #4a5a6a;"></div>
+          <div style="width: 22px; height: 28px; background: #556677;"></div>
+          <div style="width: 8px; height: 38px; background: #5a6a7a;"></div>
+        </div>
+        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 15px; background: linear-gradient(180deg, rgba(68,88,110,0.5), #3a5a7a);"></div>
+        <div style="position: absolute; bottom: 8px; right: 8px; color: rgba(255,255,255,0.4); font-size: 9px;">Flat rectangles, no landmarks</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header" style="color: #4fc3f7;">Upgraded: HDRI + Detailed Procedural (4096×2048)</div>
+      <div class="mockup-body" style="height: 120px; position: relative; overflow: hidden;">
+        <!-- Richer sky gradient -->
+        <div style="position: absolute; inset: 0; background: linear-gradient(180deg, #2a4a6a 0%, #5588aa 25%, #88bbdd 45%, #bbddee 65%, #ddeeff 100%);"></div>
+        <!-- Detailed skyline with landmarks -->
+        <div style="position: absolute; bottom: 15px; left: 0; right: 0; height: 65px; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px;">
+          <!-- Transamerica Pyramid -->
+          <div style="width: 6px; height: 55px; background: linear-gradient(180deg, #8899aa, #667788); clip-path: polygon(50% 0%, 100% 100%, 0% 100%);"></div>
+          <div style="width: 14px; height: 30px; background: linear-gradient(180deg, #7788aa, #556677); border-radius: 1px 1px 0 0;">
+            <div style="width: 100%; height: 100%; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(200,220,240,0.15) 3px, rgba(200,220,240,0.15) 4px);"></div>
+          </div>
+          <!-- Salesforce Tower -->
+          <div style="width: 12px; height: 60px; background: linear-gradient(180deg, #99aabb, #778899); border-radius: 4px 4px 0 0;">
+            <div style="width: 100%; height: 100%; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(180,210,240,0.2) 3px, rgba(180,210,240,0.2) 4px); border-radius: 4px 4px 0 0;"></div>
+          </div>
+          <div style="width: 18px; height: 35px; background: linear-gradient(180deg, #7788aa, #556677);">
+            <div style="width: 100%; height: 100%; background: repeating-linear-gradient(90deg, transparent, transparent 4px, rgba(200,220,240,0.1) 4px, rgba(200,220,240,0.1) 5px);"></div>
+          </div>
+          <div style="width: 10px; height: 42px; background: linear-gradient(180deg, #8899aa, #667788);">
+            <div style="width: 100%; height: 100%; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(200,220,240,0.15) 2px, rgba(200,220,240,0.15) 3px);"></div>
+          </div>
+          <div style="width: 20px; height: 28px; background: linear-gradient(180deg, #7788aa, #556677); border-radius: 2px 2px 0 0;">
+            <div style="width: 100%; height: 100%; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(200,220,240,0.12) 3px, rgba(200,220,240,0.12) 4px);"></div>
+          </div>
+          <div style="width: 8px; height: 48px; background: linear-gradient(180deg, #8899aa, #667788);">
+            <div style="width: 100%; height: 100%; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(200,220,240,0.18) 2px, rgba(200,220,240,0.18) 3px);"></div>
+          </div>
+          <!-- Gap for bay -->
+          <div style="width: 30px;"></div>
+          <!-- Golden Gate hint -->
+          <div style="position: relative; width: 50px; height: 20px;">
+            <div style="position: absolute; bottom: 0; left: 8px; width: 4px; height: 20px; background: #c04030;"></div>
+            <div style="position: absolute; bottom: 0; right: 8px; width: 4px; height: 20px; background: #c04030;"></div>
+            <div style="position: absolute; top: 0; left: 8px; right: 8px; height: 3px; background: #c04030; border-radius: 1px;"></div>
+            <div style="position: absolute; top: 6px; left: 8px; right: 8px; height: 2px; background: rgba(192,64,48,0.6);"></div>
+          </div>
+        </div>
+        <!-- Bay water with reflection -->
+        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 18px; background: linear-gradient(180deg, rgba(68,110,140,0.7), #2a5a7a); overflow: hidden;">
+          <div style="width: 100%; height: 100%; background: repeating-linear-gradient(90deg, transparent, transparent 8px, rgba(255,255,255,0.04) 8px, rgba(255,255,255,0.04) 16px);"></div>
+        </div>
+        <!-- Atmospheric haze -->
+        <div style="position: absolute; bottom: 15px; left: 0; right: 0; height: 20px; background: linear-gradient(0deg, rgba(180,200,220,0.3), transparent);"></div>
+        <div style="position: absolute; bottom: 8px; right: 8px; color: rgba(255,255,255,0.5); font-size: 9px;">Landmarks + window grids + water + haze</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Performance Budget -->
+<div class="section">
+  <h3>Performance Budget</h3>
+  <div style="background: #0a0e17; border: 1px solid #1a2a3a; border-radius: 8px; padding: 20px;">
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 150px; text-align: center; padding: 12px; background: rgba(76,175,80,0.08); border: 1px solid rgba(76,175,80,0.2); border-radius: 6px;">
+        <div style="color: #4caf50; font-size: 24px; font-weight: bold;">30+</div>
+        <div style="color: #81c784; font-size: 11px;">Target FPS</div>
+      </div>
+      <div style="flex: 1; min-width: 150px; text-align: center; padding: 12px; background: rgba(33,150,243,0.08); border: 1px solid rgba(33,150,243,0.2); border-radius: 6px;">
+        <div style="color: #2196f3; font-size: 24px; font-weight: bold;">~20MB</div>
+        <div style="color: #64b5f6; font-size: 11px;">Total Assets</div>
+      </div>
+      <div style="flex: 1; min-width: 150px; text-align: center; padding: 12px; background: rgba(255,152,0,0.08); border: 1px solid rgba(255,152,0,0.2); border-radius: 6px;">
+        <div style="color: #ff9800; font-size: 24px; font-weight: bold;">0</div>
+        <div style="color: #ffb74d; font-size: 11px;">API Calls Added</div>
+      </div>
+      <div style="flex: 1; min-width: 150px; text-align: center; padding: 12px; background: rgba(156,39,176,0.08); border: 1px solid rgba(156,39,176,0.2); border-radius: 6px;">
+        <div style="color: #9c27b0; font-size: 24px; font-weight: bold;">SSAO</div>
+        <div style="color: #ce93d8; font-size: 11px;">Half-res for perf</div>
+      </div>
+    </div>
+    <div style="margin-top: 16px; color: #666; font-size: 11px; text-align: center;">
+      Runs entirely in browser GPU — zero impact on bot Python process
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top: 24px;">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Rendering approach approved</h3>
+      <p>Move on to Section 4: Event/Animation Behaviors</p>
+    </div>
+  </div>
+  <div class="option" data-choice="changes" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Needs changes</h3>
+      <p>I'll describe adjustments in the terminal</p>
+    </div>
+  </div>
+</div>

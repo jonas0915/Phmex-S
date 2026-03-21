@@ -2,12 +2,47 @@
 """
 Phmex-S - Scalp Futures Trading Bot
 """
+import os
 import sys
+import atexit
 import argparse
 from bot import Phmex2Bot
 from logger import setup_logger
 
 logger = setup_logger()
+
+PIDFILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".bot.pid")
+
+
+def _check_pidfile():
+    """Prevent duplicate bot instances — zombie processes caused $490+ in losses."""
+    if os.path.exists(PIDFILE):
+        try:
+            with open(PIDFILE) as f:
+                old_pid = int(f.read().strip())
+            # Check if process is still alive
+            os.kill(old_pid, 0)
+            logger.error(f"Another bot instance is already running (PID {old_pid}). Exiting.")
+            logger.error(f"If stale, remove {PIDFILE} manually.")
+            sys.exit(1)
+        except (ProcessLookupError, ValueError):
+            # Process is dead — stale pidfile, safe to overwrite
+            pass
+        except PermissionError:
+            # Process exists but we can't signal it — still alive
+            logger.error(f"Another bot instance is running (PID in {PIDFILE}). Exiting.")
+            sys.exit(1)
+    # Write our PID
+    with open(PIDFILE, "w") as f:
+        f.write(str(os.getpid()))
+    atexit.register(_cleanup_pidfile)
+
+
+def _cleanup_pidfile():
+    try:
+        os.remove(PIDFILE)
+    except OSError:
+        pass
 
 
 def parse_args():
@@ -21,6 +56,7 @@ def parse_args():
 
 
 def main():
+    _check_pidfile()
     args = parse_args()
 
     # Apply CLI overrides

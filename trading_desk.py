@@ -7262,11 +7262,22 @@ animate();
     gltfLoader.load(
       '/assets/characters/' + fileName + '.glb',
       function(gltf) {
-        console.log('Loaded GLTF for ' + agentName);
         var model = gltf.scene;
 
-        // Scale to match scene (these models are ~1.8m, scene chars are ~1.35 units)
-        model.scale.set(0.75, 0.75, 0.75);
+        // Force world matrix update before computing bounds
+        model.updateMatrixWorld(true);
+
+        // Compute bounding box and auto-scale to target height
+        var box = new THREE.Box3().setFromObject(model);
+        var size = new THREE.Vector3();
+        box.getSize(size);
+        var targetHeight = 1.35;
+        if (size.y < 0.001) { console.warn('Zero height model: ' + agentName); return; }
+        var scale = targetHeight / size.y;
+        model.scale.setScalar(scale);
+
+        // Place feet on ground: shift by scaled min.y
+        var groundY = -(box.min.y * scale);
 
         // Enable shadows
         model.traverse(function(child) {
@@ -7280,8 +7291,8 @@ animate();
         var existing = charGroups[agentName];
         if (!existing) return;
 
-        // Position the GLTF model at the same position
-        model.position.copy(existing.position);
+        // Position at existing desk X/Z, calculated Y for ground
+        model.position.set(existing.position.x, groundY, existing.position.z);
         model.rotation.copy(existing.rotation);
 
         // Hide procedural character, show GLTF
@@ -7292,18 +7303,29 @@ animate();
         model.userData.agentName = agentName;
         model.userData.isGLTF = true;
 
-        // If model has animations, set up mixer
+        // Set up animation mixer — find idle animation
         if (gltf.animations && gltf.animations.length > 0) {
           var mixer = new THREE.AnimationMixer(model);
-          // Play the first animation (usually idle)
-          var action = mixer.clipAction(gltf.animations[0]);
+          var idleClip = null;
+          // Search for idle by name (handles both "Idle" and "CharacterArmature|Idle")
+          for (var ai = 0; ai < gltf.animations.length; ai++) {
+            var cn = gltf.animations[ai].name.toLowerCase();
+            if (cn.indexOf('idle') !== -1 && cn.indexOf('gun') === -1 && cn.indexOf('sword') === -1) {
+              idleClip = gltf.animations[ai];
+              break;
+            }
+          }
+          if (!idleClip) idleClip = gltf.animations[0];
+          var action = mixer.clipAction(idleClip);
           action.play();
           model.userData.mixer = mixer;
+          model.userData.allClips = gltf.animations;
+          console.log('GLTF ' + agentName + ': scale=' + scale.toFixed(3) + ' height=' + size.y.toFixed(2) + ' clip=' + idleClip.name);
         }
       },
-      undefined, // progress
+      undefined,
       function(err) {
-        console.warn('Failed to load GLTF for ' + agentName + ':', err.message || err);
+        console.warn('Failed to load GLTF for ' + agentName);
       }
     );
   });

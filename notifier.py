@@ -14,14 +14,15 @@ def send(message: str):
             json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
             timeout=5
         )
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger("DegenCryt").debug(f"[TG] Send failed: {e}")
 
 def notify_startup(balance: float, pairs: list, mode: str, strategy: str):
     send(
         f"🤖 <b>{BOT_NAME} Started</b>\n"
         f"Mode: {mode.upper()} | Strategy: {strategy}\n"
-        f"Leverage: 10x | Margin/trade: $20\n"
+        f"Leverage: {os.getenv('LEVERAGE', '10')}x | Margin/trade: ${os.getenv('TRADE_AMOUNT_USDT', '8')}\n"
         f"Balance: <b>${balance:.2f} USDT</b>\n"
         f"Pairs: {', '.join(p.split('/')[0] for p in pairs)}"
     )
@@ -33,8 +34,8 @@ def notify_entry(symbol: str, side: str, price: float, margin: float, sl: float,
         f"{emoji} <b>{direction} ENTRY — {symbol}</b>  [{BOT_NAME}]\n"
         f"Price:    ${price:.4f}\n"
         f"Margin:   ${margin:.2f} USDT\n"
-        f"SL:       ${sl:.4f}  (-3%)\n"
-        f"TP:       ${tp:.4f}  (+6%)\n"
+        f"SL:       ${sl:.4f}  ({(sl-price)/price*100:+.1f}%)\n"
+        f"TP:       ${tp:.4f}  ({(tp-price)/price*100:+.1f}%)\n"
         f"Strength: {strength:.2f}\n"
         f"Reason:   {reason}"
     )

@@ -1,0 +1,193 @@
+<h2>Design Spec — Trading Desk Visual Overhaul</h2>
+<p class="subtitle">Review the full spec below. Click approve when ready to proceed to implementation planning.</p>
+
+<!-- Constraints -->
+<div class="section">
+  <h3>Constraints</h3>
+  <div style="background: rgba(244,67,54,0.06); border: 1px solid rgba(244,67,54,0.2); border-radius: 8px; padding: 16px; color: #ccc; font-size: 12px; line-height: 1.8;">
+    <strong style="color: #f44336;">Dashboard isolation</strong>: Zero bot imports, zero API calls. Reads trading_state.json + bot.log only.<br>
+    <strong style="color: #ff9800;">Performance</strong>: 30+ FPS on integrated GPU. Must not compete with the bot.<br>
+    <strong style="color: #4caf50;">Structure preserved</strong>: Same room (12×10×4), desk positions, camera, HUD, social events, sleep system, lower floors.
+  </div>
+</div>
+
+<!-- Section 1: Approach -->
+<div class="section">
+  <h3>1. Approach</h3>
+  <div style="background: rgba(33,150,243,0.06); border: 1px solid rgba(33,150,243,0.2); border-radius: 8px; padding: 16px; color: #ccc; font-size: 12px;">
+    Replace procedural geometry with <strong>GLTF model assets</strong> loaded via THREE.js GLTFLoader. Industry-standard for realistic browser 3D.
+  </div>
+</div>
+
+<!-- Section 2: Characters -->
+<div class="section">
+  <h3>2. Characters — 9 Agents</h3>
+  <div style="background: #0a0e17; border: 1px solid #1a2a3a; border-radius: 8px; overflow: hidden;">
+    <table style="width: 100%; border-collapse: collapse; color: #ccc; font-size: 11px;">
+      <thead>
+        <tr style="background: rgba(255,255,255,0.03);">
+          <th style="padding: 8px; text-align: left; color: #ff9800;">#</th>
+          <th style="padding: 8px; text-align: left; color: #ff9800;">Agent</th>
+          <th style="padding: 8px; text-align: left; color: #888;">Bot Subsystem</th>
+          <th style="padding: 8px; text-align: left; color: #888;">Position</th>
+          <th style="padding: 8px; text-align: left; color: #4fc3f7;">Appearance</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-top: 1px solid #1a1a2a; background: rgba(255,215,0,0.04);">
+          <td style="padding: 8px;">1</td>
+          <td style="padding: 8px; font-weight: bold; color: #ffd700;">Jonas</td>
+          <td style="padding: 8px;">Head Trader / CEO</td>
+          <td style="padding: 8px;">(2.2, 0, 2.5)</td>
+          <td style="padding: 8px;">Hoodie + jeans, face from avatar, 6 monitors, standing desk</td>
+        </tr>
+        <tr style="border-top: 1px solid #1a1a2a;">
+          <td style="padding: 8px;">2</td>
+          <td style="padding: 8px; font-weight: bold;">Scanner</td>
+          <td style="padding: 8px;">Pair selection, volume ranking</td>
+          <td style="padding: 8px;">(-2.2, 0, -1.5)</td>
+          <td style="padding: 8px;">Professional, crew-cut, 2 monitors</td>
+        </tr>
+        <tr style="border-top: 1px solid #1a1a2a;">
+          <td style="padding: 8px;">3</td>
+          <td style="padding: 8px; font-weight: bold;">Risk Manager</td>
+          <td style="padding: 8px;">Kelly sizing, drawdown, cooldowns</td>
+          <td style="padding: 8px;">(2.2, 0, -1.5)</td>
+          <td style="padding: 8px;">Formal, glasses, 2 monitors</td>
+        </tr>
+        <tr style="border-top: 1px solid #1a1a2a;">
+          <td style="padding: 8px;">4</td>
+          <td style="padding: 8px; font-weight: bold;">Ensemble</td>
+          <td style="padding: 8px;">6-layer confidence gate</td>
+          <td style="padding: 8px;">(0, 0, 0.5)</td>
+          <td style="padding: 8px;">Analytical, scale 1.2×, 3 monitors</td>
+        </tr>
+        <tr style="border-top: 1px solid #1a1a2a;">
+          <td style="padding: 8px;">5</td>
+          <td style="padding: 8px; font-weight: bold;">Executor</td>
+          <td style="padding: 8px;">Order placement, SL/TP, fills</td>
+          <td style="padding: 8px;">(-4.0, 0, 0.5)</td>
+          <td style="padding: 8px;">Sharp, focused, 2 monitors</td>
+        </tr>
+        <tr style="border-top: 1px solid #1a1a2a;">
+          <td style="padding: 8px;">6</td>
+          <td style="padding: 8px; font-weight: bold;">Strategy</td>
+          <td style="padding: 8px;">4 trading strategies</td>
+          <td style="padding: 8px;">(4.0, 0, 0.5)</td>
+          <td style="padding: 8px;">Thoughtful, casual, 2 monitors</td>
+        </tr>
+        <tr style="border-top: 1px solid #1a1a2a;">
+          <td style="padding: 8px;">7</td>
+          <td style="padding: 8px; font-weight: bold;">Tape Reader</td>
+          <td style="padding: 8px;">Aggressor ratio, order flow</td>
+          <td style="padding: 8px;">(-2.2, 0, 2.5)</td>
+          <td style="padding: 8px;">Focused, headphones, 2 monitors</td>
+        </tr>
+        <tr style="border-top: 1px solid #1a1a2a;">
+          <td style="padding: 8px;">8</td>
+          <td style="padding: 8px; font-weight: bold;">WS Feed</td>
+          <td style="padding: 8px;">WebSocket connectivity</td>
+          <td style="padding: 8px;">(4.5, 0, 4.2)</td>
+          <td style="padding: 8px;">Tech/IT look, 2 monitors</td>
+        </tr>
+        <tr style="border-top: 1px solid #1a1a2a;">
+          <td style="padding: 8px;">9</td>
+          <td style="padding: 8px; font-weight: bold;">Position Monitor</td>
+          <td style="padding: 8px;">Exit logic tracking</td>
+          <td style="padding: 8px;">(0, 0, 2.5)</td>
+          <td style="padding: 8px;">Watchful, alert, 2 monitors</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="margin-top: 12px; color: #888; font-size: 11px; line-height: 1.6;">
+    <strong>Models</strong>: Mixamo (.glb), ~1-2MB each, ~12-15MB total. Same Mixamo skeleton for animation sharing.<br>
+    <strong>12 animation clips</strong>: idle-seated, typing, walking, standing-up, sitting-down, celebrating, head-shake, pointing, phone-talk, high-five, desk-slam, arms-crossed
+  </div>
+</div>
+
+<!-- Section 3: Event Animations -->
+<div class="section">
+  <h3>3. Event-Driven Animations (3 Tiers)</h3>
+  <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 150px; padding: 10px; background: rgba(33,150,243,0.08); border: 1px solid rgba(33,150,243,0.2); border-radius: 6px;">
+      <div style="color: #2196f3; font-size: 11px; font-weight: bold;">T1: Professional</div>
+      <div style="color: #888; font-size: 10px;">Typing, monitor checks, phone calls</div>
+    </div>
+    <div style="flex: 1; min-width: 150px; padding: 10px; background: rgba(255,152,0,0.08); border: 1px solid rgba(255,152,0,0.2); border-radius: 6px;">
+      <div style="color: #ff9800; font-size: 11px; font-weight: bold;">T2: Active Trading</div>
+      <div style="color: #888; font-size: 10px;">Signals, entries, exits, pointing</div>
+    </div>
+    <div style="flex: 1; min-width: 150px; padding: 10px; background: rgba(244,67,54,0.08); border: 1px solid rgba(244,67,54,0.2); border-radius: 6px;">
+      <div style="color: #f44336; font-size: 11px; font-weight: bold;">T3: Wolf of Wall Street</div>
+      <div style="color: #888; font-size: 10px;">High-fives, desk slams, celebrations</div>
+    </div>
+  </div>
+  <div style="color: #888; font-size: 11px; line-height: 1.6;">
+    <strong>Key triggers</strong>: 3+ win streak → high-five | 5+ streak → team celebration | Big loss → desk slam | 3 losses → huddle | ATH → big celebration<br>
+    <strong>Status indicators</strong>: Monitor glow (green/amber/red/blue) + desk LED strip + floating name/role label (replaces Sims plumbobs)<br>
+    <strong>Social events preserved</strong>: Coffee (2m), facility visits (45s), 1-on-1s (30m), team meetings (1h), team events (5m), sleep (11pm-6am)
+  </div>
+</div>
+
+<!-- Section 4: Environment -->
+<div class="section">
+  <h3>4. Environment — Salesforce Tower</h3>
+  <div style="background: rgba(33,150,243,0.06); border: 1px solid rgba(33,150,243,0.2); border-radius: 8px; padding: 16px; color: #ccc; font-size: 12px; line-height: 1.8;">
+    <strong>Location</strong>: High floor of Salesforce Tower, SF. Views: Golden Gate (N), Bay Bridge (E), SoMa (S), downtown below (W).<br>
+    <strong>HDRI</strong>: 4096×2048, used for PBR reflections only (scene.environment).<br>
+    <strong>Panorama</strong>: Upgraded procedural on sky dome — SF landmarks, window grids, fog/haze, animated bay water.<br>
+    <strong>Glass walls</strong>: MeshPhysical with transmission + IOR (perf fallback to opacity if needed).<br>
+    <strong>Room</strong>: 12×10×4, stairwell, break room, conference room, lower floors — all unchanged.
+  </div>
+</div>
+
+<!-- Section 5: Rendering -->
+<div class="section">
+  <h3>5. Rendering Pipeline</h3>
+  <div style="background: #0a0e17; border: 1px solid #1a2a3a; border-radius: 8px; padding: 16px; color: #ccc; font-size: 12px; line-height: 1.8;">
+    <strong>Shadows</strong>: 1024→2048 | <strong>Pixel ratio</strong>: retina support | <strong>Tone mapping</strong>: ACESFilmic @ 1.0<br>
+    <strong>Post-processing</strong>: RenderPass → SSAO (auto-toggle) → Bloom (0.08) → SMAA → Color Grading<br>
+    <strong>Materials</strong>: Normal-mapped concrete floor, real glass, wood/leather grain desks, env-mapped monitor bezels, acoustic ceiling<br>
+    <strong>Performance</strong>: LOD, SSAO half-res, single shadow light, animation mixer idle optimization, geometry instancing
+  </div>
+</div>
+
+<!-- Section 6: Assets -->
+<div class="section">
+  <h3>6. Asset Pipeline</h3>
+  <div style="background: #0a0e17; border: 1px solid #1a2a3a; border-radius: 8px; padding: 16px; color: #ccc; font-size: 12px; line-height: 1.8;">
+    <strong>Total</strong>: ~15-20MB in <code>assets/</code> directory (characters, animations, furniture, HDRI)<br>
+    <strong>Loading</strong>: GLTFLoader, progress bar, browser-cached after first load<br>
+    <strong>HTTP serving</strong>: New <code>/assets/&lt;path&gt;</code> route with path traversal protection, MIME types, 24hr cache<br>
+    <strong>Fallback</strong>: Procedural capsule/sphere for failed character loads, colored boxes for furniture
+  </div>
+</div>
+
+<!-- Section 7 & 8: HUD + Data -->
+<div class="section">
+  <h3>7-8. HUD & Data Pipeline (Unchanged)</h3>
+  <div style="background: rgba(76,175,80,0.06); border: 1px solid rgba(76,175,80,0.2); border-radius: 8px; padding: 16px; color: #ccc; font-size: 12px; line-height: 1.8;">
+    <strong>HUD</strong>: Bottom stats bar, right comms panel, left intel panel — same layout, same data, same rates.<br>
+    <strong>Speech bubbles</strong>: Same system, dialogue trees rewritten for new agent names/roles.<br>
+    <strong>Data</strong>: Reads trading_state.json + bot.log | /api/data polled 1s | Zero API calls | Port 8060
+  </div>
+</div>
+
+<!-- Approval -->
+<div class="options" style="margin-top: 24px;">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Spec approved — proceed to implementation plan</h3>
+      <p>Everything looks good, let's build it</p>
+    </div>
+  </div>
+  <div class="option" data-choice="changes" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Needs changes</h3>
+      <p>I'll describe what to modify in the terminal</p>
+    </div>
+  </div>
+</div>

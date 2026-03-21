@@ -1,4 +1,5 @@
 import logging
+import logging.handlers
 import os
 import colorlog
 from config import Config
@@ -27,8 +28,10 @@ def setup_logger(name: str = "DegenCryt") -> logging.Logger:
         }
     ))
 
-    # File handler
-    file_handler = logging.FileHandler(Config.LOG_FILE)
+    # File handler with rotation (10MB max, keep 5 backups)
+    file_handler = logging.handlers.RotatingFileHandler(
+        Config.LOG_FILE, maxBytes=10 * 1024 * 1024, backupCount=5
+    )
     file_handler.setFormatter(logging.Formatter(
         "%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"

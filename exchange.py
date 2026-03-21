@@ -11,7 +11,7 @@ logger = setup_logger()
 class Exchange:
     def __init__(self):
         exchange_class = getattr(ccxt, Config.EXCHANGE)
-        params = {"enableRateLimit": True, "options": {"defaultType": "swap"}}
+        params = {"enableRateLimit": True, "timeout": 10000, "options": {"defaultType": "swap"}}
 
         if Config.is_live():
             params["apiKey"] = Config.API_KEY
@@ -96,6 +96,8 @@ class Exchange:
             best_ask = asks[0][0] if asks else 0
 
             spread_pct = (best_ask - best_bid) / best_bid * 100 if best_bid else 0
+            bid_depth_usdt = sum(b[0] * b[1] for b in bids)
+            ask_depth_usdt = sum(a[0] * a[1] for a in asks)
             result = {
                 "imbalance":  imbalance,
                 "bid_vol":    bid_vol,
@@ -105,12 +107,134 @@ class Exchange:
                 "spread_pct": spread_pct,
                 "bid_walls":  bid_walls,
                 "ask_walls":  ask_walls,
+                "bid_depth_usdt": bid_depth_usdt,
+                "ask_depth_usdt": ask_depth_usdt,
             }
             if spread_pct > 0.3:
                 result["illiquid"] = True
             return result
         except Exception as e:
             logger.error(f"Failed to fetch order book for {symbol}: {e}")
+            return None
+
+    def get_recent_trades(self, symbol: str, limit: int = 100) -> Optional[dict]:
+        """Fetch recent trades (tape) and compute aggressor stats."""
+        try:
+            trades = self.client.fetch_trades(symbol, limit=limit)
+            if not trades or len(trades) < 10:
+                return None
+
+            total_buy_vol = 0.0
+            total_sell_vol = 0.0
+            large_buy_vol = 0.0
+            large_sell_vol = 0.0
+
+            sizes = [t.get("amount", 0) * t.get("price", 0) for t in trades]
+            avg_size = sum(sizes) / len(sizes) if sizes else 0
+            large_threshold = avg_size * 3.0
+
+            for t in trades:
+                usd_size = t.get("amount", 0) * t.get("price", 0)
+                side = t.get("side", "")
+                if side == "buy":
+                    total_buy_vol += usd_size
+                    if usd_size > large_threshold:
+                        large_buy_vol += usd_size
+                else:
+                    total_sell_vol += usd_size
+                    if usd_size > large_threshold:
+                        large_sell_vol += usd_size
+
+            total_vol = total_buy_vol + total_sell_vol
+            aggressor_ratio = total_buy_vol / total_vol if total_vol > 0 else 0.5
+            net_delta = total_buy_vol - total_sell_vol
+
+            # Large trade bias: +1 = large buys dominate, -1 = large sells dominate
+            large_total = large_buy_vol + large_sell_vol
+            large_trade_bias = (large_buy_vol - large_sell_vol) / large_total if large_total > 0 else 0.0
+
+            # Velocity: trades per second (recent half vs older half)
+            mid = len(trades) // 2
+            if len(trades) >= 4:
+                recent_trades = trades[mid:]
+                older_trades = trades[:mid]
+                recent_span = max(1, (recent_trades[-1]["timestamp"] - recent_trades[0]["timestamp"]) / 1000)
+                older_span = max(1, (older_trades[-1]["timestamp"] - older_trades[0]["timestamp"]) / 1000)
+                recent_rate = len(recent_trades) / recent_span
+                older_rate = len(older_trades) / older_span
+                velocity = recent_rate / older_rate if older_rate > 0 else 1.0
+            else:
+                velocity = 1.0
+
+            return {
+                "aggressor_ratio": aggressor_ratio,
+                "net_delta": net_delta,
+                "large_trade_bias": large_trade_bias,
+                "velocity": velocity,
+                "total_volume": total_vol,
+                "trade_count": len(trades),
+            }
+        except Exception as e:
+            logger.error(f"Failed to fetch recent trades for {symbol}: {e}")
+            return None
+
+    def get_cvd(self, symbol: str, limit: int = 200) -> Optional[dict]:
+        """Compute Cumulative Volume Delta from recent trades.
+        CVD divergence (price making new low but CVD rising) = high-conviction reversal signal."""
+        try:
+            trades = self.client.fetch_trades(symbol, limit=limit)
+            if not trades or len(trades) < 20:
+                return None
+
+            cvd = 0.0
+            cvd_values = []
+            for t in trades:
+                usd_size = t.get("amount", 0) * t.get("price", 0)
+                if t.get("side") == "buy":
+                    cvd += usd_size
+                else:
+                    cvd -= usd_size
+                cvd_values.append(cvd)
+
+            # CVD slope: compare first half vs second half
+            mid = len(cvd_values) // 2
+            first_half_avg = sum(cvd_values[:mid]) / mid if mid > 0 else 0
+            second_half_avg = sum(cvd_values[mid:]) / (len(cvd_values) - mid) if len(cvd_values) > mid else 0
+            cvd_slope = second_half_avg - first_half_avg
+
+            # Detect divergence: compare price direction vs CVD direction
+            # Use first and last trade prices
+            first_price = trades[0].get("price", 0)
+            last_price = trades[-1].get("price", 0)
+            price_direction = last_price - first_price  # positive = price rising
+
+            divergence = None
+            if price_direction < 0 and cvd_slope > 0:
+                divergence = "bullish"  # price falling but buying pressure increasing
+            elif price_direction > 0 and cvd_slope < 0:
+                divergence = "bearish"  # price rising but selling pressure increasing
+
+            return {
+                "cvd": cvd,
+                "cvd_slope": cvd_slope,
+                "divergence": divergence,
+            }
+        except Exception as e:
+            logger.error(f"Failed to compute CVD for {symbol}: {e}")
+            return None
+
+    def get_funding_rate(self, symbol: str) -> Optional[dict]:
+        """Fetch current funding rate. Extreme rates signal contrarian opportunities."""
+        try:
+            funding = self.client.fetch_funding_rate(symbol)
+            rate = float(funding.get("fundingRate", 0) or 0)
+            return {
+                "rate": rate,
+                "signal": "short" if rate > 0.0005 else ("long" if rate < -0.0005 else None),
+                "strength_mod": max(-0.03, min(0.03, -rate * 60)),  # scale rate to +/- 0.03
+            }
+        except Exception as e:
+            logger.debug(f"Failed to fetch funding rate for {symbol}: {e}")
             return None
 
     def get_ticker(self, symbol: str) -> Optional[dict]:
@@ -152,6 +276,103 @@ class Exchange:
                 else:
                     raise
 
+    def _try_limit_then_market(self, symbol: str, side: str, amount: float, limit_price: float) -> Optional[dict]:
+        """Place limit order at maker price, wait up to 3s for fill, fallback to market.
+        Maker fee = 0.01% vs taker 0.06% — saves 83% on fees."""
+        limit_price = self._round_price(symbol, limit_price)
+        order_side = "buy" if side == "long" else "sell"
+
+        # Try limit order first (maker)
+        try:
+            order = self.client.create_order(symbol, "limit", order_side, amount, limit_price, params={"timeInForce": "GTC", "postOnly": True})
+            order_id = order.get("id")
+            logger.info(f"[MAKER] Limit {order_side} {amount} {symbol} @ {limit_price} (id={order_id})")
+
+            # Wait up to 3s for fill
+            for _ in range(6):
+                time.sleep(0.5)
+                try:
+                    fetched = self.client.fetch_order(order_id, symbol)
+                    status = fetched.get("status", "")
+                    if status == "closed":
+                        logger.info(f"[MAKER] Limit filled for {symbol}")
+                        return fetched
+                    if status == "canceled" or status == "cancelled":
+                        break
+                except Exception:
+                    pass
+
+            # Not filled — cancel and fall through to market
+            try:
+                self.client.cancel_order(order_id, symbol)
+                # Check for partial fill after cancel
+                try:
+                    fetched = self.client.fetch_order(order_id, symbol)
+                    filled_amount = fetched.get("filled", 0) or 0
+                    if fetched.get("status") == "closed":
+                        logger.info(f"[MAKER] Limit filled (raced cancel) for {symbol}")
+                        return fetched
+                    if filled_amount > 0:
+                        remaining = amount - filled_amount
+                        logger.info(f"[MAKER] Partial fill {filled_amount}/{amount} {symbol}, market for remaining {remaining}")
+                        if remaining > 0:
+                            remaining = self._round_amount(symbol, remaining)
+                            if remaining > 0:
+                                try:
+                                    if side == "long":
+                                        mkt = self.client.create_market_buy_order(symbol, remaining)
+                                    else:
+                                        mkt = self.client.create_market_sell_order(symbol, remaining)
+                                    logger.info(f"[TAKER] Market {order_side} {remaining} {symbol} (partial fill remainder)")
+                                    return mkt
+                                except Exception as me:
+                                    logger.error(f"Market remainder failed for {symbol}: {me}")
+                                    return fetched  # Return partial fill info
+                        return fetched  # Remaining rounded to 0, partial fill is enough
+                    else:
+                        logger.info(f"[MAKER] Limit not filled, cancelled — falling back to market for {symbol}")
+                except Exception:
+                    logger.info(f"[MAKER] Limit cancelled, falling back to market for {symbol}")
+            except Exception:
+                # May already be filled or cancelled
+                try:
+                    fetched = self.client.fetch_order(order_id, symbol)
+                    if fetched.get("status") == "closed":
+                        return fetched
+                    # Check for partial fill on cancel failure too
+                    filled_amount = float(fetched.get("filled", 0) or 0)
+                    if filled_amount > 0:
+                        remaining = amount - filled_amount
+                        remaining = self._round_amount(symbol, remaining)
+                        if remaining > 0:
+                            try:
+                                if side == "long":
+                                    rem_order = self.client.create_market_buy_order(symbol, remaining)
+                                else:
+                                    rem_order = self.client.create_market_sell_order(symbol, remaining)
+                                logger.info(f"[MAKER] Cancel failed but partial fill {filled_amount} — market remainder {remaining} {symbol}")
+                                return rem_order
+                            except Exception as me:
+                                logger.error(f"Market remainder failed for {symbol}: {me}")
+                                return fetched
+                        return fetched
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"[MAKER] Limit order failed for {symbol}: {e} — using market")
+
+        # Fallback: market order (taker)
+        try:
+            if side == "long":
+                order = self.client.create_market_buy_order(symbol, amount)
+            else:
+                order = self.client.create_market_sell_order(symbol, amount)
+            logger.info(f"[TAKER] Market {order_side} {amount} {symbol} (fallback)")
+            return order
+        except Exception as e:
+            logger.error(f"Market order also failed for {symbol}: {e}")
+            return None
+
     def open_long(self, symbol: str, margin_usdt: float, price: float = None) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_open(symbol, margin_usdt, side="long")
@@ -161,39 +382,37 @@ class Exchange:
         if not price:
             logger.error(f"Cannot open long for {symbol}: no valid price")
             return None
-        amount = self._coin_amount(symbol, margin_usdt, price)
-        for attempt in range(3):
-            try:
-                order = self.client.create_market_buy_order(symbol, amount, params={"marginMode": "isolated"})
-                logger.info(f"[LIVE] LONG {amount:.6f} {symbol} @ market (margin: {margin_usdt:.2f} USDT, {Config.LEVERAGE}x)")
-                return order
-            except Exception as e:
-                if self._is_rate_limit_error(e):
-                    logger.warning(f"Rate limited on open_long {symbol} (attempt {attempt+1}/3): {e}")
-                    time.sleep(1)
-                else:
-                    logger.error(f"Failed to open long for {symbol}: {e}")
-                    return None
-        logger.error(f"open_long {symbol} failed after 3 rate-limit retries")
-        return None
+        amount = self._round_amount(symbol, self._coin_amount(symbol, margin_usdt, price))
+        if amount <= 0:
+            logger.error(f"Amount rounded to 0 for {symbol}, skipping open_long")
+            return None
+        # Use best bid for maker entry (buy at bid = maker)
+        ob = self.get_order_book(symbol, depth=5)
+        limit_price = ob["best_bid"] if ob and ob.get("best_bid") else price
+        return self._try_limit_then_market(symbol, "long", amount, limit_price)
 
     def close_long(self, symbol: str, coin_amount: float) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_close(symbol, coin_amount, side="long")
-        for attempt in range(3):
-            try:
-                order = self.client.create_market_sell_order(symbol, coin_amount, params={"reduceOnly": True})
-                logger.info(f"[LIVE] CLOSE LONG {coin_amount:.6f} {symbol}")
-                return order
-            except Exception as e:
-                if self._is_rate_limit_error(e):
-                    logger.warning(f"Rate limited on close_long {symbol} (attempt {attempt+1}/3): {e}")
-                    time.sleep(1)
-                else:
-                    logger.error(f"Failed to close long for {symbol}: {e}")
-                    return None
-        logger.error(f"close_long {symbol} failed after 3 rate-limit retries")
-        return None
+        coin_amount = self._round_amount(symbol, coin_amount)
+        if coin_amount <= 0:
+            logger.error(f"Amount rounded to 0 for close_long {symbol}")
+            return None
+        # Sell at best ask for maker exit
+        ob = self.get_order_book(symbol, depth=5)
+        limit_price = ob["best_ask"] if ob and ob.get("best_ask") else None
+        if limit_price:
+            result = self._try_limit_exit(symbol, "sell", coin_amount, limit_price)
+            if result:
+                return result
+        # Fallback to market
+        try:
+            order = self.client.create_market_sell_order(symbol, coin_amount, params={"reduceOnly": True})
+            logger.info(f"[TAKER] CLOSE LONG {coin_amount} {symbol}")
+            return order
+        except Exception as e:
+            logger.error(f"Failed to close long for {symbol}: {e}")
+            return None
 
     # ── Short ────────────────────────────────────────────────────────────────
 
@@ -206,77 +425,196 @@ class Exchange:
         if not price:
             logger.error(f"Cannot open short for {symbol}: no valid price")
             return None
-        amount = self._coin_amount(symbol, margin_usdt, price)
-        for attempt in range(3):
-            try:
-                order = self.client.create_market_sell_order(symbol, amount, params={"marginMode": "isolated"})
-                logger.info(f"[LIVE] SHORT {amount:.6f} {symbol} @ market (margin: {margin_usdt:.2f} USDT, {Config.LEVERAGE}x)")
-                return order
-            except Exception as e:
-                if self._is_rate_limit_error(e):
-                    logger.warning(f"Rate limited on open_short {symbol} (attempt {attempt+1}/3): {e}")
-                    time.sleep(1)
-                else:
-                    logger.error(f"Failed to open short for {symbol}: {e}")
-                    return None
-        logger.error(f"open_short {symbol} failed after 3 rate-limit retries")
-        return None
+        amount = self._round_amount(symbol, self._coin_amount(symbol, margin_usdt, price))
+        if amount <= 0:
+            logger.error(f"Amount rounded to 0 for {symbol}, skipping open_short")
+            return None
+        # Use best ask for maker entry (sell at ask = maker)
+        ob = self.get_order_book(symbol, depth=5)
+        limit_price = ob["best_ask"] if ob and ob.get("best_ask") else price
+        return self._try_limit_then_market(symbol, "short", amount, limit_price)
 
     def close_short(self, symbol: str, coin_amount: float) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_close(symbol, coin_amount, side="short")
-        for attempt in range(3):
+        coin_amount = self._round_amount(symbol, coin_amount)
+        if coin_amount <= 0:
+            logger.error(f"Amount rounded to 0 for close_short {symbol}")
+            return None
+        # Buy at best bid for maker exit
+        ob = self.get_order_book(symbol, depth=5)
+        limit_price = ob["best_bid"] if ob and ob.get("best_bid") else None
+        if limit_price:
+            result = self._try_limit_exit(symbol, "buy", coin_amount, limit_price)
+            if result:
+                return result
+        # Fallback to market
+        try:
+            order = self.client.create_market_buy_order(symbol, coin_amount, params={"reduceOnly": True})
+            logger.info(f"[TAKER] CLOSE SHORT {coin_amount} {symbol}")
+            return order
+        except Exception as e:
+            logger.error(f"Failed to close short for {symbol}: {e}")
+            return None
+
+    def _try_limit_exit(self, symbol: str, side: str, amount: float, limit_price: float) -> Optional[dict]:
+        """Try limit exit for maker fees. Shorter timeout than entry (2s) since exits are more urgent."""
+        limit_price = self._round_price(symbol, limit_price)
+        try:
+            order = self.client.create_order(symbol, "limit", side, amount, limit_price,
+                                             params={"reduceOnly": True, "timeInForce": "GTC", "postOnly": True})
+            order_id = order.get("id")
+            logger.info(f"[MAKER EXIT] Limit {side} {amount} {symbol} @ {limit_price}")
+
+            for _ in range(4):  # 2s total
+                time.sleep(0.5)
+                try:
+                    fetched = self.client.fetch_order(order_id, symbol)
+                    if fetched.get("status") == "closed":
+                        logger.info(f"[MAKER EXIT] Filled for {symbol}")
+                        return fetched
+                except Exception:
+                    pass
+
+            # Cancel unfilled limit
             try:
-                order = self.client.create_market_buy_order(symbol, coin_amount, params={"reduceOnly": True})
-                logger.info(f"[LIVE] CLOSE SHORT {coin_amount:.6f} {symbol}")
-                return order
-            except Exception as e:
-                if self._is_rate_limit_error(e):
-                    logger.warning(f"Rate limited on close_short {symbol} (attempt {attempt+1}/3): {e}")
-                    time.sleep(1)
-                else:
-                    logger.error(f"Failed to close short for {symbol}: {e}")
-                    return None
-        logger.error(f"close_short {symbol} failed after 3 rate-limit retries")
-        return None
+                self.client.cancel_order(order_id, symbol)
+                # Check for partial fill after cancel
+                try:
+                    fetched = self.client.fetch_order(order_id, symbol)
+                    filled_amount = fetched.get("filled", 0) or 0
+                    if fetched.get("status") == "closed":
+                        logger.info(f"[MAKER EXIT] Filled (raced cancel) for {symbol}")
+                        return fetched
+                    if filled_amount > 0:
+                        # Market-close the remainder to avoid orphan position
+                        remaining = amount - float(filled_amount)
+                        remaining = self._round_amount(symbol, remaining)
+                        if remaining > 0:
+                            try:
+                                self.client.create_order(symbol, "market", side, remaining, None, params={"reduceOnly": True})
+                                logger.info(f"[MAKER EXIT] Partial {filled_amount}, market remainder {remaining} {symbol}")
+                            except Exception as me:
+                                logger.error(f"[MAKER EXIT] Remainder market failed {symbol}: {me}")
+                        return fetched
+                    else:
+                        logger.info(f"[MAKER EXIT] Not filled, cancelled {symbol}")
+                except Exception:
+                    logger.info(f"[MAKER EXIT] Cancelled {symbol}")
+            except Exception:
+                try:
+                    fetched = self.client.fetch_order(order_id, symbol)
+                    if fetched.get("status") == "closed":
+                        return fetched
+                    filled_amount = fetched.get("filled", 0) or 0
+                    if filled_amount > 0:
+                        # Market-close the remainder to avoid orphan position
+                        remaining = amount - float(filled_amount)
+                        remaining = self._round_amount(symbol, remaining)
+                        if remaining > 0:
+                            try:
+                                self.client.create_order(symbol, "market", side, remaining, None, params={"reduceOnly": True})
+                                logger.info(f"[MAKER EXIT] Partial {filled_amount}, market remainder {remaining} {symbol}")
+                            except Exception as me:
+                                logger.error(f"[MAKER EXIT] Remainder market failed {symbol}: {me}")
+                        return fetched
+                except Exception:
+                    pass
+            return None
+        except Exception as e:
+            logger.warning(f"[MAKER EXIT] Limit failed for {symbol}: {e}")
+            return None
+
+    def _round_price(self, symbol: str, price: float) -> float:
+        """Round price to exchange tick size to avoid rejection."""
+        try:
+            return float(self.client.price_to_precision(symbol, price))
+        except Exception:
+            return price
+
+    def _round_amount(self, symbol: str, amount: float) -> float:
+        """Round amount to exchange step size to avoid rejection."""
+        try:
+            return float(self.client.amount_to_precision(symbol, amount))
+        except Exception:
+            return amount
 
     def place_sl_tp(self, symbol: str, side: str, amount: float, sl_price: float, tp_price: float) -> dict:
         """Place stop-loss and take-profit orders on exchange. Returns order IDs."""
         order_side = "sell" if side == "long" else "buy"
         results = {"sl_order_id": None, "tp_order_id": None}
 
-        # Stop Loss — market stop order
+        # Round to exchange precision — unrounded prices cause silent rejections
+        sl_price = self._round_price(symbol, sl_price)
+        tp_price = self._round_price(symbol, tp_price)
+        amount = self._round_amount(symbol, amount)
+
+        if amount <= 0:
+            logger.error(f"SL/TP skip: amount rounded to 0 for {symbol}")
+            return results
+
+        # Stop Loss — conditional trigger order
+        # Phemex/ccxt requires triggerDirection: "descending" for long SL (price falling),
+        # "ascending" for short SL (price rising). Without this, ccxt raises ArgumentsRequired.
+        sl_trigger_dir = "descending" if side == "long" else "ascending"
         for attempt in range(3):
             try:
-                trigger_dir = "descending" if side == "long" else "ascending"
-                sl_params = {"reduceOnly": True, "stopPrice": sl_price, "triggerType": "ByLastPrice", "triggerDirection": trigger_dir}
-                sl_order = self.client.create_order(symbol, "stop_market", order_side, amount, sl_price, params=sl_params)
+                sl_params = {
+                    "reduceOnly": True,
+                    "triggerPrice": sl_price,
+                    "triggerDirection": sl_trigger_dir,
+                }
+                sl_order = self.client.create_order(symbol, "market", order_side, amount, None, params=sl_params)
                 results["sl_order_id"] = sl_order.get("id")
-                logger.info(f"SL order placed: {symbol} {order_side} @ {sl_price:.4f} (id={results['sl_order_id']})")
+                logger.info(f"SL order placed: {symbol} {order_side} trigger@{sl_price} dir={sl_trigger_dir} (id={results['sl_order_id']})")
                 break
             except Exception as e:
                 if self._is_rate_limit_error(e) and attempt < 2:
                     time.sleep(1)
                 else:
-                    logger.error(f"Failed to place SL for {symbol}: {e}")
+                    logger.error(f"Failed to place SL for {symbol} (attempt {attempt+1}): {e}")
                     break
 
-        # Take Profit — limit order
+        # Take Profit — limit order triggered at TP price (maker fee instead of taker)
+        tp_trigger_dir = "ascending" if side == "long" else "descending"
         for attempt in range(3):
             try:
-                tp_params = {"reduceOnly": True}
+                tp_params = {
+                    "reduceOnly": True,
+                    "triggerPrice": tp_price,
+                    "triggerDirection": tp_trigger_dir,
+                }
+                # Use limit order at TP price for maker fees (0.01% vs 0.06% taker)
                 tp_order = self.client.create_order(symbol, "limit", order_side, amount, tp_price, params=tp_params)
                 results["tp_order_id"] = tp_order.get("id")
-                logger.info(f"TP order placed: {symbol} {order_side} @ {tp_price:.4f} (id={results['tp_order_id']})")
+                logger.info(f"TP order placed (LIMIT/MAKER): {symbol} {order_side} trigger@{tp_price} dir={tp_trigger_dir} (id={results['tp_order_id']})")
                 break
             except Exception as e:
                 if self._is_rate_limit_error(e) and attempt < 2:
                     time.sleep(1)
                 else:
-                    logger.error(f"Failed to place TP for {symbol}: {e}")
+                    # Fallback to market TP if limit not supported
+                    try:
+                        tp_params_mkt = {"reduceOnly": True, "triggerPrice": tp_price, "triggerDirection": tp_trigger_dir}
+                        tp_order = self.client.create_order(symbol, "market", order_side, amount, None, params=tp_params_mkt)
+                        results["tp_order_id"] = tp_order.get("id")
+                        logger.info(f"TP order placed (MARKET fallback): {symbol} trigger@{tp_price}")
+                    except Exception as e2:
+                        logger.error(f"Failed to place TP for {symbol}: {e2}")
                     break
 
         return results
+
+    def verify_sl_order(self, symbol: str, sl_order_id: str) -> bool:
+        """Check if a stop-loss order is still active on the exchange."""
+        if not Config.is_live() or not sl_order_id:
+            return True  # assume OK in paper mode
+        try:
+            open_orders = self.client.fetch_open_orders(symbol)
+            return any(o.get("id") == sl_order_id for o in open_orders)
+        except Exception as e:
+            logger.warning(f"Could not verify SL order for {symbol}: {e}")
+            return True  # assume OK if we can't check
 
     def cancel_open_orders(self, symbol: str):
         """Cancel all open orders for a symbol — cleans up orphaned SL/TP after close."""

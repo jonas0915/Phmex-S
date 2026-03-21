@@ -4,6 +4,7 @@ Replaces REST polling of /md/ CDN endpoints to avoid IP bans.
 """
 import asyncio
 import threading
+import time as _time
 import pandas as pd
 import ccxt.pro as ccxtpro
 from logger import setup_logger
@@ -26,6 +27,7 @@ class WSDataFeed:
         self.symbols = symbols
         self.timeframe = timeframe
         self._cache: dict = {}           # symbol -> list of [ts_ms, o, h, l, c, v]
+        self._last_update: dict = {}     # symbol -> time.time() of last WS update
         self._lock = threading.Lock()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
@@ -49,7 +51,6 @@ class WSDataFeed:
         """Prime the OHLCV cache with REST history via paginated REST calls.
         Phemex caps at 100 candles per call, so we paginate backwards to get
         up to `limit` candles (default 200)."""
-        import time as _time
         # Map timeframe string to milliseconds for pagination offset
         tf_ms = {"1m": 60_000, "5m": 300_000, "15m": 900_000,
                  "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000}
@@ -113,9 +114,9 @@ class WSDataFeed:
         """Return cached OHLCV as a DataFrame (same format as exchange.get_ohlcv)."""
         with self._lock:
             data = self._cache.get(symbol)
-        if not data or len(data) < 2:
-            return None
-        rows = data[-limit:] if limit else data
+            if not data or len(data) < 2:
+                return None
+            rows = [list(row) for row in data[-limit:]] if limit else [list(row) for row in data]
         df = pd.DataFrame(rows, columns=["timestamp", "open", "high", "low", "close", "volume"])
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
         df.set_index("timestamp", inplace=True)
@@ -127,19 +128,39 @@ class WSDataFeed:
 
     @property
     def is_connected(self) -> bool:
-        return self._running and bool(self._cache)
+        """True only if running AND at least one symbol has fresh data (<120s old)."""
+        if not self._running or not self._cache:
+            return False
+        with self._lock:
+            now = _time.time()
+            return any(now - self._last_update.get(s, 0) < 120 for s in self._cache)
+
+    def is_stale(self, symbol: str, max_age_s: float = 120) -> bool:
+        """Return True if the symbol's WS data is older than max_age_s seconds."""
+        with self._lock:
+            last = self._last_update.get(symbol)
+        if last is None:
+            return True
+        return (_time.time() - last) > max_age_s
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
     def _run_loop(self):
-        self._loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._loop)
-        try:
-            self._loop.run_until_complete(self._watch_all())
-        except Exception as e:
-            logger.error(f"[WS] Event loop crashed: {e}")
-        finally:
-            self._loop.close()
+        while self._running:
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+            try:
+                self._loop.run_until_complete(self._watch_all())
+            except Exception as e:
+                logger.error(f"[WS] Event loop crashed: {e}")
+                if self._running:
+                    logger.info("[WS] Restarting event loop in 5s...")
+                    _time.sleep(5)
+            finally:
+                try:
+                    self._loop.close()
+                except Exception:
+                    pass
 
     async def _watch_all(self):
         params = {"enableRateLimit": True, "options": {"defaultType": "swap"}}
@@ -172,6 +193,7 @@ class WSDataFeed:
                         self._cache[symbol] = merged[-300:]
                     else:
                         self._cache[symbol] = new_candles[-300:]
+                    self._last_update[symbol] = _time.time()
                     if all(s in self._cache for s in self.symbols):
                         self._ready.set()
                 backoff = 2  # reset on success
