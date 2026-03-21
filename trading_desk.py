@@ -4858,6 +4858,93 @@ function createCSS2DLabel(charGroup, name, emoji) {
 
 }
 
+// ── ANIMATION HELPERS ──
+function attachAnimations(character) {
+  var mixer = character.userData.mixer;
+  if (!mixer) return;
+
+  var clips = {};
+  Object.entries(loadedAssets.animations).forEach(function([name, clip]) {
+    if (clip) {
+      var action = mixer.clipAction(clip);
+      clips[name] = action;
+      if (['idle-seated', 'typing', 'walking', 'phone-talk', 'arms-crossed'].includes(name)) {
+        action.loop = THREE.LoopRepeat;
+      } else {
+        action.loop = THREE.LoopOnce;
+        action.clampWhenFinished = true;
+      }
+    }
+  });
+  character.userData.clips = clips;
+
+  // Start with idle-seated
+  if (clips['idle-seated']) {
+    clips['idle-seated'].play();
+    character.userData.currentAction = clips['idle-seated'];
+  }
+}
+
+function playAnimation(character, animName, fadeTime) {
+  fadeTime = fadeTime || 0.3;
+  if (!character || !character.userData.clips) return;
+  var clips = character.userData.clips;
+  var newAction = clips[animName];
+  if (!newAction) return;
+
+  var current = character.userData.currentAction;
+  if (current === newAction && newAction.isRunning()) return;
+
+  if (current) {
+    current.fadeOut(fadeTime);
+  }
+
+  newAction.reset();
+  newAction.fadeIn(fadeTime);
+  newAction.play();
+  character.userData.currentAction = newAction;
+
+  // For one-shot animations, return to idle when done
+  if (newAction.loop === THREE.LoopOnce) {
+    var mixer = character.userData.mixer;
+    var onFinished = function(e) {
+      if (e.action === newAction) {
+        mixer.removeEventListener('finished', onFinished);
+        playAnimation(character, 'idle-seated');
+      }
+    };
+    mixer.addEventListener('finished', onFinished);
+  }
+}
+
+function startWalk(character, targetPos, onArrive) {
+  var name = character.userData.agentName;
+  agentWalkState[name] = {
+    walking: true,
+    from: character.position.clone(),
+    to: targetPos,
+    start: performance.now() / 1000,
+    duration: 3.5,
+    onArrive: onArrive || null,
+    deskPos: deskPositions[name]
+  };
+  playAnimation(character, 'walking');
+  character.rotation.y = Math.atan2(
+    targetPos.x - character.position.x,
+    targetPos.z - character.position.z
+  );
+}
+
+function walkBackToDesk(character) {
+  var name = character.userData.agentName;
+  var ws = agentWalkState[name];
+  var deskPos = (ws && ws.deskPos) || deskPositions[name];
+  if (!deskPos) return;
+  startWalk(character, new THREE.Vector3(deskPos.x, 0, deskPos.z), function() {
+    playAnimation(character, 'idle-seated');
+  });
+}
+
 // ── DESK POSITIONS ──
 // Layout:  [Scanner(-2.2,z-1.5)]  [Risk(2.2,z-1.5)]
 //              [Ensemble(0, z0.5) - bigger, forward]
@@ -4920,6 +5007,7 @@ Object.entries(deskPositions).forEach(([name, pos]) => {
   }
   ch.position.set(pos.x, 0, pos.z + 0.5*sc);
   ch.rotation.y = Math.PI; // face desk
+  if (ch.userData.isGLTF) attachAnimations(ch);
 
   const emojis = { scanner:'😊', risk:'😤', ensemble:'😎', tape:'😌', jonas:'', executor:'📈', strategy:'📊', ws_feed:'🧘', pos_monitor:'📡' };
   const emoji = name === 'jonas' ? '<img src="/jonas_avatar.jpg" style="width:28px;height:28px;border-radius:50%;border:2px solid #b8922a;" onerror="this.outerHTML=\'🧑\'">' : emojis[name];
@@ -6830,8 +6918,33 @@ function animate() {
   if(frameCount % 2 !== 0) return; // ~30fps instead of 60fps
   const t = clock.getElapsedTime();
 
-  // Character idle animations
+  // Update all GLTF animation mixers
+  var mixerDelta = 1/30; // fixed step for ~30fps (frame skipping above)
+  Object.values(charGroups).forEach(function(ch) {
+    if (ch.userData && ch.userData.mixer) {
+      ch.userData.mixer.update(mixerDelta);
+    }
+  });
+
+  // Walk interpolation for all agents
+  Object.entries(agentWalkState).forEach(function([name, state]) {
+    if (!state || !state.walking) return;
+    var elapsed = performance.now() / 1000 - state.start;
+    var progress = Math.min(elapsed / state.duration, 1);
+    // Quad ease-in-out
+    var eased = progress < 0.5 ? 2*progress*progress : 1 - Math.pow(-2*progress+2,2)/2;
+    if (charGroups[name]) {
+      charGroups[name].position.lerpVectors(state.from, state.to, eased);
+    }
+    if (progress >= 1) {
+      state.walking = false;
+      if (state.onArrive) state.onArrive();
+    }
+  });
+
+  // Character idle animations (procedural sine-wave — GLTF characters use AnimationMixer)
   Object.entries(charGroups).forEach(([name, g]) => {
+    if (g.userData.isGLTF) return; // GLTF characters animated by mixer clips
     const head = g.userData.head;
     if(head) {
       head.position.y = 0.88 + Math.sin(t*1.5 + name.length)*0.008;
