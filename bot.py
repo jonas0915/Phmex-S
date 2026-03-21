@@ -412,6 +412,32 @@ class Phmex2Bot:
                 self.exchange.cancel_open_orders(symbol)
                 notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "flat_exit")
 
+        # Adverse exit — bail out of wrong-direction trades early
+        for symbol, pos in list(self.risk.positions.items()):
+            if symbol not in self.risk.positions:
+                continue  # already closed by earlier exit this cycle
+            price = prices.get(symbol)
+            if not price:
+                continue
+            if pos.should_adverse_exit(self.cycle_count, price):
+                cycles_held = self.cycle_count - pos.entry_cycle
+                held_min = cycles_held * Config.LOOP_INTERVAL / 60
+                roi = pos.pnl_percent(price)
+                logger.info(f"[ADVERSE EXIT] {symbol} — {roi:.1f}% ROI after {held_min:.0f}min")
+                if pos.side == "long":
+                    order = self.exchange.close_long(symbol, pos.amount)
+                else:
+                    order = self.exchange.close_short(symbol, pos.amount)
+                if not order:
+                    logger.error(f"[ADVERSE EXIT] Close order failed for {symbol}")
+                    continue
+                fill_price = self._extract_fill_price(order, price, is_exit=True)
+                self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
+                self.risk.close_position(symbol, fill_price, "adverse_exit")
+                self.exchange.cancel_open_orders(symbol)
+                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "adverse_exit")
+                continue
+
         # Check if exchange already closed positions (exchange SL/TP triggered)
         if Config.is_live() and self.risk.positions:
             self._sync_exchange_closes(prices)
@@ -628,8 +654,24 @@ class Phmex2Bot:
                     cvd_data=cvd_data, hurst_val=hurst_val, funding_data=funding_data,
                     strategy=strat_name
                 )
-                if confidence < 3:
-                    logger.info(f"[ENSEMBLE SKIP] {symbol} {direction} — confidence {confidence}/6 too low, need 3+")
+                # Strategy-aware confidence thresholds
+                # Start conservative: all at 3. Lower reversion to 2 after proving adverse_exit works.
+                CONFIDENCE_THRESHOLDS = {
+                    "htf_confluence_pullback": 3,
+                    "htf_confluence_vwap": 3,
+                    "vwap_reversion": 3,
+                    "bb_mean_reversion": 3,
+                    "momentum_continuation": 3,
+                    "trend_pullback": 3,
+                    "keltner_squeeze": 3,
+                }
+                min_confidence = CONFIDENCE_THRESHOLDS.get(strat_name, 3)
+
+                if confidence < min_confidence:
+                    logger.info(
+                        f"[ENSEMBLE SKIP] {symbol} {direction} — confidence {confidence}/{min_confidence} "
+                        f"too low for {strat_name}, need {min_confidence}+"
+                    )
                     continue
 
                 # Apply funding rate strength modifier
