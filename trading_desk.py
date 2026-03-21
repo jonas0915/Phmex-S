@@ -4396,7 +4396,7 @@ function createLamp(parent, lx, lz) {
   return light;
 }
 
-function createCharacter(color, hairColor, name) {
+function createProceduralCharacter(color, hairColor, name) {
   const g = new THREE.Group();
 
   // ── Per-character style configs (Sims 4 style) ──
@@ -4776,9 +4776,43 @@ function createCharacter(color, hairColor, name) {
   rightShoe.position.set(0.08, 0.02, 0.22); rightShoe.rotation.x = Math.PI/2;
   g.add(rightShoe); g.userData.rightShoe = rightShoe;
 
+  g.userData.agentName = name;
+  g.userData.isGLTF = false;
+
   scene.add(g);
   charGroups[name] = g;
   return g;
+}
+
+function createCharacterFromGLTF(name, gltfData, config) {
+  const model = gltfData.scene.clone();
+
+  // Mixamo models are typically in cm, scale to scene units
+  const scale = config.scale || 0.01;
+  model.scale.set(scale, scale, scale);
+
+  // Enable shadows on all meshes
+  model.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+      if (child.material) {
+        child.material.envMapIntensity = 0.5;
+      }
+    }
+  });
+
+  // Create animation mixer for this character
+  const mixer = new THREE.AnimationMixer(model);
+  model.userData.mixer = mixer;
+  model.userData.clips = {};
+  model.userData.currentAction = null;
+  model.userData.agentName = name;
+  model.userData.isGLTF = true;
+
+  scene.add(model);
+  charGroups[name] = model;
+  return model;
 }
 
 function createCSS2DLabel(charGroup, name, emoji) {
@@ -4862,7 +4896,7 @@ Object.entries(deskPositions).forEach(([name, pos]) => {
   // Lamp
   deskLights[name] = createLamp(desk, -0.45*sc, -0.15*sc);
 
-  // Character
+  // Character — try GLTF model first, fall back to procedural
   const charColors = {
     ensemble:    { body:0x4a3878, hair:0xc8c8d5 },  // muted purple blazer
     scanner:     { body:0x2a5535, hair:0x1a1a1a },  // dark forest green
@@ -4875,7 +4909,15 @@ Object.entries(deskPositions).forEach(([name, pos]) => {
     pos_monitor: { body:0x3a6858, hair:0x2a2a20 },  // forest teal — position monitor
   };
   const cc = charColors[name];
-  const ch = createCharacter(cc.body, cc.hair, name);
+  const gltfData = loadedAssets.characters[name];
+  let ch;
+  if (gltfData) {
+    ch = createCharacterFromGLTF(name, gltfData, {
+      scale: name === 'jonas' ? 0.012 : (name === 'ensemble' ? 0.011 : 0.01)
+    });
+  } else {
+    ch = createProceduralCharacter(cc.body, cc.hair, name);
+  }
   ch.position.set(pos.x, 0, pos.z + 0.5*sc);
   ch.rotation.y = Math.PI; // face desk
 
