@@ -812,13 +812,44 @@ bayFill.position.set(0, 3, -20);
 scene.add(bayFill);
 
 // ── MATERIALS ──
-const floorMat = new THREE.MeshStandardMaterial({ color:0x6a6560, roughness:0.55, metalness:0.08 }); // matte concrete floor
-const ceilMat = new THREE.MeshStandardMaterial({ color:0x2e2e35, roughness:0.9 });
+// Procedural concrete normal map
+var concreteCanvas = document.createElement('canvas');
+concreteCanvas.width = 256; concreteCanvas.height = 256;
+var cCtx = concreteCanvas.getContext('2d');
+var imgData = cCtx.createImageData(256, 256);
+for (var i = 0; i < imgData.data.length; i += 4) {
+  var v = 128 + (Math.random() - 0.5) * 25;
+  imgData.data[i] = v;
+  imgData.data[i+1] = v;
+  imgData.data[i+2] = 255;
+  imgData.data[i+3] = 255;
+}
+cCtx.putImageData(imgData, 0, 0);
+var concreteNormal = new THREE.CanvasTexture(concreteCanvas);
+concreteNormal.wrapS = concreteNormal.wrapT = THREE.RepeatWrapping;
+concreteNormal.repeat.set(4, 4);
+const floorMat = new THREE.MeshStandardMaterial({ color:0x6a6560, roughness:0.45, metalness:0.05, normalMap:concreteNormal, normalScale:new THREE.Vector2(0.3, 0.3) }); // polished concrete floor
+// Acoustic panel grid normal map
+var gridCanvas = document.createElement('canvas');
+gridCanvas.width = 128; gridCanvas.height = 128;
+var gCtx = gridCanvas.getContext('2d');
+gCtx.fillStyle = 'rgb(128,128,255)';
+gCtx.fillRect(0, 0, 128, 128);
+gCtx.strokeStyle = 'rgb(140,140,255)';
+gCtx.lineWidth = 1;
+for (var gi = 0; gi <= 128; gi += 16) {
+  gCtx.beginPath(); gCtx.moveTo(gi, 0); gCtx.lineTo(gi, 128); gCtx.stroke();
+  gCtx.beginPath(); gCtx.moveTo(0, gi); gCtx.lineTo(128, gi); gCtx.stroke();
+}
+var gridNormal = new THREE.CanvasTexture(gridCanvas);
+gridNormal.wrapS = gridNormal.wrapT = THREE.RepeatWrapping;
+gridNormal.repeat.set(6, 5);
+const ceilMat = new THREE.MeshStandardMaterial({ color:0x2e2e35, roughness:0.9, metalness:0.0, normalMap:gridNormal, normalScale:new THREE.Vector2(0.2, 0.2) });
 const deskMat = new THREE.MeshPhysicalMaterial({ color:0x3a3838, roughness:0.2, metalness:0.3, clearcoat:0.5, clearcoatRoughness:0.15 }); // dark professional desk
 const deskPanelMat = new THREE.MeshStandardMaterial({ color:0x333338, roughness:0.45, metalness:0.15 });
 const legMat = new THREE.MeshStandardMaterial({ color:0x888888, roughness:0.25, metalness:0.85 }); // brushed chrome
 const chairMat = new THREE.MeshPhysicalMaterial({ color:0x222222, roughness:0.5, metalness:0.03, clearcoat:0.15, clearcoatRoughness:0.7, sheen:0.2, sheenRoughness:0.85, sheenColor:new THREE.Color(0x333333) }); // dark leather
-const monFrameMat = new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.2, metalness:0.6 }); // sleek bezels
+const monFrameMat = new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.15, metalness:0.9, envMapIntensity:0.8 }); // reflective bezels
 const lampBaseMat = new THREE.MeshStandardMaterial({ color:0x666666, roughness:0.25, metalness:0.75 });
 const lampShadeMat = new THREE.MeshStandardMaterial({ color:0x2a2a2a, roughness:0.65, side:THREE.DoubleSide });
 const kbMat = new THREE.MeshStandardMaterial({ color:0x151515, roughness:0.45, metalness:0.25 });
@@ -2063,9 +2094,15 @@ for(let x=-3;x<=3;x+=6){
 
 // ── FLOOR-TO-CEILING GLASS WALLS WITH SF PANORAMA ──
 const glassMat = new THREE.MeshPhysicalMaterial({
-  color:0x88aacc, transparent:true, opacity:0.04,
-  roughness:0.05, metalness:0.1, side:THREE.DoubleSide,
+  color:0x88aacc, transmission:0.95, ior:1.5,
+  clearcoat:1.0, clearcoatRoughness:0.05,
+  roughness:0.0, metalness:0.0, side:THREE.DoubleSide, transparent:true,
 });
+// Glass performance fallback
+setTimeout(function() {
+  // If very low FPS, revert glass to simple opacity
+  // (actual FPS check will be in Task 11's animate loop)
+}, 5000);
 const frameMat = new THREE.MeshStandardMaterial({color:0x334450, metalness:0.7, roughness:0.3});
 
 // Create panorama for each wall direction (time-synced)
