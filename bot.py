@@ -1,16 +1,40 @@
 import time
 import subprocess
+from collections import deque
 from config import Config
 from exchange import Exchange
 from indicators import add_all_indicators
 from risk_manager import RiskManager
-from strategies import STRATEGIES, Signal
-from scanner import scan_top_gainers, volatility_scan
+from strategies import STRATEGIES, Signal, TradeSignal
+from scanner import scan_top_gainers, volatility_scan, start_background_scan, get_scan_result
 from logger import setup_logger
 from ws_feed import WSDataFeed
 import notifier
 
 logger = setup_logger()
+
+
+def _extract_strategy_name(reason: str) -> str:
+    """Derive strategy key from signal reason string for time exit lookup."""
+    r = reason.lower()
+    if "kc squeeze" in r or "keltner" in r:
+        return "keltner_squeeze"
+    if "bb" in r or "mean reversion" in r:
+        return "bb_mean_reversion"
+    if "trend pullback" in r:
+        return "trend_pullback"
+    if "trend scalp" in r or "trend_scalp" in r:
+        return "trend_scalp"
+    if "momentum cont" in r or "momentum_continuation" in r:
+        return "momentum_continuation"
+    if "vwap reversion" in r or "vwap_reversion" in r:
+        return "vwap_reversion"
+    if "confluence pullback" in r:
+        return "htf_confluence_pullback"
+    if "confluence vwap" in r:
+        return "htf_confluence_vwap"
+    return ""
+
 
 # ExpressVPN server rotation list — cycled through on each CDN ban
 _VPN_SERVERS = [
@@ -48,7 +72,7 @@ class Phmex2Bot:
         Config.validate()
         self.exchange = Exchange()
         self.risk = RiskManager()
-        self.strategy_fn = STRATEGIES.get(Config.STRATEGY, STRATEGIES["combined"])
+        self.strategy_fn = STRATEGIES.get(Config.STRATEGY, STRATEGIES["adaptive"])
         self.running = False
         self.cycle_count = 0
         self.active_pairs = Config.TRADING_PAIRS[:]
@@ -58,6 +82,106 @@ class Phmex2Bot:
         self.ban_mode_until = 0
         self._ws_feed: WSDataFeed | None = None
         self._empty_price_cycles = 0  # consecutive cycles with no ticker data (CDN ban detection)
+        self._loss_streak = 0    # consecutive losses for streak-based sizing
+        self._pair_cooldown: dict[str, float] = {}  # symbol -> timestamp when cooldown expires
+        self._pair_loss_streak: dict[str, int] = {}  # symbol -> consecutive loss count
+        self._last_entry_time: float = 0  # global cooldown between any new entry
+        self._trade_results: deque = deque(self.risk.trade_results, maxlen=6)  # rolling window of last 6 trade results (True=win, False=loss)
+        self._regime_pause_until: float = 0  # timestamp when regime pause expires
+        self._htf_cache: dict[str, tuple] = {}  # symbol -> (DataFrame, fetch_timestamp) for 1h candles
+        self._funding_cache: dict[str, tuple] = {}  # symbol -> (data, fetch_timestamp) for funding rates
+
+    def _fetch_htf_data(self, symbol: str):
+        """Fetch 1h candle data with 5-minute cache. Returns indicator-enriched DataFrame or None."""
+        cached = self._htf_cache.get(symbol)
+        if cached:
+            df, ts = cached
+            if time.time() - ts < 300:  # 5 min cache
+                return df
+        try:
+            df_raw = self.exchange.get_ohlcv(symbol, "1h", limit=100)
+            if df_raw is not None and len(df_raw) >= 30:
+                df = add_all_indicators(df_raw)
+                self._htf_cache[symbol] = (df, time.time())
+                return df
+        except Exception as e:
+            logger.debug(f"[HTF] Failed to fetch 1h data for {symbol}: {e}")
+        return cached[0] if cached else None  # return stale cache over nothing
+
+    def _fetch_funding_rate(self, symbol: str) -> dict | None:
+        """Fetch funding rate with 4-hour cache. Returns stale cache on REST failure."""
+        cached = self._funding_cache.get(symbol)
+        if cached:
+            data, ts = cached
+            if time.time() - ts < 14400:  # 4 hr cache
+                return data
+        data = self.exchange.get_funding_rate(symbol)
+        if data is not None:
+            self._funding_cache[symbol] = (data, time.time())
+            return data
+        return cached[0] if cached else None
+
+    def _compute_confidence(self, direction: str, df, ob: dict | None, htf_df=None,
+                            cvd_data: dict | None = None, hurst_val: float = 0.5,
+                            funding_data: dict | None = None,
+                            strategy: str = "") -> tuple[int, list[str]]:
+        """Count independent confirmation layers for the signal direction.
+        Returns (count, list_of_confirmed_layers).
+        Layers: HTF trend, VWAP position, CVD direction, Hurst regime, Funding rate, OB imbalance."""
+        confirmed = []
+        last = df.iloc[-1]
+        is_long = direction == "long"
+
+        # 1. HTF trend — 1h EMA slope confirms direction
+        if htf_df is not None and len(htf_df) >= 2:
+            htf_last = htf_df.iloc[-1]
+            htf_ema50 = htf_last.get("ema_50", 0)
+            htf_ema50_prev = htf_df.iloc[-2].get("ema_50", 0)
+            if htf_ema50 and htf_ema50_prev:
+                htf_slope = (htf_ema50 - htf_ema50_prev) / htf_ema50_prev if htf_ema50_prev else 0
+                if (is_long and htf_slope > 0) or (not is_long and htf_slope < 0):
+                    confirmed.append("htf_trend")
+
+        # 2. VWAP position — price above VWAP for longs, below for shorts
+        vwap_val = last.get("vwap", 0)
+        close_val = last.get("close", 0)
+        if vwap_val and close_val:
+            if (is_long and close_val > vwap_val) or (not is_long and close_val < vwap_val):
+                confirmed.append("vwap_pos")
+
+        # 3. CVD direction — buying pressure for longs, selling for shorts
+        #    Divergence upgrades the label but doesn't add a second count
+        if cvd_data:
+            cvd_slope = cvd_data.get("cvd_slope", 0)
+            div = cvd_data.get("divergence")
+            if (is_long and div == "bullish") or (not is_long and div == "bearish"):
+                confirmed.append("cvd_divergence")  # strongest form
+            elif (is_long and cvd_slope > 0) or (not is_long and cvd_slope < 0):
+                confirmed.append("cvd")
+
+        # 4. Hurst regime match — must align with strategy type
+        reversion_strats = {"vwap_reversion", "htf_confluence_vwap", "bb_mean_reversion"}
+        trend_strats = {"momentum_continuation", "trend_pullback", "keltner_squeeze", "htf_confluence_pullback"}
+        if hurst_val and not (hurst_val != hurst_val):  # not NaN
+            if hurst_val > 0.55 and (not strategy or strategy in trend_strats):
+                confirmed.append("hurst_trend")
+            elif hurst_val < 0.45 and (not strategy or strategy in reversion_strats):
+                confirmed.append("hurst_revert")
+
+        # 5. Funding rate — contrarian signal
+        if funding_data:
+            fsig = funding_data.get("signal")
+            if (is_long and fsig == "long") or (not is_long and fsig == "short"):
+                confirmed.append("funding")
+
+        # 6. Order book imbalance — bid-heavy for longs, ask-heavy for shorts
+        if ob:
+            imb = ob.get("imbalance", 0)
+            if (is_long and imb > 0.1) or (not is_long and imb < -0.1):
+                confirmed.append("ob_imbalance")
+
+        logger.info(f"[ENSEMBLE] {direction} confidence={len(confirmed)}/{6} layers={','.join(confirmed) or 'none'}")
+        return len(confirmed), confirmed
 
     def start(self):
         logger.info(f"Phmex-S Scalp Bot starting | Mode: {Config.MODE.upper()} | Strategy: {Config.STRATEGY}")
@@ -76,8 +200,19 @@ class Phmex2Bot:
         logger.info(f"Starting balance: {balance:.2f} {Config.BASE_CURRENCY}")
 
         if Config.SCANNER_ENABLED:
-            logger.info(f"Volatility scanner ON — top {Config.SCANNER_TOP_N} pairs, min vol ${Config.SCANNER_MIN_VOLUME:,.0f}, refresh every {Config.SCANNER_REFRESH_CYCLES} cycles (~{Config.SCANNER_REFRESH_CYCLES * Config.LOOP_INTERVAL}s)")
-            logger.info(f"[SCANNER] First scan runs at cycle {Config.SCANNER_REFRESH_CYCLES} (~{Config.SCANNER_REFRESH_CYCLES * Config.LOOP_INTERVAL}s from now).")
+            logger.info(f"Volume scanner ON — top {Config.SCANNER_TOP_N} pairs, min vol ${Config.SCANNER_MIN_VOLUME:,.0f}, refresh every {Config.SCANNER_REFRESH_CYCLES} cycles (~{Config.SCANNER_REFRESH_CYCLES * Config.LOOP_INTERVAL}s)")
+            if not self.active_pairs:
+                logger.info("[SCANNER] No static pairs configured — running initial scan synchronously...")
+                for _scan_attempt in range(3):
+                    initial_pairs = volatility_scan(self.exchange.client)
+                    if initial_pairs:
+                        self.active_pairs = initial_pairs
+                        logger.info(f"[SCANNER] Initial pairs: {', '.join(self.active_pairs)}")
+                        break
+                    logger.warning(f"[SCANNER] Initial scan attempt {_scan_attempt+1}/3 failed, retrying in 15s...")
+                    time.sleep(15)
+                if not self.active_pairs:
+                    logger.error("[SCANNER] All initial scan attempts failed — bot will retry via background scanner")
         logger.info(f"Trading pairs: {', '.join(self.active_pairs)}")
         notifier.notify_startup(balance, self.active_pairs, Config.MODE, Config.STRATEGY)
 
@@ -102,10 +237,29 @@ class Phmex2Bot:
                 self.ban_mode = True
                 self.ban_mode_until = time.time() + 120
             elif open_pos:
-                own_pos = [p for p in open_pos if p["symbol"] in self.active_pairs]
-                if own_pos:
-                    self.risk.sync_positions(own_pos)
-                    logger.info(f"Synced {len(own_pos)} open position(s) from exchange")
+                # Sync ALL open positions — don't filter by active_pairs
+                # (positions may exist on pairs not yet in the scanner/config list)
+                if open_pos:
+                    self.risk.sync_positions(open_pos, current_cycle=self.cycle_count)
+                    logger.info(f"Synced {len(open_pos)} open position(s) from exchange")
+                    # Place exchange SL/TP for synced positions (they have sl_order_id=None)
+                    for sym, pos in self.risk.positions.items():
+                        if pos.sl_order_id is None:
+                            self.exchange.cancel_open_orders(sym)
+                            sl_tp = self.exchange.place_sl_tp(sym, pos.side, pos.amount, pos.stop_loss, pos.take_profit)
+                            pos.sl_order_id = sl_tp.get("sl_order_id")
+                            pos.tp_order_id = sl_tp.get("tp_order_id")
+                            if pos.sl_order_id:
+                                logger.info(f"[SYNC] Placed exchange SL/TP for {sym} — SL@{pos.stop_loss:.4f} TP@{pos.take_profit:.4f}")
+                            else:
+                                pos.sl_order_id = "software"
+                                logger.warning(f"[SYNC] Exchange SL failed for {sym} — using software SL@{pos.stop_loss:.4f}")
+                    # Add synced symbols to active pairs so they get monitored
+                    synced_symbols = {p["symbol"] for p in open_pos}
+                    new_symbols = synced_symbols - set(self.active_pairs)
+                    if new_symbols:
+                        self.active_pairs = list(set(self.active_pairs) | synced_symbols)
+                        logger.info(f"[SYNC] Added {len(new_symbols)} symbol(s) to active pairs: {', '.join(new_symbols)}")
                 else:
                     logger.info("No open positions found on exchange.")
 
@@ -154,15 +308,21 @@ class Phmex2Bot:
         self.cycle_count += 1
         logger.info(f"Cycle #{self.cycle_count} | Positions: {len(self.risk.positions)}")
 
-        # Refresh volatility scan periodically
+        # Refresh volatility scan periodically (non-blocking background thread)
         if Config.SCANNER_ENABLED and self.cycle_count % Config.SCANNER_REFRESH_CYCLES == 0:
-            logger.info("[SCANNER] Running volatility scan...")
-            new_pairs = volatility_scan(self.exchange.client)
-            held = set(self.risk.positions.keys())
-            self.active_pairs = list(held | set(new_pairs))
-            # Subscribe WS to any new pairs so they stream live candles
-            if self._ws_feed:
-                self._ws_feed.subscribe(self.active_pairs)
+            logger.info("[SCANNER] Launching background volatility scan...")
+            start_background_scan()  # uses its own dedicated ccxt client
+
+        # Pick up background scan results when ready
+        if Config.SCANNER_ENABLED:
+            scan_result = get_scan_result()
+            if scan_result:
+                held = set(self.risk.positions.keys())
+                self.active_pairs = list(held | set(scan_result))
+                # Subscribe WS to any new pairs so they stream live candles
+                if self._ws_feed:
+                    self._ws_feed.subscribe(self.active_pairs)
+                logger.info(f"[SCANNER] Updated pairs: {', '.join(self.active_pairs)}")
 
         # Fetch OHLCV for all pairs. WS feed is tried first; falls back to REST
         # for symbols not yet in the WS cache (e.g. freshly scanned pairs).
@@ -171,10 +331,11 @@ class Phmex2Bot:
         all_symbols = list(set(self.active_pairs) | set(self.risk.positions.keys()))
         for symbol in all_symbols:
             df_raw = None
-            if self._ws_feed:
+            if self._ws_feed and not self._ws_feed.is_stale(symbol):
                 df_raw = self._ws_feed.get_ohlcv(symbol, limit=Config.CANDLE_LOOKBACK)
             if df_raw is None:
                 df_raw = self.exchange.get_ohlcv(symbol, Config.TIMEFRAME, limit=Config.CANDLE_LOOKBACK)
+                time.sleep(0.5)  # throttle REST fallback to avoid CDN ban
             if df_raw is not None and len(df_raw) >= 2:
                 ohlcv_cache[symbol] = df_raw
                 prices[symbol] = float(df_raw.iloc[-1]["close"])
@@ -215,12 +376,120 @@ class Phmex2Bot:
                         order = self.exchange.close_long(symbol, pos.amount)
                     else:
                         order = self.exchange.close_short(symbol, pos.amount)
-                    fill_price = self._extract_fill_price(order, price)
+                    if not order:
+                        logger.error(f"[EARLY EXIT] Close order failed for {symbol} — position still open on exchange")
+                        continue
+                    fill_price = self._extract_fill_price(order, price, is_exit=True)
+                    self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                     self.risk.close_position(symbol, fill_price, "early_exit")
                     self.exchange.cancel_open_orders(symbol)
                     notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "early_exit")
             except Exception as e:
                 logger.debug(f"Early exit check failed for {symbol}: {e}")
+
+        # Flat exit — cut indecisive positions after 20 min
+        for symbol, pos in list(self.risk.positions.items()):
+            if symbol not in self.risk.positions:
+                continue  # already closed by early_exit above
+            price = prices.get(symbol)
+            if not price:
+                continue
+            if pos.should_flat_exit(self.cycle_count, price):
+                roi = pos.pnl_percent(price)
+                cycles_held = self.cycle_count - pos.entry_cycle
+                held_min = cycles_held * Config.LOOP_INTERVAL / 60
+                logger.info(f"[FLAT EXIT] {symbol} — {roi:.1f}% ROI after {held_min:.0f}min (no momentum)")
+                if pos.side == "long":
+                    order = self.exchange.close_long(symbol, pos.amount)
+                else:
+                    order = self.exchange.close_short(symbol, pos.amount)
+                if not order:
+                    logger.error(f"[FLAT EXIT] Close order failed for {symbol}")
+                    continue
+                fill_price = self._extract_fill_price(order, price, is_exit=True)
+                self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
+                self.risk.close_position(symbol, fill_price, "flat_exit")
+                self.exchange.cancel_open_orders(symbol)
+                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "flat_exit")
+
+        # Check if exchange already closed positions (exchange SL/TP triggered)
+        if Config.is_live() and self.risk.positions:
+            self._sync_exchange_closes(prices)
+
+        # Verify SL orders still active — re-place if cancelled (skip software-managed)
+        for symbol, pos in list(self.risk.positions.items()):
+            if pos.sl_order_id == "software":
+                continue  # managed by bot's check_positions loop
+            if pos.sl_order_id and not self.exchange.verify_sl_order(symbol, pos.sl_order_id):
+                logger.warning(f"[SL CHECK] SL order missing for {symbol} — re-placing")
+                self.exchange.cancel_open_orders(symbol)
+                sl_tp = self.exchange.place_sl_tp(symbol, pos.side, pos.amount, pos.stop_loss, pos.take_profit or pos.entry_price)
+                pos.sl_order_id = sl_tp.get("sl_order_id")
+                pos.tp_order_id = sl_tp.get("tp_order_id")
+                if not pos.sl_order_id:
+                    # Fall back to software SL/TP — preserve existing SL/TP values
+                    # (may be ATR-based or breakeven-adjusted, don't overwrite with Config %)
+                    pos.sl_order_id = "software"
+                    logger.warning(f"[SL FALLBACK] Re-place failed for {symbol} — switching to software SL@{pos.stop_loss:.4f} TP@{pos.take_profit:.4f}")
+
+        # Time-based exit — close stale positions (strategy-specific thresholds)
+        for symbol, pos in list(self.risk.positions.items()):
+            if symbol not in self.risk.positions:
+                continue  # already closed by early_exit/flat_exit this cycle
+            price = prices.get(symbol)
+            if not price:
+                continue
+            should_exit, is_hard = pos.should_time_exit(self.cycle_count, current_price=price)
+            if should_exit:
+                pnl_pct = pos.pnl_percent(price)
+                # Soft exit: only if in the red. Hard exit: unconditional.
+                if is_hard or pnl_pct < 0:
+                    cycles_held = self.cycle_count - pos.entry_cycle
+                    held_min = cycles_held * Config.LOOP_INTERVAL / 60
+                    exit_type = "hard_time_exit" if is_hard else "time_exit"
+                    logger.info(f"[{exit_type.upper()}] {symbol} — {pnl_pct:.1f}% PnL after {held_min:.0f}min (strat={pos.strategy or 'default'})")
+                    if pos.side == "long":
+                        order = self.exchange.close_long(symbol, pos.amount)
+                    else:
+                        order = self.exchange.close_short(symbol, pos.amount)
+                    if not order:
+                        logger.error(f"[{exit_type.upper()}] Close order failed for {symbol} — position still open on exchange")
+                        continue
+                    fill_price = self._extract_fill_price(order, price, is_exit=True)
+                    self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
+                    self.risk.close_position(symbol, fill_price, exit_type)
+                    self.exchange.cancel_open_orders(symbol)
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), exit_type)
+
+        # Break-even and trailing stop updates
+        for symbol, pos in list(self.risk.positions.items()):
+            if symbol not in self.risk.positions:
+                continue  # already closed earlier this cycle
+            price = prices.get(symbol)
+            if not price:
+                continue
+            old_sl = pos.stop_loss
+            pos.check_breakeven(price)
+            pos.update_trailing_stop(price)
+            # If SL ratcheted, update the exchange order
+            if pos.stop_loss != old_sl and pos.sl_order_id and pos.sl_order_id != "software":
+                self.exchange.cancel_open_orders(symbol)
+                tp_price = pos.take_profit if pos.take_profit is not None else None
+                if tp_price is not None:
+                    sl_tp = self.exchange.place_sl_tp(symbol, pos.side, pos.amount, pos.stop_loss, tp_price)
+                else:
+                    # Partial-close mode: no TP, place SL only
+                    sl_tp = self.exchange.place_sl_tp(symbol, pos.side, pos.amount, pos.stop_loss, pos.entry_price)
+                    # We don't actually want a TP at entry, so cancel the TP if placed
+                    if sl_tp.get("tp_order_id"):
+                        try:
+                            self.exchange.client.cancel_order(sl_tp["tp_order_id"], symbol)
+                        except Exception:
+                            pass
+                        sl_tp["tp_order_id"] = None
+                pos.sl_order_id = sl_tp.get("sl_order_id") or "software"
+                pos.tp_order_id = sl_tp.get("tp_order_id")
+                logger.info(f"[BREAKEVEN] {symbol} exchange SL updated to {pos.stop_loss:.4f}")
 
         # Check exit conditions for open positions
         to_close = self.risk.check_positions(prices)
@@ -229,28 +498,18 @@ class Phmex2Bot:
             if price:
                 pos = self.risk.positions.get(symbol)
                 if pos:
-                    if reason == "partial_tp":
-                        half = self.risk.partial_close_position(symbol, price)
-                        if half:
-                            if pos.side == "long":
-                                order = self.exchange.close_long(symbol, half)
-                            else:
-                                order = self.exchange.close_short(symbol, half)
-                            fill_price = self._extract_fill_price(order, price)
-                            self.exchange.cancel_open_orders(symbol)
-                            notifier.notify_partial_tp(symbol, pos.side, fill_price, pos.pnl_usdt(fill_price) / 2, pos.pnl_percent(fill_price))
-                            remaining_pos = self.risk.positions.get(symbol)
-                            if remaining_pos:
-                                self.exchange.place_sl_tp(symbol, remaining_pos.side, remaining_pos.amount, remaining_pos.stop_loss, remaining_pos.stop_loss * (1.06 if remaining_pos.side == "long" else 0.94))
+                    if pos.side == "long":
+                        order = self.exchange.close_long(symbol, pos.amount)
                     else:
-                        if pos.side == "long":
-                            order = self.exchange.close_long(symbol, pos.amount)
-                        else:
-                            order = self.exchange.close_short(symbol, pos.amount)
-                        fill_price = self._extract_fill_price(order, price)
-                        notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), reason)
-                        self.risk.close_position(symbol, fill_price, reason)
-                        self.exchange.cancel_open_orders(symbol)
+                        order = self.exchange.close_short(symbol, pos.amount)
+                    if not order:
+                        logger.error(f"[SOFTWARE SL/TP] Close order failed for {symbol} — position still open on exchange")
+                        continue
+                    fill_price = self._extract_fill_price(order, price, is_exit=True)
+                    self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), reason)
+                    self.risk.close_position(symbol, fill_price, reason)
+                    self.exchange.cancel_open_orders(symbol)
 
         # Check for new entry signals
         available = self.exchange.get_balance(Config.BASE_CURRENCY)     # free balance for trade sizing
@@ -258,8 +517,34 @@ class Phmex2Bot:
         real_balance = available + margin_in_use                        # true equity for drawdown tracking
         self.risk.update_peak_balance(real_balance)
 
+        # Regime filter — pause all entries after consecutive losses
+        if time.time() < self._regime_pause_until:
+            remaining = int(self._regime_pause_until - time.time())
+            if self.cycle_count % 20 == 0:  # log every ~5 min
+                logger.info(f"[REGIME] Entries paused — {remaining}s remaining")
+            return  # skip entire entry section, but exits still processed above
+
+        # Pre-compute indicators for entry signals
+        indicator_cache = {}
+        for sym in self.active_pairs:
+            if sym in self.risk.positions:
+                continue
+            df_raw = ohlcv_cache.get(sym)
+            if df_raw is None or len(df_raw) < 50:
+                continue
+            df_ind = add_all_indicators(df_raw)
+            if len(df_ind) < 14:
+                continue
+            indicator_cache[sym] = df_ind
+
         for symbol in self.active_pairs:
             if symbol in self.risk.positions:
+                continue
+            # Global cooldown: 30s between any new entry (continue, not break)
+            if time.time() - self._last_entry_time < 30:
+                continue
+            # Per-pair cooldown: skip pair after losses
+            if symbol in self._pair_cooldown and time.time() < self._pair_cooldown[symbol]:
                 continue
 
             if not self.risk.can_open_trade(real_balance):
@@ -269,14 +554,15 @@ class Phmex2Bot:
                 self.exchange.ensure_leverage(symbol)
                 self._leverage_set.add(symbol)
 
-            df = ohlcv_cache.get(symbol)
-            if df is None or len(df) < 50:
-                logger.warning(f"Not enough data for {symbol}, skipping.")
-                continue
-
-            df = add_all_indicators(df)
-            if len(df) < 14:
-                continue
+            df = indicator_cache.get(symbol)
+            if df is None:
+                df_raw = ohlcv_cache.get(symbol)
+                if df_raw is None or len(df_raw) < 50:
+                    logger.warning(f"Not enough data for {symbol}, skipping.")
+                    continue
+                df = add_all_indicators(df_raw)
+                if len(df) < 14:
+                    continue
 
             try:
                 atr_val = float(df.iloc[-1]["atr"])
@@ -285,91 +571,243 @@ class Phmex2Bot:
             except (KeyError, ValueError, TypeError):
                 atr_val = 0.0
 
-            # Two-pass signal: technicals first, order book only on live signal
+            # Determine volatility regime (no extreme skip in v4.0)
+            atr_pct_val = float(df.iloc[-1].get("atr_pct", 50))
+            if atr_pct_val > 80:
+                regime = "high"
+            elif atr_pct_val > 25:
+                regime = "medium"
+            else:
+                regime = "low"
+
+            # Fetch orderbook and HTF data for strategy confirmation
+            ob = self.exchange.get_order_book(symbol)
+            htf_df = self._fetch_htf_data(symbol)
             try:
-                signal = self.strategy_fn(df, None)
+                signal = self.strategy_fn(df, ob, htf_df=htf_df)
             except TypeError:
-                signal = self.strategy_fn(df)
+                signal = self.strategy_fn(df, ob)
 
-            # If technicals fire, fetch order book for confirmation
-            if signal.signal != Signal.HOLD:
-                ob = self.exchange.get_order_book(symbol)
-                if ob is not None:
-                    try:
-                        signal = self.strategy_fn(df, ob)
-                    except TypeError:
-                        pass  # strategy doesn't accept orderbook
-                    logger.info(f"[OB] {symbol} imb={ob.get('imbalance', 0):+.2f} spread={ob.get('spread_pct', 0):.3f}% walls=B{len(ob.get('bid_walls', []))}A{len(ob.get('ask_walls', []))}")
+            if signal.signal == Signal.HOLD:
+                logger.debug(f"[HOLD] {symbol} — {signal.reason}")
 
+            if signal.signal != Signal.HOLD and ob is not None:
+                logger.info(f"[OB] {symbol} imb={ob.get('imbalance', 0):+.2f} spread={ob.get('spread_pct', 0):.3f}% walls=B{len(ob.get('bid_walls', []))}A{len(ob.get('ask_walls', []))}")
+
+            # Short penalty: -0.04 strength (reduced from -0.08 — was blocking market-open shorts)
+            if signal.signal == Signal.SELL:
+                signal = TradeSignal(signal.signal, signal.reason, signal.strength - 0.04)
+
+            # Min strength check
             if signal.signal != Signal.HOLD and signal.strength < Config.SCALP_MIN_STRENGTH:
                 logger.debug(f"Signal too weak for {symbol}: {signal.strength:.2f}, skipping")
                 continue
 
             price = prices.get(symbol, df.iloc[-1]["close"])
-            margin = self.risk.calculate_margin(available)
 
-            if signal.signal == Signal.BUY:
+            if signal.signal in (Signal.BUY, Signal.SELL):
+                direction = "long" if signal.signal == Signal.BUY else "short"
+
+                # Fetch CVD and funding rate for ensemble confidence
+                cvd_data = self.exchange.get_cvd(symbol)
+                funding_data = self._fetch_funding_rate(symbol)
+                hurst_val = float(df.iloc[-1].get("hurst", 0.5))
+                if hurst_val != hurst_val:  # NaN check
+                    hurst_val = 0.5
+
+                if cvd_data:
+                    logger.info(f"[CVD] {symbol} cvd={cvd_data['cvd']:.0f} slope={cvd_data['cvd_slope']:.0f} div={cvd_data.get('divergence', 'none')}")
+                if funding_data:
+                    logger.info(f"[FUNDING] {symbol} rate={funding_data['rate']:.6f} signal={funding_data.get('signal', 'none')}")
+                logger.info(f"[HURST] {symbol} H={hurst_val:.3f}")
+
+                # Ensemble confidence gate
+                strat_name = _extract_strategy_name(signal.reason)
+                confidence, layers = self._compute_confidence(
+                    direction, df, ob, htf_df=htf_df,
+                    cvd_data=cvd_data, hurst_val=hurst_val, funding_data=funding_data,
+                    strategy=strat_name
+                )
+                if confidence < 3:
+                    logger.info(f"[ENSEMBLE SKIP] {symbol} {direction} — confidence {confidence}/6 too low, need 3+")
+                    continue
+
+                # Apply funding rate strength modifier
+                if funding_data and funding_data.get("strength_mod"):
+                    signal = TradeSignal(signal.signal, signal.reason, signal.strength + funding_data["strength_mod"])
+
+                # Kelly-aware position sizing (uses $2 min margin during bootstrap)
+                margin = self.risk.calculate_kelly_margin(available, confidence=confidence)
+
                 if margin > available:
                     logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {available:.2f}")
                     continue
-                order = self.exchange.open_long(symbol, margin, price)
+                order = self.exchange.open_long(symbol, margin, price) if direction == "long" else self.exchange.open_short(symbol, margin, price)
                 if order:
                     fill_price = self._extract_fill_price(order, price)
-                    self.risk.open_position(symbol, fill_price, margin, side="long", atr=atr_val)
+                    self.risk.open_position(symbol, fill_price, margin, side=direction, atr=atr_val, regime=regime, cycle=self.cycle_count, strategy=strat_name)
                     pos = self.risk.positions[symbol]
                     fill_amount = self._extract_fill_amount(order, pos.amount)
                     pos.amount = fill_amount
-                    sl_tp = self.exchange.place_sl_tp(symbol, "long", fill_amount, pos.stop_loss, pos.take_profit)
+                    pos.entry_strength = signal.strength
+                    pos.confidence = confidence
+                    pos.ensemble_layers = ",".join(layers)
+                    sl_tp = self.exchange.place_sl_tp(symbol, direction, fill_amount, pos.stop_loss, pos.take_profit)
                     pos.sl_order_id = sl_tp.get("sl_order_id")
                     pos.tp_order_id = sl_tp.get("tp_order_id")
                     if not pos.sl_order_id:
-                        logger.error(f"[SAFETY] SL failed for LONG {symbol} — closing position immediately")
-                        self.exchange.close_long(symbol, fill_amount)
-                        self.exchange.cancel_open_orders(symbol)
-                        self.risk.close_position(symbol, fill_price, "sl_failed")
-                        continue
+                        pos.sl_order_id = "software"
+                        logger.warning(f"[SL FALLBACK] Exchange SL failed for {direction.upper()} {symbol} — using software SL@{pos.stop_loss:.4f} TP@{pos.take_profit:.4f}")
                     available -= margin
-                    logger.info(f"LONG ENTRY: {symbol} | Fill: {fill_price:.4f} | {signal.reason} | Strength: {signal.strength:.2f}")
-                    notifier.notify_entry(symbol, "long", fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason)
-
-            elif signal.signal == Signal.SELL:
-                if margin > available:
-                    logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {available:.2f}")
-                    continue
-                order = self.exchange.open_short(symbol, margin, price)
-                if order:
-                    fill_price = self._extract_fill_price(order, price)
-                    self.risk.open_position(symbol, fill_price, margin, side="short", atr=atr_val)
-                    pos = self.risk.positions[symbol]
-                    fill_amount = self._extract_fill_amount(order, pos.amount)
-                    pos.amount = fill_amount
-                    sl_tp = self.exchange.place_sl_tp(symbol, "short", fill_amount, pos.stop_loss, pos.take_profit)
-                    pos.sl_order_id = sl_tp.get("sl_order_id")
-                    pos.tp_order_id = sl_tp.get("tp_order_id")
-                    if not pos.sl_order_id:
-                        logger.error(f"[SAFETY] SL failed for SHORT {symbol} — closing position immediately")
-                        self.exchange.close_short(symbol, fill_amount)
-                        self.exchange.cancel_open_orders(symbol)
-                        self.risk.close_position(symbol, fill_price, "sl_failed")
-                        continue
-                    available -= margin
-                    logger.info(f"SHORT ENTRY: {symbol} | Fill: {fill_price:.4f} | {signal.reason} | Strength: {signal.strength:.2f}")
-                    notifier.notify_entry(symbol, "short", fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason)
+                    self._last_entry_time = time.time()
+                    logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${margin:.2f} | Conf: {confidence}/6 | {signal.reason} | Strength: {signal.strength:.2f}")
+                    notifier.notify_entry(symbol, direction, fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason)
+                else:
+                    logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
 
         if self.cycle_count % 10 == 0:
             self.risk.print_stats(real_balance)
 
-    def _extract_fill_price(self, order: dict, fallback: float) -> float:
-        """Extract actual fill price from exchange order response. Falls back to ticker price."""
-        if not order:
-            return fallback
-        fill = order.get("average") or order.get("price")
+    def _set_cooldown_if_loss(self, symbol: str, pnl_pct: float):
+        """Set cooldown on a pair after loss: 2 min per loss, 10 min after 3 consecutive.
+        Also tracks global loss streak for regime filter."""
+        if pnl_pct < 0:
+            # Per-pair cooldown
+            self._pair_loss_streak[symbol] = self._pair_loss_streak.get(symbol, 0) + 1
+            streak = self._pair_loss_streak[symbol]
+            if streak >= 3:
+                self._pair_cooldown[symbol] = time.time() + 7200  # 2 hr after 3 consecutive losses
+                self._pair_loss_streak[symbol] = 0
+                logger.info(f"[BLACKLIST] {symbol} blocked for 2 hours after {streak} consecutive losses")
+            else:
+                self._pair_cooldown[symbol] = time.time() + 120  # 2 min after any loss
+                logger.info(f"[COOLDOWN] {symbol} blocked for 2 min (streak: {streak})")
+            # Global regime filter: 4 of last 6 trades lost → 15 min pause
+            self._trade_results.append(False)
+            losses = sum(1 for r in self._trade_results if not r)
+            if len(self._trade_results) >= 6 and losses >= 4:
+                self._regime_pause_until = time.time() + 900  # 15 min pause
+                logger.warning(f"[REGIME] Rolling window: {losses}/6 losses — pausing 15 min")
+                notifier.notify_ban_mode(15)  # reuse ban notification for regime pause
+                self._trade_results.clear()  # reset window after pause
+            self._persist_trade_results()
+        else:
+            self._pair_loss_streak[symbol] = 0  # reset on win
+            self._trade_results.append(True)  # record win in rolling window
+            self._persist_trade_results()
+
+    def _persist_trade_results(self):
+        """Sync rolling trade results to risk manager for persistence."""
+        self.risk.trade_results = list(self._trade_results)
+        self.risk._save_state()
+
+    def _sync_exchange_closes(self, prices: dict):
+        """Detect positions closed by exchange SL/TP orders so we don't double-close."""
         try:
-            fill = float(fill)
-            if fill > 0:
-                return fill
-        except (TypeError, ValueError):
-            pass
+            exchange_positions = self.exchange.get_open_positions()
+            if exchange_positions is None:
+                return  # API failed, skip sync this cycle
+            exchange_symbols = {p["symbol"] for p in exchange_positions}
+            for symbol in list(self.risk.positions.keys()):
+                if symbol not in exchange_symbols:
+                    pos = self.risk.positions[symbol]
+                    # Try to get actual fill price from recent trades
+                    exit_price = prices.get(symbol, pos.entry_price)
+                    try:
+                        recent = self.exchange.client.fetch_my_trades(symbol, limit=5)
+                        if recent:
+                            last_trade = recent[-1]
+                            fill = float(last_trade.get("price", 0))
+                            if fill > 0:
+                                exit_price = fill
+                                logger.info(f"[SYNC] {symbol} real exit fill: {exit_price}")
+                    except Exception:
+                        pass
+                    logger.info(f"[SYNC] {symbol} closed on exchange (SL/TP triggered) — removing from tracker")
+                    self.exchange.cancel_open_orders(symbol)
+                    self._set_cooldown_if_loss(symbol, pos.pnl_percent(exit_price))
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), "exchange_close")
+                    self.risk.close_position(symbol, exit_price, "exchange_close")
+        except Exception as e:
+            logger.debug(f"Exchange position sync failed: {e}")
+
+    def _extract_fill_price(self, order: dict, fallback: float, is_exit: bool = False) -> float:
+        """Get real fill price from exchange.
+
+        For ENTRIES: fetch position entryPrice (source of truth).
+        For EXITS: fetch order fill or last trade (position is already closed).
+        """
+        symbol = order.get("symbol") if order else None
+        if not symbol:
+            return fallback
+
+        time.sleep(1.5)  # let the order settle on exchange
+
+        if is_exit:
+            # --- EXIT path: position is closed, fetch fill from order or trades ---
+            order_id = order.get("id") if order else None
+
+            # 1. Try fetch_order to get the actual average fill price
+            if order_id:
+                try:
+                    fetched = self.exchange.client.fetch_order(order_id, symbol)
+                    avg = fetched.get("average") if fetched else None
+                    if avg is not None:
+                        avg = float(avg)
+                        if avg > 0:
+                            logger.info(f"[FILL] {symbol} exit fill (fetch_order): {avg}")
+                            return avg
+                except Exception as e:
+                    logger.debug(f"[FILL] fetch_order failed for {symbol}: {e}")
+
+            # 2. Try fetch_my_trades to get the last trade's fill price
+            try:
+                trades = self.exchange.client.fetch_my_trades(symbol, limit=1)
+                if trades:
+                    trade_price = float(trades[-1].get("price", 0))
+                    if trade_price > 0:
+                        logger.info(f"[FILL] {symbol} exit fill (last trade): {trade_price}")
+                        return trade_price
+            except Exception as e:
+                logger.debug(f"[FILL] fetch_my_trades failed for {symbol}: {e}")
+
+            # 3. Try order response average field directly
+            if order:
+                fill = order.get("average")
+                try:
+                    fill = float(fill)
+                    if fill > 0:
+                        logger.info(f"[FILL] {symbol} exit fill (order response): {fill}")
+                        return fill
+                except (TypeError, ValueError):
+                    pass
+
+            logger.warning(f"[FILL] {symbol} exit using fallback price: {fallback}")
+            return fallback
+
+        # --- ENTRY path: fetch position entryPrice (source of truth) ---
+        try:
+            positions = self.exchange.client.fetch_positions([symbol])
+            for p in positions:
+                if p.get("symbol") == symbol and float(p.get("contracts", 0)) > 0:
+                    entry = float(p.get("entryPrice", 0))
+                    if entry > 0:
+                        logger.info(f"[FILL] {symbol} real entry price: {entry}")
+                        return entry
+        except Exception as e:
+            logger.warning(f"[FILL] Could not fetch position for {symbol}: {e}")
+
+        # Fallback: try order average
+        if order:
+            fill = order.get("average")
+            try:
+                fill = float(fill)
+                if fill > 0:
+                    return fill
+            except (TypeError, ValueError):
+                pass
+
+        logger.warning(f"[FILL] {symbol} entry using fallback price: {fallback}")
         return fallback
 
     def _extract_fill_amount(self, order: dict, fallback: float) -> float:
