@@ -12,15 +12,15 @@ PERSISTENCE_FILE = os.path.join(os.path.dirname(__file__), "trading_state.json")
 
 # Strategy-specific time exit thresholds (cycles at 60s loop interval for 5m TF)
 STRATEGY_TIME_EXITS = {
-    "keltner_squeeze":        {"soft": 45,  "hard": 120},   # 45 min / 2 hr
-    "trend_pullback":         {"soft": 30,  "hard": 90},    # 30 min / 1.5 hr
-    "trend_scalp":            {"soft": 30,  "hard": 90},    # 30 min / 1.5 hr
-    "momentum_continuation":  {"soft": 20,  "hard": 60},    # 20 min / 1 hr
-    "vwap_reversion":         {"soft": 15,  "hard": 45},    # 15 min / 45 min (mean reversion resolves fast)
-    "htf_confluence_pullback": {"soft": 25,  "hard": 75},   # 25 min / 1.25 hr
-    "htf_confluence_vwap":     {"soft": 15,  "hard": 45},   # 15 min / 45 min
+    "keltner_squeeze":          {"soft": 30, "hard": 120},   # was 45
+    "trend_pullback":           {"soft": 20, "hard": 90},    # was 30
+    "trend_scalp":              {"soft": 20, "hard": 90},    # was 30
+    "momentum_continuation":    {"soft": 15, "hard": 60},    # was 20
+    "vwap_reversion":           {"soft": 10, "hard": 45},    # was 15
+    "htf_confluence_pullback":  {"soft": 20, "hard": 75},    # was 25
+    "htf_confluence_vwap":      {"soft": 10, "hard": 45},    # was 15
 }
-DEFAULT_TIME_EXIT = {"soft": 45, "hard": 120}              # 45 min / 2 hr
+DEFAULT_TIME_EXIT = {"soft": 30, "hard": 120}               # was soft: 45
 
 
 @dataclass
@@ -137,6 +137,17 @@ class Position:
         if self.margin <= 0:
             return 0.0
         return self.pnl_usdt(current_price) / self.margin * 100
+
+    def should_adverse_exit(self, current_cycle: int, current_price: float) -> bool:
+        """Exit early if trade is going wrong direction after N cycles.
+        Catches bad entries before they bleed to time_exit."""
+        cycles_held = current_cycle - self.entry_cycle
+        if cycles_held < Config.ADVERSE_EXIT_CYCLES:
+            return False
+        roi = self.pnl_percent(current_price)
+        if roi <= Config.ADVERSE_EXIT_THRESHOLD:
+            return True
+        return False
 
     def should_time_exit(self, current_cycle: int, current_price: float = 0.0) -> tuple[bool, bool]:
         """Exit if trade hasn't moved in our favor after too many cycles.
