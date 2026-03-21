@@ -1015,6 +1015,20 @@ function createSFPanorama(facing, hour) {
       ctx.fillStyle = isDaytime ? 'rgba(30,40,60,0.08)' : 'rgba(0,0,0,0.12)';
       ctx.fillRect(bx+bw-2, by-bh, 2, bh);
     }
+
+    // Window grid overlay — fine horizontal lines for glass curtain wall realism
+    if(detailLevel >= 2 && bw > 10 && bh > 15) {
+      ctx.strokeStyle = isDaytime ? 'rgba(200,220,240,0.12)' : 'rgba(120,150,200,0.06)';
+      ctx.lineWidth = 0.5;
+      for(var wy2 = by - bh + 3; wy2 < by; wy2 += 4) {
+        ctx.beginPath(); ctx.moveTo(bx, wy2); ctx.lineTo(bx + bw, wy2); ctx.stroke();
+      }
+      // Vertical mullion lines
+      ctx.strokeStyle = isDaytime ? 'rgba(180,200,220,0.08)' : 'rgba(100,130,180,0.04)';
+      for(var wx2 = bx + 3; wx2 < bx + bw - 2; wx2 += 6) {
+        ctx.beginPath(); ctx.moveTo(wx2, by - bh); ctx.lineTo(wx2, by); ctx.stroke();
+      }
+    }
   }
 
   // ── Time-based color palette ──
@@ -1805,6 +1819,16 @@ function createSFPanorama(facing, hour) {
     hazeG.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = hazeG;
     ctx.fillRect(0, landY-15*S, W, 20*S);
+  }
+
+  // ── DEEP FOG LAYER — distant buildings fade into atmosphere ──
+  {
+    var fogG = ctx.createLinearGradient(0, landY - 30*S, 0, landY + 10*S);
+    fogG.addColorStop(0, 'rgba(180,200,220,0)');
+    fogG.addColorStop(0.5, isDaytime ? 'rgba(180,200,220,0.18)' : 'rgba(15,25,45,0.12)');
+    fogG.addColorStop(1, isDaytime ? 'rgba(180,200,220,0.35)' : 'rgba(10,18,35,0.2)');
+    ctx.fillStyle = fogG;
+    ctx.fillRect(0, landY - 30*S, W, 40*S);
   }
 
   // ── VIGNETTE — subtle dark edges for photographic look ──
@@ -3145,6 +3169,7 @@ const beamMat = colMat;
 }
 
 // ── 3D CITY BUILDINGS AROUND SALESFORCE TOWER ──
+var bayWaterMesh = null; // hoisted for animate() wave access
 {
   const GROUND_Y = -50;
 
@@ -3156,18 +3181,20 @@ const beamMat = colMat;
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // SF Bay water plane — extends far to cover all visible bay area
+  // SF Bay water plane — subdivided for wave animation, extends far to cover all visible bay area
   const waterMat = new THREE.MeshPhysicalMaterial({
     color: 0x1a5a8a, roughness: 0.08, metalness: 0.45,
     transparent: true, opacity: 0.95,
     clearcoat: 0.9, clearcoatRoughness: 0.05,
     envMapIntensity: 1.8,
   });
-  const waterPlane = new THREE.Mesh(new THREE.PlaneGeometry(1000, 800), waterMat);
+  const waterGeom = new THREE.PlaneGeometry(1000, 800, 64, 48);
+  const waterPlane = new THREE.Mesh(waterGeom, waterMat);
   waterPlane.rotation.x = -Math.PI/2;
   waterPlane.position.set(20, GROUND_Y + 0.1, -180);
   waterPlane.receiveShadow = true;
   scene.add(waterPlane);
+  bayWaterMesh = waterPlane; // expose to animate() for wave animation
 
   // Water rendering fix: offset to prevent z-fighting with ground
   waterPlane.renderOrder = 1;
@@ -7564,6 +7591,17 @@ function animate() {
   if(Date.now() - lastTimeUpdate > 60000) {
     lastTimeUpdate = Date.now();
     updateTimeOfDay();
+  }
+
+  // Bay water wave animation — gentle ocean-like displacement
+  if(bayWaterMesh && bayWaterMesh.geometry) {
+    var wPos = bayWaterMesh.geometry.attributes.position;
+    for(var wi = 0; wi < wPos.count; wi++) {
+      var wx = wPos.getX(wi);
+      var wz = wPos.getZ(wi);
+      wPos.setY(wi, Math.sin(t * 0.5 + wx * 0.02) * 0.15 + Math.cos(t * 0.3 + wz * 0.025) * 0.12 + Math.sin(t * 0.7 + wx * 0.01 + wz * 0.015) * 0.08);
+    }
+    wPos.needsUpdate = true;
   }
 
   controls.update();
