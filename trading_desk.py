@@ -492,8 +492,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+// SSAOPass loaded dynamically below — may not exist in all THREE versions
+var SSAOPass = null;
 
 // ── GLOBALS ──
 let apiData = null;
@@ -648,11 +648,11 @@ const teamMeetingPositions = {
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.1;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const css2dRenderer = new CSS2DRenderer();
@@ -798,7 +798,7 @@ scene.add(cityGlow);
 const dirLight = new THREE.DirectionalLight(0xfff0dd, 0.5);
 dirLight.position.set(-5, 12, -8);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.set(2048,2048);
+dirLight.shadow.mapSize.set(1024,1024);
 dirLight.shadow.camera.near = 0.5;
 dirLight.shadow.camera.far = 25;
 dirLight.shadow.camera.left = -8;
@@ -819,39 +819,8 @@ bayFill.position.set(0, 3, -20);
 scene.add(bayFill);
 
 // ── MATERIALS ──
-// Procedural concrete normal map
-var concreteCanvas = document.createElement('canvas');
-concreteCanvas.width = 256; concreteCanvas.height = 256;
-var cCtx = concreteCanvas.getContext('2d');
-var imgData = cCtx.createImageData(256, 256);
-for (var i = 0; i < imgData.data.length; i += 4) {
-  var v = 128 + (Math.random() - 0.5) * 25;
-  imgData.data[i] = v;
-  imgData.data[i+1] = v;
-  imgData.data[i+2] = 255;
-  imgData.data[i+3] = 255;
-}
-cCtx.putImageData(imgData, 0, 0);
-var concreteNormal = new THREE.CanvasTexture(concreteCanvas);
-concreteNormal.wrapS = concreteNormal.wrapT = THREE.RepeatWrapping;
-concreteNormal.repeat.set(4, 4);
-const floorMat = new THREE.MeshStandardMaterial({ color:0x6a6560, roughness:0.45, metalness:0.05, normalMap:concreteNormal, normalScale:new THREE.Vector2(0.3, 0.3) }); // polished concrete floor
-// Acoustic panel grid normal map
-var gridCanvas = document.createElement('canvas');
-gridCanvas.width = 128; gridCanvas.height = 128;
-var gCtx = gridCanvas.getContext('2d');
-gCtx.fillStyle = 'rgb(128,128,255)';
-gCtx.fillRect(0, 0, 128, 128);
-gCtx.strokeStyle = 'rgb(140,140,255)';
-gCtx.lineWidth = 1;
-for (var gi = 0; gi <= 128; gi += 16) {
-  gCtx.beginPath(); gCtx.moveTo(gi, 0); gCtx.lineTo(gi, 128); gCtx.stroke();
-  gCtx.beginPath(); gCtx.moveTo(0, gi); gCtx.lineTo(128, gi); gCtx.stroke();
-}
-var gridNormal = new THREE.CanvasTexture(gridCanvas);
-gridNormal.wrapS = gridNormal.wrapT = THREE.RepeatWrapping;
-gridNormal.repeat.set(6, 5);
-const ceilMat = new THREE.MeshStandardMaterial({ color:0x2e2e35, roughness:0.9, metalness:0.0, normalMap:gridNormal, normalScale:new THREE.Vector2(0.2, 0.2) });
+const floorMat = new THREE.MeshStandardMaterial({ color:0x6a6560, roughness:0.55 });
+const ceilMat = new THREE.MeshStandardMaterial({ color:0x2e2e35, roughness:0.9, metalness:0.0 });
 const deskMat = new THREE.MeshPhysicalMaterial({ color:0x3a3838, roughness:0.2, metalness:0.3, clearcoat:0.5, clearcoatRoughness:0.15 }); // dark professional desk
 const deskPanelMat = new THREE.MeshStandardMaterial({ color:0x333338, roughness:0.45, metalness:0.15 });
 const legMat = new THREE.MeshStandardMaterial({ color:0x888888, roughness:0.25, metalness:0.85 }); // brushed chrome
@@ -2125,15 +2094,8 @@ for(let x=-3;x<=3;x+=6){
 
 // ── FLOOR-TO-CEILING GLASS WALLS WITH SF PANORAMA ──
 const glassMat = new THREE.MeshPhysicalMaterial({
-  color:0x88aacc, transmission:0.95, ior:1.5,
-  clearcoat:1.0, clearcoatRoughness:0.05,
-  roughness:0.0, metalness:0.0, side:THREE.DoubleSide, transparent:true,
+  color:0x88aacc, opacity:0.04, transparent:true, side:THREE.DoubleSide,
 });
-// Glass performance fallback
-setTimeout(function() {
-  // If very low FPS, revert glass to simple opacity
-  // (actual FPS check will be in Task 11's animate loop)
-}, 5000);
 const frameMat = new THREE.MeshStandardMaterial({color:0x334450, metalness:0.7, roughness:0.3});
 
 // Create panorama for each wall direction (time-synced)
@@ -7183,36 +7145,20 @@ function updateHUD() {
 // ── BLOOM SETUP (post scene/camera init) ──
 composer.addPass(new RenderPass(scene, camera));
 
-// SSAO — subtle ambient occlusion for depth
-var ssaoPass = new SSAOPass(scene, camera, Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2));
-ssaoPass.kernelRadius = 8;
-ssaoPass.minDistance = 0.005;
-ssaoPass.maxDistance = 0.1;
-ssaoPass.output = SSAOPass.OUTPUT.Default;
-composer.addPass(ssaoPass);
+// SSAO disabled — requires THREE.js addons not available in r160 CDN build
+// Can be re-enabled once assets/environment are set up with a compatible THREE version
+var ssaoPass = null;
 
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.08,  // strength — subtler for realism
+  0.15,  // strength
   0.4,   // radius
-  0.85   // threshold — only brightest surfaces bloom
+  0.85   // threshold
 );
 composer.addPass(bloomPass);
 composer.addPass(new SMAAPass(window.innerWidth, window.innerHeight));
-composer.addPass(new OutputPass());
 
-// Color grading — warm tint + vignette
-var colorGradeShader = {
-  uniforms: {
-    tDiffuse: { value: null },
-    vignetteStrength: { value: 0.3 },
-    warmth: { value: 0.05 }
-  },
-  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: 'uniform sampler2D tDiffuse; uniform float vignetteStrength; uniform float warmth; varying vec2 vUv; void main() { vec4 color = texture2D(tDiffuse, vUv); color.r += warmth * color.r; color.b -= warmth * 0.5 * (1.0 - color.b); vec2 center = vUv - 0.5; float dist = length(center); color.rgb *= 1.0 - vignetteStrength * dist * dist; gl_FragColor = color; }'
-};
-var colorGradePass = new ShaderPass(colorGradeShader);
-composer.addPass(colorGradePass);
+composer.addPass(new OutputPass());
 
 // ── TIME OF DAY UPDATE ──
 function updateTimeOfDay() {
@@ -7811,7 +7757,7 @@ function animate() {
       lowFpsFrames++;
       if (lowFpsFrames > 90) {
         console.warn('SSAO disabled for performance');
-        ssaoPass.enabled = false;
+        if (ssaoPass) ssaoPass.enabled = false;
         ssaoEnabled = false;
       }
     } else {
@@ -7835,6 +7781,8 @@ window.addEventListener('resize', () => {
 // ── INIT ──
 loadAllAssets().then(() => {
   console.log('Assets loaded, initializing scene');
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) overlay.style.display = 'none';
   fetchData();
   setInterval(fetchData, 3000);
   animate();
