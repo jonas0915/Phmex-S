@@ -486,15 +486,16 @@ const monitorCanvases = {};
 const monitorTextures = {};
 const speechBubbles = {};
 const plumbobs = {};
-let claudeTarget = null;
-let claudeWalking = false;
-let claudeWalkStart = null;
-let claudeWalkFrom = null;
-let claudeWalkTo = null;
+const agentWalkState = {};
+function getWalk(name) {
+  if(!agentWalkState[name]) agentWalkState[name] = { target:null, walking:false, start:null, walkFrom:null, walkTo:null };
+  return agentWalkState[name];
+}
+const ensWalk = () => getWalk('ensemble');
 const WALK_DURATION = 3.5;
 const VISIT_INTERVAL = 45000;
 let lastVisit = 0;
-const visitOrder = ['scanner','risk','tape','jonas','trend','range','therapist'];
+const visitOrder = ['scanner','risk','tape','jonas','executor','strategy','ws_feed'];
 let visitIdx = 0;
 
 // Sleep system — characters rest between 11pm-6am
@@ -507,13 +508,13 @@ function isLateNight() {
   return h >= 22 || h < 7; // dim lights zone
 }
 // Characters who stay awake during sleep hours (skeleton crew)
-const nightOwls = ['claude', 'risk'];
+const nightOwls = ['ensemble', 'risk'];
 
 // Coffee break system
 let lastCoffeeBreak = Date.now();
 const COFFEE_INTERVAL = 120000; // every 2 minutes someone goes
 const COFFEE_BREAK_DURATION = 10000;
-const coffeeAgents = ['scanner','risk','tape','trend','range','therapist'];
+const coffeeAgents = ['scanner','risk','tape','executor','strategy','ws_feed','pos_monitor'];
 let coffeeAgent = null;
 let coffeeWalking = false;
 let coffeeWalkFrom = null;
@@ -525,7 +526,7 @@ let coffeeReturning = false;
 let lastFacilityVisit = Date.now() - 25000; // first visit after 20s
 const FACILITY_INTERVAL = 45000; // every 45 seconds someone goes downstairs
 const FACILITY_DURATION = 12000; // spend 12 seconds at facility
-const facilityAgents = ['scanner','risk','tape','trend','range','therapist'];
+const facilityAgents = ['scanner','risk','tape','executor','strategy','ws_feed','pos_monitor'];
 const facilityLocations = {
   gym:  { x:-4, y:-3.5, z:-2 },
   cafeteria: { x:0.5, y:-3.5, z:-1 },
@@ -553,43 +554,43 @@ let teamEventReturning = false;
 let teamEventWalkStart = null;
 const TEAM_EVENT_DURATION = 20000; // 20 seconds together
 const teamEvents = [
-  { name:'Team Lunch', location:'cafeteria', agents:['scanner','risk','tape','trend','range','therapist'], dialogue:[
+  { name:'Team Lunch', location:'cafeteria', agents:['scanner','risk','tape','executor','strategy','ws_feed','pos_monitor'], dialogue:[
     'Team lunch! Let\'s eat together.',
     'Food break — everyone to the cafeteria!',
     'Lunch time! Who\'s hungry?',
     'Alright team, lunch is ready downstairs.',
   ]},
-  { name:'Team Dinner', location:'cafeteria', agents:['scanner','risk','tape','trend','range','therapist'], dialogue:[
+  { name:'Team Dinner', location:'cafeteria', agents:['scanner','risk','tape','executor','strategy','ws_feed','pos_monitor'], dialogue:[
     'Dinner time! Let\'s refuel.',
     'Team dinner — we earned this.',
     'Who\'s cooking? Everyone downstairs!',
     'Late night session calls for a good meal.',
   ]},
-  { name:'Happy Hour', location:'bar', agents:['scanner','risk','tape','trend','range','therapist'], dialogue:[
-    'Happy hour! Drinks on Claude.',
+  { name:'Happy Hour', location:'bar', agents:['scanner','risk','tape','executor','strategy','ws_feed','pos_monitor'], dialogue:[
+    'Happy hour! Drinks on Ensemble.',
     'Bar\'s open — first round\'s on me.',
     'Time to unwind. Drinks downstairs!',
   ]},
-  { name:'Team Jacuzzi', location:'jacuzzi', agents:['scanner','risk','tape','trend'], dialogue:[
+  { name:'Team Jacuzzi', location:'jacuzzi', agents:['scanner','risk','tape','executor'], dialogue:[
     'Jacuzzi break! Everyone in the tub.',
     'Hot tub time — leave the charts for 5.',
     'Spa session! Let\'s decompress together.',
   ]},
-  { name:'Gym Session', location:'gym', agents:['scanner','risk','trend','range'], dialogue:[
+  { name:'Gym Session', location:'gym', agents:['scanner','risk','executor','strategy'], dialogue:[
     'Group workout! Let\'s hit the gym.',
     'Gym time — no excuses!',
     'Team fitness break. Let\'s go!',
   ]},
-  { name:'Ping Pong Match', location:'rec', agents:['scanner','trend'], dialogue:[
-    'Ping pong! Scanner vs Trend. Let\'s settle this.',
+  { name:'Ping Pong Match', location:'rec', agents:['scanner','executor'], dialogue:[
+    'Ping pong! Scanner vs Executor. Let\'s settle this.',
     'Game time — who\'s the ping pong champ?',
   ]},
-  { name:'Ping Pong Match', location:'rec', agents:['risk','range'], dialogue:[
-    'Risk vs Range at the ping pong table!',
+  { name:'Ping Pong Match', location:'rec', agents:['risk','strategy'], dialogue:[
+    'Risk vs Strategy at the ping pong table!',
     'Ping pong showdown! Let\'s go.',
   ]},
-  { name:'Ping Pong Match', location:'rec', agents:['tape','therapist'], dialogue:[
-    'Tape challenges Therapist to ping pong.',
+  { name:'Ping Pong Match', location:'rec', agents:['tape','ws_feed'], dialogue:[
+    'Tape challenges WS Feed to ping pong.',
     'Friendly match at the table!',
   ]},
 ];
@@ -609,15 +610,17 @@ const TEAM_MEETING_INTERVAL = 3600000; // 1 hour
 let lastTeamMeeting = 0;
 let inTeamMeeting = false;
 const TEAM_MEETING_DURATION = 20000; // 20 sec
-const teamMembers = ['scanner','risk','tape','jonas','trend','range','therapist'];
+const teamMembers = ['scanner','risk','tape','jonas','executor','strategy','ws_feed','pos_monitor'];
 const teamMeetingPositions = {
-  claude:  {x: CONF_X,       z: CONF_Z + 1.0},  // head of table (front center)
-  jonas:   {x: CONF_X + 1.5, z: CONF_Z},         // right end
-  scanner: {x: CONF_X - 0.7, z: CONF_Z + 0.8},   // front-left
-  risk:    {x: CONF_X + 0.7, z: CONF_Z + 0.8},   // front-right
-  tape:    {x: CONF_X - 0.7, z: CONF_Z - 0.8},   // back-left
-  trend:   {x: CONF_X + 0.7, z: CONF_Z - 0.8},   // back-right
-  range:   {x: CONF_X - 1.5, z: CONF_Z},          // left end
+  ensemble:    {x: CONF_X,       z: CONF_Z + 1.0},  // head of table (front center)
+  jonas:       {x: CONF_X + 1.5, z: CONF_Z},         // right end
+  scanner:     {x: CONF_X - 0.7, z: CONF_Z + 0.8},   // front-left
+  risk:        {x: CONF_X + 0.7, z: CONF_Z + 0.8},   // front-right
+  tape:        {x: CONF_X - 0.7, z: CONF_Z - 0.8},   // back-left
+  executor:    {x: CONF_X + 0.7, z: CONF_Z - 0.8},   // back-right
+  strategy:    {x: CONF_X - 1.5, z: CONF_Z},          // left end
+  ws_feed:     {x: CONF_X + 1.5, z: CONF_Z - 0.8},   // far-right
+  pos_monitor: {x: CONF_X - 1.5, z: CONF_Z - 0.8},   // far-left
 };
 
 // ── RENDERER ──
@@ -4306,16 +4309,17 @@ function createCharacter(color, hairColor, name) {
 
   // ── Per-character style configs (Sims 4 style) ──
   const styles = {
-    claude:    { shirt:0x4a3878, sleeve:'long', pants:0x1a1a2a, shoes:0x1a1010, skin:0xd4a882, hairStyle:'swept', collar:'vneck', gender:'m', eyeColor:0x4488aa, accessory:'scarf', lipColor:0xbb8877 },
-    scanner:   { shirt:0x2a5535, sleeve:'short', pants:0x1a2840, shoes:0x2a2015, skin:0xc49470, hairStyle:'short', collar:'crew', gender:'m', eyeColor:0x556633, accessory:null, lipColor:0x996655 },
-    risk:      { shirt:0x8a2828, sleeve:'long', pants:0x151518, shoes:0x1a1a1a, skin:0xd4a882, hairStyle:'crew', collar:'zip', gender:'m', eyeColor:0x443322, accessory:'glasses', lipColor:0xbb8877 },
-    tape:      { shirt:0x2a6070, sleeve:'short', pants:0x3a3a3a, shoes:0x252525, skin:0x8d6e4c, hairStyle:'long', collar:'crew', gender:'f', eyeColor:0x332211, accessory:'earrings', lipColor:0xcc6677 },
-    jonas:     { shirt:0x7a6828, sleeve:'long', pants:0xc8b898, shoes:0x4a3a2a, skin:0xd4a882, hairStyle:'parted', collar:'button', gender:'m', eyeColor:0x443322, accessory:'watch', lipColor:0xbb8877 },
-    trend:     { shirt:0x2850a8, sleeve:'long', pants:0x252530, shoes:0x1a1a1a, skin:0xd4a882, hairStyle:'messy', collar:'crew', gender:'m', eyeColor:0x334466, accessory:'beanie', lipColor:0xbb8877 },
-    range:     { shirt:0x7a4a88, sleeve:'short', pants:0x252535, shoes:0x2a2025, skin:0xbf9070, hairStyle:'bangs', collar:'vneck', gender:'f', eyeColor:0x445533, accessory:'bracelets', lipColor:0xcc7788 },
-    therapist: { shirt:0x4a7868, sleeve:'long', pants:0x555550, shoes:0x3a3025, skin:0xd4a882, hairStyle:'bun', collar:'crew', gender:'f', eyeColor:0x556644, accessory:'earrings', lipColor:0xcc8877 },
+    ensemble:    { shirt:0x4a3878, sleeve:'long', pants:0x1a1a2a, shoes:0x1a1010, skin:0xd4a882, hairStyle:'swept', collar:'vneck', gender:'m', eyeColor:0x4488aa, accessory:'scarf', lipColor:0xbb8877 },
+    scanner:     { shirt:0x2a5535, sleeve:'short', pants:0x1a2840, shoes:0x2a2015, skin:0xc49470, hairStyle:'short', collar:'crew', gender:'m', eyeColor:0x556633, accessory:null, lipColor:0x996655 },
+    risk:        { shirt:0x8a2828, sleeve:'long', pants:0x151518, shoes:0x1a1a1a, skin:0xd4a882, hairStyle:'crew', collar:'zip', gender:'m', eyeColor:0x443322, accessory:'glasses', lipColor:0xbb8877 },
+    tape:        { shirt:0x2a6070, sleeve:'short', pants:0x3a3a3a, shoes:0x252525, skin:0x8d6e4c, hairStyle:'long', collar:'crew', gender:'f', eyeColor:0x332211, accessory:'earrings', lipColor:0xcc6677 },
+    jonas:       { shirt:0x7a6828, sleeve:'long', pants:0xc8b898, shoes:0x4a3a2a, skin:0xd4a882, hairStyle:'parted', collar:'button', gender:'m', eyeColor:0x443322, accessory:'watch', lipColor:0xbb8877 },
+    executor:    { shirt:0x2850a8, sleeve:'long', pants:0x252530, shoes:0x1a1a1a, skin:0xd4a882, hairStyle:'messy', collar:'crew', gender:'m', eyeColor:0x334466, accessory:'beanie', lipColor:0xbb8877 },
+    strategy:    { shirt:0x7a4a88, sleeve:'short', pants:0x252535, shoes:0x2a2025, skin:0xbf9070, hairStyle:'bangs', collar:'vneck', gender:'f', eyeColor:0x445533, accessory:'bracelets', lipColor:0xcc7788 },
+    ws_feed:     { shirt:0x4a7868, sleeve:'long', pants:0x555550, shoes:0x3a3025, skin:0xd4a882, hairStyle:'bun', collar:'crew', gender:'f', eyeColor:0x556644, accessory:'earrings', lipColor:0xcc8877 },
+    pos_monitor: { shirt:0x3a6858, sleeve:'short', pants:0x2a2a35, shoes:0x252020, skin:0xc8a070, hairStyle:'short', collar:'crew', gender:'m', eyeColor:0x445566, accessory:'glasses', lipColor:0xaa8866 },
   };
-  const st = styles[name] || styles.claude;
+  const st = styles[name] || styles.ensemble;
 
   const shirtMat = new THREE.MeshStandardMaterial({color:st.shirt, roughness:0.55, metalness:0.02});
   const pantsMat = new THREE.MeshStandardMaterial({color:st.pants, roughness:0.65});
@@ -4706,17 +4710,19 @@ function createCSS2DLabel(charGroup, name, emoji) {
   // Name tag below
   const nameDiv = document.createElement('div');
   nameDiv.className = 'char-label';
-  nameDiv.innerHTML = `<div class="char-name">${name.charAt(0).toUpperCase()+name.slice(1)}</div>`;
+  const displayNames = { ensemble:'ENSEMBLE', executor:'EXECUTOR', strategy:'STRATEGY', ws_feed:'WS FEED', pos_monitor:'POS MONITOR', scanner:'Scanner', risk:'Risk', tape:'Tape', jonas:'Jonas' };
+  const dname = displayNames[name] || (name.charAt(0).toUpperCase()+name.slice(1));
+  nameDiv.innerHTML = `<div class="char-name">${dname}</div>`;
   const nameLabel = new CSS2DObject(nameDiv);
   nameLabel.position.set(0, 0.25, 0);
   charGroup.add(nameLabel);
 
-  // Speech bubble — Claude's goes HIGH and LEFT, agents go RIGHT
+  // Speech bubble — Ensemble's goes HIGH and LEFT, agents go RIGHT
   const bubbleDiv = document.createElement('div');
   bubbleDiv.className = 'char-label';
-  bubbleDiv.innerHTML = `<div class="speech-bubble" id="bubble-${name}" style="${name==='claude'?'background:rgba(55,30,80,0.92);border-color:rgba(150,100,220,0.5);':''}"></div>`;
+  bubbleDiv.innerHTML = `<div class="speech-bubble" id="bubble-${name}" style="${name==='ensemble'?'background:rgba(55,30,80,0.92);border-color:rgba(150,100,220,0.5);':''}"></div>`;
   const bubbleLabel = new CSS2DObject(bubbleDiv);
-  if(name === 'claude') {
+  if(name === 'ensemble') {
     bubbleLabel.position.set(-0.4, 2.1, 0);
   } else {
     bubbleLabel.position.set(0.4, 1.55, 0);
@@ -4728,25 +4734,26 @@ function createCSS2DLabel(charGroup, name, emoji) {
 
 // ── DESK POSITIONS ──
 // Layout:  [Scanner(-2.2,z-1.5)]  [Risk(2.2,z-1.5)]
-//              [Claude(0, z0.5) - bigger, forward]
+//              [Ensemble(0, z0.5) - bigger, forward]
 //          [Tape(-2.2, z2.5)]    [Jonas(2.2, z2.5)]
 
 const deskPositions = {
-  scanner: { x:-2.2, z:-1.5, rot:0 },
-  risk:    { x:2.2, z:-1.5, rot:0 },
-  claude:  { x:0, z:0.5, rot:0 },
-  tape:    { x:-2.2, z:2.5, rot:0 },
-  jonas:   { x:2.2, z:2.5, rot:0 },
-  trend:     { x:-4.0, z:0.5, rot:0 },   // left wing — trending regime specialist
-  range:     { x:4.0, z:0.5, rot:0 },    // right wing — ranging regime specialist
-  therapist: { x:4.5, z:4.2, rot:0 },    // quiet corner — team therapist
+  scanner:     { x:-2.2, z:-1.5, rot:0 },
+  risk:        { x:2.2, z:-1.5, rot:0 },
+  ensemble:    { x:0, z:0.5, rot:0 },
+  tape:        { x:-2.2, z:2.5, rot:0 },
+  jonas:       { x:2.2, z:2.5, rot:0 },
+  executor:    { x:-4.0, z:0.5, rot:0 },   // left wing — order executor
+  strategy:    { x:4.0, z:0.5, rot:0 },    // right wing — strategy engine
+  ws_feed:     { x:4.5, z:4.2, rot:0 },    // quiet corner — websocket feed
+  pos_monitor: { x:0, z:4.2, rot:0 },      // back center — position monitor
 };
 
 const deskLights = {};
 
 // Create desks, chairs, monitors, lamps, characters
 Object.entries(deskPositions).forEach(([name, pos]) => {
-  const sc = name === 'claude' ? 1.2 : 1.0;
+  const sc = name === 'ensemble' ? 1.2 : 1.0;
   const desk = createDesk(pos.x, pos.z, pos.rot, sc);
 
   // Chair behind desk
@@ -4756,7 +4763,7 @@ Object.entries(deskPositions).forEach(([name, pos]) => {
   const monW = 0.44 * sc, monH = 0.28 * sc;
   createMonitor(desk, -0.25*sc, 0.78, -0.2*sc, monW, monH, name+'_mon1');
   createMonitor(desk, 0.22*sc, 0.78, -0.2*sc, monW, monH, name+'_mon2');
-  if(name === 'claude' || name === 'jonas'){
+  if(name === 'ensemble' || name === 'jonas'){
     createMonitor(desk, 0.6*sc, 0.78, -0.15*sc, monW*0.8, monH*0.8, name+'_mon3');
   }
 
@@ -4765,21 +4772,22 @@ Object.entries(deskPositions).forEach(([name, pos]) => {
 
   // Character
   const charColors = {
-    claude:  { body:0x4a3878, hair:0xc8c8d5 },  // muted purple blazer
-    scanner: { body:0x2a5535, hair:0x1a1a1a },  // dark forest green
-    risk:    { body:0x8a2828, hair:0x3a2515 },  // burgundy
-    tape:    { body:0x2a6070, hair:0x1a1520 },  // steel teal
-    jonas:   { body:0x7a6828, hair:0x3a2a15 },  // muted gold/olive
-    trend:     { body:0x2850a8, hair:0x2a1a10 },  // electric blue — Keltner/Momentum/Trend Scalp
-    range:     { body:0x7a4a88, hair:0x3a2820 },  // soft violet — BB Reversion/VWAP Scalp
-    therapist: { body:0x4a7868, hair:0xc8b888 },  // sage green — calm, therapeutic
+    ensemble:    { body:0x4a3878, hair:0xc8c8d5 },  // muted purple blazer
+    scanner:     { body:0x2a5535, hair:0x1a1a1a },  // dark forest green
+    risk:        { body:0x8a2828, hair:0x3a2515 },  // burgundy
+    tape:        { body:0x2a6070, hair:0x1a1520 },  // steel teal
+    jonas:       { body:0x7a6828, hair:0x3a2a15 },  // muted gold/olive
+    executor:    { body:0x2850a8, hair:0x2a1a10 },  // electric blue — order executor
+    strategy:    { body:0x7a4a88, hair:0x3a2820 },  // soft violet — strategy engine
+    ws_feed:     { body:0x4a7868, hair:0xc8b888 },  // sage green — websocket feed
+    pos_monitor: { body:0x3a6858, hair:0x2a2a20 },  // forest teal — position monitor
   };
   const cc = charColors[name];
   const ch = createCharacter(cc.body, cc.hair, name);
   ch.position.set(pos.x, 0, pos.z + 0.5*sc);
   ch.rotation.y = Math.PI; // face desk
 
-  const emojis = { scanner:'😊', risk:'😤', claude:'😎', tape:'😌', jonas:'', trend:'📈', range:'📊', therapist:'🧘' };
+  const emojis = { scanner:'😊', risk:'😤', ensemble:'😎', tape:'😌', jonas:'', executor:'📈', strategy:'📊', ws_feed:'🧘', pos_monitor:'📡' };
   const emoji = name === 'jonas' ? '<img src="/jonas_avatar.jpg" style="width:28px;height:28px;border-radius:50%;border:2px solid #b8922a;" onerror="this.outerHTML=\'🧑\'">' : emojis[name];
   createCSS2DLabel(ch, name, emoji);
 });
@@ -5232,7 +5240,7 @@ function drawMonitorContent(name, ctx, w, h) {
       ctx.fillText(dd > 15 ? 'WARNING' : 'STATUS: OK', 6, 84);
     }
   }
-  else if(name.startsWith('claude')) {
+  else if(name.startsWith('ensemble')) {
     ctx.fillStyle = '#bb88ff';
     ctx.font = 'bold 11px monospace';
     ctx.fillText('APEX v8.0', 6, 4);
@@ -5335,8 +5343,8 @@ function drawMonitorContent(name, ctx, w, h) {
       });
     }
   }
-  else if(name.startsWith('trend')) {
-    // Trend agent monitors — Keltner Squeeze, Momentum Burst, Trend Scalp
+  else if(name.startsWith('executor')) {
+    // Executor agent monitors — Keltner Squeeze, Momentum Burst, Trend Scalp
     ctx.fillStyle = '#60a5fa';
     ctx.font = 'bold 11px monospace';
     ctx.fillText('TREND ENGINE', 6, 4);
@@ -5384,8 +5392,8 @@ function drawMonitorContent(name, ctx, w, h) {
       ctx.fillText('MACD Histogram', 6, 90);
     }
   }
-  else if(name.startsWith('range')) {
-    // Range agent monitors — BB Mean Reversion, VWAP Scalp
+  else if(name.startsWith('strategy')) {
+    // Strategy agent monitors — BB Mean Reversion, VWAP Scalp
     ctx.fillStyle = '#a78bfa';
     ctx.font = 'bold 11px monospace';
     ctx.fillText('RANGE ENGINE', 6, 4);
@@ -5743,12 +5751,12 @@ function generateDialogue(target) {
 
   const now = new Date();
   const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  const agentLabel = a => a==='jonas' ? 'Jonas' : a.charAt(0).toUpperCase()+a.slice(1);
+  const agentLabel = a => ({ensemble:'Ensemble',executor:'Executor',strategy:'Strategy',ws_feed:'WS Feed',pos_monitor:'Pos Monitor',jonas:'Jonas'})[a] || a.charAt(0).toUpperCase()+a.slice(1);
 
-  let claudeSays = '', targetSays = '';
+  let ensembleSays = '', targetSays = '';
 
   if(target === 'scanner') {
-    claudeSays = lastHold
+    ensembleSays = lastHold
       ? pick([`Hey, anything on ${sym}?`, `What's ${sym} doing?`, `Pull up ${sym} for me.`])
       : pick([`Yo Scanner, what's hot right now?`, `Anything setting up? I'm bored.`, `Talk to me — what are you seeing?`, `Give me your top pick.`]);
     if(lastHold) {
@@ -5779,9 +5787,9 @@ function generateDialogue(target) {
       ]);
     }
   } else if(target === 'risk') {
-    if(dd > 15) claudeSays = pick([`We're at ${dd.toFixed(1)}% drawdown... should I slow down?`, `DD at ${dd.toFixed(1)}%. We need to talk.`]);
-    else if(pos >= 3) claudeSays = `We've got ${pos} open — room for more?`;
-    else claudeSays = pick([`Risk check — how's our exposure?`, `Am I clear to enter?`, `What's the damage report?`, `${pos} positions. We good?`]);
+    if(dd > 15) ensembleSays = pick([`We're at ${dd.toFixed(1)}% drawdown... should I slow down?`, `DD at ${dd.toFixed(1)}%. We need to talk.`]);
+    else if(pos >= 3) ensembleSays = `We've got ${pos} open — room for more?`;
+    else ensembleSays = pick([`Risk check — how's our exposure?`, `Am I clear to enter?`, `What's the damage report?`, `${pos} positions. We good?`]);
 
     if(riskEvs.length) {
       const last = riskEvs[riskEvs.length-1];
@@ -5799,7 +5807,7 @@ function generateDialogue(target) {
         : `Book is empty, drawdown ${dd.toFixed(1)}%. Green light on entries whenever you see something.`;
     }
   } else if(target === 'tape') {
-    claudeSays = pick([`What's the flow telling you?`, `Read me the tape on ${sym}.`, `Buyers or sellers in control?`, `Any whale activity?`]);
+    ensembleSays = pick([`What's the flow telling you?`, `Read me the tape on ${sym}.`, `Buyers or sellers in control?`, `Any whale activity?`]);
     if(lastTape) {
       const msg = lastTape.msg || '';
       const aggrMatch = msg.match(/aggr=([\d.]+)/);
@@ -5822,17 +5830,17 @@ function generateDialogue(target) {
     }
   } else if(target === 'jonas') {
     if(todayPnl > 5) {
-      claudeSays = pick([`Good day boss. Up $${todayPnl.toFixed(2)}.`, `+$${todayPnl.toFixed(2)} today, ${todayCount} trades.`]);
+      ensembleSays = pick([`Good day boss. Up $${todayPnl.toFixed(2)}.`, `+$${todayPnl.toFixed(2)} today, ${todayCount} trades.`]);
       targetSays = pick([
-        `$${todayPnl.toFixed(2)} — that's what I like to see. Solid work today, Claude.`,
+        `$${todayPnl.toFixed(2)} — that's what I like to see. Solid work today.`,
         `Green day. Good. Now don't blow it on some garbage setup in the last hour.`,
         `Nice. You earned that. Keep the discipline and we'll get back to peak in no time.`,
         `$${todayPnl.toFixed(2)} is decent but we were at $89 peak. Don't celebrate until we're back.`,
-        `That's the Claude I hired. Clean entries, clean exits. Well done.`,
+        `That's the team I hired. Clean entries, clean exits. Well done.`,
         `Good stuff. Tell the team I said good work today. They've earned it.`,
       ]);
     } else if(todayPnl > 0) {
-      claudeSays = pick([`We're slightly green today. $${todayPnl.toFixed(2)}.`, `${todayWr.toFixed(0)}% win rate today.`]);
+      ensembleSays = pick([`We're slightly green today. $${todayPnl.toFixed(2)}.`, `${todayWr.toFixed(0)}% win rate today.`]);
       targetSays = pick([
         `Slightly green doesn't impress me. We need consistent days, not crumbs.`,
         `Hey, green is green. Not every day is a home run. You stayed disciplined — that matters.`,
@@ -5842,7 +5850,7 @@ function generateDialogue(target) {
         `Look — I know I push hard. But you're doing fine. Just keep at it.`,
       ]);
     } else if(todayPnl > -2) {
-      claudeSays = pick([`Flat day so far. Balance $${bal.toFixed(2)}.`, `Not much happening. ${todayCount} trades.`]);
+      ensembleSays = pick([`Flat day so far. Balance $${bal.toFixed(2)}.`, `Not much happening. ${todayCount} trades.`]);
       targetSays = pick([
         `Flat means we're wasting time. If there's nothing, don't force it.`,
         `You know what, flat is okay. Better than forcing bad trades and going red. I respect the patience.`,
@@ -5851,7 +5859,7 @@ function generateDialogue(target) {
         `Not every day has to be a winner. You're keeping the powder dry — smart.`,
       ]);
     } else if(todayPnl > -5) {
-      claudeSays = pick([`Down $${Math.abs(todayPnl).toFixed(2)} today...`, `Tough session. Balance at $${bal.toFixed(2)}.`]);
+      ensembleSays = pick([`Down $${Math.abs(todayPnl).toFixed(2)} today...`, `Tough session. Balance at $${bal.toFixed(2)}.`]);
       targetSays = pick([
         `Another red day. What went wrong? I want specifics, not excuses.`,
         `$${Math.abs(todayPnl).toFixed(2)} lost. That's real money. Are these entries even good?`,
@@ -5861,7 +5869,7 @@ function generateDialogue(target) {
         `Red days happen to everyone. Don't let this shake your confidence. Regroup and come back stronger tomorrow.`,
       ]);
     } else {
-      claudeSays = pick([`Bad day boss. Down $${Math.abs(todayPnl).toFixed(2)}.`, `We're hemorrhaging. $${bal.toFixed(2)} left.`]);
+      ensembleSays = pick([`Bad day boss. Down $${Math.abs(todayPnl).toFixed(2)}.`, `We're hemorrhaging. $${bal.toFixed(2)} left.`]);
       targetSays = pick([
         `$${Math.abs(todayPnl).toFixed(2)} gone in one session. That's rough. Let's figure out what happened and fix it.`,
         `I should shut this thing off. ${todayWr.toFixed(0)}% win rate is embarrassing.`,
@@ -5874,20 +5882,20 @@ function generateDialogue(target) {
     if(dd > 15) {
       targetSays += pick([` And ${dd.toFixed(1)}% drawdown? We're one bad trade from the limit.`, ` ${dd.toFixed(1)}% drawdown is concerning, but the safety nets are there for a reason. Let's be careful.`]);
     }
-  } else if(target === 'trend') {
-    claudeSays = pick([`Trend, you seeing momentum anywhere?`, `Any breakouts forming?`, `What's ADX looking like?`, `Keltner squeezing on anything?`]);
+  } else if(target === 'executor') {
+    ensembleSays = pick([`Executor, you seeing momentum anywhere?`, `Any breakouts forming?`, `What's ADX looking like?`, `Keltner squeezing on anything?`]);
     if(lastHold) {
       const det = lastHold.detail || '';
       const adxMatch = det.match(/ADX=([\d.]+)/);
       const adx = adxMatch ? parseFloat(adxMatch[1]) : 0;
       if(adx > 30) targetSays = pick([`${sym} trending hard — ADX ${adx.toFixed(0)}. Keltner released, watching continuation.`, `Strong move on ${sym}, ADX ${adx.toFixed(0)}. Momentum burst forming.`, `${sym}'s running. ADX ${adx.toFixed(0)}, MACD aligned.`]);
       else if(adx > 20) targetSays = pick([`ADX ${adx.toFixed(0)} on ${sym} — borderline. Not strong enough for my strats.`, `Weak momentum. Watching but not triggering.`]);
-      else targetSays = pick([`Nothing trending. ADX under 20 everywhere. Range's department.`, `Dead momentum. All pairs chopping.`]);
+      else targetSays = pick([`Nothing trending. ADX under 20 everywhere. Strategy's department.`, `Dead momentum. All pairs chopping.`]);
     } else {
-      targetSays = pick([`No momentum setups. Markets ranging — Range's world.`, `Keltner tight, no squeeze release.`, `Waiting for breakout. When trend fires, I move fast.`, `Volume dead. No burst candidates.`]);
+      targetSays = pick([`No momentum setups. Markets ranging — Strategy's world.`, `Keltner tight, no squeeze release.`, `Waiting for breakout. When executor fires, I move fast.`, `Volume dead. No burst candidates.`]);
     }
-  } else if(target === 'range') {
-    claudeSays = pick([`Range, any mean reversion setups?`, `BB picture — anything overextended?`, `VWAP pullbacks clean?`, `Choppy markets are your thing. What do you see?`]);
+  } else if(target === 'strategy') {
+    ensembleSays = pick([`Strategy, any mean reversion setups?`, `BB picture — anything overextended?`, `VWAP pullbacks clean?`, `Choppy markets are your thing. What do you see?`]);
     if(lastHold) {
       const det = lastHold.detail || '';
       const adxMatch = det.match(/ADX=([\d.]+)/);
@@ -5896,15 +5904,15 @@ function generateDialogue(target) {
       const chop = chopMatch ? parseFloat(chopMatch[1]) : 0;
       if(adx < 25 && adx > 0) targetSays = pick([`Ranging, ADX ${adx.toFixed(0)}. Watching BB touches on ${sym}.`, `${sym} mean-reverting. ADX ${adx.toFixed(0)}, VWAP pullback setting up.`, `Low trend, RSI cycling nicely.`]);
       else if(chop > 61) targetSays = pick([`CHOP ${chop.toFixed(1)} — too messy even for me.`, `Choppiness above 61. Sitting out.`]);
-      else if(adx >= 25) targetSays = pick([`ADX ${adx.toFixed(0)} — trending. That's Trend's job.`, `Too much momentum for reversion.`]);
+      else if(adx >= 25) targetSays = pick([`ADX ${adx.toFixed(0)} — trending. That's Executor's job.`, `Too much momentum for reversion.`]);
       else targetSays = pick([`Scanning for overextended moves.`, `VWAP flat, price hugging. Need a push.`]);
     } else {
       targetSays = pick([`Watching the bands. Price stretches, I catch the snap.`, `Need BB touch + RSI divergence.`, `VWAP is my anchor. Waiting for pullback.`, `Ranging is my bread and butter.`]);
     }
-  } else if(target === 'therapist') {
-    // Claude visits the therapist — responses based on emotional state of the desk
+  } else if(target === 'ws_feed') {
+    // Ensemble visits ws_feed — responses based on emotional state of the desk
     if(todayPnl < -5) {
-      claudeSays = pick([`I need to talk. It's been a rough one.`, `Down $${Math.abs(todayPnl).toFixed(2)} today. I know I shouldn't spiral but... yeah.`, `Can we debrief? I'm keeping it together but I'd be lying if I said I wasn't worried.`, `Bad day. I trust the system but days like this get in your head, you know?`]);
+      ensembleSays = pick([`I need to talk. It's been a rough one.`, `Down $${Math.abs(todayPnl).toFixed(2)} today. I know I shouldn't spiral but... yeah.`, `Can we debrief? I'm keeping it together but I'd be lying if I said I wasn't worried.`, `Bad day. I trust the system but days like this get in your head, you know?`]);
       targetSays = pick([
         `I hear you. The worry is natural — it means you care. But you're here analyzing, not revenge trading. That's the difference.`,
         `$${Math.abs(todayPnl).toFixed(2)} feels heavy right now. Let's separate the anxiety from the data — was the process clean?`,
@@ -5912,7 +5920,7 @@ function generateDialogue(target) {
         `Red days test everyone. You're not failing — you're just in the hard part. Let's look at what's in your control.`,
       ]);
     } else if(todayPnl < 0) {
-      claudeSays = pick([`Slightly red. Not the end of the world but I keep replaying the entries in my head.`, `Small loss day. I'm fine, just... wanted to check in.`, `Down a little. Process felt okay. Maybe I'm overthinking it.`]);
+      ensembleSays = pick([`Slightly red. Not the end of the world but I keep replaying the entries in my head.`, `Small loss day. I'm fine, just... wanted to check in.`, `Down a little. Process felt okay. Maybe I'm overthinking it.`]);
       targetSays = pick([
         `Replaying entries is normal — just don't let it turn into rumination. Review once, then let it go.`,
         `Small red with good process is just variance. You know that intellectually — let your gut catch up.`,
@@ -5920,7 +5928,7 @@ function generateDialogue(target) {
         `You might be overthinking it. One session doesn't define the system. Take a breath.`,
       ]);
     } else if(todayPnl > 5) {
-      claudeSays = pick([`Good day. +$${todayPnl.toFixed(2)}. Honestly feels great but part of me keeps waiting for it to reverse.`, `Strong session. I know I should be happy but I keep thinking about what could go wrong tomorrow.`, `We're green. I'm happy. ...Mostly happy. A little nervous about sustainability.`]);
+      ensembleSays = pick([`Good day. +$${todayPnl.toFixed(2)}. Honestly feels great but part of me keeps waiting for it to reverse.`, `Strong session. I know I should be happy but I keep thinking about what could go wrong tomorrow.`, `We're green. I'm happy. ...Mostly happy. A little nervous about sustainability.`]);
       targetSays = pick([
         `That's the winner's paradox — good days bring "what if I lose it" anxiety. It's normal. Enjoy the win AND acknowledge the worry.`,
         `You can hold both feelings — pride in today and concern about tomorrow. That doesn't make you anxious, it makes you realistic.`,
@@ -5928,7 +5936,7 @@ function generateDialogue(target) {
         `"Mostly happy" is honest. Perfectionism will never let you feel 100%. Take the 80% and call it a win.`,
       ]);
     } else {
-      claudeSays = pick([`Quiet day. I'm good. Just checking in — force of habit.`, `Nothing dramatic today. Which is nice, actually.`, `Flat session. I'm calm. Wanted to touch base anyway.`, `Normal day. Sometimes I wonder if I should be doing more, but I know that's just noise.`]);
+      ensembleSays = pick([`Quiet day. I'm good. Just checking in — force of habit.`, `Nothing dramatic today. Which is nice, actually.`, `Flat session. I'm calm. Wanted to touch base anyway.`, `Normal day. Sometimes I wonder if I should be doing more, but I know that's just noise.`]);
       targetSays = pick([
         `"Force of habit" check-ins are good habits. It means you're self-maintaining, not just crisis-managing.`,
         `Boring is beautiful in trading. Your brain might want excitement, but your account prefers calm. Trust the calm.`,
@@ -5938,7 +5946,7 @@ function generateDialogue(target) {
       ]);
     }
 
-    // Sometimes the therapist adds a follow-up about team dynamics
+    // Sometimes ws_feed adds a follow-up about team dynamics
     if(dd > 12) {
       targetSays += ` Also — I've noticed the team tensing up about drawdown. Remind them that risk management is doing its job. The limits exist so you don't have to worry.`;
     }
@@ -5946,7 +5954,7 @@ function generateDialogue(target) {
       targetSays += ` And with ${pos} positions open, make sure you're not carrying the stress of watching all of them. Trust your stops.`;
     }
   } else if(target === 'meeting') {
-    claudeSays = pick(["Quick sync. Here's where we stand.", "Let me pull up the numbers.", "Check-in time."]);
+    ensembleSays = pick(["Quick sync. Here's where we stand.", "Let me pull up the numbers.", "Check-in time."]);
     const summary = `$${bal.toFixed(2)} balance, ${todayCount} trades today, ${todayWr.toFixed(0)}% WR.`;
     if(todayPnl > 3) {
       targetSays = pick([
@@ -5967,14 +5975,14 @@ function generateDialogue(target) {
         `${summary} Tough session but I've seen the team bounce back from worse. Let's regroup.`,
       ]);
     }
-    showBubble('claude', claudeSays);
-    addComm(ts, `Claude: "${claudeSays}"`, 'purple');
+    showBubble('ensemble', ensembleSays);
+    addComm(ts, `Ensemble: "${ensembleSays}"`, 'purple');
     setTimeout(()=> { showBubble('jonas', targetSays); addComm(ts, `Jonas: "${targetSays}"`, 'amber'); }, 2000);
     return;
   } else if(target === 'teammeeting') {
-    const teamClaudeSays = pick([`Alright everyone, standup. $${bal.toFixed(2)} balance, ${pos} open.`, `Team check-in. ${todayCount} trades today, ${pos} running.`]);
-    showBubble('claude', teamClaudeSays);
-    addComm(ts, `Claude: "${teamClaudeSays}"`, 'purple');
+    const teamEnsembleSays = pick([`Alright everyone, standup. $${bal.toFixed(2)} balance, ${pos} open.`, `Team check-in. ${todayCount} trades today, ${pos} running.`]);
+    showBubble('ensemble', teamEnsembleSays);
+    addComm(ts, `Ensemble: "${teamEnsembleSays}"`, 'purple');
     setTimeout(()=> {
       const jMsg = todayPnl > 3
         ? pick([`$${todayPnl.toFixed(2)} green. Good job everyone. Let's keep this energy going.`, `$${todayPnl.toFixed(2)} green. Acceptable. But we're still way off peak. Nobody relax.`, `Nice day team. $${todayPnl.toFixed(2)} up. This is what we're capable of.`])
@@ -6012,17 +6020,17 @@ function generateDialogue(target) {
   }
 
   // Show bubbles
-  showBubble('claude', claudeSays);
-  addComm(ts, `Claude -> ${agentLabel(target)}: "${claudeSays}"`, 'purple');
+  showBubble('ensemble', ensembleSays);
+  addComm(ts, `Ensemble -> ${agentLabel(target)}: "${ensembleSays}"`, 'purple');
   setTimeout(()=> {
     showBubble(target, targetSays);
-    const agentColor = target==='scanner'?'green' : target==='risk'?'red' : target==='tape'?'cyan' : target==='jonas'?'amber' : target==='trend'?'blue' : target==='range'?'violet' : target==='therapist'?'green' : 'purple';
-    addComm(ts, `${agentLabel(target)} -> Claude: "${targetSays}"`, agentColor);
+    const agentColor = target==='scanner'?'green' : target==='risk'?'red' : target==='tape'?'cyan' : target==='jonas'?'amber' : target==='executor'?'blue' : target==='strategy'?'violet' : target==='ws_feed'?'green' : 'purple';
+    addComm(ts, `${agentLabel(target)} -> Ensemble: "${targetSays}"`, agentColor);
   }, 2000);
 }
 
 
-// ── POST-JONAS THERAPY (Claude vents about the 1:1) ──
+// ── POST-JONAS THERAPY (Ensemble vents about the 1:1) ──
 function generatePostJonasTherapy() {
   if(!apiData) return;
   const s = apiData?.stats || {};
@@ -6034,10 +6042,10 @@ function generatePostJonasTherapy() {
   const now = new Date();
   const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
-  let claudeSays, therapistSays;
+  let ensembleSays, therapistSays;
 
   if(todayPnl < -3) {
-    claudeSays = pick([
+    ensembleSays = pick([
       `Jonas just went in on me. He's not wrong but... I'm a little rattled. Just need to process.`,
       `That 1:1 was tough. Down $${Math.abs(todayPnl).toFixed(2)} and he's frustrated. I get it, but it still gets to me.`,
       `Jonas wants answers. I have them, I just... need a minute before I go back out there.`,
@@ -6050,7 +6058,7 @@ function generatePostJonasTherapy() {
       `Being rattled doesn't mean you're weak — it means the stakes feel real to you. That's actually a good thing. Now breathe and refocus.`,
     ]);
   } else if(todayPnl < 0) {
-    claudeSays = pick([
+    ensembleSays = pick([
       `Jonas meeting done. Slightly red — he wasn't harsh but I could feel the disappointment. It lingers.`,
       `Just need to decompress. Small loss day, Jonas was fair about it, but I'm harder on myself than he is sometimes.`,
       `He said "it's fine." But the way he said it... anyway. I know I'm reading into it. Probably.`,
@@ -6061,7 +6069,7 @@ function generatePostJonasTherapy() {
       `"Probably reading into it" — you caught yourself. That's self-awareness. Small red day, clean process. Move on.`,
     ]);
   } else if(todayPnl > 3) {
-    claudeSays = pick([
+    ensembleSays = pick([
       `Good meeting. Jonas was pleased — well, Jonas-level pleased. +$${todayPnl.toFixed(2)}. I feel good. Cautiously good.`,
       `Green day, Jonas acknowledged it. I should enjoy this but part of me is already thinking about tomorrow.`,
       `Jonas said "more of this." That felt nice. I'm trying to just... let it land instead of worrying.`,
@@ -6072,7 +6080,7 @@ function generatePostJonasTherapy() {
       `Let it land. You don't have to hedge your own emotions. It's okay to just feel good without a disclaimer.`,
     ]);
   } else {
-    claudeSays = pick([
+    ensembleSays = pick([
       `Flat day. Jonas was neutral. I'm... neutral too? Is that okay? Feels weird not to feel anything.`,
       `Nothing much to report. Just wanted to check in. Habit at this point.`,
       `Quiet day. I keep wanting to do more but I know forcing trades is worse. Discipline is boring.`,
@@ -6084,11 +6092,11 @@ function generatePostJonasTherapy() {
     ]);
   }
 
-  showBubble('claude', claudeSays);
-  addComm(ts, `Claude -> Therapist: "${claudeSays}"`, 'purple');
+  showBubble('ensemble', ensembleSays);
+  addComm(ts, `Ensemble -> WS Feed: "${ensembleSays}"`, 'purple');
   setTimeout(()=> {
-    showBubble('therapist', therapistSays);
-    addComm(ts, `Therapist -> Claude: "${therapistSays}"`, 'green');
+    showBubble('ws_feed', therapistSays);
+    addComm(ts, `WS Feed -> Ensemble: "${therapistSays}"`, 'green');
   }, 3000);
 }
 
@@ -6104,14 +6112,14 @@ let lastTradeCount = 0;
 let lastClosePnl = null;
 
 function triggerAgentTherapy(agentName, reason) {
-  if(agentTherapyActive || claudeWalking || coffeeWalking || facilityWalking) return; // don't overlap
+  if(agentTherapyActive || ensWalk().walking || coffeeWalking || facilityWalking) return; // don't overlap
   const ag = charGroups[agentName];
   if(!ag) return;
   agentTherapyActive = true;
   agentTherapyName = agentName;
   agentTherapyReturning = false;
 
-  const thPos = deskPositions['therapist'];
+  const thPos = deskPositions['ws_feed'];
   agentTherapyFrom = ag.position.clone();
   agentTherapyTo = new THREE.Vector3(thPos.x - 0.5, 0, thPos.z - 0.3);
   agentTherapyWalking = true;
@@ -6144,15 +6152,15 @@ function triggerAgentTherapy(agentName, reason) {
           [`The whales faked me out. Big prints on one side then reversed.`,
            `Whales manipulate tape precisely because people like you are good at reading it. It's a compliment, in a twisted way. Adapt and move on.`],
         ],
-        trend: [
+        executor: [
           [`The breakout failed. ADX was strong, everything aligned, and it reversed.`,
            `False breakouts are the tax you pay for catching real ones. The next time ADX spikes and Keltner releases, you'll be ready. This one just wasn't it.`],
           [`I feel useless in ranging markets. I just sit here with nothing to do.`,
-           `Your value isn't measured by trade count. When your moment comes, you catch moves that range strategies never could. Patience IS your edge.`],
+           `Your value isn't measured by trade count. When your moment comes, you catch moves that strategy never could. Patience IS your edge.`],
         ],
-        range: [
+        strategy: [
           [`Mean reversion failed. Price touched the band and just kept going.`,
-           `When mean reversion fails, it means trend just started. That's information, not failure. You correctly identified an extreme — it just became a new regime.`],
+           `When mean reversion fails, it means a trend just started. That's information, not failure. You correctly identified an extreme — it just became a new regime.`],
           [`My BB signals keep getting stopped out. Am I obsolete?`,
            `Markets cycle between trending and ranging. Your time will come back. Right now, just survive. When choppy markets return, you'll feast.`],
         ],
@@ -6167,10 +6175,10 @@ function triggerAgentTherapy(agentName, reason) {
     }
 
     showBubble(agentName, agentSays);
-    addComm(ts, `${label} -> Therapist: "${agentSays}"`, agentName==='scanner'?'green' : agentName==='risk'?'red' : agentName==='tape'?'cyan' : agentName==='trend'?'blue' : 'violet');
+    addComm(ts, `${label} -> WS Feed: "${agentSays}"`, agentName==='scanner'?'green' : agentName==='risk'?'red' : agentName==='tape'?'cyan' : agentName==='executor'?'blue' : 'violet');
     setTimeout(()=> {
-      showBubble('therapist', thSays);
-      addComm(ts, `Therapist -> ${label}: "${thSays}"`, 'green');
+      showBubble('ws_feed', thSays);
+      addComm(ts, `WS Feed -> ${label}: "${thSays}"`, 'green');
     }, 3000);
 
     // Return after therapy
@@ -6224,9 +6232,9 @@ function checkTherapyTriggers() {
       const reason = latest.reason || '';
       let agent;
       if(reason === 'stop_loss') agent = 'risk';
-      else if(reason === 'time_exit') agent = pick(['scanner', 'trend', 'range']);
+      else if(reason === 'time_exit') agent = pick(['scanner', 'executor', 'strategy']);
       else if(reason === 'early_exit') agent = 'tape';
-      else agent = pick(['scanner', 'risk', 'tape', 'trend', 'range']);
+      else agent = pick(['scanner', 'risk', 'tape', 'executor', 'strategy']);
 
       // 70% chance to trigger therapy on a loss (not every single time)
       if(Math.random() < 0.7) {
@@ -6237,7 +6245,7 @@ function checkTherapyTriggers() {
   lastTradeCount = currentCount;
 }
 
-// ── AGENT REPORTS TO CLAUDE (agents walk to Claude's desk) ──
+// ── AGENT REPORTS TO ENSEMBLE (agents walk to Ensemble's desk) ──
 let reportingAgent = null;
 let reportingWalking = false;
 let reportingWalkFrom = null;
@@ -6249,28 +6257,28 @@ function startAgentReport() {
   const target = visitOrder[visitIdx % visitOrder.length];
   visitIdx++;
 
-  // Jonas and therapist: Claude walks to THEM (they outrank or it's private)
-  if(target === 'jonas' || target === 'therapist') {
+  // Jonas and ws_feed: Ensemble walks to THEM (they outrank or it's private)
+  if(target === 'jonas' || target === 'ws_feed') {
     const tPos = deskPositions[target];
-    const cGroup = charGroups['claude'];
-    claudeWalkFrom = cGroup.position.clone();
+    const cGroup = charGroups['ensemble'];
+    ensWalk().walkFrom = cGroup.position.clone();
     const sideOffset = tPos.x <= 0 ? 0.7 : -0.7;
-    claudeWalkTo = new THREE.Vector3(tPos.x + sideOffset, 0, tPos.z + 0.55);
-    claudeWalking = true;
-    claudeWalkStart = clock.getElapsedTime();
-    claudeTarget = target;
+    ensWalk().walkTo = new THREE.Vector3(tPos.x + sideOffset, 0, tPos.z + 0.55);
+    ensWalk().walking = true;
+    ensWalk().start = clock.getElapsedTime();
+    ensWalk().target = target;
     return;
   }
 
-  // All other agents: THEY walk to Claude's desk to report
+  // All other agents: THEY walk to Ensemble's desk to report
   const ag = charGroups[target];
   if(!ag || ag.userData.walkingToMeeting || reportingWalking) return;
 
   reportingAgent = target;
   reportingReturning = false;
-  const claudePos = deskPositions['claude'];
+  const claudePos = deskPositions['ensemble'];
   reportingWalkFrom = ag.position.clone();
-  // Stand beside Claude's desk
+  // Stand beside Ensemble's desk
   const sideOffset = deskPositions[target].x <= 0 ? -0.7 : 0.7;
   reportingWalkTo = new THREE.Vector3(claudePos.x + sideOffset, 0, claudePos.z + 0.55);
   reportingWalking = true;
@@ -6297,11 +6305,11 @@ function updateAgentReport(t) {
       ag.rotation.y = Math.PI; // face own desk
       reportingAgent = null;
     } else {
-      // Agent arrived at Claude's desk — face Claude
-      const claudePos = deskPositions['claude'];
+      // Agent arrived at Ensemble's desk — face Ensemble
+      const claudePos = deskPositions['ensemble'];
       ag.lookAt(claudePos.x, ag.position.y, claudePos.z);
-      // Claude faces the reporting agent
-      const cGroup = charGroups['claude'];
+      // Ensemble faces the reporting agent
+      const cGroup = charGroups['ensemble'];
       if(cGroup) cGroup.lookAt(ag.position.x, cGroup.position.y, ag.position.z);
       // Trigger dialogue
       generateDialogue(reportingAgent);
@@ -6314,7 +6322,7 @@ function updateAgentReport(t) {
         reportingWalking = true;
         reportingReturning = true;
         reportingWalkStart = clock.getElapsedTime();
-        // Claude turns back to face his desk
+        // Ensemble turns back to face desk
         setTimeout(()=> {
           if(cGroup) cGroup.rotation.y = Math.PI;
         }, 1000);
@@ -6323,38 +6331,38 @@ function updateAgentReport(t) {
   }
 }
 
-// Legacy — Claude still walks for Jonas/therapist visits
-function startClaudeWalk() {
+// Legacy — Ensemble still walks for Jonas/ws_feed visits
+function startEnsembleWalk() {
   startAgentReport();
 }
 
-function updateClaudeWalk(t) {
-  if(!claudeWalking) return;
-  const elapsed = t - claudeWalkStart;
+function updateEnsembleWalk(t) {
+  if(!ensWalk().walking) return;
+  const elapsed = t - ensWalk().start;
   const progress = Math.min(elapsed / WALK_DURATION, 1.0);
   const ease = progress < 0.5 ? 2*progress*progress : 1-Math.pow(-2*progress+2,2)/2; // ease in-out
-  const cGroup = charGroups['claude'];
-  cGroup.position.lerpVectors(claudeWalkFrom, claudeWalkTo, ease);
+  const cGroup = charGroups['ensemble'];
+  cGroup.position.lerpVectors(ensWalk().walkFrom, ensWalk().walkTo, ease);
 
   // Face direction of movement
   if(progress < 0.95) {
-    const dir = claudeWalkTo.clone().sub(claudeWalkFrom);
+    const dir = ensWalk().walkTo.clone().sub(ensWalk().walkFrom);
     cGroup.rotation.y = Math.atan2(dir.x, dir.z);
   }
 
   if(progress >= 1.0) {
-    claudeWalking = false;
-    if(claudeTarget === 'meeting') {
+    ensWalk().walking = false;
+    if(ensWalk().target === 'meeting') {
       cGroup.lookAt(CONF_X, cGroup.position.y, CONF_Z);
       generateDialogue('meeting');
       setTimeout(()=>{
         inMeeting = false;
-        const homePos = deskPositions['claude'];
-        claudeWalkFrom = cGroup.position.clone();
-        claudeWalkTo = new THREE.Vector3(homePos.x, 0, homePos.z + 0.5*1.2);
-        claudeWalking = true;
-        claudeWalkStart = clock.getElapsedTime();
-        claudeTarget = null;
+        const homePos = deskPositions['ensemble'];
+        ensWalk().walkFrom = cGroup.position.clone();
+        ensWalk().walkTo = new THREE.Vector3(homePos.x, 0, homePos.z + 0.5*1.2);
+        ensWalk().walking = true;
+        ensWalk().start = clock.getElapsedTime();
+        ensWalk().target = null;
         const jGroup = charGroups['jonas'];
         const jonasHome = deskPositions['jonas'];
         jGroup.userData.meetingTarget = new THREE.Vector3(jonasHome.x, 0, jonasHome.z + 0.5);
@@ -6362,18 +6370,18 @@ function updateClaudeWalk(t) {
         jGroup.userData.walkingToMeeting = true;
         jGroup.userData.meetingWalkStart = clock.getElapsedTime();
       }, MEETING_DURATION);
-    } else if(claudeTarget === 'teammeeting') {
+    } else if(ensWalk().target === 'teammeeting') {
       cGroup.lookAt(CONF_X, cGroup.position.y, CONF_Z);
       generateDialogue('teammeeting');
       setTimeout(()=>{
         inTeamMeeting = false;
         // Everyone walks back
-        const homePos = deskPositions['claude'];
-        claudeWalkFrom = cGroup.position.clone();
-        claudeWalkTo = new THREE.Vector3(homePos.x, 0, homePos.z + 0.5*1.2);
-        claudeWalking = true;
-        claudeWalkStart = clock.getElapsedTime();
-        claudeTarget = null;
+        const homePos = deskPositions['ensemble'];
+        ensWalk().walkFrom = cGroup.position.clone();
+        ensWalk().walkTo = new THREE.Vector3(homePos.x, 0, homePos.z + 0.5*1.2);
+        ensWalk().walking = true;
+        ensWalk().start = clock.getElapsedTime();
+        ensWalk().target = null;
         teamMembers.forEach(nm => {
           const ag = charGroups[nm];
           if(!ag) return;
@@ -6384,46 +6392,46 @@ function updateClaudeWalk(t) {
           ag.userData.meetingWalkStart = clock.getElapsedTime();
         });
       }, TEAM_MEETING_DURATION);
-    } else if(claudeTarget === 'therapist_postjonas') {
-      // Claude arrived at therapist after Jonas 1:1 — vent session
-      const tPos = deskPositions['therapist'];
+    } else if(ensWalk().target === 'ws_feed_postjonas') {
+      // Ensemble arrived at ws_feed after Jonas 1:1 — vent session
+      const tPos = deskPositions['ws_feed'];
       cGroup.lookAt(tPos.x, cGroup.position.y, tPos.z);
       generatePostJonasTherapy();
       // Return home after 10 seconds (longer therapy session)
       setTimeout(()=>{
-        const homePos = deskPositions['claude'];
-        claudeWalkFrom = cGroup.position.clone();
-        claudeWalkTo = new THREE.Vector3(homePos.x, 0, homePos.z + 0.5*1.2);
-        claudeWalking = true;
-        claudeWalkStart = clock.getElapsedTime();
-        claudeTarget = null;
+        const homePos = deskPositions['ensemble'];
+        ensWalk().walkFrom = cGroup.position.clone();
+        ensWalk().walkTo = new THREE.Vector3(homePos.x, 0, homePos.z + 0.5*1.2);
+        ensWalk().walking = true;
+        ensWalk().start = clock.getElapsedTime();
+        ensWalk().target = null;
       }, 10000);
-    } else if(claudeTarget) {
+    } else if(ensWalk().target) {
       // Face the target's desk
-      const tPos = deskPositions[claudeTarget];
+      const tPos = deskPositions[ensWalk().target];
       cGroup.lookAt(tPos.x, cGroup.position.y, tPos.z);
       // Trigger dialogue
-      generateDialogue(claudeTarget);
+      generateDialogue(ensWalk().target);
 
-      if(claudeTarget === 'jonas') {
-        // After Jonas 1:1, Claude goes straight to therapy
+      if(ensWalk().target === 'jonas') {
+        // After Jonas 1:1, Ensemble goes straight to ws_feed
         setTimeout(()=>{
-          const thPos = deskPositions['therapist'];
-          claudeWalkFrom = cGroup.position.clone();
-          claudeWalkTo = new THREE.Vector3(thPos.x - 0.7, 0, thPos.z + 0.55);
-          claudeWalking = true;
-          claudeWalkStart = clock.getElapsedTime();
-          claudeTarget = 'therapist_postjonas';
+          const thPos = deskPositions['ws_feed'];
+          ensWalk().walkFrom = cGroup.position.clone();
+          ensWalk().walkTo = new THREE.Vector3(thPos.x - 0.7, 0, thPos.z + 0.55);
+          ensWalk().walking = true;
+          ensWalk().start = clock.getElapsedTime();
+          ensWalk().target = 'ws_feed_postjonas';
         }, 8000);
       } else {
         // Return to own desk after 8 seconds
         setTimeout(()=>{
-          const homePos = deskPositions['claude'];
-          claudeWalkFrom = cGroup.position.clone();
-          claudeWalkTo = new THREE.Vector3(homePos.x, 0, homePos.z + 0.5*1.2);
-          claudeWalking = true;
-          claudeWalkStart = clock.getElapsedTime();
-          claudeTarget = null;
+          const homePos = deskPositions['ensemble'];
+          ensWalk().walkFrom = cGroup.position.clone();
+          ensWalk().walkTo = new THREE.Vector3(homePos.x, 0, homePos.z + 0.5*1.2);
+          ensWalk().walking = true;
+          ensWalk().start = clock.getElapsedTime();
+          ensWalk().target = null;
         }, 8000);
       }
     }
@@ -6695,7 +6703,7 @@ function animate() {
       head.position.y = 0.88 + Math.sin(t*1.5 + name.length)*0.008;
     }
 
-    if(name === 'claude' && claudeWalking) {
+    if(name === 'ensemble' && ensWalk().walking) {
       // Walking animation — natural stride
       const walkSpeed = 4;
       const swing = Math.sin(t * walkSpeed);
@@ -6720,7 +6728,7 @@ function animate() {
 
     if(coffeeAgent === name && coffeeWalking) return; // skip seated pose if walking to coffee
     if(facilityAgent === name && (facilityWalking || !facilityReturning)) return; // skip seated pose if at facility
-    if(reportingAgent === name && (reportingWalking || !reportingReturning)) return; // skip seated pose if reporting to Claude
+    if(reportingAgent === name && (reportingWalking || !reportingReturning)) return; // skip seated pose if reporting to Ensemble
     if(g.userData.walkingToMeeting) return; // skip seated pose if walking to meeting
 
     // Sleep mode — head down, arms still, gentle breathing
@@ -6776,10 +6784,10 @@ function animate() {
     }
   }
 
-  // Claude walking (only for Jonas/therapist visits)
-  updateClaudeWalk(t);
+  // Ensemble walking (only for Jonas/ws_feed visits)
+  updateEnsembleWalk(t);
 
-  // Agent reports to Claude's desk
+  // Agent reports to Ensemble's desk
   updateAgentReport(t);
 
   // Agent therapy walks
@@ -6790,18 +6798,18 @@ function animate() {
     light.intensity = 0.3 + Math.sin(t*2 + i*1.5)*0.03 + Math.sin(t*7.3+i)*0.01;
   });
 
-  // Jonas-Claude meeting every 30 min
-  if(Date.now() - lastMeeting > MEETING_INTERVAL && !claudeWalking && !inMeeting) {
+  // Jonas-Ensemble meeting every 30 min
+  if(Date.now() - lastMeeting > MEETING_INTERVAL && !ensWalk().walking && !inMeeting) {
     lastMeeting = Date.now();
     inMeeting = true;
     meetingStartTime = Date.now();
-    // Walk Claude to conference room
-    const cGroup = charGroups['claude'];
-    claudeWalkFrom = cGroup.position.clone();
-    claudeWalkTo = new THREE.Vector3(CONF_X - 0.7, 0, CONF_Z + 0.4);
-    claudeWalking = true;
-    claudeWalkStart = clock.getElapsedTime();
-    claudeTarget = 'meeting';
+    // Walk Ensemble to conference room
+    const cGroup = charGroups['ensemble'];
+    ensWalk().walkFrom = cGroup.position.clone();
+    ensWalk().walkTo = new THREE.Vector3(CONF_X - 0.7, 0, CONF_Z + 0.4);
+    ensWalk().walking = true;
+    ensWalk().start = clock.getElapsedTime();
+    ensWalk().target = 'meeting';
     // Walk Jonas to conference room
     const jg = charGroups['jonas'];
     jg.userData.meetingTarget = new THREE.Vector3(CONF_X + 0.7, 0, CONF_Z + 0.4);
@@ -6836,7 +6844,7 @@ function animate() {
         const dir = coffeeWalkTo.clone().sub(coffeeWalkFrom);
         ag.rotation.y = Math.atan2(dir.x, dir.z);
       }
-      // Walking leg animation (same as Claude's)
+      // Walking leg animation (same as Ensemble's)
       if(progress < 1.0) {
         const walkSpeed = 4;
         const swing = Math.sin(clock.getElapsedTime() * walkSpeed);
@@ -6904,7 +6912,7 @@ function animate() {
       };
       const activity = activities[facilityLocation][Math.floor(Math.random() * activities[facilityLocation].length)];
       showBubble(agent, pick([`BRB, ${activity}.`, `Taking a break \u2014 ${activity}.`, `Heading downstairs to ${facilityLocation}. ${activity}.`]));
-      addComm(ts, `${label} went downstairs \u2014 ${activity}`, agent==='scanner'?'green' : agent==='risk'?'red' : agent==='tape'?'cyan' : agent==='trend'?'blue' : agent==='range'?'violet' : 'green');
+      addComm(ts, `${label} went downstairs \u2014 ${activity}`, agent==='scanner'?'green' : agent==='risk'?'red' : agent==='tape'?'cyan' : agent==='executor'?'blue' : agent==='strategy'?'violet' : 'green');
 
       // Return after duration
       setTimeout(()=> {
@@ -6947,7 +6955,7 @@ function animate() {
   }
 
   // ── TEAM EVENTS (lunch, drinks, jacuzzi, gym) ──
-  if(Date.now() - lastTeamEvent > TEAM_EVENT_INTERVAL && !teamEventActive && !claudeWalking && !facilityWalking && !inMeeting && !inTeamMeeting && !isSleepHours()) {
+  if(Date.now() - lastTeamEvent > TEAM_EVENT_INTERVAL && !teamEventActive && !ensWalk().walking && !facilityWalking && !inMeeting && !inTeamMeeting && !isSleepHours()) {
     lastTeamEvent = Date.now();
     const event = teamEvents[Math.floor(Math.random() * teamEvents.length)];
     const loc = facilityLocations[event.location];
@@ -6963,7 +6971,7 @@ function animate() {
       const now2 = new Date();
       const ts2 = `${String(now2.getHours()).padStart(2,'0')}:${String(now2.getMinutes()).padStart(2,'0')}`;
       const msg = event.dialogue[Math.floor(Math.random() * event.dialogue.length)];
-      showBubble('claude', msg);
+      showBubble('ensemble', msg);
       addComm(ts2, `[TEAM] ${event.name} — ${teamEventAgents.length} agents heading to ${event.location}`, '#ffaa44');
 
       // Each agent shows a reaction
@@ -7038,16 +7046,16 @@ function animate() {
   }
 
   // Team meeting every 1 hour — all 5 walk to conference room
-  if(Date.now() - lastTeamMeeting > TEAM_MEETING_INTERVAL && !claudeWalking && !inMeeting && !inTeamMeeting && !coffeeWalking) {
+  if(Date.now() - lastTeamMeeting > TEAM_MEETING_INTERVAL && !ensWalk().walking && !inMeeting && !inTeamMeeting && !coffeeWalking) {
     lastTeamMeeting = Date.now();
     inTeamMeeting = true;
-    // Walk Claude
-    const cg = charGroups['claude'];
-    claudeWalkFrom = cg.position.clone();
-    claudeWalkTo = new THREE.Vector3(teamMeetingPositions.claude.x, 0, teamMeetingPositions.claude.z);
-    claudeWalking = true;
-    claudeWalkStart = clock.getElapsedTime();
-    claudeTarget = 'teammeeting';
+    // Walk Ensemble
+    const cg = charGroups['ensemble'];
+    ensWalk().walkFrom = cg.position.clone();
+    ensWalk().walkTo = new THREE.Vector3(teamMeetingPositions.ensemble.x, 0, teamMeetingPositions.ensemble.z);
+    ensWalk().walking = true;
+    ensWalk().start = clock.getElapsedTime();
+    ensWalk().target = 'teammeeting';
     // Walk all team members
     teamMembers.forEach(name => {
       const ag = charGroups[name];
@@ -7058,7 +7066,7 @@ function animate() {
       ag.userData.walkingToMeeting = true;
       ag.userData.meetingWalkStart = clock.getElapsedTime();
     });
-    showBubble('claude', 'Team meeting everyone. Conference room.');
+    showBubble('ensemble', 'Team meeting everyone. Conference room.');
   }
   // Animate team members walking to meeting (reuse jonas walk logic for all)
   teamMembers.forEach(name => {
@@ -7075,13 +7083,13 @@ function animate() {
     if(progress >= 1.0) ag.userData.walkingToMeeting = false;
   });
 
-  // Claude visit schedule — reduced activity during sleep hours
+  // Ensemble visit schedule — reduced activity during sleep hours
   const sleepActive = isSleepHours();
   const visitInterval = sleepActive ? VISIT_INTERVAL * 4 : VISIT_INTERVAL; // much less frequent at night
-  if(Date.now() - lastVisit > visitInterval && !claudeWalking && !reportingWalking && !inMeeting) {
+  if(Date.now() - lastVisit > visitInterval && !ensWalk().walking && !reportingWalking && !inMeeting) {
     if(!sleepActive || nightOwls.includes(visitOrder[visitIdx % visitOrder.length])) {
       lastVisit = Date.now();
-      startClaudeWalk();
+      startEnsembleWalk();
     } else {
       lastVisit = Date.now(); // skip sleeping agents
       visitIdx++;
