@@ -478,8 +478,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
-import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+// SSAOPass and ShaderPass removed — too heavy for integrated GPU
 
 // ── GLOBALS ──
 let apiData = null;
@@ -633,7 +632,7 @@ const teamMeetingPositions = {
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -705,7 +704,7 @@ scene.add(cityGlow);
 const dirLight = new THREE.DirectionalLight(0xfff0dd, 0.5);
 dirLight.position.set(-5, 12, -8);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.set(2048,2048);
+dirLight.shadow.mapSize.set(1024,1024);
 dirLight.shadow.camera.near = 0.5;
 dirLight.shadow.camera.far = 25;
 dirLight.shadow.camera.left = -8;
@@ -6646,12 +6645,8 @@ function updateHUD() {
 // ── POST-PROCESSING SETUP (post scene/camera init) ──
 composer.addPass(new RenderPass(scene, camera));
 
-// SSAO — ambient occlusion for depth
-var ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
-ssaoPass.kernelRadius = 8;
-ssaoPass.minDistance = 0.005;
-ssaoPass.maxDistance = 0.1;
-composer.addPass(ssaoPass);
+// SSAO disabled — too heavy on integrated GPU
+var ssaoPass = null;
 
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
@@ -6661,17 +6656,7 @@ const bloomPass = new UnrealBloomPass(
 );
 composer.addPass(bloomPass);
 
-// Color grading — subtle warm tint + vignette
-var colorGradeShader = {
-  uniforms: {
-    tDiffuse: { value: null },
-    vignetteStrength: { value: 0.25 },
-    warmth: { value: 0.03 }
-  },
-  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: 'uniform sampler2D tDiffuse; uniform float vignetteStrength; uniform float warmth; varying vec2 vUv; void main() { vec4 color = texture2D(tDiffuse, vUv); color.r += warmth * color.r; color.b -= warmth * 0.5 * (1.0 - color.b); vec2 center = vUv - 0.5; float dist = length(center); color.rgb *= 1.0 - vignetteStrength * dist * dist; gl_FragColor = color; }'
-};
-composer.addPass(new ShaderPass(colorGradeShader));
+// Color grading removed — extra render pass too heavy for integrated GPU
 
 composer.addPass(new OutputPass());
 
