@@ -512,7 +512,7 @@ const ensWalk = () => getWalk('ensemble');
 const WALK_DURATION = 3.5;
 const VISIT_INTERVAL = 45000;
 let lastVisit = 0;
-const visitOrder = ['scanner','risk','tape','jonas','executor','strategy','ws_feed'];
+const visitOrder = ['scanner','risk','tape','jonas','executor','strategy','ws_feed','pos_monitor'];
 let visitIdx = 0;
 
 // Sleep system — characters rest between 11pm-6am
@@ -572,43 +572,47 @@ let teamEventWalkStart = null;
 const TEAM_EVENT_DURATION = 20000; // 20 seconds together
 const teamEvents = [
   { name:'Team Lunch', location:'cafeteria', agents:['scanner','risk','tape','executor','strategy','ws_feed','pos_monitor'], dialogue:[
-    'Team lunch! Let\'s eat together.',
-    'Food break — everyone to the cafeteria!',
-    'Lunch time! Who\'s hungry?',
-    'Alright team, lunch is ready downstairs.',
+    'Team lunch! Scanner found a good restaurant — just kidding, cafeteria.',
+    'Food break — Risk says we\'re within calorie budget.',
+    'Lunch time! Even the positions can wait 15 minutes.',
+    'Alright team, lunch is ready. Executor, stop watching fills and eat.',
   ]},
   { name:'Team Dinner', location:'cafeteria', agents:['scanner','risk','tape','executor','strategy','ws_feed','pos_monitor'], dialogue:[
-    'Dinner time! Let\'s refuel.',
-    'Team dinner — we earned this.',
-    'Who\'s cooking? Everyone downstairs!',
-    'Late night session calls for a good meal.',
+    'Dinner time! Long session — we\'ve earned this.',
+    'Team dinner. Pos Monitor, leave the exits alone for a bit.',
+    'Late night session calls for a good meal. Strategy, stop backtesting and eat.',
+    'Dinner break. WS Feed says all connections stable — we can relax.',
   ]},
   { name:'Happy Hour', location:'bar', agents:['scanner','risk','tape','executor','strategy','ws_feed','pos_monitor'], dialogue:[
-    'Happy hour! Drinks on Ensemble.',
-    'Bar\'s open — first round\'s on me.',
-    'Time to unwind. Drinks downstairs!',
+    'Happy hour! Drinks on Ensemble. Risk says one drink max.',
+    'Bar\'s open — first round\'s on the P&L.',
+    'Time to unwind. Even Risk Manager is smiling.',
   ]},
-  { name:'Team Jacuzzi', location:'jacuzzi', agents:['scanner','risk','tape','executor'], dialogue:[
-    'Jacuzzi break! Everyone in the tub.',
-    'Hot tub time — leave the charts for 5.',
-    'Spa session! Let\'s decompress together.',
+  { name:'Team Jacuzzi', location:'jacuzzi', agents:['scanner','risk','tape','executor','pos_monitor'], dialogue:[
+    'Jacuzzi break! Leave the charts for 5.',
+    'Hot tub time. Pos Monitor, stop checking exits from the tub.',
+    'Spa session! Even Executor deserves a break between fills.',
   ]},
-  { name:'Gym Session', location:'gym', agents:['scanner','risk','executor','strategy'], dialogue:[
-    'Group workout! Let\'s hit the gym.',
-    'Gym time — no excuses!',
-    'Team fitness break. Let\'s go!',
+  { name:'Gym Session', location:'gym', agents:['scanner','risk','executor','strategy','pos_monitor'], dialogue:[
+    'Group workout! Strategy says pullbacks build muscle too.',
+    'Gym time — Executor runs fastest, but Scanner spots the best machines.',
+    'Team fitness break. Pos Monitor times the sets.',
   ]},
   { name:'Ping Pong Match', location:'rec', agents:['scanner','executor'], dialogue:[
-    'Ping pong! Scanner vs Executor. Let\'s settle this.',
-    'Game time — who\'s the ping pong champ?',
+    'Scanner vs Executor — who finds the ball faster vs who hits it harder!',
+    'Ping pong! Scanner spots the spin, Executor fires the return.',
   ]},
   { name:'Ping Pong Match', location:'rec', agents:['risk','strategy'], dialogue:[
-    'Risk vs Strategy at the ping pong table!',
-    'Ping pong showdown! Let\'s go.',
+    'Risk vs Strategy — conservative defense vs aggressive offense!',
+    'Ping pong! Risk manages the rally, Strategy picks the shot.',
   ]},
   { name:'Ping Pong Match', location:'rec', agents:['tape','ws_feed'], dialogue:[
-    'Tape challenges WS Feed to ping pong.',
-    'Friendly match at the table!',
+    'Tape reads the spin, WS Feed keeps the connection — game on!',
+    'Tape vs WS Feed at the table. Latency matters here too.',
+  ]},
+  { name:'Ping Pong Match', location:'rec', agents:['pos_monitor','ensemble'], dialogue:[
+    'Pos Monitor vs Ensemble — exit timing vs confidence gating!',
+    'Ping pong! Pos Monitor watches the ball like an open position.',
   ]},
 ];
 
@@ -6455,31 +6459,65 @@ function generateDialogue(target) {
       targetSays += pick([` And ${dd.toFixed(1)}% drawdown? We're one bad trade from the limit.`, ` ${dd.toFixed(1)}% drawdown is concerning, but the safety nets are there for a reason. Let's be careful.`]);
     }
   } else if(target === 'executor') {
-    ensembleSays = pick([`Executor, you seeing momentum anywhere?`, `Any breakouts forming?`, `What's ADX looking like?`, `Keltner squeezing on anything?`]);
-    if(lastHold) {
-      const det = lastHold.detail || '';
-      const adxMatch = det.match(/ADX=([\d.]+)/);
-      const adx = adxMatch ? parseFloat(adxMatch[1]) : 0;
-      if(adx > 30) targetSays = pick([`${sym} trending hard — ADX ${adx.toFixed(0)}. Keltner released, watching continuation.`, `Strong move on ${sym}, ADX ${adx.toFixed(0)}. Momentum burst forming.`, `${sym}'s running. ADX ${adx.toFixed(0)}, MACD aligned.`]);
-      else if(adx > 20) targetSays = pick([`ADX ${adx.toFixed(0)} on ${sym} — borderline. Not strong enough for my strats.`, `Weak momentum. Watching but not triggering.`]);
-      else targetSays = pick([`Nothing trending. ADX under 20 everywhere. Strategy's department.`, `Dead momentum. All pairs chopping.`]);
+    ensembleSays = pick([`Executor, how's the order flow?`, `Any fills come through?`, `Last entry clean?`, `How's the fill quality?`]);
+    if(lastEntry) {
+      targetSays = pick([
+        `Last order on ${entrySym} — limit placed postOnly, maker fees only. Fill confirmed. SL at 1.2%, TP at 2.1%.`,
+        `${entrySym} entry filled at market. SL and TP set. PostOnly keeps our fees at 0.01%.`,
+        `Placed a limit on ${entrySym}, got the fill. Stops are in. Clean execution.`,
+        `${entrySym} order went through. PostOnly confirmed — no taker fees. SL/TP brackets active.`,
+      ]);
     } else {
-      targetSays = pick([`No momentum setups. Markets ranging — Strategy's world.`, `Keltner tight, no squeeze release.`, `Waiting for breakout. When executor fires, I move fast.`, `Volume dead. No burst candidates.`]);
+      targetSays = pick([
+        `No orders placed this cycle. Standing by for Ensemble's signal.`,
+        `Quiet on my end. When a signal comes through, I'll get the fill fast.`,
+        `Order book ready. PostOnly limits queued — waiting for the green light.`,
+        `Nothing to execute yet. I'll make sure we get maker fees when it's time.`,
+      ]);
     }
   } else if(target === 'strategy') {
-    ensembleSays = pick([`Strategy, any mean reversion setups?`, `BB picture — anything overextended?`, `VWAP pullbacks clean?`, `Choppy markets are your thing. What do you see?`]);
+    ensembleSays = pick([`Strategy, any setups forming?`, `What signals are you seeing?`, `Keltner or VWAP — anything cooking?`, `Talk to me — which strategy is closest to firing?`]);
     if(lastHold) {
       const det = lastHold.detail || '';
       const adxMatch = det.match(/ADX=([\d.]+)/);
       const chopMatch = det.match(/CHOP=([\d.]+)/);
       const adx = adxMatch ? parseFloat(adxMatch[1]) : 0;
       const chop = chopMatch ? parseFloat(chopMatch[1]) : 0;
-      if(adx < 25 && adx > 0) targetSays = pick([`Ranging, ADX ${adx.toFixed(0)}. Watching BB touches on ${sym}.`, `${sym} mean-reverting. ADX ${adx.toFixed(0)}, VWAP pullback setting up.`, `Low trend, RSI cycling nicely.`]);
-      else if(chop > 61) targetSays = pick([`CHOP ${chop.toFixed(1)} — too messy even for me.`, `Choppiness above 61. Sitting out.`]);
-      else if(adx >= 25) targetSays = pick([`ADX ${adx.toFixed(0)} — trending. That's Executor's job.`, `Too much momentum for reversion.`]);
-      else targetSays = pick([`Scanning for overextended moves.`, `VWAP flat, price hugging. Need a push.`]);
+      if(adx > 25) targetSays = pick([`Keltner squeeze releasing on ${sym}. ADX ${adx.toFixed(0)}, momentum burst building.`, `Trend pullback to EMA-21 bounce on ${sym}. ADX ${adx.toFixed(0)} — clean setup.`, `${sym} trending. EMA scalp aligning with the move. ADX ${adx.toFixed(0)}.`]);
+      else if(adx < 25 && adx > 0) targetSays = pick([`VWAP reversion setup forming on ${sym}. ADX ${adx.toFixed(0)}, ranging.`, `${sym} mean-reverting. BB touch + RSI divergence lining up.`, `Low trend on ${sym}, ADX ${adx.toFixed(0)}. Watching for VWAP pullback.`]);
+      else if(chop > 61) targetSays = pick([`CHOP ${chop.toFixed(1)} — too messy. None of my strategies want this.`, `Choppiness above 61. All four strats sitting out.`]);
+      else targetSays = pick([`Scanning for setups across all four strategies.`, `VWAP flat, Keltner tight. Need a catalyst.`]);
     } else {
-      targetSays = pick([`Watching the bands. Price stretches, I catch the snap.`, `Need BB touch + RSI divergence.`, `VWAP is my anchor. Waiting for pullback.`, `Ranging is my bread and butter.`]);
+      targetSays = pick([`EMA scalp ready to fire when conditions align.`, `Watching for Keltner squeeze release.`, `VWAP reversion is my bread and butter. Waiting for the setup.`, `Trend pullback, momentum burst, VWAP reversion, EMA scalp — all four primed.`]);
+    }
+  } else if(target === 'pos_monitor') {
+    ensembleSays = pick([`Pos Monitor, how are the open positions?`, `What's the exit picture looking like?`, `Any positions close to target?`, `Check on the runners for me.`]);
+    if(pos > 0) {
+      if(lastClose && lastClose.pnl > 0) {
+        targetSays = pick([
+          `Just closed one green. ${pos} still running. ROI looks healthy on the remaining.`,
+          `Watching ${pos} position${pos!==1?'s':''}. Flat exit timer ticking on the oldest one.`,
+          `${pos} open. Trailing stops are tracking nicely. No early exit signals yet.`,
+        ]);
+      } else if(lastClose && lastClose.pnl < 0) {
+        targetSays = pick([
+          `Last one hit the stop. ${pos} still open — watching them closely now.`,
+          `Monitoring ${pos} position${pos!==1?'s':''}. The recent loss has me cautious — tightening my watch.`,
+          `${pos} running. Early exit conditions approaching on one of them. Keeping a close eye.`,
+        ]);
+      } else {
+        targetSays = pick([
+          `${pos} position${pos!==1?'s':''} open. All within parameters. Flat exit timer at 15 minutes on the oldest.`,
+          `Watching everything. ROI decent on ${sym}. No exit triggers yet.`,
+          `All positions healthy. Trailing is active. I'll flag if anything needs attention.`,
+        ]);
+      }
+    } else {
+      targetSays = pick([
+        `Book is empty. Nothing to monitor. Standing by for the next entry.`,
+        `No positions to watch. Quiet shift. Ready when Executor opens something.`,
+        `All clear — zero open. I'll be here when something comes in.`,
+      ]);
     }
   } else if(target === 'ws_feed') {
     // Ensemble visits ws_feed — responses based on emotional state of the desk
@@ -6588,6 +6626,13 @@ function generateDialogue(target) {
       showBubble('tape', tMsg);
       addComm(ts, `Tape: "${tMsg}"`, 'cyan');
     }, 8000);
+    setTimeout(()=> {
+      const pmMsg = pos > 0
+        ? pick([`${pos} position${pos!==1?'s':''} open. All exits tracked. Timers running.`, `Watching ${pos} open. Trailing stops active. No early exit triggers yet.`, `Monitoring exits on ${pos} position${pos!==1?'s':''}. Flat exit timer ticking.`])
+        : pick(['No open positions to monitor. Standing by.', 'Book is clear. Ready for the next entry.']);
+      showBubble('pos_monitor', pmMsg);
+      addComm(ts, `Pos Monitor: "${pmMsg}"`, '#55aa88');
+    }, 10000);
     return;
   }
 
@@ -6596,7 +6641,7 @@ function generateDialogue(target) {
   addComm(ts, `Ensemble -> ${agentLabel(target)}: "${ensembleSays}"`, 'purple');
   setTimeout(()=> {
     showBubble(target, targetSays);
-    const agentColor = target==='scanner'?'green' : target==='risk'?'red' : target==='tape'?'cyan' : target==='jonas'?'amber' : target==='executor'?'blue' : target==='strategy'?'violet' : target==='ws_feed'?'green' : 'purple';
+    const agentColor = target==='scanner'?'green' : target==='risk'?'red' : target==='tape'?'cyan' : target==='jonas'?'amber' : target==='executor'?'blue' : target==='strategy'?'violet' : target==='ws_feed'?'green' : target==='pos_monitor'?'#55aa88' : 'purple';
     addComm(ts, `${agentLabel(target)} -> Ensemble: "${targetSays}"`, agentColor);
   }, 2000);
 }
@@ -6736,6 +6781,12 @@ function triggerAgentTherapy(agentName, reason) {
           [`My BB signals keep getting stopped out. Am I obsolete?`,
            `Markets cycle between trending and ranging. Your time will come back. Right now, just survive. When choppy markets return, you'll feast.`],
         ],
+        pos_monitor: [
+          [`I watched that position bleed out. I saw it coming but the exit rules said hold. Should I have overridden?`,
+           `You followed the system. Override instincts lead to worse outcomes long-term. The rules protect you from yourself.`],
+          [`The flat exit timer ran out and we closed at a loss. If I'd been faster...`,
+           `Time exits exist for a reason — they cut dead weight. A small loss now prevents a bigger one later. You did your job.`],
+        ],
       };
       const pool = lossDialogues[agentName] || [[`That loss was tough.`, `Losses are tuition, not punishment. What did you learn?`]];
       const [a, th] = pick(pool);
@@ -6747,7 +6798,7 @@ function triggerAgentTherapy(agentName, reason) {
     }
 
     showBubble(agentName, agentSays);
-    addComm(ts, `${label} -> WS Feed: "${agentSays}"`, agentName==='scanner'?'green' : agentName==='risk'?'red' : agentName==='tape'?'cyan' : agentName==='executor'?'blue' : 'violet');
+    addComm(ts, `${label} -> WS Feed: "${agentSays}"`, agentName==='scanner'?'green' : agentName==='risk'?'red' : agentName==='tape'?'cyan' : agentName==='executor'?'blue' : agentName==='pos_monitor'?'#55aa88' : 'violet');
     setTimeout(()=> {
       showBubble('ws_feed', thSays);
       addComm(ts, `WS Feed -> ${label}: "${thSays}"`, 'green');
@@ -6804,9 +6855,10 @@ function checkTherapyTriggers() {
       const reason = latest.reason || '';
       let agent;
       if(reason === 'stop_loss') agent = 'risk';
-      else if(reason === 'time_exit') agent = pick(['scanner', 'executor', 'strategy']);
-      else if(reason === 'early_exit') agent = 'tape';
-      else agent = pick(['scanner', 'risk', 'tape', 'executor', 'strategy']);
+      else if(reason === 'time_exit') agent = pick(['pos_monitor', 'scanner', 'strategy']);
+      else if(reason === 'early_exit') agent = pick(['tape', 'pos_monitor']);
+      else if(reason === 'flat_exit') agent = 'pos_monitor';
+      else agent = pick(['scanner', 'risk', 'tape', 'executor', 'strategy', 'pos_monitor']);
 
       // 70% chance to trigger therapy on a loss (not every single time)
       if(Math.random() < 0.7) {
