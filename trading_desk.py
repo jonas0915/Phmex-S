@@ -771,8 +771,13 @@ function createSFPanorama(facing, hour) {
 
     // Base building color — glass/steel/concrete tones, atmospheric fade for distance
     const baseColors = isDaytime
-      ? ['#8899aa','#7a8a9a','#95a5b5','#6a7a8a','#a0aab5','#8590a0','#708090','#5a6a7a','#5e7088','#7b8d9e','#697a8c','#8fa0b2','#4a5e72','#b0b8c2','#6e8090','#556677','#9eaab8']
-      : ['#1a2535','#1e2840','#222d3d','#162030','#253545','#1d2838','#152535','#0e1a28','#1b2230','#202a3a','#18222e','#252e3e','#0c1520','#1f2938','#2a3040'];
+      ? ['#8899aa','#7a8a9a','#95a5b5','#6a7a8a','#a0aab5','#8590a0','#708090','#5a6a7a','#5e7088','#7b8d9e',
+         '#697a8c','#8fa0b2','#4a5e72','#b0b8c2','#6e8090','#556677','#9eaab8',
+         '#8ca0a8','#78909c','#a0b0b8','#647888','#90989e','#82959e','#6b8494','#98a8b0',
+         '#707e8a','#bcc4cc','#5a7080','#a8b4be','#7a8890','#c0c8d0','#607080']
+      : ['#1a2535','#1e2840','#222d3d','#162030','#253545','#1d2838','#152535','#0e1a28','#1b2230','#202a3a',
+         '#18222e','#252e3e','#0c1520','#1f2938','#2a3040',
+         '#141e2c','#1c2638','#20283a','#0f1825','#222a38','#182234','#121c2a','#262e40'];
     const baseColor = baseColors[Math.floor(Math.random()*baseColors.length)];
     const [br,bg,bb] = parseHex(baseColor);
 
@@ -782,12 +787,22 @@ function createSFPanorama(facing, hour) {
     const ag = Math.round(bg + (sg2-bg)*hazeAlpha);
     const ab = Math.round(bb + (sb-bb)*hazeAlpha);
 
+    // Glass tint variation — some buildings have green, bronze, or warm blue tints
+    const tintRoll = Math.random();
+    var tintR=0, tintG=0, tintB=0;
+    if(isDaytime && depth < 2) {
+      if(tintRoll < 0.15) { tintR=-8; tintG=6; tintB=-4; } // green glass
+      else if(tintRoll < 0.25) { tintR=8; tintG=4; tintB=-6; } // bronze glass
+      else if(tintRoll < 0.35) { tintR=-4; tintG=2; tintB=10; } // blue glass
+    }
+
     // Building body with vertical gradient (lighter at top = sky reflection)
     const bG = ctx.createLinearGradient(bx, by-bh, bx, by);
     const topTint = isDaytime ? 25 : 8;
-    bG.addColorStop(0, `rgb(${Math.min(255,ar+topTint)},${Math.min(255,ag+topTint)},${Math.min(255,ab+topTint)})`);
-    bG.addColorStop(0.3, `rgb(${ar},${ag},${ab})`);
-    bG.addColorStop(1, `rgb(${Math.max(0,ar-10)},${Math.max(0,ag-10)},${Math.max(0,ab-10)})`);
+    bG.addColorStop(0, `rgb(${Math.min(255,ar+topTint+tintR)},${Math.min(255,ag+topTint+tintG)},${Math.min(255,ab+topTint+tintB)})`);
+    bG.addColorStop(0.3, `rgb(${ar+tintR},${ag+tintG},${ab+tintB})`);
+    bG.addColorStop(0.7, `rgb(${ar},${ag},${ab})`);
+    bG.addColorStop(1, `rgb(${Math.max(0,ar-12)},${Math.max(0,ag-12)},${Math.max(0,ab-12)})`);
     ctx.fillStyle = bG;
     ctx.fillRect(bx, by-bh, bw, bh);
 
@@ -956,11 +971,14 @@ function createSFPanorama(facing, hour) {
     waterTop=lc('#3a4555','#0a1530',t); waterBot=lc('#2a3548','#060e20',t);
   }
 
-  // Sky gradient
+  // Sky gradient — extra stops for smoother atmospheric transition
   const skyG = ctx.createLinearGradient(0,0,0,H*0.73);
   skyG.addColorStop(0, skyTop);
+  skyG.addColorStop(0.15, lc(skyTop, skyMid, 0.4));
   skyG.addColorStop(0.35, skyMid);
-  skyG.addColorStop(0.7, skyLow);
+  skyG.addColorStop(0.55, lc(skyMid, skyLow, 0.5));
+  skyG.addColorStop(0.72, skyLow);
+  skyG.addColorStop(0.88, lc(skyLow, skyHorizon, 0.6));
   skyG.addColorStop(1.0, skyHorizon);
   ctx.fillStyle = skyG;
   ctx.fillRect(0,0,W,H);
@@ -1081,6 +1099,36 @@ function createSFPanorama(facing, hour) {
     ctx.quadraticCurveTo(200*S, landY-35*S, 300*S, landY-10*S);
     ctx.lineTo(300*S, landY); ctx.lineTo(0, landY); ctx.fill();
 
+    // Golden Gate Bridge (visible far left, behind headlands — international orange)
+    {
+      const ggO = isDaytime ? '#c04030' : '#8a2a1e';
+      // Distant towers (small due to distance)
+      ctx.fillStyle = ggO;
+      ctx.fillRect(55*S, landY-38*S, 4*S, 28*S);
+      ctx.fillRect(115*S, landY-35*S, 4*S, 25*S);
+      // Deck
+      ctx.fillRect(35*S, landY-12*S, 100*S, 2.5*S);
+      // Main cable catenary
+      ctx.strokeStyle = ggO; ctx.lineWidth = 1.5*S;
+      ctx.beginPath();
+      const ggNmid = 87*S;
+      for(let x=57*S; x<=117*S; x+=2*S) {
+        const sag = Math.pow((x-ggNmid)/(30*S),2)*12*S;
+        ctx.lineTo(x, landY-30*S+sag);
+      }
+      ctx.stroke();
+      // Suspender cables
+      ctx.lineWidth = S*0.3;
+      for(let x=62*S; x<115*S; x+=5*S) {
+        const sag = Math.pow((x-ggNmid)/(30*S),2)*12*S;
+        ctx.beginPath(); ctx.moveTo(x, landY-30*S+sag); ctx.lineTo(x, landY-12*S); ctx.stroke();
+      }
+      // Aviation lights
+      ctx.fillStyle = '#ff3333';
+      ctx.beginPath(); ctx.arc(57*S, landY-39*S, 1.5*S, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(117*S, landY-36*S, 1.5*S, 0, Math.PI*2); ctx.fill();
+    }
+
     // Tiburon Peninsula (behind Angel Island, green hills)
     ctx.fillStyle = isDaytime ? 'rgba(90,120,80,0.4)' : 'rgba(15,25,20,0.55)';
     ctx.beginPath(); ctx.moveTo(400*S, landY-1*S); ctx.quadraticCurveTo(520*S, landY-28*S, 700*S, landY-1*S); ctx.fill();
@@ -1186,13 +1234,70 @@ function createSFPanorama(facing, hour) {
       ctx.fillRect(bx-5*S, byy, 16*S, S*0.5);
     }
 
-    // Bay Bridge visible on far right
-    const tc = isDaytime ? '#99aabb' : '#8899aa';
-    ctx.fillStyle = tc;
-    ctx.fillRect(880*S, landY-50*S, 6*S, 50*S);
-    ctx.fillRect(950*S, landY-45*S, 6*S, 45*S);
-    ctx.fillStyle = isDaytime ? '#8899aa' : '#667788';
-    ctx.fillRect(860*S, landY-8*S, 170*S, 5*S);
+    // Bay Bridge visible on far right (western span towers + deck + cables)
+    const bbColor = isDaytime ? '#b0b8c0' : '#8899aa';
+    const bbDark = isDaytime ? '#8a9298' : '#667788';
+    // Towers
+    ctx.fillStyle = bbColor;
+    ctx.fillRect(820*S, landY-48*S, 6*S, 48*S);
+    ctx.fillRect(900*S, landY-44*S, 6*S, 44*S);
+    // Tower cross-beams
+    ctx.fillStyle = bbDark;
+    ctx.fillRect(820*S, landY-30*S, 6*S, 3*S);
+    ctx.fillRect(900*S, landY-28*S, 6*S, 3*S);
+    // Deck
+    ctx.fillStyle = bbDark;
+    ctx.fillRect(800*S, landY-8*S, 220*S, 5*S);
+    ctx.fillStyle = isDaytime ? '#99aabb' : '#778899';
+    ctx.fillRect(800*S, landY-8*S, 220*S, 2*S);
+    // Main cable catenary between towers
+    ctx.strokeStyle = bbColor; ctx.lineWidth = 1.5*S;
+    ctx.beginPath();
+    for(let x=823*S; x<=903*S; x+=2*S) {
+      const mid = 863*S;
+      const sag = Math.pow((x-mid)/(40*S),2)*18*S;
+      ctx.lineTo(x, landY-38*S+sag);
+    }
+    ctx.stroke();
+    // Vertical suspender cables
+    ctx.lineWidth = S*0.4;
+    for(let x=828*S; x<900*S; x+=8*S) {
+      const mid = 863*S;
+      const sag = Math.pow((x-mid)/(40*S),2)*18*S;
+      ctx.beginPath(); ctx.moveTo(x, landY-38*S+sag); ctx.lineTo(x, landY-8*S); ctx.stroke();
+    }
+    // Aviation lights on towers
+    ctx.fillStyle = '#ff3333';
+    ctx.beginPath(); ctx.arc(823*S, landY-49*S, 2*S, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(903*S, landY-45*S, 2*S, 0, Math.PI*2); ctx.fill();
+    if(!isDaytime) {
+      ctx.fillStyle = 'rgba(255,50,50,0.2)';
+      ctx.beginPath(); ctx.arc(823*S, landY-49*S, 6*S, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(903*S, landY-45*S, 6*S, 0, Math.PI*2); ctx.fill();
+    }
+    // Bridge deck lights
+    for(let x=805*S; x<1015*S; x+=8*S) {
+      ctx.fillStyle = '#ffeeaa'; ctx.fillRect(x, landY-10*S, 1.5*S, 1.5*S);
+    }
+
+    // Transamerica Pyramid visible behind waterfront (iconic pointed shape)
+    {
+      const tpX = 160*S;
+      const tpTop = landY - 60*S;
+      const tpBase = 8*S;
+      const tpG = ctx.createLinearGradient(tpX-tpBase, landY, tpX+tpBase, tpTop);
+      if(isDaytime) { tpG.addColorStop(0,'#8898a8'); tpG.addColorStop(1,'#a0b0c0'); }
+      else { tpG.addColorStop(0,'#2a3545'); tpG.addColorStop(1,'#3a4a60'); }
+      ctx.fillStyle = tpG;
+      ctx.beginPath(); ctx.moveTo(tpX-tpBase, landY-10*S); ctx.lineTo(tpX, tpTop); ctx.lineTo(tpX+tpBase, landY-10*S); ctx.fill();
+      // Glass reflection streak
+      ctx.fillStyle = isDaytime ? 'rgba(200,220,240,0.2)' : 'rgba(100,140,200,0.1)';
+      ctx.beginPath(); ctx.moveTo(tpX-1.5*S, landY-10*S); ctx.lineTo(tpX, tpTop); ctx.lineTo(tpX+1.5*S, landY-10*S); ctx.fill();
+      // Spire
+      ctx.fillStyle = isDaytime ? '#99aabb' : '#667788';
+      ctx.fillRect(tpX-S*0.5, tpTop-6*S, S, 6*S);
+      ctx.fillStyle = '#ff3333'; ctx.beginPath(); ctx.arc(tpX, tpTop-7*S, 1.5*S, 0, Math.PI*2); ctx.fill();
+    }
   }
   else if(facing === 'south') {
     // ── SOUTH — SoMa/Mission neighborhoods, Twin Peaks in background ──
@@ -1410,47 +1515,94 @@ function createSFPanorama(facing, hour) {
       }
     }
 
-    // Bay Bridge — western suspension span
-    const tc = isDaytime ? '#99aabb' : '#8899aa';
-    ctx.fillStyle = tc;
-    ctx.fillRect(50*S, 170*S, 10*S, 105*S);
-    ctx.fillRect(170*S, 170*S, 10*S, 105*S);
-    // Eastern self-anchored span (single tower with X-brace)
-    ctx.fillStyle = isDaytime ? '#dddddd' : '#aaaaaa';
-    ctx.fillRect(330*S, 180*S, 8*S, 95*S);
+    // Bay Bridge — western suspension span (silver/gray steel)
+    const bbSilver = isDaytime ? '#b0b8c4' : '#8899aa';
+    const bbGray = isDaytime ? '#8a9298' : '#667788';
+    const bbLight = isDaytime ? '#c8d0d8' : '#aabbcc';
+
+    // Western span tower 1
+    ctx.fillStyle = bbSilver;
+    ctx.fillRect(140*S, 168*S, 10*S, landY-168*S-10*S);
+    // Tower cross-beams
+    ctx.fillStyle = bbGray;
+    ctx.fillRect(138*S, 200*S, 14*S, 3*S);
+    ctx.fillRect(138*S, 235*S, 14*S, 3*S);
+    // Tower cap
+    ctx.fillStyle = bbLight;
+    ctx.fillRect(141*S, 165*S, 8*S, 3*S);
+
+    // Western span tower 2
+    ctx.fillStyle = bbSilver;
+    ctx.fillRect(290*S, 173*S, 10*S, landY-173*S-10*S);
+    ctx.fillStyle = bbGray;
+    ctx.fillRect(288*S, 205*S, 14*S, 3*S);
+    ctx.fillRect(288*S, 238*S, 14*S, 3*S);
+    ctx.fillStyle = bbLight;
+    ctx.fillRect(291*S, 170*S, 8*S, 3*S);
+
+    // Eastern self-anchored span single tower (white/silver, modern design)
+    ctx.fillStyle = isDaytime ? '#dde0e4' : '#aaaaaa';
+    ctx.fillRect(465*S, 178*S, 8*S, landY-178*S-10*S);
+    // X-brace detail
+    ctx.strokeStyle = isDaytime ? '#c0c4c8' : '#888888';
+    ctx.lineWidth = 1.5*S;
+    ctx.beginPath(); ctx.moveTo(465*S, 200*S); ctx.lineTo(473*S, 230*S); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(473*S, 200*S); ctx.lineTo(465*S, 230*S); ctx.stroke();
+
     // Aviation lights
-    [[55*S,168*S],[175*S,168*S],[334*S,178*S]].forEach(([tx,ty])=>{
+    [[145*S,166*S],[295*S,171*S],[469*S,176*S]].forEach(([tx,ty])=>{
       ctx.fillStyle='#ff3333'; ctx.beginPath(); ctx.arc(tx,ty,3*S,0,Math.PI*2); ctx.fill();
       ctx.fillStyle='rgba(255,50,50,0.25)'; ctx.beginPath(); ctx.arc(tx,ty,8*S,0,Math.PI*2); ctx.fill();
     });
-    // Bridge deck
-    ctx.fillStyle = isDaytime ? '#8899aa' : '#667788';
-    ctx.fillRect(20*S, landY-10*S, 420*S, 7*S);
+
+    // Bridge deck — full span
+    ctx.fillStyle = bbGray;
+    ctx.fillRect(80*S, landY-10*S, 470*S, 7*S);
     ctx.fillStyle = isDaytime ? '#99aabb' : '#778899';
-    ctx.fillRect(20*S, landY-10*S, 420*S, 3*S);
-    // Suspension cables
-    ctx.strokeStyle = isDaytime ? '#aabbcc' : '#99aabb';
-    ctx.lineWidth = 2*S;
-    const cableSx = 55*S;
+    ctx.fillRect(80*S, landY-10*S, 470*S, 3*S);
+
+    // Suspension cables — span 1 (between tower 1 and tower 2)
+    ctx.strokeStyle = bbLight; ctx.lineWidth = 2*S;
+    const span1Mid = 215*S;
+    const span1Half = 75*S;
     ctx.beginPath();
-    for(let x=0; x<=120*S; x+=2*S) {
-      const sag = Math.pow((x-60*S)/(60*S), 2) * 28*S;
-      ctx.lineTo(cableSx+x, 225*S-28*S+sag);
+    for(let x=145*S; x<=295*S; x+=2*S) {
+      const sag = Math.pow((x-span1Mid)/span1Half, 2) * 30*S;
+      ctx.lineTo(x, 195*S-30*S+sag);
     }
     ctx.stroke();
-    // Vertical suspender cables
+    // Span 1 vertical suspenders
     ctx.lineWidth = S*0.5;
-    for(let x=cableSx+5*S; x<cableSx+115*S; x+=10*S) {
-      const sag = Math.pow((x-cableSx-60*S)/(60*S), 2) * 28*S;
-      ctx.beginPath(); ctx.moveTo(x, 225*S-28*S+sag); ctx.lineTo(x, landY-10*S); ctx.stroke();
+    for(let x=152*S; x<290*S; x+=8*S) {
+      const sag = Math.pow((x-span1Mid)/span1Half, 2) * 30*S;
+      ctx.beginPath(); ctx.moveTo(x, 195*S-30*S+sag); ctx.lineTo(x, landY-10*S); ctx.stroke();
     }
+
+    // Suspension cables — span 2 (tower 2 to approach)
+    ctx.lineWidth = 2*S;
+    ctx.beginPath();
+    for(let x=80*S; x<=145*S; x+=2*S) {
+      const t = (x-80*S)/(65*S);
+      const y = landY-10*S + (168*S - landY+10*S)*t - Math.sin(t*Math.PI)*8*S;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Eastern SAS cables (fan-shaped from single tower)
+    ctx.strokeStyle = isDaytime ? '#ccd0d4' : '#999999'; ctx.lineWidth = S*0.8;
+    for(let x=400*S; x<530*S; x+=10*S) {
+      ctx.beginPath(); ctx.moveTo(469*S, 185*S); ctx.lineTo(x, landY-10*S); ctx.stroke();
+    }
+
     // Bridge lights
-    for(let x=25*S; x<440*S; x+=8*S) {
+    for(let x=85*S; x<550*S; x+=8*S) {
       ctx.fillStyle = '#ffeeaa'; ctx.fillRect(x, landY-12*S, 2*S, 2*S);
-      ctx.fillStyle = 'rgba(255,238,170,0.12)'; ctx.beginPath(); ctx.arc(x+S, landY-11*S, 8*S, 0, Math.PI*2); ctx.fill();
+      if(!isDaytime) {
+        ctx.fillStyle = 'rgba(255,238,170,0.1)'; ctx.beginPath(); ctx.arc(x+S, landY-11*S, 6*S, 0, Math.PI*2); ctx.fill();
+      }
     }
-    // Car headlights on bridge
-    for(let x=30*S; x<435*S; x+=15*S+Math.random()*12*S) {
+    // Car headlights on bridge (both directions)
+    for(let x=90*S; x<545*S; x+=12*S+Math.random()*10*S) {
       ctx.fillStyle = Math.random()>0.5 ? 'rgba(255,255,240,0.7)' : 'rgba(255,60,30,0.5)';
       ctx.fillRect(x, landY-7*S, 4*S, S);
     }
@@ -1588,51 +1740,84 @@ function createSFPanorama(facing, hour) {
       ctx.fillRect(pyrX+pyrBase, landY-40*S, 3*S, 40*S);
     }
 
-    // Golden Gate Bridge (visible on far left — more prominent)
-    const ggRed = isDaytime ? '#cc4422' : '#aa3318';
-    // Towers (taller, thicker)
-    ctx.fillStyle = ggRed;
-    ctx.fillRect(760*S, landY-45*S, 5*S, 35*S);
-    ctx.fillRect(810*S, landY-42*S, 5*S, 32*S);
-    // Tower cross-beams
-    ctx.fillRect(760*S, landY-30*S, 5*S, 3*S);
-    ctx.fillRect(810*S, landY-28*S, 5*S, 3*S);
-    // Deck
-    ctx.fillRect(745*S, landY-12*S, 85*S, 3*S);
-    // Cable curves (main span)
-    ctx.strokeStyle = ggRed; ctx.lineWidth = 2*S;
+    // Golden Gate Bridge (northwest, international orange #c04030)
+    const ggOrange = isDaytime ? '#c04030' : '#8a2a1e';
+    const ggDark = isDaytime ? '#a03525' : '#6a2015';
+    // Tower 1 (south tower, closer = larger)
+    const ggT1x = 700*S, ggT1top = landY-72*S;
+    ctx.fillStyle = ggOrange;
+    ctx.fillRect(ggT1x-4*S, ggT1top, 8*S, 72*S-10*S);
+    // Tower 1 cross-beams (two levels like real GG)
+    ctx.fillStyle = ggDark;
+    ctx.fillRect(ggT1x-5*S, landY-48*S, 10*S, 3*S);
+    ctx.fillRect(ggT1x-5*S, landY-28*S, 10*S, 3*S);
+    // Tower 1 top detail (stepped cap)
+    ctx.fillStyle = ggOrange;
+    ctx.fillRect(ggT1x-3*S, ggT1top-3*S, 6*S, 3*S);
+
+    // Tower 2 (north tower, farther = slightly smaller, atmospheric perspective)
+    const ggT2x = 820*S, ggT2top = landY-65*S;
+    ctx.fillStyle = isDaytime ? '#b8483a' : '#7a2518';
+    ctx.fillRect(ggT2x-3.5*S, ggT2top, 7*S, 65*S-10*S);
+    ctx.fillStyle = isDaytime ? '#a03a2c' : '#6a1c12';
+    ctx.fillRect(ggT2x-4.5*S, landY-44*S, 9*S, 3*S);
+    ctx.fillRect(ggT2x-4.5*S, landY-26*S, 9*S, 3*S);
+    ctx.fillStyle = isDaytime ? '#b8483a' : '#7a2518';
+    ctx.fillRect(ggT2x-2.5*S, ggT2top-2.5*S, 5*S, 2.5*S);
+
+    // Bridge deck (spans full width between towers and beyond)
+    ctx.fillStyle = ggDark;
+    ctx.fillRect(660*S, landY-13*S, 210*S, 4*S);
+    // Deck rail highlights
+    ctx.fillStyle = ggOrange;
+    ctx.fillRect(660*S, landY-14*S, 210*S, 1.5*S);
+
+    // Main cables — catenary between towers
+    ctx.strokeStyle = ggOrange; ctx.lineWidth = 2.5*S;
     ctx.beginPath();
-    for(let x=762*S; x<=813*S; x+=2*S) {
-      const mid = 787*S;
-      const sag = Math.pow((x-mid)/(26*S),2)*16*S;
-      ctx.lineTo(x, landY-36*S+sag);
+    const ggMid = (ggT1x + ggT2x)/2;
+    const ggSpan = (ggT2x - ggT1x)/2;
+    for(let x=ggT1x; x<=ggT2x; x+=2*S) {
+      const sag = Math.pow((x-ggMid)/ggSpan,2)*22*S;
+      ctx.lineTo(x, landY-58*S+sag);
     }
     ctx.stroke();
-    // Side span cables
+
+    // Left side cable (south approach)
+    ctx.lineWidth = 2*S;
     ctx.beginPath();
-    for(let x=745*S; x<=762*S; x+=2*S) {
-      const sag = Math.pow((x-745*S)/(17*S),2)*(-10*S);
-      ctx.lineTo(x, landY-12*S+sag);
+    for(let x=660*S; x<=ggT1x; x+=2*S) {
+      const t = (x-660*S)/(ggT1x-660*S);
+      const y = landY-13*S + (ggT1top - landY+13*S)*t - Math.sin(t*Math.PI)*5*S;
+      ctx.lineTo(x, y);
     }
     ctx.stroke();
-    // Vertical suspenders
-    ctx.lineWidth = S*0.4;
-    for(let x=748*S; x<828*S; x+=5*S) {
-      const mid = 787*S;
-      const distToMid = Math.abs(x-mid);
-      if(distToMid < 26*S) {
-        const sag = Math.pow((x-mid)/(26*S),2)*16*S;
-        ctx.beginPath(); ctx.moveTo(x, landY-36*S+sag); ctx.lineTo(x, landY-12*S); ctx.stroke();
-      }
+
+    // Right side cable (north approach)
+    ctx.beginPath();
+    for(let x=ggT2x; x<=870*S; x+=2*S) {
+      const t = (x-ggT2x)/(870*S-ggT2x);
+      const y = ggT2top + (landY-13*S - ggT2top)*t - Math.sin((1-t)*Math.PI)*4*S;
+      ctx.lineTo(x, y);
     }
+    ctx.stroke();
+
+    // Vertical suspender cables (between towers)
+    ctx.strokeStyle = ggOrange; ctx.lineWidth = S*0.5;
+    for(let x=ggT1x+6*S; x<ggT2x-4*S; x+=6*S) {
+      const sag = Math.pow((x-ggMid)/ggSpan,2)*22*S;
+      const cableY = landY-58*S+sag;
+      ctx.beginPath(); ctx.moveTo(x, cableY); ctx.lineTo(x, landY-13*S); ctx.stroke();
+    }
+
     // Aviation lights on tower tops
     ctx.fillStyle = '#ff3333';
-    ctx.beginPath(); ctx.arc(762*S, landY-46*S, 2*S, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(812*S, landY-43*S, 2*S, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ggT1x, ggT1top-4*S, 2.5*S, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(ggT2x, ggT2top-3.5*S, 2*S, 0, Math.PI*2); ctx.fill();
     if(!isDaytime) {
-      ctx.fillStyle = 'rgba(255,50,50,0.2)';
-      ctx.beginPath(); ctx.arc(762*S, landY-46*S, 6*S, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(812*S, landY-43*S, 6*S, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,50,50,0.25)';
+      ctx.beginPath(); ctx.arc(ggT1x, ggT1top-4*S, 8*S, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ggT2x, ggT2top-3.5*S, 6*S, 0, Math.PI*2); ctx.fill();
     }
 
     // Street-level trees (denser)
@@ -7299,6 +7484,9 @@ animate();
         existing.visible = false;
         scene.add(model);
 
+        // Replace charGroups reference so walk system moves GLTF model
+        charGroups[agentName] = model;
+
         // Store reference
         model.userData.agentName = agentName;
         model.userData.isGLTF = true;
@@ -7307,15 +7495,36 @@ animate();
         if (gltf.animations && gltf.animations.length > 0) {
           var mixer = new THREE.AnimationMixer(model);
           var idleClip = null;
-          // Search for idle by name (handles both "Idle" and "CharacterArmature|Idle")
+          // Priority 1: Find sitting animation
           for (var ai = 0; ai < gltf.animations.length; ai++) {
             var cn = gltf.animations[ai].name.toLowerCase();
-            if (cn.indexOf('idle') !== -1 && cn.indexOf('gun') === -1 && cn.indexOf('sword') === -1) {
+            if (cn.indexOf('sitting') !== -1 || cn.indexOf('sit') !== -1) {
               idleClip = gltf.animations[ai];
               break;
             }
           }
+          // Priority 2: Find neutral idle (not gun/sword)
+          if (!idleClip) {
+            for (var ai2 = 0; ai2 < gltf.animations.length; ai2++) {
+              var cn2 = gltf.animations[ai2].name.toLowerCase();
+              if ((cn2.indexOf('idle') !== -1 || cn2.indexOf('neutral') !== -1) && cn2.indexOf('gun') === -1 && cn2.indexOf('sword') === -1) {
+                idleClip = gltf.animations[ai2];
+                break;
+              }
+            }
+          }
           if (!idleClip) idleClip = gltf.animations[0];
+          // Find walk clip too
+          var walkClip = null;
+          for (var wi = 0; wi < gltf.animations.length; wi++) {
+            var wn = gltf.animations[wi].name.toLowerCase();
+            if (wn.indexOf('walk') !== -1 && wn.indexOf('run') === -1) {
+              walkClip = gltf.animations[wi];
+              break;
+            }
+          }
+          model.userData.walkClip = walkClip;
+          model.userData.idleClip = idleClip;
           var action = mixer.clipAction(idleClip);
           action.play();
           model.userData.mixer = mixer;
