@@ -413,6 +413,17 @@ body { background:#080f1c; overflow:hidden; height:100vh; width:100vw; font-fami
 </style>
 </head>
 <body>
+<div id="loading-overlay" style="
+  position: fixed; inset: 0; background: #0a0e17; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: 'Fira Code', monospace; color: #ccc;
+">
+  <div style="font-size: 18px; margin-bottom: 20px; color: #4fc3f7;">PHMEX-S TRADING DESK</div>
+  <div style="width: 300px; height: 4px; background: #1a2a3a; border-radius: 2px; overflow: hidden;">
+    <div id="loading-bar" style="width: 0%; height: 100%; background: #4fc3f7; transition: width 0.3s;"></div>
+  </div>
+  <div id="loading-text" style="margin-top: 10px; font-size: 11px; color: #666;">Loading assets...</div>
+</div>
 <canvas id="c"></canvas>
 <div id="css2d"></div>
 
@@ -477,6 +488,9 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 // ── GLOBALS ──
 let apiData = null;
@@ -660,6 +674,84 @@ function getTimeOfDay() {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x88bbdd);
 scene.fog = new THREE.FogExp2(0x9ab5cc, 0.0003);
+
+// ── ASSET MANIFEST & LOADING ──
+const ASSET_MANIFEST = {
+  characters: [
+    'jonas', 'scanner', 'risk_manager', 'ensemble', 'executor',
+    'strategy', 'tape_reader', 'ws_feed', 'pos_monitor'
+  ],
+  animations: [
+    'idle-seated', 'typing', 'walking', 'standing-up', 'sitting-down',
+    'celebrating', 'head-shake', 'pointing', 'phone-talk',
+    'high-five', 'desk-slam', 'arms-crossed'
+  ],
+  furniture: ['desk', 'chair', 'monitor', 'lamp'],
+  environment: ['sf_bay_hdri']
+};
+
+const loadedAssets = { characters: {}, animations: {}, furniture: {}, environment: {} };
+const gltfLoader = new GLTFLoader();
+const rgbeLoader = new RGBELoader();
+
+async function loadAllAssets() {
+  const totalItems = ASSET_MANIFEST.characters.length +
+    ASSET_MANIFEST.animations.length +
+    ASSET_MANIFEST.furniture.length +
+    ASSET_MANIFEST.environment.length;
+  let loaded = 0;
+
+  function updateProgress(name) {
+    loaded++;
+    const pct = (loaded / totalItems * 100).toFixed(0);
+    const bar = document.getElementById('loading-bar');
+    const text = document.getElementById('loading-text');
+    if (bar) bar.style.width = pct + '%';
+    if (text) text.textContent = 'Loading ' + name + '...';
+  }
+
+  // Load characters (parallel)
+  await Promise.allSettled(
+    ASSET_MANIFEST.characters.map(name =>
+      gltfLoader.loadAsync('/assets/characters/' + name + '.glb')
+        .then(gltf => { loadedAssets.characters[name] = gltf; updateProgress(name); })
+        .catch(e => { console.warn('Failed to load character:', name); loadedAssets.characters[name] = null; updateProgress(name); })
+    )
+  );
+
+  // Load animations (parallel)
+  await Promise.allSettled(
+    ASSET_MANIFEST.animations.map(name =>
+      gltfLoader.loadAsync('/assets/animations/' + name + '.glb')
+        .then(gltf => { loadedAssets.animations[name] = gltf.animations[0]; updateProgress(name); })
+        .catch(e => { console.warn('Failed to load animation:', name); loadedAssets.animations[name] = null; updateProgress(name); })
+    )
+  );
+
+  // Load furniture (parallel)
+  await Promise.allSettled(
+    ASSET_MANIFEST.furniture.map(name =>
+      gltfLoader.loadAsync('/assets/furniture/' + name + '.glb')
+        .then(gltf => { loadedAssets.furniture[name] = gltf.scene; updateProgress(name); })
+        .catch(e => { console.warn('Failed to load furniture:', name); loadedAssets.furniture[name] = null; updateProgress(name); })
+    )
+  );
+
+  // Load HDRI environment
+  try {
+    const hdr = await rgbeLoader.loadAsync('/assets/environment/sf_bay_hdri.hdr');
+    hdr.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = hdr;
+    loadedAssets.environment.hdri = hdr;
+  } catch (e) {
+    console.warn('Failed to load HDRI');
+  }
+  updateProgress('environment');
+
+  // Hide loading overlay
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
 
 // ── CAMERA ──
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.5, 2000);
@@ -7117,9 +7209,19 @@ window.addEventListener('resize', () => {
 });
 
 // ── INIT ──
-fetchData();
-setInterval(fetchData, 3000);
-animate();
+loadAllAssets().then(() => {
+  console.log('Assets loaded, initializing scene');
+  fetchData();
+  setInterval(fetchData, 3000);
+  animate();
+}).catch(err => {
+  console.error('Asset loading failed, running with fallbacks:', err);
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) overlay.style.display = 'none';
+  fetchData();
+  setInterval(fetchData, 3000);
+  animate();
+});
 </script>
 </body>
 </html>"""
