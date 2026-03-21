@@ -2206,6 +2206,7 @@ wallConfigs.forEach(wc => {
   panPlane.rotation.y = wc.rotY;
   panPlane.position.x += Math.sin(wc.rotY)*(-0.02);
   panPlane.position.z += Math.cos(wc.rotY)*(-0.02);
+  panPlane.userData.isPanorama = true;
   scene.add(panPlane);
   panPlaneMeshes[wc.facing] = panPlane;
 
@@ -2239,6 +2240,39 @@ wallConfigs.forEach(wc => {
   hFrame2.position.y = 0;
   scene.add(hFrame2);
 });
+
+// ── PHOTO PANORAMA OVERRIDE ──
+(function loadPhotoPanorama() {
+  var texLoader = new THREE.TextureLoader();
+  texLoader.load('/assets/environment/sf_panorama.jpg', function(texture) {
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    // Create a large cylinder around the scene for 360-degree backdrop
+    var panoRadius = 400;
+    var panoHeight = 200;
+    var panoGeom = new THREE.CylinderGeometry(panoRadius, panoRadius, panoHeight, 64, 1, true);
+    var panoMat = new THREE.MeshBasicMaterial({
+      map: texture,
+      side: THREE.BackSide,  // render on inside
+      fog: false,
+    });
+    var panoCylinder = new THREE.Mesh(panoGeom, panoMat);
+    panoCylinder.position.y = panoHeight / 4;  // center vertically
+    panoCylinder.rotation.y = Math.PI;  // rotate so photo aligns with scene
+    scene.add(panoCylinder);
+
+    // Hide the old procedural panorama planes
+    scene.traverse(function(obj) {
+      if (obj.userData && obj.userData.isPanorama) {
+        obj.visible = false;
+      }
+    });
+
+    console.log('Photo panorama loaded');
+  }, undefined, function(err) {
+    console.warn('Photo panorama failed, keeping procedural');
+  });
+})();
 
 // ── STRUCTURAL COLUMNS (4 corners, floor to ceiling) ──
 const colMat = new THREE.MeshStandardMaterial({color:0x2a2e33, metalness:0.8, roughness:0.3});
