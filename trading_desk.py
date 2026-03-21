@@ -4279,6 +4279,28 @@ const beamMat = colMat;
   }
 }
 
+// ── GLTF FURNITURE PLACEMENT ──
+function placeGLTFFurniture(type, pos, config) {
+  config = config || {};
+  var gltfScene = loadedAssets.furniture[type];
+  if (!gltfScene) return null; // caller will use procedural fallback
+
+  var model = gltfScene.clone();
+  model.position.set(pos.x, pos.y || 0, pos.z);
+  if (config.rotation) model.rotation.y = config.rotation;
+  if (config.scale) model.scale.setScalar(config.scale);
+
+  model.traverse(function(child) {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  scene.add(model);
+  return model;
+}
+
 // ── HELPER FUNCTIONS ──
 function createDesk(x, z, rot, scale=1.0) {
   const g = new THREE.Group();
@@ -5101,12 +5123,18 @@ const deskLights = {};
 // Create desks, chairs, monitors, lamps, characters
 Object.entries(deskPositions).forEach(([name, pos]) => {
   const sc = name === 'ensemble' ? 1.2 : 1.0;
-  const desk = createDesk(pos.x, pos.z, pos.rot, sc);
 
-  // Chair behind desk
-  createChair(pos.x, pos.z + 0.55*sc, 0);
+  // Desk — try GLTF first, procedural fallback
+  var gltfDesk = placeGLTFFurniture('desk', {x: pos.x, y: 0, z: pos.z}, {rotation: pos.rot, scale: sc});
+  const desk = gltfDesk || createDesk(pos.x, pos.z, pos.rot, sc);
 
-  // Monitors on desk
+  // Chair behind desk — try GLTF first, procedural fallback
+  var gltfChair = placeGLTFFurniture('chair', {x: pos.x, y: 0, z: pos.z + 0.55*sc}, {rotation: 0, scale: 1.0});
+  if (!gltfChair) {
+    createChair(pos.x, pos.z + 0.55*sc, 0);
+  }
+
+  // Monitors on desk — always procedural (canvas textures needed for live data)
   const monW = 0.44 * sc, monH = 0.28 * sc;
   createMonitor(desk, -0.25*sc, 0.78, -0.2*sc, monW, monH, name+'_mon1');
   createMonitor(desk, 0.22*sc, 0.78, -0.2*sc, monW, monH, name+'_mon2');
@@ -5114,8 +5142,17 @@ Object.entries(deskPositions).forEach(([name, pos]) => {
     createMonitor(desk, 0.6*sc, 0.78, -0.15*sc, monW*0.8, monH*0.8, name+'_mon3');
   }
 
-  // Lamp
-  deskLights[name] = createLamp(desk, -0.45*sc, -0.15*sc);
+  // Lamp — try GLTF first, procedural fallback
+  var gltfLamp = placeGLTFFurniture('lamp', {x: pos.x - 0.45*sc, y: 0.78, z: pos.z - 0.15*sc}, {scale: 1.0});
+  if (!gltfLamp) {
+    deskLights[name] = createLamp(desk, -0.45*sc, -0.15*sc);
+  } else {
+    // GLTF lamp loaded — still need a light source for the scene
+    var lampLight = new THREE.PointLight(0xffaa55, 0.3, 3);
+    lampLight.position.set(0.02, 0.33, -0.08);
+    gltfLamp.add(lampLight);
+    deskLights[name] = lampLight;
+  }
 
   // Character — try GLTF model first, fall back to procedural
   const charColors = {
