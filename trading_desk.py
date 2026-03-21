@@ -491,6 +491,7 @@ import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 
 // ── GLOBALS ──
 let apiData = null;
@@ -641,11 +642,11 @@ const teamMeetingPositions = {
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const css2dRenderer = new CSS2DRenderer();
@@ -791,7 +792,7 @@ scene.add(cityGlow);
 const dirLight = new THREE.DirectionalLight(0xfff0dd, 0.5);
 dirLight.position.set(-5, 12, -8);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.set(1024,1024);
+dirLight.shadow.mapSize.set(2048,2048);
 dirLight.shadow.camera.near = 0.5;
 dirLight.shadow.camera.far = 25;
 dirLight.shadow.camera.left = -8;
@@ -7014,15 +7015,37 @@ function updateHUD() {
 
 // ── BLOOM SETUP (post scene/camera init) ──
 composer.addPass(new RenderPass(scene, camera));
+
+// SSAO — subtle ambient occlusion for depth
+var ssaoPass = new SSAOPass(scene, camera, Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2));
+ssaoPass.kernelRadius = 8;
+ssaoPass.minDistance = 0.005;
+ssaoPass.maxDistance = 0.1;
+ssaoPass.output = SSAOPass.OUTPUT.Default;
+composer.addPass(ssaoPass);
+
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.12,  // strength — very subtle for realism
+  0.08,  // strength — subtler for realism
   0.4,   // radius
   0.85   // threshold — only brightest surfaces bloom
 );
 composer.addPass(bloomPass);
+composer.addPass(new SMAAPass(window.innerWidth, window.innerHeight));
 composer.addPass(new OutputPass());
-// SMAA removed for performance — renderer antialias handles it
+
+// Color grading — warm tint + vignette
+var colorGradeShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    vignetteStrength: { value: 0.3 },
+    warmth: { value: 0.05 }
+  },
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'uniform sampler2D tDiffuse; uniform float vignetteStrength; uniform float warmth; varying vec2 vUv; void main() { vec4 color = texture2D(tDiffuse, vUv); color.r += warmth * color.r; color.b -= warmth * 0.5 * (1.0 - color.b); vec2 center = vUv - 0.5; float dist = length(center); color.rgb *= 1.0 - vignetteStrength * dist * dist; gl_FragColor = color; }'
+};
+var colorGradePass = new ShaderPass(colorGradeShader);
+composer.addPass(colorGradePass);
 
 // ── TIME OF DAY UPDATE ──
 function updateTimeOfDay() {
@@ -7156,6 +7179,9 @@ async function fetchData() {
 
 // ── ANIMATION LOOP ──
 let frameCount = 0;
+var ssaoEnabled = true;
+var lowFpsFrames = 0;
+var lastFrameTime = performance.now() / 1000;
 function animate() {
   requestAnimationFrame(animate);
   frameCount++;
@@ -7607,6 +7633,24 @@ function animate() {
   controls.update();
   composer.render();
   css2dRenderer.render(scene, camera);
+
+  // SSAO auto-disable for performance
+  var now = performance.now() / 1000;
+  var frameDelta = now - lastFrameTime;
+  lastFrameTime = now;
+  if (ssaoEnabled && ssaoPass) {
+    var fps = 1 / frameDelta;
+    if (fps < 25) {
+      lowFpsFrames++;
+      if (lowFpsFrames > 90) {
+        console.warn('SSAO disabled for performance');
+        ssaoPass.enabled = false;
+        ssaoEnabled = false;
+      }
+    } else {
+      lowFpsFrames = Math.max(0, lowFpsFrames - 1);
+    }
+  }
 }
 
 // ── RESIZE ──
@@ -7615,6 +7659,9 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
+  if (ssaoPass) {
+    ssaoPass.setSize(Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2));
+  }
   css2dRenderer.setSize(window.innerWidth, window.innerHeight);
 });
 
