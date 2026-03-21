@@ -4945,6 +4945,140 @@ function walkBackToDesk(character) {
   });
 }
 
+// ── EVENT-DRIVEN ANIMATIONS (3 Tiers) ──
+var winStreak = 0;
+var lossStreak = 0;
+var lastPeakBalance = 0;
+var lastProcessedEventCount = 0;
+
+function triggerHighFive(char1, char2) {
+  if (!char1 || !char2) return;
+  var midpoint = new THREE.Vector3().lerpVectors(char1.position, char2.position, 0.5);
+  startWalk(char1, midpoint.clone(), function() {
+    playAnimation(char1, 'high-five');
+    setTimeout(function() { walkBackToDesk(char1); }, 2500);
+  });
+  startWalk(char2, midpoint.clone(), function() {
+    playAnimation(char2, 'high-five');
+    setTimeout(function() { walkBackToDesk(char2); }, 2500);
+  });
+}
+
+function triggerWalkTo(walker, target) {
+  if (!walker || !target) return;
+  var targetPos = target.position.clone();
+  targetPos.x += 0.5;
+  startWalk(walker, targetPos, function() {
+    playAnimation(walker, 'arms-crossed');
+    setTimeout(function() { walkBackToDesk(walker); }, 8000);
+  });
+}
+
+function handleBotEvent(event) {
+  var type = event.type;
+
+  // ── TIER 1: Professional ──
+  if (type === 'scanner' && charGroups.scanner) {
+    playAnimation(charGroups.scanner, 'phone-talk');
+    setTimeout(function() { playAnimation(charGroups.scanner, 'typing'); }, 4000);
+  }
+  if (type === 'ws' && charGroups.ws_feed) {
+    playAnimation(charGroups.ws_feed, 'typing');
+  }
+  if (type === 'cooldown' && charGroups.risk) {
+    playAnimation(charGroups.risk, 'arms-crossed');
+  }
+
+  // ── TIER 2: Active Trading ──
+  if (type === 'ensemble' && charGroups.strategy && charGroups.ensemble && charGroups.executor) {
+    playAnimation(charGroups.strategy, 'standing-up');
+    setTimeout(function() {
+      playAnimation(charGroups.strategy, 'pointing');
+      playAnimation(charGroups.ensemble, 'pointing');
+    }, 500);
+    setTimeout(function() {
+      playAnimation(charGroups.executor, 'typing');
+    }, 1000);
+    setTimeout(function() {
+      playAnimation(charGroups.strategy, 'sitting-down');
+    }, 3000);
+  }
+  if (type === 'ensemble_skip' && charGroups.ensemble) {
+    playAnimation(charGroups.ensemble, 'head-shake');
+  }
+  if (type === 'entry') {
+    if (charGroups.executor) playAnimation(charGroups.executor, 'typing');
+    if (charGroups.pos_monitor) playAnimation(charGroups.pos_monitor, 'pointing');
+    setTimeout(function() {
+      if (charGroups.executor) playAnimation(charGroups.executor, 'idle-seated');
+    }, 2000);
+  }
+  if ((type === 'tape' || type === 'orderbook') && charGroups.tape) {
+    playAnimation(charGroups.tape, 'pointing');
+    setTimeout(function() { playAnimation(charGroups.tape, 'typing'); }, 2000);
+  }
+
+  // ── Close events (profit/loss) ──
+  if (type === 'close') {
+    if (event.pnl > 0) {
+      winStreak++;
+      lossStreak = 0;
+      if (charGroups.executor) playAnimation(charGroups.executor, 'celebrating');
+
+      // T3: Win streaks
+      if (winStreak >= 5) {
+        Object.values(charGroups).forEach(function(c) { playAnimation(c, 'celebrating'); });
+        setTimeout(function() {
+          Object.values(charGroups).forEach(function(c) { playAnimation(c, 'idle-seated'); });
+        }, 5000);
+      } else if (winStreak >= 3) {
+        triggerHighFive(charGroups.executor, charGroups.ensemble);
+      }
+    } else {
+      lossStreak++;
+      winStreak = 0;
+      if (charGroups.executor) playAnimation(charGroups.executor, 'head-shake');
+      if (charGroups.risk) playAnimation(charGroups.risk, 'pointing');
+
+      // T3: Big loss
+      if (event.pnl && Math.abs(event.pnl) > 2) {
+        if (charGroups.executor) playAnimation(charGroups.executor, 'desk-slam');
+        triggerWalkTo(charGroups.risk, charGroups.executor);
+      }
+
+      // T3: 3 consecutive losses
+      if (lossStreak >= 3) {
+        if (charGroups.risk) playAnimation(charGroups.risk, 'arms-crossed');
+        triggerWalkTo(charGroups.jonas, charGroups.risk);
+        Object.values(charGroups).forEach(function(c) {
+          if (c !== charGroups.jonas && c !== charGroups.risk) {
+            playAnimation(c, 'arms-crossed');
+          }
+        });
+      }
+    }
+  }
+}
+
+function handleStatsUpdate(stats) {
+  if (!stats) return;
+  // T3: Drawdown > 10%
+  if (stats.drawdown > 10) {
+    Object.values(charGroups).forEach(function(c) { playAnimation(c, 'arms-crossed'); });
+    if (charGroups.jonas) playAnimation(charGroups.jonas, 'walking');
+  }
+  // T3: New ATH
+  if (stats.balance && stats.balance > lastPeakBalance && lastPeakBalance > 0) {
+    lastPeakBalance = stats.balance;
+    Object.values(charGroups).forEach(function(c) { playAnimation(c, 'celebrating'); });
+    setTimeout(function() {
+      Object.values(charGroups).forEach(function(c) { playAnimation(c, 'idle-seated'); });
+    }, 5000);
+  } else if (stats.balance) {
+    lastPeakBalance = Math.max(lastPeakBalance, stats.balance);
+  }
+}
+
 // ── DESK POSITIONS ──
 // Layout:  [Scanner(-2.2,z-1.5)]  [Risk(2.2,z-1.5)]
 //              [Ensemble(0, z0.5) - bigger, forward]
@@ -6895,6 +7029,15 @@ async function fetchData() {
     updateHUD();
     updateAllMonitors();
     checkTherapyTriggers();
+    // Event-driven animations: dispatch new events only
+    var events = apiData.events || [];
+    if (events.length > lastProcessedEventCount) {
+      var newEvents = events.slice(lastProcessedEventCount);
+      newEvents.forEach(function(event) { handleBotEvent(event); });
+      lastProcessedEventCount = events.length;
+    }
+    var latestStats = apiData.stats || null;
+    if (latestStats) handleStatsUpdate(latestStats);
     // v8.0: pipe ensemble events to comms
     (apiData.ensemble||[]).forEach(e => {
       const key = (e.direction||'')+(e.confidence||0)+(e.layers||'');
