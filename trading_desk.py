@@ -363,7 +363,7 @@ body { background:#080f1c; overflow:hidden; height:100vh; width:100vw; font-fami
   color:#fff; background:rgba(0,0,0,0.6); padding:2px 8px;
   border-radius:8px; white-space:nowrap;
 }
-.char-emoji { font-size:28px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.char-emoji { font-size:28px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5)); display:none; }
 .speech-bubble {
   font-family:'Nunito',sans-serif; font-size:12px; color:#e8dcc8;
   background:rgba(18,33,58,0.95); border:1px solid rgba(58,175,203,0.5);
@@ -382,6 +382,7 @@ body { background:#080f1c; overflow:hidden; height:100vh; width:100vw; font-fami
   width:8px; height:8px; border-radius:50%;
   animation:status-pulse 2.5s ease-in-out infinite;
   box-shadow:0 0 6px currentColor, 0 0 2px currentColor;
+  display:none;
 }
 @keyframes status-pulse { 0%{opacity:0.7; transform:scale(1);} 50%{opacity:1; transform:scale(1.2);} 100%{opacity:0.7; transform:scale(1);} }
 #comms-panel {
@@ -1685,6 +1686,15 @@ function createSFPanorama(facing, hour) {
     hazeG.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = hazeG;
     ctx.fillRect(0, landY-15*S, W, 20*S);
+  }
+
+  // ── ATMOSPHERIC HAZE AT HORIZON ──
+  {
+    var hazeGrad = ctx.createLinearGradient(0, landY - 30*S, 0, landY + 10*S);
+    hazeGrad.addColorStop(0, 'rgba(180,200,220,0)');
+    hazeGrad.addColorStop(1, 'rgba(180,200,220,0.35)');
+    ctx.fillStyle = hazeGrad;
+    ctx.fillRect(0, landY - 30*S, W, 40*S);
   }
 
   // ── VIGNETTE — subtle dark edges for photographic look ──
@@ -3037,7 +3047,7 @@ const beamMat = colMat;
     clearcoat: 0.9, clearcoatRoughness: 0.05,
     envMapIntensity: 1.8,
   });
-  const waterPlane = new THREE.Mesh(new THREE.PlaneGeometry(1000, 800), waterMat);
+  const waterPlane = new THREE.Mesh(new THREE.PlaneGeometry(1000, 800, 32, 24), waterMat);
   waterPlane.rotation.x = -Math.PI/2;
   waterPlane.position.set(20, GROUND_Y + 0.1, -180);
   waterPlane.receiveShadow = true;
@@ -7191,6 +7201,17 @@ function animate() {
   if(Date.now() - lastTimeUpdate > 60000) {
     lastTimeUpdate = Date.now();
     updateTimeOfDay();
+  }
+
+  // Bay water waves
+  if (typeof waterPlane !== 'undefined' && waterPlane.geometry) {
+    var wPos = waterPlane.geometry.attributes.position;
+    for (var wi = 0; wi < wPos.count; wi++) {
+      var wx = wPos.getX(wi);
+      var wz = wPos.getZ(wi);
+      wPos.setY(wi, Math.sin(t * 0.5 + wx * 0.02) * 0.15 + Math.cos(t * 0.3 + wz * 0.025) * 0.12);
+    }
+    wPos.needsUpdate = true;
   }
 
   controls.update();
