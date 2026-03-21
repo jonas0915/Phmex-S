@@ -478,6 +478,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 // ── GLOBALS ──
 let apiData = null;
@@ -6641,8 +6643,16 @@ function updateHUD() {
 }
 
 
-// ── BLOOM SETUP (post scene/camera init) ──
+// ── POST-PROCESSING SETUP (post scene/camera init) ──
 composer.addPass(new RenderPass(scene, camera));
+
+// SSAO — ambient occlusion for depth
+var ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
+ssaoPass.kernelRadius = 8;
+ssaoPass.minDistance = 0.005;
+ssaoPass.maxDistance = 0.1;
+composer.addPass(ssaoPass);
+
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
   0.12,  // strength — very subtle for realism
@@ -6650,8 +6660,20 @@ const bloomPass = new UnrealBloomPass(
   0.85   // threshold — only brightest surfaces bloom
 );
 composer.addPass(bloomPass);
+
+// Color grading — subtle warm tint + vignette
+var colorGradeShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    vignetteStrength: { value: 0.25 },
+    warmth: { value: 0.03 }
+  },
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'uniform sampler2D tDiffuse; uniform float vignetteStrength; uniform float warmth; varying vec2 vUv; void main() { vec4 color = texture2D(tDiffuse, vUv); color.r += warmth * color.r; color.b -= warmth * 0.5 * (1.0 - color.b); vec2 center = vUv - 0.5; float dist = length(center); color.rgb *= 1.0 - vignetteStrength * dist * dist; gl_FragColor = color; }'
+};
+composer.addPass(new ShaderPass(colorGradeShader));
+
 composer.addPass(new OutputPass());
-// SMAA removed for performance — renderer antialias handles it
 
 // ── TIME OF DAY UPDATE ──
 function updateTimeOfDay() {
@@ -7225,6 +7247,7 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
+  if (ssaoPass) ssaoPass.setSize(window.innerWidth, window.innerHeight);
   css2dRenderer.setSize(window.innerWidth, window.innerHeight);
 });
 
