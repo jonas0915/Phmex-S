@@ -631,11 +631,11 @@ const teamMeetingPositions = {
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const css2dRenderer = new CSS2DRenderer();
@@ -703,7 +703,7 @@ scene.add(cityGlow);
 const dirLight = new THREE.DirectionalLight(0xfff0dd, 0.5);
 dirLight.position.set(-5, 12, -8);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.set(1024,1024);
+dirLight.shadow.mapSize.set(2048,2048);
 dirLight.shadow.camera.near = 0.5;
 dirLight.shadow.camera.far = 25;
 dirLight.shadow.camera.left = -8;
@@ -6697,7 +6697,7 @@ function updateTimeOfDay() {
     scene.background.setHex(0x7799aa);
     scene.fog.color.setHex(0x9ab5cc);
     scene.fog.density = 0.0003;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.0;
     bloomPass.strength = 0.12;
     setCeilingBrightness(1.0);
   } else if(isGolden) {
