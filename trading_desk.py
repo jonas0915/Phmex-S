@@ -4792,6 +4792,35 @@ Object.entries(deskPositions).forEach(([name, pos]) => {
   createCSS2DLabel(ch, name, emoji);
 });
 
+// ── DESK LED STRIPS ──
+var deskLEDs = {};
+Object.entries(deskPositions).forEach(function([name, pos]) {
+  var ledGeom = new THREE.BoxGeometry(0.7, 0.01, 0.02);
+  var ledMat = new THREE.MeshStandardMaterial({
+    color: 0x00ff88,
+    emissive: 0x00ff88,
+    emissiveIntensity: 0.5,
+  });
+  var led = new THREE.Mesh(ledGeom, ledMat);
+  led.position.set(pos.x, 0.76, pos.z - 0.2);
+  scene.add(led);
+  deskLEDs[name] = led;
+});
+
+function updateAgentLED(name, status) {
+  var led = deskLEDs[name];
+  if (!led) return;
+  var colors = {
+    active: 0x00ff88,
+    waiting: 0xffaa00,
+    alert: 0xff4444,
+    scanning: 0x4488ff,
+    idle: 0x333333,
+  };
+  var color = colors[status] || colors.idle;
+  led.material.color.setHex(color);
+  led.material.emissive.setHex(color);
+}
 
 // ── BREAK ROOM (back-left corner) ──
 {
