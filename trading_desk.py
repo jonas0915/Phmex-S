@@ -359,11 +359,13 @@ body { background:#080f1c; overflow:hidden; height:100vh; width:100vw; font-fami
 /* CSS2D labels */
 .char-label { pointer-events:none; text-align:center; }
 .char-name {
-  font-family:'Nunito',sans-serif; font-size:12px; font-weight:700;
-  color:#fff; background:rgba(0,0,0,0.6); padding:2px 8px;
-  border-radius:8px; white-space:nowrap;
+  font-family:'Fira Code',monospace; font-size:10px; font-weight:700;
+  color:#c8dce8; background:rgba(8,12,20,0.82); padding:3px 10px 2px;
+  border-radius:6px; white-space:nowrap; letter-spacing:0.5px;
+  border:1px solid rgba(58,175,203,0.2); text-transform:uppercase;
 }
-.char-emoji { font-size:28px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.char-emoji { display:none; /* replaced by clean labels */ }
+.char-role { font-family:'Fira Code',monospace; font-size:9px; color:#8899aa; white-space:nowrap; margin-top:1px; }
 .speech-bubble {
   font-family:'Nunito',sans-serif; font-size:12px; color:#e8dcc8;
   background:rgba(18,33,58,0.95); border:1px solid rgba(58,175,203,0.5);
@@ -379,8 +381,8 @@ body { background:#080f1c; overflow:hidden; height:100vh; width:100vw; font-fami
   border-top:6px solid rgba(18,33,58,0.92);
 }
 .plumbob {
+  display:none; /* replaced by desk LEDs — hidden, not removed */
   width:8px; height:8px; border-radius:50%;
-  animation:status-pulse 2.5s ease-in-out infinite;
   box-shadow:0 0 6px currentColor, 0 0 2px currentColor;
 }
 @keyframes status-pulse { 0%{opacity:0.7; transform:scale(1);} 50%{opacity:1; transform:scale(1.2);} 100%{opacity:0.7; transform:scale(1);} }
@@ -4903,7 +4905,7 @@ function createCharacterFromGLTF(name, gltfData, config) {
 }
 
 function createCSS2DLabel(charGroup, name, emoji) {
-  // Emoji face above head
+  // Emoji face above head (hidden via CSS, kept for compatibility)
   const emojiDiv = document.createElement('div');
   emojiDiv.className = 'char-label';
   emojiDiv.innerHTML = `<div class="char-emoji">${emoji}</div>`;
@@ -4911,7 +4913,7 @@ function createCSS2DLabel(charGroup, name, emoji) {
   emojiLabel.position.set(0, 1.15, 0);
   charGroup.add(emojiLabel);
 
-  // Plumbob
+  // Plumbob (hidden via CSS, kept for compatibility)
   const plumbobDiv = document.createElement('div');
   plumbobDiv.className = 'char-label';
   plumbobDiv.innerHTML = `<div class="plumbob" style="background:#4ecb71;color:#4ecb71;margin:0 auto;"></div>`;
@@ -4920,12 +4922,16 @@ function createCSS2DLabel(charGroup, name, emoji) {
   charGroup.add(plumbobLabel);
   plumbobs[name] = plumbobDiv.querySelector('.plumbob');
 
-  // Name tag below
+  // Clean name + role label
   const nameDiv = document.createElement('div');
   nameDiv.className = 'char-label';
-  const displayNames = { ensemble:'ENSEMBLE', executor:'EXECUTOR', strategy:'STRATEGY', ws_feed:'WS FEED', pos_monitor:'POS MONITOR', scanner:'Scanner', risk:'Risk', tape:'Tape', jonas:'Jonas' };
+  const displayNames = { ensemble:'ENSEMBLE', executor:'EXECUTOR', strategy:'STRATEGY', ws_feed:'WS FEED', pos_monitor:'POS MON', scanner:'SCANNER', risk:'RISK', tape:'TAPE', jonas:'JONAS' };
+  const roleNames = { ensemble:'Lead Analyst', executor:'Order Exec', strategy:'Strategy Engine', ws_feed:'Data Feed', pos_monitor:'Position Mgr', scanner:'Market Scanner', risk:'Risk Manager', tape:'Tape Reader', jonas:'Director' };
+  const nameColors = { ensemble:'#b888e0', executor:'#4488ff', strategy:'#aa66cc', ws_feed:'#66ccaa', pos_monitor:'#55aa88', scanner:'#44cc88', risk:'#ff6655', tape:'#55aacc', jonas:'#ddb844' };
   const dname = displayNames[name] || (name.charAt(0).toUpperCase()+name.slice(1));
-  nameDiv.innerHTML = `<div class="char-name">${dname}</div>`;
+  const role = roleNames[name] || '';
+  const ncolor = nameColors[name] || '#c8dce8';
+  nameDiv.innerHTML = `<div class="char-name" style="color:${ncolor};">${dname}</div>${role ? `<div class="char-role">${role}</div>` : ''}`;
   const nameLabel = new CSS2DObject(nameDiv);
   nameLabel.position.set(0, 0.25, 0);
   charGroup.add(nameLabel);
@@ -5063,6 +5069,50 @@ function triggerWalkTo(walker, target) {
 
 function handleBotEvent(event) {
   var type = event.type;
+
+  // ── DESK LED STATUS UPDATES ──
+  if (type === 'scanner') {
+    updateAgentStatus('scanner', 'scanning');
+    updateMonitorGlow('scanner', 'scanning');
+    setTimeout(function() { updateAgentStatus('scanner', 'idle'); }, 5000);
+  }
+  if (type === 'entry') {
+    updateAgentStatus('executor', 'active');
+    updateMonitorGlow('executor', 'active');
+  }
+  if (type === 'cooldown') {
+    updateAgentStatus('risk', 'alert');
+    updateMonitorGlow('risk', 'alert');
+    setTimeout(function() { updateAgentStatus('risk', 'waiting'); }, 5000);
+  }
+  if (type === 'close') {
+    var ledStatus = event.pnl > 0 ? 'active' : 'alert';
+    updateAgentStatus('executor', ledStatus);
+    updateMonitorGlow('executor', ledStatus);
+    setTimeout(function() { updateAgentStatus('executor', 'waiting'); updateMonitorGlow('executor', 'idle'); }, 3000);
+  }
+  if (type === 'ensemble') {
+    updateAgentStatus('ensemble', 'active');
+    updateAgentStatus('strategy', 'active');
+    updateMonitorGlow('ensemble', 'active');
+    updateMonitorGlow('strategy', 'active');
+    setTimeout(function() { updateAgentStatus('ensemble', 'idle'); updateAgentStatus('strategy', 'idle'); }, 4000);
+  }
+  if (type === 'ensemble_skip') {
+    updateAgentStatus('ensemble', 'waiting');
+    updateMonitorGlow('ensemble', 'waiting');
+    setTimeout(function() { updateAgentStatus('ensemble', 'idle'); }, 3000);
+  }
+  if (type === 'ws') {
+    updateAgentStatus('ws_feed', 'active');
+    updateMonitorGlow('ws_feed', 'active');
+    setTimeout(function() { updateAgentStatus('ws_feed', 'idle'); updateMonitorGlow('ws_feed', 'idle'); }, 3000);
+  }
+  if (type === 'tape' || type === 'orderbook') {
+    updateAgentStatus('tape', 'active');
+    updateMonitorGlow('tape', 'active');
+    setTimeout(function() { updateAgentStatus('tape', 'idle'); }, 3000);
+  }
 
   // ── TIER 1: Professional ──
   if (type === 'scanner' && charGroups.scanner) {
@@ -5249,6 +5299,70 @@ Object.entries(deskPositions).forEach(([name, pos]) => {
   const emoji = name === 'jonas' ? '<img src="/jonas_avatar.jpg" style="width:28px;height:28px;border-radius:50%;border:2px solid #b8922a;" onerror="this.outerHTML=\'🧑\'">' : emojis[name];
   createCSS2DLabel(ch, name, emoji);
 });
+
+// ── DESK LED STRIPS ──
+const deskLEDs = {};
+Object.entries(deskPositions).forEach(function([name, pos]) {
+  var ledGeom = new THREE.BoxGeometry(0.7, 0.01, 0.02);
+  var ledMat = new THREE.MeshStandardMaterial({
+    color: 0x00ff88,
+    emissive: 0x00ff88,
+    emissiveIntensity: 0.5,
+  });
+  var led = new THREE.Mesh(ledGeom, ledMat);
+  led.position.set(pos.x, 0.76, pos.z - 0.2);
+  scene.add(led);
+  deskLEDs[name] = led;
+});
+
+function updateAgentStatus(name, status) {
+  var led = deskLEDs[name];
+  if (!led) return;
+  var colors = {
+    active: 0x00ff88,
+    waiting: 0xffaa00,
+    alert: 0xff4444,
+    scanning: 0x4488ff,
+    idle: 0x333333,
+  };
+  var color = colors[status] || colors.idle;
+  led.material.color.setHex(color);
+  led.material.emissive.setHex(color);
+  // Flag to prevent PnL ambient loop from overriding event colors
+  if (!led.userData) led.userData = {};
+  if (status === 'idle') {
+    led.userData.eventOverride = false;
+  } else {
+    led.userData.eventOverride = true;
+    // Auto-clear override after 6s so PnL ambient resumes
+    clearTimeout(led.userData._overrideTimer);
+    led.userData._overrideTimer = setTimeout(function() { led.userData.eventOverride = false; }, 6000);
+  }
+}
+
+function updateMonitorGlow(name, status) {
+  var canvas = monitorCanvases[name + '_mon1'];
+  if (!canvas) return;
+  var colors = {
+    active: 'rgba(0,255,136,0.15)',
+    waiting: 'rgba(255,170,0,0.15)',
+    alert: 'rgba(255,68,68,0.15)',
+    scanning: 'rgba(68,136,255,0.15)',
+    idle: 'rgba(51,51,51,0.08)',
+  };
+  var color = colors[status] || colors.idle;
+  var ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+    ctx.restore();
+  }
+  var tex = monitorTextures[name + '_mon1'];
+  if (tex) tex.needsUpdate = true;
+}
 
 
 // ── BREAK ROOM (back-left corner) ──
@@ -6998,16 +7112,17 @@ function updateHUD() {
     return `<div class="feed-line ${t}">${time} ${msg}</div>`;
   }).join('');
 
-  // Update plumbob colors based on performance
+  // Update desk LED ambient glow based on overall PnL performance
   const pnlVal = pnl;
-  Object.keys(plumbobs).forEach(name => {
-    const pb = plumbobs[name];
-    if(!pb) return;
-    let color = '#4ecb71'; // green
-    if(pnlVal < -3) color = '#e05252'; // red
-    else if(pnlVal < 0) color = '#f5c842'; // yellow
-    pb.style.background = color;
-    pb.style.color = color;
+  const pnlLedColor = pnlVal < -3 ? 0xff4444 : (pnlVal < 0 ? 0xffaa00 : 0x00ff88);
+  Object.keys(deskLEDs).forEach(name => {
+    const led = deskLEDs[name];
+    if (!led || !led.userData) return;
+    // Only update ambient PnL glow if LED is in idle state (not overridden by event)
+    if (!led.userData.eventOverride) {
+      led.material.color.setHex(pnlLedColor);
+      led.material.emissive.setHex(pnlLedColor);
+    }
   });
 
 }
