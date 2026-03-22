@@ -10,17 +10,6 @@ logger = setup_logger()
 
 PERSISTENCE_FILE = os.path.join(os.path.dirname(__file__), "trading_state.json")
 
-# Strategy-specific time exit thresholds (cycles at 60s loop interval for 5m TF)
-STRATEGY_TIME_EXITS = {
-    "keltner_squeeze":          {"soft": 30, "hard": 120},   # was 45
-    "trend_pullback":           {"soft": 20, "hard": 90},    # was 30
-    "trend_scalp":              {"soft": 20, "hard": 90},    # was 30
-    "momentum_continuation":    {"soft": 15, "hard": 60},    # was 20
-    "vwap_reversion":           {"soft": 10, "hard": 45},    # was 15
-    "htf_confluence_pullback":  {"soft": 20, "hard": 75},    # was 25
-    "htf_confluence_vwap":      {"soft": 10, "hard": 45},    # was 15
-}
-DEFAULT_TIME_EXIT = {"soft": 30, "hard": 120}               # was soft: 45
 
 
 @dataclass
@@ -150,34 +139,21 @@ class Position:
         return False
 
     def should_time_exit(self, current_cycle: int, current_price: float = 0.0) -> tuple[bool, bool]:
-        """Exit if trade hasn't moved in our favor after too many cycles.
-        Returns (should_exit, is_hard_exit).
-        - Deep loss (< -6%): exit at half soft limit (cut fast)
-        - Any loss at soft limit: exit immediately (no more extensions)
-        - Hard exit: unconditional — unless ROI >= 5%, then extend by 50%.
-        """
-        thresholds = STRATEGY_TIME_EXITS.get(self.strategy, DEFAULT_TIME_EXIT)
-        soft_limit = thresholds["soft"]
-        hard_limit = thresholds["hard"]
+        """Hard time exit only — 4h unconditional safety net.
+        Soft time exits removed per 567K backtest study:
+        tight time exits destroy performance.
+        Adverse exit at -5% ROI handles wrong-direction trades."""
+        hard_limit = 240  # 4 hours at 60s loop = 240 cycles
         cycles_held = current_cycle - self.entry_cycle
         roi = self.pnl_percent(current_price) if current_price > 0 else -99.0
 
-        # Hard exit — conditional: extend by 50% if ROI >= 5%
         if cycles_held >= hard_limit:
+            # Extend by 50% if trade is profitable (>= 5% ROI)
             if roi >= 5.0:
-                extended_hard = int(hard_limit * 1.5)
-                if cycles_held < extended_hard:
+                extended = int(hard_limit * 1.5)
+                if cycles_held < extended:
                     return False, False
             return True, True
-
-        # Early cut: deeply losing after half the soft limit
-        if cycles_held >= soft_limit // 2 and roi < -6.0:
-            return True, False
-
-        # Soft exit: any loss at soft limit gets cut — no more 2x extensions
-        # Data: barely-losing trades almost never recover (2.2% WR on time_exit)
-        if cycles_held >= soft_limit and roi < 0.0:
-            return True, False
 
         return False, False
 
@@ -417,12 +393,11 @@ class RiskManager:
         )
         self.positions[symbol] = position
         sl_mode = f"ATR×{mults['sl'] if atr > 0 else 'fixed'}({atr:.5f})" if atr > 0 else "fixed%"
-        time_exits = STRATEGY_TIME_EXITS.get(strategy, DEFAULT_TIME_EXIT)
         logger.info(
             f"Position opened: {side.upper()} {symbol} | Entry: {entry_price:.4f} | "
             f"SL: {stop_loss:.4f} | TP: {take_profit:.4f} | "
             f"Margin: {margin:.2f} USDT | Size: {coin_amount:.6f} ({Config.LEVERAGE}x) | {sl_mode}"
-            f" | strat={strategy or 'default'} time_exit=soft{time_exits['soft']}/hard{time_exits['hard']}"
+            f" | strat={strategy or 'default'} time_exit=hard240"
         )
         return position
 
