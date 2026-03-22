@@ -976,6 +976,15 @@ def confluence_strategy(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.Dat
         if s.signal == Signal.HOLD:
             _log.debug(f"[STRAT] {s.reason}")
 
+    # Mean reversion in confirmed ranging conditions
+    # Research: works at 2-30 min horizons when ADX < 25 AND Hurst < 0.50
+    if htf_adx < 25:
+        hurst_val = df.iloc[-1].get("hurst", 0.5) if "hurst" in df.columns else 0.5
+        if hurst_val < 0.50:
+            bb_signal = bb_mean_reversion_strategy(df, orderbook)
+            if bb_signal.signal != Signal.HOLD:
+                signals.append(bb_signal)
+
     # Pick strongest non-HOLD
     active = [s for s in signals if s.signal != Signal.HOLD]
     if not active:
