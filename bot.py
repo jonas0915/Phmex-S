@@ -678,6 +678,14 @@ class Phmex2Bot:
                 if funding_data and funding_data.get("strength_mod"):
                     signal = TradeSignal(signal.signal, signal.reason, signal.strength + funding_data["strength_mod"])
 
+                # Candle-boundary entry bias: prefer entries near 5m candle opens
+                # Research: +0.58bps at candle boundaries (t-stat > 9)
+                now_min = datetime.datetime.utcnow().minute
+                candle_offset = now_min % 5  # 0 = candle just opened, 4 = about to close
+                if candle_offset >= 3:  # Last 2 minutes of candle — skip, wait for next open
+                    logger.debug(f"[TIMING] {symbol} — skipping entry, {5-candle_offset}min to next candle open")
+                    continue
+
                 # Kelly-aware position sizing (uses $2 min margin during bootstrap)
                 margin = self.risk.calculate_kelly_margin(available, confidence=confidence)
 
