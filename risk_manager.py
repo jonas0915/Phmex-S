@@ -33,29 +33,60 @@ class Position:
     ensemble_layers: str = ""
 
     def update_trailing_stop(self, current_price: float):
+        """Tiered trailing stop — the bigger the winner, the tighter the trail.
+        Never give back more than 1/3 of peak profit.
+
+        | ROI Reached | Min Lock-In | Trail from Peak |
+        |-------------|-------------|-----------------|
+        | +5%         | +2%         | 3% from peak    |
+        | +8%         | +4%         | 4% from peak    |
+        | +10%        | +6%         | 4% from peak    |
+        | +15%        | +10%        | 5% from peak    |
+        | +20%        | +15%        | 5% from peak    |
+        """
         if not Config.TRAILING_STOP:
             return
-        # Only activate trailing stop after reaching 1R profit
-        r_distance = abs(self.entry_price - self.stop_loss)
+
+        roi = self.pnl_percent(current_price)
+        if roi < 5.0:
+            return  # Not yet in profit territory for trailing
+
+        # Determine tier
+        tiers = [
+            (20.0, 15.0, 5.0),  # (roi_threshold, lock_in_pct, trail_pct)
+            (15.0, 10.0, 5.0),
+            (10.0,  6.0, 4.0),
+            ( 8.0,  4.0, 4.0),
+            ( 5.0,  2.0, 3.0),
+        ]
+
+        lock_in_pct = 2.0
+        trail_pct = 3.0
+        for threshold, lock, trail in tiers:
+            if roi >= threshold:
+                lock_in_pct = lock
+                trail_pct = trail
+                break
+
+        # Compute trail price from current peak
         if self.side == "long":
-            if current_price < self.entry_price + r_distance:
-                return  # not yet at 1R
-            if current_price > self.peak_price:
+            if current_price > self.peak_price or self.peak_price == 0.0:
                 self.peak_price = current_price
-                trail_dist = r_distance * 0.7  # trail at 0.7R from peak
-                new_trail = current_price - trail_dist
-                # Only ratchet up, never down
-                if self.trailing_stop_price is None or new_trail > self.trailing_stop_price:
-                    self.trailing_stop_price = new_trail
+            trail_price = self.peak_price * (1 - trail_pct / 100 / Config.LEVERAGE)
+            # Compute lock-in floor price
+            lock_price = self.entry_price * (1 + lock_in_pct / 100 / Config.LEVERAGE)
+            # Use the higher of trail and lock-in
+            new_trail = max(trail_price, lock_price)
+            if self.trailing_stop_price is None or new_trail > self.trailing_stop_price:
+                self.trailing_stop_price = new_trail
         elif self.side == "short":
-            if current_price > self.entry_price - r_distance:
-                return  # not yet at 1R
-            if current_price < self.peak_price:
+            if current_price < self.peak_price or self.peak_price == 0.0:
                 self.peak_price = current_price
-                trail_dist = r_distance * 0.7
-                new_trail = current_price + trail_dist
-                if self.trailing_stop_price is None or new_trail < self.trailing_stop_price:
-                    self.trailing_stop_price = new_trail
+            trail_price = self.peak_price * (1 + trail_pct / 100 / Config.LEVERAGE)
+            lock_price = self.entry_price * (1 - lock_in_pct / 100 / Config.LEVERAGE)
+            new_trail = min(trail_price, lock_price)
+            if self.trailing_stop_price is None or new_trail < self.trailing_stop_price:
+                self.trailing_stop_price = new_trail
 
     def should_stop_loss(self, current_price: float) -> bool:
         if Config.TRAILING_STOP and self.trailing_stop_price:
