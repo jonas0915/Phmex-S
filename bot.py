@@ -37,6 +37,8 @@ def _extract_strategy_name(reason: str) -> str:
         return "htf_confluence_vwap"
     if "liq_cascade" in r:
         return "liq_cascade"
+    if "funding_contrarian" in r:
+        return "funding_contrarian"
     return ""
 
 
@@ -124,6 +126,14 @@ class Phmex2Bot:
                 slot_id="5m_liq_cascade",
                 strategy_name="liq_cascade",
                 timeframe="5m",
+                max_positions=1,
+                capital_pct=0.0,  # 0% for now — paper only
+                paper_mode=True,
+            ),
+            StrategySlot(
+                slot_id="8h_funding",
+                strategy_name="funding_contrarian",
+                timeframe="5m",  # Runs on 5m but signal is 8h funding rate
                 max_positions=1,
                 capital_pct=0.0,  # 0% for now — paper only
                 paper_mode=True,

@@ -1170,6 +1170,90 @@ def liquidation_cascade_strategy(df, ob, htf_df=None):
     return TradeSignal(direction, reason, strength)
 
 
+def funding_rate_contrarian_strategy(df, ob, htf_df=None):
+    """Funding rate contrarian strategy.
+    When funding is extremely positive → market is overleveraged long → short signal.
+    When funding is extremely negative → overleveraged short → long signal.
+
+    Research: Extreme funding preceded BTC Nov 2022 bottom, Mar 2020 crash bottom,
+    and Oct 2025 $19B liquidation cascade.
+
+    This strategy uses RSI and price position relative to EMA as confirmation.
+    Funding rate data must be passed via the dataframe (added by bot.py).
+    """
+    if len(df) < 50:
+        return TradeSignal(Signal.HOLD, "Insufficient data", 0)
+
+    last = df.iloc[-1]
+
+    close = last.get("close", 0)
+    rsi = last.get("rsi", 50)
+    ema_50 = last.get("ema_50", 0)
+
+    # Funding rate — check if it's in the dataframe
+    # Bot adds funding_rate to df via _fetch_funding_rate
+    funding_rate = last.get("funding_rate", None)
+    if funding_rate is None:
+        # Try to get from the last few rows
+        for i in range(-1, max(-5, -len(df)), -1):
+            fr = df.iloc[i].get("funding_rate", None)
+            if fr is not None:
+                funding_rate = fr
+                break
+
+    if funding_rate is None or funding_rate == 0:
+        return TradeSignal(Signal.HOLD, "funding_contrarian: no funding data", 0)
+
+    # Extreme thresholds (per 8h funding period)
+    # Normal: 0.01% (0.0001)
+    # Elevated: >0.05% (0.0005)
+    # Extreme: >0.1% (0.001)
+    EXTREME_POSITIVE = 0.0008  # 0.08% — overleveraged longs
+    EXTREME_NEGATIVE = -0.0005  # -0.05% — overleveraged shorts (rarer)
+
+    direction = None
+
+    if funding_rate >= EXTREME_POSITIVE:
+        # Market overleveraged long → contrarian short
+        direction = Signal.SELL
+        # Confirmation: price should be extended above EMA (overextended)
+        if close < ema_50:
+            return TradeSignal(Signal.HOLD,
+                f"funding_contrarian: extreme positive ({funding_rate*100:.3f}%) but price below EMA-50", 0)
+    elif funding_rate <= EXTREME_NEGATIVE:
+        # Market overleveraged short → contrarian long
+        direction = Signal.BUY
+        # Confirmation: price should be below EMA (oversold)
+        if close > ema_50:
+            return TradeSignal(Signal.HOLD,
+                f"funding_contrarian: extreme negative ({funding_rate*100:.3f}%) but price above EMA-50", 0)
+    else:
+        return TradeSignal(Signal.HOLD,
+            f"funding_contrarian: funding {funding_rate*100:.4f}% not extreme", 0)
+
+    # RSI confirmation — should align with reversal
+    if direction == Signal.BUY and rsi > 60:
+        return TradeSignal(Signal.HOLD,
+            f"funding_contrarian: long but RSI {rsi:.0f} > 60 (not oversold enough)", 0)
+    if direction == Signal.SELL and rsi < 40:
+        return TradeSignal(Signal.HOLD,
+            f"funding_contrarian: short but RSI {rsi:.0f} < 40 (not overbought enough)", 0)
+
+    # Strength based on funding extremity
+    strength = 0.80
+    if abs(funding_rate) >= 0.001:  # 0.1%
+        strength += 0.05
+    if abs(funding_rate) >= 0.002:  # 0.2%
+        strength += 0.05
+    strength = min(strength, 0.95)
+
+    side_str = "long" if direction == Signal.BUY else "short"
+    reason = f"funding_contrarian: {side_str} funding={funding_rate*100:.3f}% RSI={rsi:.0f}"
+
+    _log.debug(f"[SIGNAL] {reason} | strength={strength:.2f}")
+    return TradeSignal(direction, reason, strength)
+
+
 STRATEGIES = {
     "trend_scalp":              trend_scalp_strategy,
     "trend_pullback":           trend_pullback_strategy,
@@ -1181,4 +1265,5 @@ STRATEGIES = {
     "confluence":               confluence_strategy,
     "htf_momentum":             htf_momentum_strategy,
     "liq_cascade":              liquidation_cascade_strategy,
+    "funding_contrarian":       funding_rate_contrarian_strategy,
 }
