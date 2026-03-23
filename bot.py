@@ -746,18 +746,21 @@ class Phmex2Bot:
                     logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {available:.2f}")
                     continue
 
-                # Check if margin meets exchange minimum for this symbol
+                # Bump margin to exchange minimum if needed (ensures BTC/ETH can trade)
                 try:
                     market = self.exchange.client.market(symbol)
                     min_amount = market.get('limits', {}).get('amount', {}).get('min', 0)
                     if min_amount and price > 0:
-                        min_notional = min_amount * price
-                        min_margin_needed = min_notional / Config.LEVERAGE
+                        min_margin_needed = (min_amount * price) / Config.LEVERAGE
                         if margin < min_margin_needed:
-                            logger.debug(f"[SKIP] {symbol} — margin ${margin:.2f} < min ${min_margin_needed:.2f} for {min_amount} qty")
-                            continue
+                            old_margin = margin
+                            margin = min(min_margin_needed * 1.1, available * 0.3)  # 10% buffer, cap at 30% of balance
+                            if margin > available:
+                                logger.debug(f"[SKIP] {symbol} — need ${min_margin_needed:.2f} but only ${available:.2f} available")
+                                continue
+                            logger.info(f"[MARGIN BUMP] {symbol} — ${old_margin:.2f} → ${margin:.2f} (exchange min qty)")
                 except Exception:
-                    pass  # If check fails, let the order attempt proceed
+                    pass
 
                 order = self.exchange.open_long(symbol, margin, price) if direction == "long" else self.exchange.open_short(symbol, margin, price)
                 if order:
