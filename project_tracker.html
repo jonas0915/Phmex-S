@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phmex-S v10 Pipeline — Project Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary: #0a0a0f;
+  --bg-card: #12121a;
+  --bg-card-hover: #16161f;
+  --bg-elevated: #1a1a25;
+  --border: #1e1e2e;
+  --border-subtle: #16161f;
+  --text-primary: #e4e4ec;
+  --text-secondary: #8888a0;
+  --text-muted: #555570;
+  --green: #00d4a1;
+  --green-dim: #00d4a122;
+  --green-glow: #00d4a144;
+  --amber: #f0a030;
+  --amber-dim: #f0a03022;
+  --amber-glow: #f0a03044;
+  --red: #f04060;
+  --red-dim: #f0406022;
+  --red-glow: #f0406044;
+  --blue: #4488ff;
+  --blue-dim: #4488ff22;
+  --blue-glow: #4488ff44;
+  --purple: #8866ee;
+  --purple-dim: #8866ee22;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: 'Inter', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+/* ---- Header ---- */
+.header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.header-label {
+  font-size: 11px;
+  font-family: var(--mono);
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--text-primary), var(--blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.header h1 span {
+  -webkit-text-fill-color: var(--text-muted);
+  font-weight: 400;
+  font-size: 20px;
+}
+
+/* ---- Total Progress ---- */
+.total-progress-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.total-pct {
+  font-family: var(--mono);
+  font-size: 42px;
+  font-weight: 600;
+  color: var(--blue);
+  min-width: 110px;
+  text-align: center;
+  line-height: 1;
+}
+
+.total-pct small {
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.total-bar-wrap {
+  flex: 1;
+}
+
+.total-bar-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.total-bar-label span {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.total-bar {
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.total-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue), var(--green));
+  border-radius: 4px;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  width: 0%;
+}
+
+/* ---- Pipeline ---- */
+.pipeline {
+  display: flex;
+  gap: 0;
+  margin-bottom: 40px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.pipeline-phase {
+  flex: 1;
+  min-width: 180px;
+  position: relative;
+  text-align: center;
+  padding: 0 8px;
+}
+
+.pipeline-node {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin: 0 auto 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  position: relative;
+  z-index: 2;
+  transition: all 0.3s;
+}
+
+.pipeline-node.not-started {
+  background: var(--bg-elevated);
+  border: 2px solid var(--text-muted);
+  color: var(--text-muted);
+}
+
+.pipeline-node.in-progress {
+  background: var(--amber-dim);
+  border: 2px solid var(--amber);
+  color: var(--amber);
+  box-shadow: 0 0 16px var(--amber-glow);
+}
+
+.pipeline-node.completed {
+  background: var(--green-dim);
+  border: 2px solid var(--green);
+  color: var(--green);
+  box-shadow: 0 0 16px var(--green-glow);
+}
+
+.pipeline-node.blocked {
+  background: var(--red-dim);
+  border: 2px solid var(--red);
+  color: var(--red);
+}
+
+.pipeline-phase::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: calc(50% + 24px);
+  right: -50%;
+  height: 2px;
+  background: var(--border);
+  z-index: 1;
+}
+
+.pipeline-phase:last-child::after { display: none; }
+
+.pipeline-phase-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.pipeline-phase-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+.pipeline-phase-status {
+  font-size: 10px;
+  font-family: var(--mono);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.pipeline-phase-status.not-started { color: var(--text-muted); background: var(--bg-elevated); }
+.pipeline-phase-status.in-progress { color: var(--amber); background: var(--amber-dim); }
+.pipeline-phase-status.completed { color: var(--green); background: var(--green-dim); }
+.pipeline-phase-status.blocked { color: var(--red); background: var(--red-dim); }
+
+/* ---- Cards Grid ---- */
+.grid { display: grid; gap: 20px; }
+.grid-2 { grid-template-columns: 1fr 1fr; }
+.grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+@media (max-width: 900px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+
+/* ---- Card ---- */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.card:hover { border-color: #2a2a3a; }
+
+.card-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+  user-select: none;
+}
+
+.card-header:hover { background: var(--bg-card-hover); }
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-title .phase-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.badge-p1 { background: var(--amber-dim); color: var(--amber); }
+.badge-p2 { background: var(--blue-dim); color: var(--blue); }
+.badge-p3 { background: var(--purple-dim); color: var(--purple); }
+.badge-p4 { background: var(--red-dim); color: var(--red); }
+.badge-p5 { background: var(--green-dim); color: var(--green); }
+
+.card-pct {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.card-pct.has-progress { color: var(--amber); }
+.card-pct.done { color: var(--green); }
+
+.card-expand {
+  font-size: 18px;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+  margin-left: 12px;
+}
+
+.card.open .card-expand { transform: rotate(180deg); }
+
+.card-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card.open .card-body { max-height: 600px; }
+
+.card-body-inner { padding: 16px 20px; }
+
+.phase-bar {
+  height: 3px;
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.phase-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.phase-bar-fill.bar-p1 { background: var(--amber); }
+.phase-bar-fill.bar-p2 { background: var(--blue); }
+.phase-bar-fill.bar-p3 { background: var(--purple); }
+.phase-bar-fill.bar-p4 { background: var(--red); }
+.phase-bar-fill.bar-p5 { background: var(--green); }
+
+/* ---- Checklist ---- */
+.checklist { list-style: none; }
+
+.checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.checklist li:last-child { border-bottom: none; }
+.checklist li:hover { color: var(--text-primary); }
+.checklist li.checked { color: var(--text-muted); text-decoration: line-through; }
+
+.check-box {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--text-muted);
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.checklist li.checked .check-box {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.check-box svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.checklist li.checked .check-box svg { opacity: 1; }
+
+/* ---- Info Cards (no expand) ---- */
+.info-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.info-card:hover { border-color: #2a2a3a; }
+
+.info-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-card-title .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-green { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+.dot-amber { background: var(--amber); box-shadow: 0 0 8px var(--amber-glow); }
+.dot-red { background: var(--red); box-shadow: 0 0 8px var(--red-glow); }
+.dot-blue { background: var(--blue); box-shadow: 0 0 8px var(--blue-glow); }
+
+/* ---- Milestone List ---- */
+.milestone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+
+.milestone:last-child { border-bottom: none; }
+
+.milestone-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.milestone-marker.pending { background: var(--text-muted); }
+.milestone-marker.hit { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+
+.milestone-label { color: var(--text-secondary); flex: 1; }
+
+.milestone-target {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.milestone-kill {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--red);
+  opacity: 0.7;
+}
+
+/* ---- Stat Row ---- */
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+
+.stat-row:last-child { border-bottom: none; }
+
+.stat-label { color: var(--text-secondary); }
+
+.stat-value {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.stat-value.positive { color: var(--green); }
+.stat-value.negative { color: var(--red); }
+.stat-value.neutral { color: var(--text-muted); }
+.stat-value.info { color: var(--blue); }
+.stat-value.warn { color: var(--amber); }
+
+/* ---- Status Indicator ---- */
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.status-row:last-child { border-bottom: none; }
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.live {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green-glow);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.status-dot.target { background: var(--blue); }
+.status-dot.balance { background: var(--amber); }
+.status-dot.funding { background: var(--purple); }
+
+.status-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.status-value {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* ---- Target Grid ---- */
+.target-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+
+.target-item:last-child { border-bottom: none; }
+
+.target-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.target-icon.t-green { background: var(--green-dim); color: var(--green); }
+
+.target-label { color: var(--text-secondary); flex: 1; }
+
+.target-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* ---- Research Tag ---- */
+.research-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.research-item:last-child { border-bottom: none; }
+
+.research-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.research-value {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ---- Section Title ---- */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin: 36px 0 16px;
+}
+
+/* ---- Footer ---- */
+.footer {
+  text-align: center;
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-label">Phmex-S Trading Bot</div>
+    <h1>v10 Pipeline <span>Project Tracker</span></h1>
+  </div>
+
+  <!-- Total Progress -->
+  <div class="total-progress-wrap">
+    <div class="total-pct" id="totalPct">0<small>%</small></div>
+    <div class="total-bar-wrap">
+      <div class="total-bar-label">
+        Overall Project Completion
+        <span id="totalTaskCount">0 / 20 tasks</span>
+      </div>
+      <div class="total-bar">
+        <div class="total-bar-fill" id="totalBarFill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pipeline -->
+  <div class="pipeline" id="pipeline">
+    <div class="pipeline-phase" data-phase="1">
+      <div class="pipeline-node not-started">1</div>
+      <div class="pipeline-phase-name">Fix Current Bot</div>
+      <div class="pipeline-phase-sub">6 tasks</div>
+      <div class="pipeline-phase-status not-started" id="pipeStatus1">NOT STARTED</div>
+    </div>
+    <div class="pipeline-phase" data-phase="2">
+      <div class="pipeline-node blocked">2</div>
+      <div class="pipeline-phase-name">Strategy Slots</div>
+      <div class="pipeline-phase-sub">4 tasks</div>
+      <div class="pipeline-phase-status blocked" id="pipeStatus2">BLOCKED</div>
+    </div>
+    <div class="pipeline-phase" data-phase="3">
+      <div class="pipeline-node blocked">3</div>
+      <div class="pipeline-phase-name">Mean Reversion</div>
+      <div class="pipeline-phase-sub">2 tasks</div>
+      <div class="pipeline-phase-status blocked" id="pipeStatus3">BLOCKED</div>
+    </div>
+    <div class="pipeline-phase" data-phase="4">
+      <div class="pipeline-node blocked">4</div>
+      <div class="pipeline-phase-name">Liq + Funding</div>
+      <div class="pipeline-phase-sub">2 tasks</div>
+      <div class="pipeline-phase-status blocked" id="pipeStatus4">BLOCKED</div>
+    </div>
+    <div class="pipeline-phase" data-phase="5">
+      <div class="pipeline-node blocked">5</div>
+      <div class="pipeline-phase-name">Strategy Factory</div>
+      <div class="pipeline-phase-sub">ongoing</div>
+      <div class="pipeline-phase-status blocked" id="pipeStatus5">BLOCKED</div>
+    </div>
+  </div>
+
+  <!-- Phase Checklists -->
+  <div class="section-title">Phase Checklists</div>
+
+  <!-- Phase 1 -->
+  <div class="card open" data-card="phase1" style="margin-bottom: 12px;">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title">
+        <span class="phase-badge badge-p1">P1</span>
+        Fix Current Bot
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="card-pct" id="pct-phase1">0%</div>
+        <div class="card-expand">&#9662;</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <div class="phase-bar"><div class="phase-bar-fill bar-p1" id="bar-phase1" style="width:0%"></div></div>
+        <ul class="checklist" id="list-phase1">
+          <li data-key="p1t1"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Widen adverse exit -3% &rarr; -5% ROI</span></li>
+          <li data-key="p1t2"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Remove soft time exits (keep only 4h hard exit)</span></li>
+          <li data-key="p1t3"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Add tiered trailing stop (progressive profit lock-in)</span></li>
+          <li data-key="p1t4"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Add weekend Kelly multiplier (1.3x Sat/Sun)</span></li>
+          <li data-key="p1t5"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Add candle-boundary entry bias</span></li>
+          <li data-key="p1t6"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Re-enable bb_mean_reversion with regime gate (ADX&lt;25 + Hurst&lt;0.50)</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 2 -->
+  <div class="card" data-card="phase2" style="margin-bottom: 12px;">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title">
+        <span class="phase-badge badge-p2">P2</span>
+        Strategy Slots + 1h Momentum
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="card-pct" id="pct-phase2">0%</div>
+        <div class="card-expand">&#9662;</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <div class="phase-bar"><div class="phase-bar-fill bar-p2" id="bar-phase2" style="width:0%"></div></div>
+        <ul class="checklist" id="list-phase2">
+          <li data-key="p2t1"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Refactor bot.py for strategy slots architecture</span></li>
+          <li data-key="p2t2"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Build backtester + WFO framework</span></li>
+          <li data-key="p2t3"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Build 1h momentum strategy (Slot 2)</span></li>
+          <li data-key="p2t4"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Integrate proven edges (weekend, candle-boundary) into all slots</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 3 -->
+  <div class="card" data-card="phase3" style="margin-bottom: 12px;">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title">
+        <span class="phase-badge badge-p3">P3</span>
+        Mean Reversion + Recalibration
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="card-pct" id="pct-phase3">0%</div>
+        <div class="card-expand">&#9662;</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <div class="phase-bar"><div class="phase-bar-fill bar-p3" id="bar-phase3" style="width:0%"></div></div>
+        <ul class="checklist" id="list-phase3">
+          <li data-key="p3t1"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>bb_mean_reversion as Slot 3 (paper &rarr; live)</span></li>
+          <li data-key="p3t2"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Build recalibration.py (monthly reports, walk-forward, kill switch)</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 4 -->
+  <div class="card" data-card="phase4" style="margin-bottom: 12px;">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title">
+        <span class="phase-badge badge-p4">P4</span>
+        Liquidation + Funding Rate
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="card-pct" id="pct-phase4">0%</div>
+        <div class="card-expand">&#9662;</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <div class="phase-bar"><div class="phase-bar-fill bar-p4" id="bar-phase4" style="width:0%"></div></div>
+        <ul class="checklist" id="list-phase4">
+          <li data-key="p4t1"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Liquidation cascade strategy (Slot 4)</span></li>
+          <li data-key="p4t2"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Funding rate contrarian strategy (Slot 5)</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 5 -->
+  <div class="card" data-card="phase5" style="margin-bottom: 12px;">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title">
+        <span class="phase-badge badge-p5">P5</span>
+        Strategy Factory
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="card-pct" id="pct-phase5">0%</div>
+        <div class="card-expand">&#9662;</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <div class="phase-bar"><div class="phase-bar-fill bar-p5" id="bar-phase5" style="width:0%"></div></div>
+        <ul class="checklist" id="list-phase5">
+          <li data-key="p5t1"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Strategy factory pipeline</span></li>
+          <li data-key="p5t2"><div class="check-box"><svg viewBox="0 0 12 12" fill="none" stroke="#0a0a0f" stroke-width="2"><path d="M2 6l3 3 5-5"/></svg></div><span>Continuous R&D process</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Grid -->
+  <div class="section-title">Intelligence</div>
+
+  <div class="grid grid-3" style="margin-bottom: 20px;">
+
+    <!-- Bot Status -->
+    <div class="info-card">
+      <div class="info-card-title"><span class="dot dot-green"></span> Bot Status</div>
+      <div class="status-row">
+        <div class="status-dot live"></div>
+        <div class="status-label">Current version</div>
+        <div class="status-value">v9.0 Triage</div>
+      </div>
+      <div class="status-row">
+        <div class="status-dot target"></div>
+        <div class="status-label">Target version</div>
+        <div class="status-value">v10.0 Pipeline</div>
+      </div>
+      <div class="status-row">
+        <div class="status-dot balance"></div>
+        <div class="status-label">Account balance</div>
+        <div class="status-value">~$20.61</div>
+      </div>
+      <div class="status-row">
+        <div class="status-dot" style="background:var(--purple);"></div>
+        <div class="status-label">Funding target</div>
+        <div class="status-value">$100-200</div>
+      </div>
+    </div>
+
+    <!-- Milestones -->
+    <div class="info-card">
+      <div class="info-card-title"><span class="dot dot-amber"></span> Milestones</div>
+      <div class="milestone">
+        <div class="milestone-marker pending"></div>
+        <div class="milestone-label">25 trades Slot 1</div>
+        <div>
+          <div class="milestone-target">WR > 40%</div>
+          <div class="milestone-kill">kill: &lt; 30%</div>
+        </div>
+      </div>
+      <div class="milestone">
+        <div class="milestone-marker pending"></div>
+        <div class="milestone-label">25 trades Slot 2</div>
+        <div>
+          <div class="milestone-target">WR > 45%</div>
+          <div class="milestone-kill">kill: &lt; 35%</div>
+        </div>
+      </div>
+      <div class="milestone">
+        <div class="milestone-marker pending"></div>
+        <div class="milestone-label">50 trades combined</div>
+        <div class="milestone-target">Kelly positive 1+ slot</div>
+      </div>
+      <div class="milestone">
+        <div class="milestone-marker pending"></div>
+        <div class="milestone-label">100 trades</div>
+        <div class="milestone-target">Sharpe > 0.5</div>
+      </div>
+      <div class="milestone">
+        <div class="milestone-marker pending"></div>
+        <div class="milestone-label">200 trades</div>
+        <div class="milestone-target">60%+ green days</div>
+      </div>
+    </div>
+
+    <!-- Top 1% Target -->
+    <div class="info-card">
+      <div class="info-card-title"><span class="dot dot-blue"></span> Top 1% Targets</div>
+      <div class="target-item">
+        <div class="target-icon t-green">&#9670;</div>
+        <div class="target-label">Portfolio Sharpe</div>
+        <div class="target-value">> 1.0</div>
+      </div>
+      <div class="target-item">
+        <div class="target-icon t-green">&#9670;</div>
+        <div class="target-label">Kelly positive slots</div>
+        <div class="target-value">2+</div>
+      </div>
+      <div class="target-item">
+        <div class="target-icon t-green">&#9670;</div>
+        <div class="target-label">Monthly recalibration</div>
+        <div class="target-value">running</div>
+      </div>
+      <div class="target-item">
+        <div class="target-icon t-green">&#9670;</div>
+        <div class="target-label">Combined WR</div>
+        <div class="target-value">> 45%</div>
+      </div>
+      <div class="target-item">
+        <div class="target-icon t-green">&#9670;</div>
+        <div class="target-label">Monthly return</div>
+        <div class="target-value">3-5%</div>
+      </div>
+      <div class="target-item">
+        <div class="target-icon t-green">&#9670;</div>
+        <div class="target-label">Max drawdown</div>
+        <div class="target-value">&lt; 15%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Research Findings -->
+  <div class="grid grid-2">
+    <div class="info-card">
+      <div class="info-card-title"><span class="dot dot-blue"></span> Research Findings &mdash; Edges</div>
+      <div class="research-item">
+        <div class="research-label">Weekend effect</div>
+        <div class="research-value positive">+85-92% returns <span style="color:var(--text-muted);font-size:11px;">(p &lt; 0.001)</span></div>
+      </div>
+      <div class="research-item">
+        <div class="research-label">Candle boundary bias</div>
+        <div class="research-value positive">+0.58bps <span style="color:var(--text-muted);font-size:11px;">(t-stat > 9)</span></div>
+      </div>
+      <div class="research-item">
+        <div class="research-label">Top 1% approach</div>
+        <div class="research-value info">Strategy pipeline, 50+ strategies, continuous R&D</div>
+      </div>
+      <div class="research-item">
+        <div class="research-label">1h timeframe</div>
+        <div class="research-value positive">Only consistently positive Sharpe in WFO</div>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <div class="info-card-title"><span class="dot dot-red"></span> Research Findings &mdash; Warnings</div>
+      <div class="research-item">
+        <div class="research-label">567K study finding</div>
+        <div class="research-value negative">Tight time exits destroy performance</div>
+      </div>
+      <div class="research-item">
+        <div class="research-label">5m timeframe</div>
+        <div class="research-value negative">Negative Sharpes in WFO</div>
+      </div>
+      <div class="research-item">
+        <div class="research-label">Break-even WR</div>
+        <div class="research-value warn">36.6%</div>
+      </div>
+      <div class="research-item">
+        <div class="research-label">Current WR</div>
+        <div class="research-value negative">35.9% <span style="color:var(--text-muted);font-size:11px;">(below breakeven)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Phmex-S v10 Pipeline &mdash; Last updated manually &mdash; State saved to localStorage
+  </div>
+
+</div>
+
+<script>
+const STORAGE_KEY = 'phmex_v10_tracker';
+
+const phases = {
+  phase1: { tasks: ['p1t1','p1t2','p1t3','p1t4','p1t5','p1t6'] },
+  phase2: { tasks: ['p2t1','p2t2','p2t3','p2t4'] },
+  phase3: { tasks: ['p3t1','p3t2'] },
+  phase4: { tasks: ['p4t1','p4t2'] },
+  phase5: { tasks: ['p5t1','p5t2'] },
+};
+
+let state = {};
+
+async function loadState() {
+  // Try loading from tracker_state.json first (shared with CLI)
+  try {
+    const resp = await fetch('tracker_state.json?t=' + Date.now());
+    if (resp.ok) {
+      state = await resp.json();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      return;
+    }
+  } catch(e) {}
+  // Fallback to localStorage
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch(e) { state = {}; }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  // Note: browser can't write tracker_state.json directly.
+  // CLI updates the JSON file; browser reads it on reload.
+}
+
+function toggleCard(header) {
+  header.closest('.card').classList.toggle('open');
+}
+
+function getPhaseCompletion(phaseKey) {
+  const tasks = phases[phaseKey].tasks;
+  const done = tasks.filter(t => state[t]).length;
+  return { done, total: tasks.length, pct: Math.round((done / tasks.length) * 100) };
+}
+
+function getTotalCompletion() {
+  let done = 0, total = 0;
+  for (const key in phases) {
+    const c = getPhaseCompletion(key);
+    done += c.done;
+    total += c.total;
+  }
+  return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
+}
+
+function getPhaseStatus(phaseKey, phaseIndex) {
+  const c = getPhaseCompletion(phaseKey);
+  if (c.pct === 100) return 'completed';
+  if (c.done > 0) return 'in-progress';
+  // Check if previous phase is done (or this is phase 1)
+  if (phaseIndex === 0) return 'not-started';
+  const prevKey = 'phase' + phaseIndex; // phaseIndex is 1-based for previous
+  const prev = getPhaseCompletion(prevKey);
+  if (prev.pct === 100) return 'not-started';
+  return 'blocked';
+}
+
+const statusLabels = {
+  'not-started': 'NOT STARTED',
+  'in-progress': 'IN PROGRESS',
+  'completed': 'COMPLETED',
+  'blocked': 'BLOCKED',
+};
+
+function render() {
+  // Update checklists
+  for (const phaseKey in phases) {
+    const list = document.getElementById('list-' + phaseKey);
+    if (!list) continue;
+    const items = list.querySelectorAll('li');
+    items.forEach(li => {
+      const key = li.dataset.key;
+      if (state[key]) li.classList.add('checked');
+      else li.classList.remove('checked');
+    });
+
+    // Phase bar + pct
+    const c = getPhaseCompletion(phaseKey);
+    const bar = document.getElementById('bar-' + phaseKey);
+    const pct = document.getElementById('pct-' + phaseKey);
+    if (bar) bar.style.width = c.pct + '%';
+    if (pct) {
+      pct.textContent = c.pct + '%';
+      pct.className = 'card-pct' + (c.pct === 100 ? ' done' : c.pct > 0 ? ' has-progress' : '');
+    }
+  }
+
+  // Pipeline nodes
+  const phaseKeys = Object.keys(phases);
+  phaseKeys.forEach((key, i) => {
+    const status = getPhaseStatus(key, i);
+    const phaseNum = i + 1;
+    const nodeEl = document.querySelector(`.pipeline-phase[data-phase="${phaseNum}"] .pipeline-node`);
+    const statusEl = document.getElementById('pipeStatus' + phaseNum);
+    if (nodeEl) {
+      nodeEl.className = 'pipeline-node ' + status;
+      if (status === 'completed') nodeEl.innerHTML = '&#10003;';
+      else nodeEl.textContent = phaseNum;
+    }
+    if (statusEl) {
+      statusEl.className = 'pipeline-phase-status ' + status;
+      statusEl.textContent = statusLabels[status];
+    }
+  });
+
+  // Total
+  const total = getTotalCompletion();
+  document.getElementById('totalPct').innerHTML = total.pct + '<small>%</small>';
+  document.getElementById('totalBarFill').style.width = total.pct + '%';
+  document.getElementById('totalTaskCount').textContent = total.done + ' / ' + total.total + ' tasks';
+}
+
+async function init() {
+  await loadState();
+
+  // Attach click handlers to all checklist items
+  document.querySelectorAll('.checklist li').forEach(li => {
+    li.addEventListener('click', () => {
+      const key = li.dataset.key;
+      state[key] = !state[key];
+      saveState();
+      render();
+    });
+  });
+
+  render();
+
+  // Auto-reload state from JSON every 10 seconds (picks up CLI updates)
+  setInterval(async () => {
+    await loadState();
+    render();
+  }, 10000);
+}
+
+init();
+</script>
+
+</body>
+</html>

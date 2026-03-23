@@ -2242,33 +2242,36 @@ wallConfigs.forEach(wc => {
 });
 
 // ── PHOTO PANORAMA OVERRIDE ──
+// ── PHOTO PANORAMA — replace procedural wall textures with real SF photo ──
 (function loadPhotoPanorama() {
   var texLoader = new THREE.TextureLoader();
   texLoader.load('/assets/environment/sf_panorama.jpg', function(texture) {
     texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
 
-    // Create a large cylinder around the scene for 360-degree backdrop
-    var panoRadius = 400;
-    var panoHeight = 200;
-    var panoGeom = new THREE.CylinderGeometry(panoRadius, panoRadius, panoHeight, 64, 1, true);
-    var panoMat = new THREE.MeshBasicMaterial({
-      map: texture,
-      side: THREE.BackSide,  // render on inside
-      fog: false,
+    // The photo is a ~227-degree panorama. Split it into 4 wall segments.
+    // Each wall gets a UV-offset slice of the full panorama.
+    var facingToUV = {
+      north: { offsetX: 0.0,  scaleX: 0.25 },
+      east:  { offsetX: 0.25, scaleX: 0.25 },
+      south: { offsetX: 0.5,  scaleX: 0.25 },
+      west:  { offsetX: 0.75, scaleX: 0.25 },
+    };
+
+    Object.entries(panPlaneMeshes).forEach(function([facing, mesh]) {
+      var uv = facingToUV[facing];
+      if (!uv) return;
+      // Clone texture with different UV offset for each wall
+      var wallTex = texture.clone();
+      wallTex.needsUpdate = true;
+      wallTex.offset.set(uv.offsetX, 0);
+      wallTex.repeat.set(uv.scaleX, 1);
+      mesh.material.map = wallTex;
+      mesh.material.needsUpdate = true;
     });
-    var panoCylinder = new THREE.Mesh(panoGeom, panoMat);
-    panoCylinder.position.y = panoHeight / 4;  // center vertically
-    panoCylinder.rotation.y = Math.PI;  // rotate so photo aligns with scene
-    scene.add(panoCylinder);
 
-    // Hide the old procedural panorama planes
-    scene.traverse(function(obj) {
-      if (obj.userData && obj.userData.isPanorama) {
-        obj.visible = false;
-      }
-    });
-
-    console.log('Photo panorama loaded');
+    console.log('Photo panorama applied to wall planes');
   }, undefined, function(err) {
     console.warn('Photo panorama failed, keeping procedural');
   });
@@ -4543,16 +4546,16 @@ function createCharacter(color, hairColor, name) {
 
   // ── Per-character style configs (Sims 4 style) ──
   const styles = {
-    claude:    { shirt:0x4a3878, sleeve:'long', pants:0x1a1a2a, shoes:0x1a1010, skin:0xd4a882, hairStyle:'swept', collar:'vneck', gender:'m', eyeColor:0x4488aa, accessory:'scarf', lipColor:0xbb8877 },
+    ensemble:  { shirt:0x4a3878, sleeve:'long', pants:0x1a1a2a, shoes:0x1a1010, skin:0xd4a882, hairStyle:'swept', collar:'vneck', gender:'m', eyeColor:0x4488aa, accessory:'scarf', lipColor:0xbb8877 },
     scanner:   { shirt:0x2a5535, sleeve:'short', pants:0x1a2840, shoes:0x2a2015, skin:0xc49470, hairStyle:'short', collar:'crew', gender:'m', eyeColor:0x556633, accessory:null, lipColor:0x996655 },
     risk:      { shirt:0x8a2828, sleeve:'long', pants:0x151518, shoes:0x1a1a1a, skin:0xd4a882, hairStyle:'crew', collar:'zip', gender:'m', eyeColor:0x443322, accessory:'glasses', lipColor:0xbb8877 },
     tape:      { shirt:0x2a6070, sleeve:'short', pants:0x3a3a3a, shoes:0x252525, skin:0x8d6e4c, hairStyle:'long', collar:'crew', gender:'f', eyeColor:0x332211, accessory:'earrings', lipColor:0xcc6677 },
     jonas:     { shirt:0x7a6828, sleeve:'long', pants:0xc8b898, shoes:0x4a3a2a, skin:0xd4a882, hairStyle:'parted', collar:'button', gender:'m', eyeColor:0x443322, accessory:'watch', lipColor:0xbb8877 },
-    trend:     { shirt:0x2850a8, sleeve:'long', pants:0x252530, shoes:0x1a1a1a, skin:0xd4a882, hairStyle:'messy', collar:'crew', gender:'m', eyeColor:0x334466, accessory:'beanie', lipColor:0xbb8877 },
-    range:     { shirt:0x7a4a88, sleeve:'short', pants:0x252535, shoes:0x2a2025, skin:0xbf9070, hairStyle:'bangs', collar:'vneck', gender:'f', eyeColor:0x445533, accessory:'bracelets', lipColor:0xcc7788 },
-    therapist: { shirt:0x4a7868, sleeve:'long', pants:0x555550, shoes:0x3a3025, skin:0xd4a882, hairStyle:'bun', collar:'crew', gender:'f', eyeColor:0x556644, accessory:'earrings', lipColor:0xcc8877 },
+    executor:  { shirt:0x2850a8, sleeve:'long', pants:0x252530, shoes:0x1a1a1a, skin:0xd4a882, hairStyle:'messy', collar:'crew', gender:'m', eyeColor:0x334466, accessory:'beanie', lipColor:0xbb8877 },
+    strategy:  { shirt:0x7a4a88, sleeve:'short', pants:0x252535, shoes:0x2a2025, skin:0xbf9070, hairStyle:'bangs', collar:'vneck', gender:'f', eyeColor:0x445533, accessory:'bracelets', lipColor:0xcc7788 },
+    ws_feed:   { shirt:0x4a7868, sleeve:'long', pants:0x555550, shoes:0x3a3025, skin:0xd4a882, hairStyle:'bun', collar:'crew', gender:'f', eyeColor:0x556644, accessory:'earrings', lipColor:0xcc8877 },
   };
-  const st = styles[name] || styles.claude;
+  const st = styles[name] || styles.ensemble;
 
   const shirtMat = new THREE.MeshStandardMaterial({color:st.shirt, roughness:0.55, metalness:0.02});
   const pantsMat = new THREE.MeshStandardMaterial({color:st.pants, roughness:0.65});
@@ -6401,7 +6404,7 @@ function generatePostJonasTherapy() {
   }, 3000);
 }
 
-// ── AGENT THERAPY WALKS (agents visit therapist after losses) ──
+// ── AGENT THERAPY WALKS (agents visit ws_feed after losses) ──
 let agentTherapyActive = false;
 let agentTherapyName = null;
 let agentTherapyWalking = false;
@@ -6413,7 +6416,7 @@ let lastTradeCount = 0;
 let lastClosePnl = null;
 
 function triggerAgentTherapy(agentName, reason) {
-  if(agentTherapyActive || claudeWalking || coffeeWalking || facilityWalking) return; // don't overlap
+  if(agentTherapyActive || claudeWalking || reportingWalking || coffeeWalking || facilityWalking) return; // don't overlap
   const ag = charGroups[agentName];
   if(!ag) return;
   agentTherapyActive = true;
@@ -6425,6 +6428,7 @@ function triggerAgentTherapy(agentName, reason) {
   agentTherapyTo = new THREE.Vector3(thPos.x - 0.5, 0, thPos.z - 0.3);
   agentTherapyWalking = true;
   agentTherapyStart = clock.getElapsedTime();
+  switchToWalkAnim(agentName);
 
   // Therapy dialogue after arrival
   setTimeout(()=> {
@@ -6496,6 +6500,7 @@ function triggerAgentTherapy(agentName, reason) {
       agentTherapyWalking = true;
       agentTherapyReturning = true;
       agentTherapyStart = clock.getElapsedTime();
+      switchToWalkAnim(agentName);
     }, 12000);
   }, WALK_DURATION * 1000 + 500);
 }
@@ -6516,6 +6521,7 @@ function updateAgentTherapyWalk(t) {
 
   if(progress >= 1.0) {
     agentTherapyWalking = false;
+    if(agentTherapyName) switchToIdleAnim(agentTherapyName);
     if(agentTherapyReturning) {
       ag.rotation.y = Math.PI; // face desk
       agentTherapyActive = false;
@@ -6560,11 +6566,35 @@ let reportingWalkTo = null;
 let reportingWalkStart = null;
 let reportingReturning = false;
 
+// Switch GLTF model to walk animation if available
+function switchToWalkAnim(name) {
+  var walkingChar = charGroups[name];
+  if (walkingChar && walkingChar.userData && walkingChar.userData.mixer && walkingChar.userData.walkClip) {
+    var walkAction = walkingChar.userData.mixer.clipAction(walkingChar.userData.walkClip);
+    var currentAction = walkingChar.userData.currentAction;
+    if (currentAction) currentAction.fadeOut(0.3);
+    walkAction.reset().fadeIn(0.3).play();
+    walkingChar.userData.currentAction = walkAction;
+  }
+}
+
+// Switch GLTF model back to idle animation if available
+function switchToIdleAnim(name) {
+  var walkingChar = charGroups[name];
+  if (walkingChar && walkingChar.userData && walkingChar.userData.mixer && walkingChar.userData.idleClip) {
+    var idleAction = walkingChar.userData.mixer.clipAction(walkingChar.userData.idleClip);
+    var currentAction = walkingChar.userData.currentAction;
+    if (currentAction) currentAction.fadeOut(0.3);
+    idleAction.reset().fadeIn(0.3).play();
+    walkingChar.userData.currentAction = idleAction;
+  }
+}
+
 function startAgentReport() {
   const target = visitOrder[visitIdx % visitOrder.length];
   visitIdx++;
 
-  // Jonas and therapist: Claude walks to THEM (they outrank or it's private)
+  // Jonas and ws_feed: Claude walks to THEM (they outrank or it's private)
   if(target === 'jonas' || target === 'ws_feed') {
     const tPos = deskPositions[target];
     const cGroup = charGroups['ensemble'];
@@ -6574,6 +6604,7 @@ function startAgentReport() {
     claudeWalking = true;
     claudeWalkStart = clock.getElapsedTime();
     claudeTarget = target;
+    switchToWalkAnim('ensemble');
     return;
   }
 
@@ -6590,6 +6621,7 @@ function startAgentReport() {
   reportingWalkTo = new THREE.Vector3(claudePos.x + sideOffset, 0, claudePos.z + 0.55);
   reportingWalking = true;
   reportingWalkStart = clock.getElapsedTime();
+  switchToWalkAnim(target);
 }
 
 function updateAgentReport(t) {
@@ -6608,6 +6640,7 @@ function updateAgentReport(t) {
 
   if(progress >= 1.0) {
     reportingWalking = false;
+    if(reportingAgent) switchToIdleAnim(reportingAgent);
     if(reportingReturning) {
       ag.rotation.y = Math.PI; // face own desk
       reportingAgent = null;
@@ -6629,6 +6662,7 @@ function updateAgentReport(t) {
         reportingWalking = true;
         reportingReturning = true;
         reportingWalkStart = clock.getElapsedTime();
+        switchToWalkAnim(reportingAgent);
         // Claude turns back to face his desk
         setTimeout(()=> {
           if(cGroup) cGroup.rotation.y = Math.PI;
@@ -6638,7 +6672,7 @@ function updateAgentReport(t) {
   }
 }
 
-// Legacy — Claude still walks for Jonas/therapist visits
+// Legacy — Claude still walks for Jonas/ws_feed visits
 function startClaudeWalk() {
   startAgentReport();
 }
@@ -6649,6 +6683,7 @@ function updateClaudeWalk(t) {
   const progress = Math.min(elapsed / WALK_DURATION, 1.0);
   const ease = progress < 0.5 ? 2*progress*progress : 1-Math.pow(-2*progress+2,2)/2; // ease in-out
   const cGroup = charGroups['ensemble'];
+  if(!cGroup) return;
   cGroup.position.lerpVectors(claudeWalkFrom, claudeWalkTo, ease);
 
   // Face direction of movement
@@ -6659,6 +6694,7 @@ function updateClaudeWalk(t) {
 
   if(progress >= 1.0) {
     claudeWalking = false;
+    switchToIdleAnim('ensemble');
     if(claudeTarget === 'meeting') {
       cGroup.lookAt(CONF_X, cGroup.position.y, CONF_Z);
       generateDialogue('meeting');
@@ -6670,12 +6706,14 @@ function updateClaudeWalk(t) {
         claudeWalking = true;
         claudeWalkStart = clock.getElapsedTime();
         claudeTarget = null;
+        switchToWalkAnim('ensemble');
         const jGroup = charGroups['jonas'];
         const jonasHome = deskPositions['jonas'];
         jGroup.userData.meetingTarget = new THREE.Vector3(jonasHome.x, 0, jonasHome.z + 0.5);
         jGroup.userData.meetingFrom = jGroup.position.clone();
         jGroup.userData.walkingToMeeting = true;
         jGroup.userData.meetingWalkStart = clock.getElapsedTime();
+        switchToWalkAnim('jonas');
       }, MEETING_DURATION);
     } else if(claudeTarget === 'teammeeting') {
       cGroup.lookAt(CONF_X, cGroup.position.y, CONF_Z);
@@ -6689,6 +6727,7 @@ function updateClaudeWalk(t) {
         claudeWalking = true;
         claudeWalkStart = clock.getElapsedTime();
         claudeTarget = null;
+        switchToWalkAnim('ensemble');
         teamMembers.forEach(nm => {
           const ag = charGroups[nm];
           if(!ag) return;
@@ -6697,10 +6736,11 @@ function updateClaudeWalk(t) {
           ag.userData.meetingFrom = ag.position.clone();
           ag.userData.walkingToMeeting = true;
           ag.userData.meetingWalkStart = clock.getElapsedTime();
+          switchToWalkAnim(nm);
         });
       }, TEAM_MEETING_DURATION);
     } else if(claudeTarget === 'ws_feed_postjonas') {
-      // Claude arrived at therapist after Jonas 1:1 — vent session
+      // Claude arrived at ws_feed after Jonas 1:1 — vent session
       const tPos = deskPositions['ws_feed'];
       cGroup.lookAt(tPos.x, cGroup.position.y, tPos.z);
       generatePostJonasTherapy();
@@ -6712,6 +6752,7 @@ function updateClaudeWalk(t) {
         claudeWalking = true;
         claudeWalkStart = clock.getElapsedTime();
         claudeTarget = null;
+        switchToWalkAnim('ensemble');
       }, 10000);
     } else if(claudeTarget) {
       // Face the target's desk
@@ -6729,6 +6770,7 @@ function updateClaudeWalk(t) {
           claudeWalking = true;
           claudeWalkStart = clock.getElapsedTime();
           claudeTarget = 'ws_feed_postjonas';
+          switchToWalkAnim('ensemble');
         }, 8000);
       } else {
         // Return to own desk after 8 seconds
@@ -6739,6 +6781,7 @@ function updateClaudeWalk(t) {
           claudeWalking = true;
           claudeWalkStart = clock.getElapsedTime();
           claudeTarget = null;
+          switchToWalkAnim('ensemble');
         }, 8000);
       }
     }
@@ -7026,6 +7069,7 @@ function animate() {
 
   // Character idle animations
   Object.entries(charGroups).forEach(([name, g]) => {
+    if (g.userData && g.userData.isGLTF) return; // GLTF uses mixer, skip procedural animation
     const head = g.userData.head;
     if(head) {
       head.position.y = 0.88 + Math.sin(t*1.5 + name.length)*0.008;
@@ -7055,7 +7099,8 @@ function animate() {
     }
 
     if(coffeeAgent === name && coffeeWalking) return; // skip seated pose if walking to coffee
-    if(facilityAgent === name && (facilityWalking || !facilityReturning)) return; // skip seated pose if at facility
+    // Skip seated pose while agent is at facility (walking there or staying there, not yet returning)
+    if(facilityAgent === name && (facilityWalking || !facilityReturning)) return;
     if(reportingAgent === name && (reportingWalking || !reportingReturning)) return; // skip seated pose if reporting to Claude
     if(g.userData.walkingToMeeting) return; // skip seated pose if walking to meeting
 
@@ -7112,7 +7157,7 @@ function animate() {
     }
   }
 
-  // Claude walking (only for Jonas/therapist visits)
+  // Claude walking (only for Jonas/ws_feed visits)
   updateClaudeWalk(t);
 
   // Agent reports to Claude's desk
@@ -7127,7 +7172,7 @@ function animate() {
   });
 
   // Jonas-Claude meeting every 30 min
-  if(Date.now() - lastMeeting > MEETING_INTERVAL && !claudeWalking && !inMeeting) {
+  if(Date.now() - lastMeeting > MEETING_INTERVAL && !claudeWalking && !reportingWalking && !coffeeWalking && !facilityWalking && !inMeeting && !inTeamMeeting) {
     lastMeeting = Date.now();
     inMeeting = true;
     meetingStartTime = Date.now();
@@ -7138,16 +7183,18 @@ function animate() {
     claudeWalking = true;
     claudeWalkStart = clock.getElapsedTime();
     claudeTarget = 'meeting';
+    switchToWalkAnim('ensemble');
     // Walk Jonas to conference room
     const jg = charGroups['jonas'];
     jg.userData.meetingTarget = new THREE.Vector3(CONF_X + 0.7, 0, CONF_Z + 0.4);
     jg.userData.meetingFrom = jg.position.clone();
     jg.userData.walkingToMeeting = true;
     jg.userData.meetingWalkStart = clock.getElapsedTime();
+    switchToWalkAnim('jonas');
   }
 
   // Coffee breaks
-  if(Date.now() - lastCoffeeBreak > COFFEE_INTERVAL && !coffeeWalking && !coffeeAgent && !isSleepHours()) {
+  if(Date.now() - lastCoffeeBreak > COFFEE_INTERVAL && !coffeeWalking && !coffeeAgent && !claudeWalking && !reportingWalking && !facilityWalking && !isSleepHours()) {
     lastCoffeeBreak = Date.now();
     coffeeAgent = coffeeAgents[Math.floor(Math.random()*coffeeAgents.length)];
     const ag = charGroups[coffeeAgent];
@@ -7157,6 +7204,7 @@ function animate() {
       coffeeWalking = true;
       coffeeReturning = false;
       coffeeWalkStart = clock.getElapsedTime();
+      switchToWalkAnim(coffeeAgent);
       showBubble(coffeeAgent, 'Coffee time ☕');
     }
   }
@@ -7188,9 +7236,11 @@ function animate() {
       }
       if(progress >= 1.0) {
         coffeeWalking = false;
+        switchToIdleAnim(coffeeAgent);
         if(!coffeeReturning) {
           // Arrived at break room — stay for a bit then return
           showBubble(coffeeAgent, 'Ah, needed this ☕');
+          const returnAgent = coffeeAgent;
           setTimeout(() => {
             const homePos = deskPositions[coffeeAgent];
             coffeeWalkFrom = ag.position.clone();
@@ -7198,6 +7248,7 @@ function animate() {
             coffeeWalking = true;
             coffeeReturning = true;
             coffeeWalkStart = clock.getElapsedTime();
+            switchToWalkAnim(returnAgent);
           }, COFFEE_BREAK_DURATION);
         } else {
           // Back at desk
@@ -7210,13 +7261,14 @@ function animate() {
   }
 
   // Facility visits (agents go downstairs)
-  if(Date.now() - lastFacilityVisit > FACILITY_INTERVAL && !facilityWalking && !teamEventActive && !isSleepHours()) {
+  if(Date.now() - lastFacilityVisit > FACILITY_INTERVAL && !facilityWalking && !claudeWalking && !reportingWalking && !coffeeWalking && !teamEventActive && !isSleepHours()) {
     lastFacilityVisit = Date.now();
     const agent = facilityAgents[Math.floor(Math.random() * facilityAgents.length)];
     if(charGroups[agent] && !charGroups[agent].userData.walkingToMeeting) {
       facilityAgent = agent;
       facilityWalking = true;
       facilityReturning = false;
+      switchToWalkAnim(agent);
       const locKeys = Object.keys(facilityLocations);
       facilityLocation = locKeys[Math.floor(Math.random() * locKeys.length)];
       const loc = facilityLocations[facilityLocation];
@@ -7252,6 +7304,7 @@ function animate() {
         facilityWalking = true;
         facilityReturning = true;
         facilityWalkStart = clock.getElapsedTime();
+        switchToWalkAnim(agent);
       }, FACILITY_DURATION + WALK_DURATION * 1000);
     }
   }
@@ -7273,6 +7326,7 @@ function animate() {
 
       if(progress >= 1.0) {
         facilityWalking = false;
+        switchToIdleAnim(facilityAgent);
         if(facilityReturning) {
           ag.rotation.y = Math.PI;
           facilityAgent = null;
@@ -7283,7 +7337,7 @@ function animate() {
   }
 
   // ── TEAM EVENTS (lunch, drinks, jacuzzi, gym) ──
-  if(Date.now() - lastTeamEvent > TEAM_EVENT_INTERVAL && !teamEventActive && !claudeWalking && !facilityWalking && !inMeeting && !inTeamMeeting && !isSleepHours()) {
+  if(Date.now() - lastTeamEvent > TEAM_EVENT_INTERVAL && !teamEventActive && !claudeWalking && !reportingWalking && !coffeeWalking && !facilityWalking && !inMeeting && !inTeamMeeting && !isSleepHours()) {
     lastTeamEvent = Date.now();
     const event = teamEvents[Math.floor(Math.random() * teamEvents.length)];
     const loc = facilityLocations[event.location];
@@ -7294,6 +7348,7 @@ function animate() {
       teamEventWalkStart = clock.getElapsedTime();
       teamEventAgents = event.agents.filter(a => charGroups[a]);
       teamEventWalking = teamEventAgents.map(() => true);
+      teamEventAgents.forEach(name => switchToWalkAnim(name));
 
       // Announce
       const now2 = new Date();
@@ -7316,6 +7371,7 @@ function animate() {
         teamEventReturning = true;
         teamEventWalkStart = clock.getElapsedTime();
         teamEventWalking = teamEventAgents.map(() => true);
+        teamEventAgents.forEach(name => switchToWalkAnim(name));
         addComm(ts2, `[TEAM] ${event.name} over — everyone heading back`, '#7799aa');
       }, TEAM_EVENT_DURATION + WALK_DURATION * 1500);
     }
@@ -7357,6 +7413,7 @@ function animate() {
 
       if(progress >= 1.0) {
         teamEventWalking[i] = false;
+        switchToIdleAnim(name);
         if(teamEventReturning) {
           ag.rotation.y = Math.PI;
         }
@@ -7374,16 +7431,17 @@ function animate() {
   }
 
   // Team meeting every 1 hour — all 5 walk to conference room
-  if(Date.now() - lastTeamMeeting > TEAM_MEETING_INTERVAL && !claudeWalking && !inMeeting && !inTeamMeeting && !coffeeWalking) {
+  if(Date.now() - lastTeamMeeting > TEAM_MEETING_INTERVAL && !claudeWalking && !reportingWalking && !coffeeWalking && !facilityWalking && !inMeeting && !inTeamMeeting) {
     lastTeamMeeting = Date.now();
     inTeamMeeting = true;
     // Walk Claude
     const cg = charGroups['ensemble'];
     claudeWalkFrom = cg.position.clone();
-    claudeWalkTo = new THREE.Vector3(teamMeetingPositions.claude.x, 0, teamMeetingPositions.claude.z);
+    claudeWalkTo = new THREE.Vector3(teamMeetingPositions.ensemble.x, 0, teamMeetingPositions.ensemble.z);
     claudeWalking = true;
     claudeWalkStart = clock.getElapsedTime();
     claudeTarget = 'teammeeting';
+    switchToWalkAnim('ensemble');
     // Walk all team members
     teamMembers.forEach(name => {
       const ag = charGroups[name];
@@ -7393,6 +7451,7 @@ function animate() {
       ag.userData.meetingFrom = ag.position.clone();
       ag.userData.walkingToMeeting = true;
       ag.userData.meetingWalkStart = clock.getElapsedTime();
+      switchToWalkAnim(name);
     });
     showBubble('ensemble', 'Team meeting everyone. Conference room.');
   }
@@ -7408,13 +7467,13 @@ function animate() {
       const dir = ag.userData.meetingTarget.clone().sub(ag.userData.meetingFrom);
       ag.rotation.y = Math.atan2(dir.x, dir.z);
     }
-    if(progress >= 1.0) ag.userData.walkingToMeeting = false;
+    if(progress >= 1.0) { ag.userData.walkingToMeeting = false; switchToIdleAnim(name); }
   });
 
   // Claude visit schedule — reduced activity during sleep hours
   const sleepActive = isSleepHours();
   const visitInterval = sleepActive ? VISIT_INTERVAL * 4 : VISIT_INTERVAL; // much less frequent at night
-  if(Date.now() - lastVisit > visitInterval && !claudeWalking && !reportingWalking && !inMeeting) {
+  if(Date.now() - lastVisit > visitInterval && !claudeWalking && !reportingWalking && !coffeeWalking && !facilityWalking && !inMeeting && !inTeamMeeting) {
     if(!sleepActive || nightOwls.includes(visitOrder[visitIdx % visitOrder.length])) {
       lastVisit = Date.now();
       startClaudeWalk();
