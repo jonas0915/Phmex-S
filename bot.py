@@ -100,15 +100,23 @@ class Phmex2Bot:
                 strategy_name="confluence",
                 timeframe="5m",
                 max_positions=2,
-                capital_pct=0.5,  # 50% of balance
+                capital_pct=0.4,  # 40% of balance
             ),
             StrategySlot(
                 slot_id="1h_momentum",
                 strategy_name="htf_momentum",
                 timeframe="1h",
                 max_positions=2,
-                capital_pct=0.5,  # 50% of balance
+                capital_pct=0.3,  # 30% of balance
                 paper_mode=True,  # Paper mode first — validate before going live
+            ),
+            StrategySlot(
+                slot_id="5m_mean_revert",
+                strategy_name="bb_reversion",
+                timeframe="5m",
+                max_positions=1,      # conservative — mean reversion is riskier
+                capital_pct=0.3,      # 30% allocation (less than momentum/scalp)
+                paper_mode=True,      # Paper mode first
             ),
         ]
 
