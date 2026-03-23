@@ -173,7 +173,7 @@ class Phmex2Bot:
     def _compute_confidence(self, direction: str, df, ob: dict | None, htf_df=None,
                             cvd_data: dict | None = None, hurst_val: float = 0.5,
                             funding_data: dict | None = None,
-                            strategy: str = "") -> tuple[int, list[str]]:
+                            strategy: str = "", flow: dict | None = None) -> tuple[int, list[str]]:
         """Count independent confirmation layers for the signal direction.
         Returns (count, list_of_confirmed_layers).
         Layers: HTF trend, VWAP position, CVD direction, Hurst regime, Funding rate, OB imbalance."""
@@ -229,7 +229,13 @@ class Phmex2Bot:
             if (is_long and imb > 0.1) or (not is_long and imb < -0.1):
                 confirmed.append("ob_imbalance")
 
-        logger.info(f"[ENSEMBLE] {direction} confidence={len(confirmed)}/{6} layers={','.join(confirmed) or 'none'}")
+        # 7. Order flow — real-time buy/sell aggressor ratio
+        if flow and flow.get("trade_count", 0) > 10:
+            buy_ratio = flow.get("buy_ratio", 0.5)
+            if (is_long and buy_ratio > 0.55) or (not is_long and buy_ratio < 0.45):
+                confirmed.append("order_flow")
+
+        logger.info(f"[ENSEMBLE] {direction} confidence={len(confirmed)}/{7} layers={','.join(confirmed) or 'none'}")
         return len(confirmed), confirmed
 
     def start(self):
@@ -683,8 +689,20 @@ class Phmex2Bot:
             if signal.signal in (Signal.BUY, Signal.SELL):
                 direction = "long" if signal.signal == Signal.BUY else "short"
 
-                # Fetch CVD and funding rate for ensemble confidence
-                cvd_data = self.exchange.get_cvd(symbol)
+                # Get order flow from WS (real-time, no REST call)
+                flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
+
+                # Build cvd_data from order flow (backward compatible with ensemble layer 3)
+                cvd_data = None
+                if flow and flow.get("trade_count", 0) > 0:
+                    cvd_data = {
+                        "cvd": flow.get("cvd", 0),
+                        "cvd_slope": flow.get("cvd_slope", 0),
+                        "divergence": flow.get("divergence"),
+                    }
+                else:
+                    # Fallback to REST CVD when WS trades unavailable
+                    cvd_data = self.exchange.get_cvd(symbol)
                 funding_data = self._fetch_funding_rate(symbol)
                 hurst_val = float(df.iloc[-1].get("hurst", 0.5))
                 if hurst_val != hurst_val:  # NaN check
@@ -701,7 +719,7 @@ class Phmex2Bot:
                 confidence, layers = self._compute_confidence(
                     direction, df, ob, htf_df=htf_df,
                     cvd_data=cvd_data, hurst_val=hurst_val, funding_data=funding_data,
-                    strategy=strat_name
+                    strategy=strat_name, flow=flow
                 )
                 # Strategy-aware confidence thresholds
                 # Start conservative: all at 3. Lower reversion to 2 after proving adverse_exit works.
@@ -722,6 +740,20 @@ class Phmex2Bot:
                         f"too low for {strat_name}, need {min_confidence}+"
                     )
                     continue
+
+                # Order flow extreme veto — block entry if real money strongly disagrees
+                if flow and flow.get("trade_count", 0) > 20:
+                    buy_ratio = flow.get("buy_ratio", 0.5)
+                    if direction == "long" and buy_ratio < 0.30:
+                        logger.info(
+                            f"[FLOW VETO] {symbol} LONG blocked — buy_ratio {buy_ratio:.0%} "
+                            f"({flow.get('trade_count', 0)} trades, sellers dominating)")
+                        continue
+                    if direction == "short" and buy_ratio > 0.70:
+                        logger.info(
+                            f"[FLOW VETO] {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%} "
+                            f"({flow.get('trade_count', 0)} trades, buyers dominating)")
+                        continue
 
                 # Apply funding rate strength modifier
                 if funding_data and funding_data.get("strength_mod"):
