@@ -1,10 +1,12 @@
 import time
+import datetime
 import subprocess
 from collections import deque
 from config import Config
 from exchange import Exchange
 from indicators import add_all_indicators
 from risk_manager import RiskManager
+from strategy_slot import StrategySlot
 from strategies import STRATEGIES, Signal, TradeSignal
 from scanner import scan_top_gainers, volatility_scan, start_background_scan, get_scan_result
 from logger import setup_logger
@@ -90,6 +92,17 @@ class Phmex2Bot:
         self._regime_pause_until: float = 0  # timestamp when regime pause expires
         self._htf_cache: dict[str, tuple] = {}  # symbol -> (DataFrame, fetch_timestamp) for 1h candles
         self._funding_cache: dict[str, tuple] = {}  # symbol -> (data, fetch_timestamp) for funding rates
+
+        # Strategy slots framework — independent trading units (additive, main loop still uses self.risk)
+        self.slots = [
+            StrategySlot(
+                slot_id="5m_scalp",
+                strategy_name="confluence",
+                timeframe="5m",
+                max_positions=2,
+                capital_pct=1.0,  # 100% for now — single slot until 1h momentum is added
+            ),
+        ]
 
     def _fetch_htf_data(self, symbol: str):
         """Fetch 1h candle data with 5-minute cache. Returns indicator-enriched DataFrame or None."""
@@ -690,9 +703,8 @@ class Phmex2Bot:
                 margin = self.risk.calculate_kelly_margin(available, confidence=confidence)
 
                 # Weekend sizing boost: +85-92% weekend returns (p < 0.001)
-                import datetime
                 if datetime.datetime.utcnow().weekday() in (5, 6):  # Saturday=5, Sunday=6
-                    margin = min(margin * 1.3, 10.0)
+                    margin = min(margin * 1.3, 10.0)  # cap at $10 (MAX_TRADE_MARGIN)
 
                 if margin > available:
                     logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {available:.2f}")

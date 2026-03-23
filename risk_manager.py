@@ -218,7 +218,8 @@ class Position:
 
 
 class RiskManager:
-    def __init__(self):
+    def __init__(self, state_file: str = None):
+        self.state_file = os.path.join(os.path.dirname(__file__), state_file or "trading_state.json")
         self.positions: dict[str, Position] = {}
         self.initial_balance: float = 0.0
         self.peak_balance: float = 0.0
@@ -228,9 +229,9 @@ class RiskManager:
         self._load_state()
 
     def _load_state(self):
-        if os.path.exists(PERSISTENCE_FILE):
+        if os.path.exists(self.state_file):
             try:
-                with open(PERSISTENCE_FILE) as f:
+                with open(self.state_file) as f:
                     data = json.load(f)
                 self.peak_balance = data.get("peak_balance", 0.0)
                 self.closed_trades = data.get("closed_trades", [])
@@ -241,7 +242,7 @@ class RiskManager:
 
     def _save_state(self):
         try:
-            with open(PERSISTENCE_FILE, "w") as f:
+            with open(self.state_file, "w") as f:
                 json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades, "trade_results": self.trade_results}, f)
         except Exception as e:
             logger.warning(f"Could not save state: {e}")
@@ -368,6 +369,22 @@ class RiskManager:
 
         logger.info(f"[KELLY] f*={kelly:.4f} fKelly={f_kelly:.4f} conf={confidence} mult={conf_mult} → ${margin:.2f}")
         return margin
+
+    def calculate_kelly_raw(self) -> float:
+        """Return raw Kelly criterion value. Negative = no edge."""
+        trades = self.closed_trades
+        if len(trades) < 20:
+            return 0.0
+        wins = [t for t in trades if t.get("pnl_usdt", 0) > 0]
+        losses = [t for t in trades if t.get("pnl_usdt", 0) <= 0]
+        if not wins or not losses:
+            return 0.0
+        wr = len(wins) / len(trades)
+        avg_win = sum(t["pnl_usdt"] for t in wins) / len(wins)
+        avg_loss = abs(sum(t["pnl_usdt"] for t in losses) / len(losses))
+        if avg_win == 0:
+            return 0.0
+        return (wr * avg_win - (1 - wr) * avg_loss) / avg_win
 
     def open_position(self, symbol: str, entry_price: float, margin: float, side: str, atr: float = 0.0, regime: str = "medium", cycle: int = 0, strategy: str = "") -> Position:
         coin_amount = (margin * Config.LEVERAGE) / entry_price
