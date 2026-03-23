@@ -223,21 +223,23 @@ class WSDataFeed:
                 backoff = min(backoff * 2, 60)
 
     def _archive_candle(self, symbol: str):
-        """Archive current candle's delta to CVD running total, reset for new candle."""
-        flow = self._order_flow.get(symbol, {})
-        delta = flow.get("delta", 0)
-        self._cvd_total[symbol] = self._cvd_total.get(symbol, 0) + delta
-        self._candle_deltas.setdefault(
-            symbol, collections.deque(maxlen=10)
-        ).append(delta)
-        self._order_flow[symbol] = {
-            "buy_volume": 0, "sell_volume": 0, "buy_ratio": 0.5,
-            "delta": 0, "cvd": self._cvd_total[symbol],
-            "cvd_slope": 0, "divergence": None,
-            "large_trade_count": 0, "large_trade_bias": 0.5,
-            "trade_count": 0, "updated_at": 0,
-        }
-        self._trade_buffer[symbol] = []
+        """Archive current candle's delta to CVD running total, reset for new candle.
+        Must hold self._lock or be called from within a locked context."""
+        with self._lock:
+            flow = self._order_flow.get(symbol, {})
+            delta = flow.get("delta", 0)
+            self._cvd_total[symbol] = self._cvd_total.get(symbol, 0) + delta
+            self._candle_deltas.setdefault(
+                symbol, collections.deque(maxlen=10)
+            ).append(delta)
+            self._order_flow[symbol] = {
+                "buy_volume": 0, "sell_volume": 0, "buy_ratio": 0.5,
+                "delta": 0, "cvd": self._cvd_total[symbol],
+                "cvd_slope": 0, "divergence": None,
+                "large_trade_count": 0, "large_trade_bias": 0.5,
+                "trade_count": 0, "updated_at": 0,
+            }
+            self._trade_buffer[symbol] = []
 
     async def _watch_trades(self, symbol: str):
         """Stream individual trades, aggregate into per-candle order flow stats."""
