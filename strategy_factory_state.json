@@ -1,0 +1,96 @@
+{
+  "strategies": {
+    "confluence": {
+      "name": "confluence",
+      "hypothesis": "5m multi-timeframe confluence scalping with ensemble confidence gate",
+      "timeframe": "5m",
+      "stage": "live",
+      "created": "2026-03-22T18:12:53.766983",
+      "promoted": null,
+      "killed": null,
+      "kill_reason": null,
+      "backtest_results": null,
+      "paper_results": null,
+      "live_results": null
+    },
+    "htf_momentum": {
+      "name": "htf_momentum",
+      "hypothesis": "1h trend-following momentum with pullback entry (ADX>25, EMA cross, MACD expanding)",
+      "timeframe": "1h",
+      "stage": "paper",
+      "created": "2026-03-22T18:12:53.794427",
+      "promoted": null,
+      "killed": null,
+      "kill_reason": null,
+      "backtest_results": null,
+      "paper_results": null,
+      "live_results": null
+    },
+    "bb_reversion": {
+      "name": "bb_reversion",
+      "hypothesis": "5m BB mean reversion in ranging conditions (ADX<25, Hurst<0.50)",
+      "timeframe": "5m",
+      "stage": "paper",
+      "created": "2026-03-22T18:12:53.815268",
+      "promoted": null,
+      "killed": null,
+      "kill_reason": null,
+      "backtest_results": null,
+      "paper_results": null,
+      "live_results": null
+    },
+    "liq_cascade": {
+      "name": "liq_cascade",
+      "hypothesis": "5m liquidation cascade proxy - volume spike + strong directional candle",
+      "timeframe": "5m",
+      "stage": "paper",
+      "created": "2026-03-22T18:12:53.841869",
+      "promoted": null,
+      "killed": null,
+      "kill_reason": null,
+      "backtest_results": null,
+      "paper_results": null,
+      "live_results": null
+    },
+    "funding_contrarian": {
+      "name": "funding_contrarian",
+      "hypothesis": "Funding rate contrarian - extreme funding predicts reversals",
+      "timeframe": "8h",
+      "stage": "paper",
+      "created": "2026-03-22T18:12:53.860487",
+      "promoted": null,
+      "killed": null,
+      "kill_reason": null,
+      "backtest_results": null,
+      "paper_results": null,
+      "live_results": null
+    }
+  },
+  "pipeline_log": [
+    {
+      "time": "2026-03-22T18:12:53.766993",
+      "strategy": "confluence",
+      "event": "Registered \u2014 stage: hypothesis"
+    },
+    {
+      "time": "2026-03-22T18:12:53.794437",
+      "strategy": "htf_momentum",
+      "event": "Registered \u2014 stage: hypothesis"
+    },
+    {
+      "time": "2026-03-22T18:12:53.815276",
+      "strategy": "bb_reversion",
+      "event": "Registered \u2014 stage: hypothesis"
+    },
+    {
+      "time": "2026-03-22T18:12:53.841880",
+      "strategy": "liq_cascade",
+      "event": "Registered \u2014 stage: hypothesis"
+    },
+    {
+      "time": "2026-03-22T18:12:53.860492",
+      "strategy": "funding_contrarian",
+      "event": "Registered \u2014 stage: hypothesis"
+    }
+  ]
+}
