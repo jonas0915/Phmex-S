@@ -100,7 +100,15 @@ class Phmex2Bot:
                 strategy_name="confluence",
                 timeframe="5m",
                 max_positions=2,
-                capital_pct=1.0,  # 100% for now — single slot until 1h momentum is added
+                capital_pct=0.5,  # 50% of balance
+            ),
+            StrategySlot(
+                slot_id="1h_momentum",
+                strategy_name="htf_momentum",
+                timeframe="1h",
+                max_positions=2,
+                capital_pct=0.5,  # 50% of balance
+                paper_mode=True,  # Paper mode first — validate before going live
             ),
         ]
 
@@ -734,6 +742,13 @@ class Phmex2Bot:
 
         if self.cycle_count % 10 == 0:
             self.risk.print_stats(real_balance)
+
+        # Log slot status
+        for slot in self.slots:
+            s = slot.stats_summary()
+            mode = "PAPER" if slot.paper_mode else "LIVE"
+            status = "KILLED" if slot.is_killed else "ACTIVE" if slot.is_active else "DISABLED"
+            logger.info(f"[SLOT] {slot.slot_id} ({mode}/{status}) | {s['trades']} trades | WR: {s['wr']}% | PnL: ${s['pnl']}")
 
     def _set_cooldown_if_loss(self, symbol: str, pnl_pct: float):
         """Set cooldown on a pair after loss: 2 min per loss, 10 min after 3 consecutive.
