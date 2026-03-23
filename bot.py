@@ -717,6 +717,20 @@ class Phmex2Bot:
                 if margin > available:
                     logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {available:.2f}")
                     continue
+
+                # Check if margin meets exchange minimum for this symbol
+                try:
+                    market = self.exchange.client.market(symbol)
+                    min_amount = market.get('limits', {}).get('amount', {}).get('min', 0)
+                    if min_amount and price > 0:
+                        min_notional = min_amount * price
+                        min_margin_needed = min_notional / Config.LEVERAGE
+                        if margin < min_margin_needed:
+                            logger.debug(f"[SKIP] {symbol} — margin ${margin:.2f} < min ${min_margin_needed:.2f} for {min_amount} qty")
+                            continue
+                except Exception:
+                    pass  # If check fails, let the order attempt proceed
+
                 order = self.exchange.open_long(symbol, margin, price) if direction == "long" else self.exchange.open_short(symbol, margin, price)
                 if order:
                     fill_price = self._extract_fill_price(order, price)
