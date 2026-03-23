@@ -993,6 +993,102 @@ def confluence_strategy(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.Dat
     return max(active, key=lambda s: s.strength)
 
 
+def htf_momentum_strategy(df, ob, htf_df=None):
+    """1h momentum strategy — trend-following with pullback entry.
+    Research: 1h is the only consistently positive Sharpe timeframe in WFO studies.
+    Momentum dominates at 1h+ horizons (Rob Carver, AdaptiveTrend study).
+
+    Entry: 4 core conditions (simple to avoid over-fitting):
+    1. ADX > 25 (confirmed trend)
+    2. EMA-21 > EMA-50 for longs (< for shorts)
+    3. MACD histogram expanding
+    4. Pullback to EMA-21 (within 0.5% of EMA-21)
+
+    Optional boosters:
+    - Volume > 1.2x → +0.05 strength
+    """
+    if len(df) < 50:
+        return TradeSignal(Signal.HOLD, "Insufficient data", 0)
+
+    last = df.iloc[-1]
+    prev = df.iloc[-2]
+
+    # Core indicators
+    adx = last.get("adx", 0)
+    ema_21 = last.get("ema_21", 0)
+    ema_50 = last.get("ema_50", 0)
+    macd_hist = last.get("macd_hist", 0)
+    prev_macd_hist = prev.get("macd_hist", 0)
+    close = last.get("close", 0)
+    volume = last.get("volume", 0)
+
+    if not all([adx, ema_21, ema_50, close]):
+        return TradeSignal(Signal.HOLD, "Missing indicators", 0)
+
+    # Volume average (20-period)
+    vol_avg = df["volume"].iloc[-20:].mean() if len(df) >= 20 else volume
+    vol_ratio = volume / vol_avg if vol_avg > 0 else 0
+
+    # Condition 1: ADX > 25 (confirmed trend)
+    if adx <= 25:
+        _log.debug(f"htf_momentum: ADX {adx:.1f} <= 25 — no trend")
+        return TradeSignal(Signal.HOLD, f"htf_momentum: ADX {adx:.1f} too low", 0)
+
+    # Condition 2: EMA alignment determines direction
+    direction = None
+    if ema_21 > ema_50:
+        direction = Signal.BUY
+    elif ema_21 < ema_50:
+        direction = Signal.SELL
+    else:
+        return TradeSignal(Signal.HOLD, "htf_momentum: EMAs flat", 0)
+
+    # Condition 3: MACD histogram expanding in direction
+    if direction == Signal.BUY:
+        macd_expanding = macd_hist > prev_macd_hist and macd_hist > 0
+    else:
+        macd_expanding = macd_hist < prev_macd_hist and macd_hist < 0
+
+    if not macd_expanding:
+        side_str = "long" if direction == Signal.BUY else "short"
+        _log.debug(f"htf_momentum: {side_str} MACD not expanding (hist={macd_hist:.4f} prev={prev_macd_hist:.4f})")
+        return TradeSignal(Signal.HOLD, "htf_momentum: MACD not expanding", 0)
+
+    # Condition 4: Pullback to EMA-21 (within 0.5% of EMA-21)
+    ema_distance_pct = abs(close - ema_21) / ema_21 * 100 if ema_21 > 0 else 999
+
+    if direction == Signal.BUY:
+        # Price should be near or slightly below EMA-21 (pullback)
+        pullback = close <= ema_21 * 1.005  # within 0.5% above EMA-21
+    else:
+        # Price should be near or slightly above EMA-21
+        pullback = close >= ema_21 * 0.995  # within 0.5% below EMA-21
+
+    if not pullback:
+        _log.debug(f"htf_momentum: price {ema_distance_pct:.2f}% from EMA-21 — too far for pullback entry")
+        return TradeSignal(Signal.HOLD, f"htf_momentum: no pullback (dist={ema_distance_pct:.1f}%)", 0)
+
+    # All 4 conditions met — calculate strength
+    strength = 0.80
+
+    # Volume booster
+    if vol_ratio > 1.2:
+        strength += 0.05
+
+    # ADX strength bonus
+    if adx > 35:
+        strength += 0.03
+    if adx > 45:
+        strength += 0.02
+
+    strength = min(strength, 0.95)
+
+    side_str = "long" if direction == Signal.BUY else "short"
+    reason = f"htf_momentum: {side_str} ADX={adx:.0f} MACD expanding vol={vol_ratio:.1f}x"
+
+    return TradeSignal(direction, reason, strength)
+
+
 STRATEGIES = {
     "trend_scalp":              trend_scalp_strategy,
     "trend_pullback":           trend_pullback_strategy,
@@ -1002,4 +1098,5 @@ STRATEGIES = {
     "vwap_reversion":           vwap_reversion_strategy,
     "adaptive":                 adaptive_strategy,
     "confluence":               confluence_strategy,
+    "htf_momentum":             htf_momentum_strategy,
 }
