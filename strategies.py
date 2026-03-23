@@ -752,8 +752,8 @@ def htf_confluence_pullback(df: pd.DataFrame, orderbook: dict = None, htf_df: pd
         return TradeSignal(Signal.HOLD, f"confluence_pullback: 1h ADX {htf_adx:.1f} < 20", 0.0)
 
     # Volume gate
-    if vol_avg <= 0 or volume < vol_avg * 1.3:
-        return TradeSignal(Signal.HOLD, f"confluence_pullback: vol {volume/max(vol_avg,1e-10):.2f}x < 1.3x", 0.0)
+    if vol_avg <= 0 or volume < vol_avg * 0.8:
+        return TradeSignal(Signal.HOLD, f"confluence_pullback: vol {volume/max(vol_avg,1e-10):.2f}x < 0.8x", 0.0)
 
     if vwap <= 0 or pd.isna(vwap):
         return TradeSignal(Signal.HOLD, "confluence_pullback: no VWAP", 0.0)
@@ -876,8 +876,8 @@ def htf_confluence_vwap(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.Dat
     vwap_dist_pct = (close - vwap) / vwap * 100
 
     # Volume gate
-    if vol_avg <= 0 or volume < vol_avg * 1.0:
-        return TradeSignal(Signal.HOLD, f"confluence_vwap: vol {volume/max(vol_avg,1e-10):.2f}x < 1.0x", 0.0)
+    if vol_avg <= 0 or volume < vol_avg * 0.7:
+        return TradeSignal(Signal.HOLD, f"confluence_vwap: vol {volume/max(vol_avg,1e-10):.2f}x < 0.7x", 0.0)
 
     direction = None
 
