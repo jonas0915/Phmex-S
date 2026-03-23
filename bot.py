@@ -35,6 +35,8 @@ def _extract_strategy_name(reason: str) -> str:
         return "htf_confluence_pullback"
     if "confluence vwap" in r:
         return "htf_confluence_vwap"
+    if "liq_cascade" in r:
+        return "liq_cascade"
     return ""
 
 
@@ -117,6 +119,14 @@ class Phmex2Bot:
                 max_positions=1,      # conservative — mean reversion is riskier
                 capital_pct=0.3,      # 30% allocation (less than momentum/scalp)
                 paper_mode=True,      # Paper mode first
+            ),
+            StrategySlot(
+                slot_id="5m_liq_cascade",
+                strategy_name="liq_cascade",
+                timeframe="5m",
+                max_positions=1,
+                capital_pct=0.0,  # 0% for now — paper only
+                paper_mode=True,
             ),
         ]
 

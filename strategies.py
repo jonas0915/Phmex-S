@@ -1089,6 +1089,87 @@ def htf_momentum_strategy(df, ob, htf_df=None):
     return TradeSignal(direction, reason, strength)
 
 
+def liquidation_cascade_strategy(df, ob, htf_df=None):
+    """Liquidation cascade proxy strategy.
+    Uses volume spike + strong momentum + extreme RSI as proxies for
+    liquidation cascades in progress.
+
+    Research: Liquidation cascades are structural — forced selling/buying
+    accelerates price in the cascade direction. Oct 2025: $19B OI erased in 36h.
+
+    Entry: Ride the cascade (momentum), not fade it.
+    - Massive volume spike (>2.5x average) = liquidations happening
+    - Strong directional candle (body > 70% of range)
+    - RSI extreme (>75 or <25) = momentum, not reversal here
+    - ADX > 30 = confirmed strong move
+    """
+    if len(df) < 50:
+        return TradeSignal(Signal.HOLD, "Insufficient data", 0)
+
+    last = df.iloc[-1]
+    prev = df.iloc[-2]
+
+    close = last.get("close", 0)
+    open_price = last.get("open", 0)
+    high = last.get("high", 0)
+    low = last.get("low", 0)
+    volume = last.get("volume", 0)
+    rsi = last.get("rsi", 50)
+    adx = last.get("adx", 0)
+
+    if not all([close, open_price, high, low]):
+        return TradeSignal(Signal.HOLD, "Missing data", 0)
+
+    # Volume average (20-period)
+    vol_avg = df["volume"].iloc[-20:].mean() if len(df) >= 20 else volume
+    vol_ratio = volume / vol_avg if vol_avg > 0 else 0
+
+    # Condition 1: Massive volume spike (liquidations in progress)
+    if vol_ratio < 2.5:
+        return TradeSignal(Signal.HOLD, f"liq_cascade: vol {vol_ratio:.1f}x < 2.5x", 0)
+
+    # Condition 2: Strong directional candle (body > 70% of range)
+    candle_range = high - low
+    if candle_range == 0:
+        return TradeSignal(Signal.HOLD, "liq_cascade: zero range candle", 0)
+    body = abs(close - open_price)
+    body_ratio = body / candle_range
+    if body_ratio < 0.7:
+        return TradeSignal(Signal.HOLD, f"liq_cascade: weak body {body_ratio:.0%}", 0)
+
+    # Condition 3: ADX confirms strong move
+    if adx < 30:
+        return TradeSignal(Signal.HOLD, f"liq_cascade: ADX {adx:.0f} < 30", 0)
+
+    # Direction: follow the cascade (momentum, not reversal)
+    if close > open_price:
+        direction = Signal.BUY  # Bullish cascade — shorts getting liquidated
+    else:
+        direction = Signal.SELL  # Bearish cascade — longs getting liquidated
+
+    # Condition 4: RSI confirms momentum (NOT overbought/oversold reversal)
+    if direction == Signal.BUY and rsi < 55:
+        return TradeSignal(Signal.HOLD, f"liq_cascade: long but RSI {rsi:.0f} < 55", 0)
+    if direction == Signal.SELL and rsi > 45:
+        return TradeSignal(Signal.HOLD, f"liq_cascade: short but RSI {rsi:.0f} > 45", 0)
+
+    # Strength based on volume intensity
+    strength = 0.82
+    if vol_ratio > 3.5:
+        strength += 0.05
+    if vol_ratio > 5.0:
+        strength += 0.05
+    if adx > 40:
+        strength += 0.03
+    strength = min(strength, 0.95)
+
+    side_str = "long" if direction == Signal.BUY else "short"
+    reason = f"liq_cascade: {side_str} vol={vol_ratio:.1f}x body={body_ratio:.0%} ADX={adx:.0f} RSI={rsi:.0f}"
+
+    _log.debug(f"[SIGNAL] {reason} | strength={strength:.2f}")
+    return TradeSignal(direction, reason, strength)
+
+
 STRATEGIES = {
     "trend_scalp":              trend_scalp_strategy,
     "trend_pullback":           trend_pullback_strategy,
@@ -1099,4 +1180,5 @@ STRATEGIES = {
     "adaptive":                 adaptive_strategy,
     "confluence":               confluence_strategy,
     "htf_momentum":             htf_momentum_strategy,
+    "liq_cascade":              liquidation_cascade_strategy,
 }
