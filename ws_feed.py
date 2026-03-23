@@ -3,6 +3,7 @@ WebSocket data feed for Phemex — streams OHLCV candles via ccxt.pro.
 Replaces REST polling of /md/ CDN endpoints to avoid IP bans.
 """
 import asyncio
+import collections
 import threading
 import time as _time
 import pandas as pd
@@ -34,6 +35,11 @@ class WSDataFeed:
         self._exchange = None
         self._running = False
         self._ready = threading.Event()  # set when ALL symbols have initial data
+        self._trade_buffer: dict[str, list] = {}
+        self._order_flow: dict[str, dict] = {}
+        self._current_candle_start: dict[str, int] = {}
+        self._candle_deltas: dict[str, collections.deque] = {}
+        self._cvd_total: dict[str, float] = {}
 
     # ── Public interface ──────────────────────────────────────────────────────
 
@@ -102,6 +108,7 @@ class WSDataFeed:
         if self._loop and not self._loop.is_closed():
             for sym in new:
                 asyncio.run_coroutine_threadsafe(self._watch_symbol(sym), self._loop)
+                asyncio.run_coroutine_threadsafe(self._watch_trades(sym), self._loop)
             logger.info(f"[WS] Subscribed to {len(new)} new symbol(s): {new}")
 
     def stop(self):
@@ -143,6 +150,12 @@ class WSDataFeed:
             return True
         return (_time.time() - last) > max_age_s
 
+    def get_order_flow(self, symbol: str) -> dict | None:
+        """Get current candle's order flow stats for a symbol."""
+        with self._lock:
+            flow = self._order_flow.get(symbol)
+            return dict(flow) if flow else None
+
     # ── Internal ──────────────────────────────────────────────────────────────
 
     def _run_loop(self):
@@ -170,7 +183,10 @@ class WSDataFeed:
 
         self._exchange = ccxtpro.phemex(params)
         try:
-            tasks = [self._watch_symbol(sym) for sym in self.symbols]
+            tasks = []
+            for sym in self.symbols:
+                tasks.append(self._watch_symbol(sym))
+                tasks.append(self._watch_trades(sym))
             await asyncio.gather(*tasks)
         finally:
             await self._close_exchange()
@@ -203,6 +219,97 @@ class WSDataFeed:
                 if not self._running:
                     break
                 logger.warning(f"[WS] {symbol} error, retrying in {backoff}s: {str(e)[:120]}")
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+
+    def _archive_candle(self, symbol: str):
+        """Archive current candle's delta to CVD running total, reset for new candle."""
+        flow = self._order_flow.get(symbol, {})
+        delta = flow.get("delta", 0)
+        self._cvd_total[symbol] = self._cvd_total.get(symbol, 0) + delta
+        self._candle_deltas.setdefault(
+            symbol, collections.deque(maxlen=10)
+        ).append(delta)
+        self._order_flow[symbol] = {
+            "buy_volume": 0, "sell_volume": 0, "buy_ratio": 0.5,
+            "delta": 0, "cvd": self._cvd_total[symbol],
+            "cvd_slope": 0, "divergence": None,
+            "large_trade_count": 0, "large_trade_bias": 0.5,
+            "trade_count": 0, "updated_at": 0,
+        }
+        self._trade_buffer[symbol] = []
+
+    async def _watch_trades(self, symbol: str):
+        """Stream individual trades, aggregate into per-candle order flow stats."""
+        backoff = 2
+        while self._running:
+            try:
+                trades = await self._exchange.watch_trades(symbol)
+                batch_buy = 0.0
+                batch_sell = 0.0
+                batch_count = 0
+
+                for trade in trades:
+                    cost = trade.get("cost", 0) or (
+                        trade.get("amount", 0) * trade.get("price", 0))
+                    ts = trade.get("timestamp", 0)
+
+                    candle_start = (ts // 300_000) * 300_000
+                    current = self._current_candle_start.get(symbol, 0)
+                    if candle_start != current and current != 0:
+                        self._archive_candle(symbol)
+                    self._current_candle_start[symbol] = candle_start
+
+                    if trade.get("side") == "buy":
+                        batch_buy += cost
+                    else:
+                        batch_sell += cost
+                    batch_count += 1
+
+                with self._lock:
+                    flow = self._order_flow.setdefault(symbol, {
+                        "buy_volume": 0, "sell_volume": 0, "buy_ratio": 0.5,
+                        "delta": 0, "cvd": 0, "cvd_slope": 0, "divergence": None,
+                        "large_trade_count": 0, "large_trade_bias": 0.5,
+                        "trade_count": 0, "updated_at": 0,
+                    })
+                    flow["buy_volume"] += batch_buy
+                    flow["sell_volume"] += batch_sell
+                    flow["trade_count"] += batch_count
+                    total = flow["buy_volume"] + flow["sell_volume"]
+                    flow["buy_ratio"] = flow["buy_volume"] / total if total > 0 else 0.5
+                    flow["delta"] = flow["buy_volume"] - flow["sell_volume"]
+                    flow["cvd"] = self._cvd_total.get(symbol, 0) + flow["delta"]
+                    flow["updated_at"] = _time.time()
+
+                    deltas = self._candle_deltas.get(symbol, collections.deque(maxlen=10))
+                    if len(deltas) >= 2:
+                        half = len(deltas) // 2
+                        d_list = list(deltas)
+                        flow["cvd_slope"] = sum(d_list[half:]) - sum(d_list[:half])
+                    else:
+                        flow["cvd_slope"] = flow["delta"]
+
+                    candles = self._cache.get(symbol, [])
+                    if len(candles) >= 2:
+                        price_dir = candles[-1][4] - candles[-2][4]
+                        cvd_dir = flow["cvd_slope"]
+                        if price_dir < 0 and cvd_dir > 0:
+                            flow["divergence"] = "bullish"
+                        elif price_dir > 0 and cvd_dir < 0:
+                            flow["divergence"] = "bearish"
+                        else:
+                            flow["divergence"] = None
+                    else:
+                        flow["divergence"] = None
+
+                backoff = 2
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                if not self._running:
+                    break
+                logger.warning(f"[WS] Trade stream error for {symbol}: {e}")
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 60)
 
