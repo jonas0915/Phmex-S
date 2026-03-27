@@ -97,3 +97,24 @@ def notify_shutdown(open_positions: list, balance: float):
         f"Open positions: {pos_str}\n"
         f"Balance: ${balance:.2f} USDT"
     )
+
+def notify_paper_entry(symbol: str, side: str, price: float, margin: float, strength: float, reason: str):
+    emoji = "🔵" if side == "long" else "🟣"
+    direction = "LONG" if side == "long" else "SHORT"
+    send(
+        f"{emoji} <b>[PAPER] {direction} ENTRY — {symbol}</b>  [{BOT_NAME}]\n"
+        f"Price:    ${price:.4f}\n"
+        f"Margin:   ${margin:.2f} USDT (simulated)\n"
+        f"Strength: {strength:.2f}\n"
+        f"Reason:   {reason}"
+    )
+
+def notify_paper_exit(symbol: str, side: str, entry: float, exit_price: float, pnl: float, pnl_pct: float, reason: str):
+    emoji = "🔷" if pnl >= 0 else "🔶"
+    sign = "+" if pnl >= 0 else ""
+    send(
+        f"{emoji} <b>[PAPER] EXIT — {symbol}</b>  [{BOT_NAME}]\n"
+        f"Entry: ${entry:.4f}  →  Exit: ${exit_price:.4f}\n"
+        f"PnL:   <b>{sign}${pnl:.2f} USDT ({sign}{pnl_pct:.1f}%)</b>\n"
+        f"Reason: {reason}"
+    )

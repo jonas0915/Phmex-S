@@ -14,6 +14,15 @@ import subprocess
 import threading
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+CA_TZ = ZoneInfo("America/Los_Angeles")
+
+def _now_ca():
+    return datetime.now(CA_TZ)
+
+def _from_ts(ts):
+    return datetime.fromtimestamp(ts, CA_TZ)
 from collections import defaultdict
 from html import escape
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -25,6 +34,7 @@ import matplotlib.dates as mdates
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
+PAPER_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_sma_vwap.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
 HOST = "0.0.0.0"
 PORT = 8050
@@ -43,6 +53,15 @@ def strip_ansi(text: str) -> str:
 def read_state() -> dict:
     try:
         with open(STATE_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {"peak_balance": 0, "closed_trades": []}
+
+
+def read_paper_state() -> dict:
+    """Read paper slot state file. Returns empty structure if missing."""
+    try:
+        with open(PAPER_STATE_FILE, "r") as f:
             return json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         return {"peak_balance": 0, "closed_trades": []}
@@ -204,7 +223,7 @@ def build_audit_table(trades: list[dict]) -> str:
         reason = t.get("reason", "unknown")
         side = t.get("side", "?").upper()
         closed_at = t.get("closed_at", 0)
-        hour = datetime.fromtimestamp(closed_at).strftime("%H:00") if closed_at > 0 else "??"
+        hour = _from_ts(closed_at).strftime("%H:00") if closed_at > 0 else "??"
         is_win = pnl > 0
 
         for key, bucket in [(sym, pair_stats), (strat, strat_stats), (reason, exit_stats), (side, side_stats), (hour, hourly_stats)]:
@@ -252,7 +271,7 @@ def build_audit_table(trades: list[dict]) -> str:
         side_cls = "side-long" if side == "LONG" else "side-short"
         closed_at = t.get("closed_at", 0)
         opened_at = t.get("opened_at", 0)
-        time_str = datetime.fromtimestamp(closed_at).strftime("%m/%d %I:%M%p").lower() if closed_at > 0 else "--"
+        time_str = _from_ts(closed_at).strftime("%m/%d %I:%M%p").lower() if closed_at > 0 else "--"
         duration = ""
         if closed_at > 0 and opened_at > 0:
             dur_min = (closed_at - opened_at) / 60
@@ -306,6 +325,7 @@ def build_audit_table(trades: list[dict]) -> str:
             <div style="margin-bottom:6px"><span style="color:var(--positive);font-weight:600">early_exit</span> — Momentum reversal while in profit (ROI &ge; 3%). Needs 2-of-3 reversal signals, or 1-of-3 at 8%+ ROI.</div>
             <div style="margin-bottom:6px"><span style="color:var(--accent-blue);font-weight:600">flat_exit</span> — Stagnant trade after 4 hrs. Exits if ROI is between -4% and +4%. Catches trades going nowhere.</div>
             <div style="margin-bottom:6px"><span style="color:var(--accent-cyan);font-weight:600">exchange_close</span> — SL or TP triggered on the exchange itself. Bot detects position is gone and records it.</div>
+            <div style="margin-bottom:6px"><span style="color:#fab387;font-weight:600">adverse_exit</span> — Trade going wrong direction after hold period. Cuts losses early (at ~-5% ROI) before reaching SL or time exit.</div>
             <div style="margin-bottom:6px"><span style="color:var(--warning);font-weight:600">stop_loss</span> — Software SL fallback. Trailing stop or breakeven SL triggered by the bot&#39;s own price checks.</div>
             <div style="margin-bottom:6px"><span style="color:var(--positive);font-weight:600">take_profit</span> — Software TP triggered by bot. Rarely fires — early_exit usually catches profits first.</div>
             <div style="margin-bottom:6px"><span style="color:var(--negative);font-weight:600">time_exit</span> — Soft clock limit (15-45 min by strategy). Exits if losing at soft limit. Deep losses (&lt; -6%) cut at half soft limit.</div>
@@ -374,6 +394,282 @@ def compute_stats(trades: list[dict]) -> dict:
         "profit_factor": gp / gl if gl > 0 else float('inf'),
         "best": best, "worst": worst, "max_dd": max_dd, "max_dd_pct": max_dd_pct,
     }
+
+
+def _build_session_card(trades: list[dict], paper_trades: list[dict], balance: float = 0, balance_start: float = 0, balance_mar25: float = 0, balance_first: float = 0) -> str:
+    """Build SESSION PERFORMANCE card with 3 columns: LIVE, V10, PAPER per session."""
+    SESSION_DEFS = [
+        ("Early AM", "earlyam", 0, 6, "&#127747;", "#cba6f7"),          # purple, pre-dawn
+        ("Morning", "morning", 6, 12, "&#9728;&#65039;", "#a6e3a1"),    # sun, green
+        ("Afternoon", "afternoon", 12, 20, "&#9925;", "#fab387"),       # cloud, orange
+        ("Night", "night", 20, 24, "&#9789;&#65039;", "#89b4fa"),       # moon, blue
+    ]
+    TIME_LABELS = ["12:01AM-5:59AM PT", "6AM-12PM PT", "12:01PM-8PM PT", "8:01PM-12AM PT"]
+
+    V10_STRATS = {"htf_confluence_pullback", "htf_confluence_vwap", "momentum_continuation"}
+
+    def _classify_hour(hour: int) -> int:
+        if 0 <= hour < 6:
+            return 0  # Early AM (12:01AM-5:59AM)
+        elif 6 <= hour < 12:
+            return 1  # Morning (6AM-12PM)
+        elif 12 <= hour < 20:
+            return 2  # Afternoon (12:01PM-8PM)
+        else:
+            return 3  # Night (8:01PM-12AM)
+
+    def _compute_session_stats(trade_list: list[dict]) -> list[dict]:
+        stats = [{"trades": 0, "wins": 0, "pnl": 0.0} for _ in range(4)]
+        for t in trade_list:
+            opened_at = t.get("opened_at", 0)
+            if opened_at <= 0:
+                continue
+            hour = _from_ts(opened_at).hour
+            idx = _classify_hour(hour)
+            pnl = t.get("pnl_usdt", 0)
+            stats[idx]["trades"] += 1
+            stats[idx]["pnl"] += pnl
+            if pnl > 0:
+                stats[idx]["wins"] += 1
+        return stats
+
+    def _fmt_cell(s: dict, has_data: bool) -> str:
+        if not has_data or s["trades"] == 0:
+            return '<span style="color:var(--text-dim);font-size:0.8em">--</span>'
+        pnl_cls = "positive" if s["pnl"] >= 0 else "negative"
+        wr = (s["wins"] / s["trades"] * 100) if s["trades"] > 0 else 0
+        wr_cls = "positive" if wr >= 50 else "negative"
+        return f'{s["trades"]}t {s["wins"]}W <span class="{wr_cls}">{wr:.0f}%</span> <span class="{pnl_cls}" style="font-weight:600">${s["pnl"]:+.2f}</span>'
+
+    # Split trades
+    v10_trades = [t for t in trades if t.get("strategy", "") in V10_STRATS]
+
+    # "Today" starts at midnight PT
+    today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    today_live = [t for t in trades if t.get("opened_at", 0) >= today_start]
+    today_v10 = [t for t in v10_trades if t.get("opened_at", 0) >= today_start]
+    today_paper = [t for t in paper_trades if t.get("opened_at", 0) >= today_start]
+
+    has_v10 = len(v10_trades) > 0
+    has_paper = len(paper_trades) > 0
+
+    def _render_section(title: str, live_stats: list[dict], v10_stats: list[dict], paper_stats: list[dict]) -> str:
+        has_data = any(s["trades"] > 0 for s in live_stats) or any(s["trades"] > 0 for s in v10_stats) or any(s["trades"] > 0 for s in paper_stats)
+        if not has_data:
+            return f'''<div class="session-section">
+                <div class="session-section-title">{title}</div>
+                <div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.82em">No trades yet</div>
+            </div>'''
+        rows = ""
+        for i, (label, cls, _s, _e, icon, color) in enumerate(SESSION_DEFS):
+            time_lbl = TIME_LABELS[i]
+            live_cell = _fmt_cell(live_stats[i], True)
+            paper_cell = _fmt_cell(paper_stats[i], has_paper)
+            rows += f'''<div class="session-row session-{cls}" style="display:grid;grid-template-columns:140px 1fr 1fr;align-items:center;gap:4px;padding:6px 8px;border-left:3px solid {color}">
+                <div style="font-size:0.85em">{icon} <span style="color:{color};font-weight:600">{escape(label)}</span><br><span style="color:var(--text-dim);font-size:0.75em">{time_lbl}</span></div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:center">{live_cell}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:center">{paper_cell}</div>
+            </div>'''
+        # Totals row
+        def _sum_stats(stats_list):
+            t = sum(s["trades"] for s in stats_list)
+            w = sum(s["wins"] for s in stats_list)
+            p = sum(s["pnl"] for s in stats_list)
+            return {"trades": t, "wins": w, "pnl": p}
+        live_total = _sum_stats(live_stats)
+        paper_total = _sum_stats(paper_stats)
+        live_tot_cell = _fmt_cell(live_total, True)
+        paper_tot_cell = _fmt_cell(paper_total, has_paper)
+        totals_row = f'''<div style="display:grid;grid-template-columns:140px 1fr 1fr;align-items:center;gap:4px;padding:6px 8px;border-top:1px solid rgba(100,140,200,0.15);margin-top:4px">
+            <div style="font-size:0.82em;font-weight:600;color:var(--text-secondary)">Total</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:center;font-weight:600">{live_tot_cell}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:center;font-weight:600">{paper_tot_cell}</div>
+        </div>'''
+        return f'''<div class="session-section">
+            <div class="session-section-title">{title}</div>
+            {rows}
+            {totals_row}
+        </div>'''
+
+    # Compute stats
+    all_live = _compute_session_stats(trades)
+    all_v10 = _compute_session_stats(v10_trades)
+    all_paper = _compute_session_stats(paper_trades)
+    td_live = _compute_session_stats(today_live)
+    td_v10 = _compute_session_stats(today_v10)
+    td_paper = _compute_session_stats(today_paper)
+
+    today_label = f"Today — {_now_ca().strftime('%b %d, %Y')}"
+    today_section = _render_section(today_label, td_live, td_v10, td_paper)
+
+    # Since Mar 25 section (when paper slot + current analysis started)
+    mar25_start = datetime(2026, 3, 25, tzinfo=CA_TZ).timestamp()
+    mar25_live = [t for t in trades if t.get("opened_at", 0) >= mar25_start]
+    mar25_v10 = [t for t in v10_trades if t.get("opened_at", 0) >= mar25_start]
+    mar25_paper = paper_trades  # Paper slot started Mar 25/26 so all paper trades qualify
+    m25_live = _compute_session_stats(mar25_live)
+    m25_v10 = _compute_session_stats(mar25_v10)
+    m25_paper = _compute_session_stats(mar25_paper)
+    mar25_section = _render_section("Since Mar 25", m25_live, m25_v10, m25_paper)
+
+    # Find date range for all trades
+    all_dates = [t.get("opened_at", 0) for t in trades if t.get("opened_at", 0) > 0]
+    if all_dates:
+        first = _from_ts(min(all_dates)).strftime("%b %d")
+        last = _from_ts(max(all_dates)).strftime("%b %d, %Y")
+        all_label = f"All Time — {first} to {last}"
+    else:
+        all_label = "All Time"
+    all_section = _render_section(all_label, all_live, all_v10, all_paper)
+
+    # Column start dates
+    live_start = ""
+    v10_start = ""
+    paper_start = ""
+    live_dates = [t.get("opened_at", 0) for t in trades if t.get("opened_at", 0) > 0]
+    v10_dates = [t.get("opened_at", 0) for t in v10_trades if t.get("opened_at", 0) > 0]
+    paper_dates = [t.get("opened_at", t.get("closed_at", 0)) for t in paper_trades if t.get("opened_at", t.get("closed_at", 0)) > 0]
+    if live_dates:
+        live_start = f"<br><span style='font-size:0.7em;color:var(--text-dim);font-weight:400'>since {_from_ts(min(live_dates)).strftime('%b %d')}</span>"
+    if v10_dates:
+        v10_start = f"<br><span style='font-size:0.7em;color:var(--text-dim);font-weight:400'>since {_from_ts(min(v10_dates)).strftime('%b %d')}</span>"
+    if paper_dates:
+        paper_start = f"<br><span style='font-size:0.7em;color:var(--text-dim);font-weight:400'>since {_from_ts(min(paper_dates)).strftime('%b %d')}</span>"
+    else:
+        paper_start = f"<br><span style='font-size:0.7em;color:var(--text-dim);font-weight:400'>new</span>"
+
+    def _build_balance_row(bal_now, bal_then, trade_list):
+        if bal_now <= 0 or bal_then <= 0:
+            return ""
+        change = bal_now - bal_then
+        trade_pnl = sum(t.get("pnl_usdt", 0) for t in trade_list)
+        hidden = change - trade_pnl
+        chg_cls = "positive" if change >= 0 else "negative"
+        hid_cls = "negative" if hidden < 0 else "positive"
+        return f'''<div style="display:grid;grid-template-columns:140px 1fr 1fr;gap:4px;padding:8px;margin-top:4px;background:rgba(100,140,200,0.05);border-radius:6px">
+            <div style="font-size:0.8em;color:var(--text-dim)">
+                <div>Actual P&amp;L</div>
+                <div style="margin-top:4px">Hidden costs</div>
+                <div style="margin-top:2px;font-size:0.75em;color:var(--text-dim)">funding + slippage</div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.78em;text-align:center">
+                <div class="{chg_cls}" style="font-weight:600">${change:+.2f}</div>
+                <div class="{hid_cls}" style="margin-top:4px">${hidden:+.2f}</div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:center;color:var(--text-dim)">
+                <div style="font-size:0.9em">simulated</div>
+                <div style="margin-top:4px">no fees</div>
+            </div>
+        </div>'''
+
+    col_header = f'''<div style="display:grid;grid-template-columns:140px 1fr 1fr;gap:4px;padding:4px 8px;margin-bottom:2px">
+        <span></span>
+        <span style="text-align:center;font-size:0.75em;font-weight:700;color:#a6e3a1;text-transform:uppercase;letter-spacing:0.05em">LIVE{live_start}</span>
+        <span style="text-align:center;font-size:0.75em;font-weight:700;color:#89b4fa;text-transform:uppercase;letter-spacing:0.05em">PAPER{paper_start}</span>
+    </div>'''
+
+    return f'''<div class="glass-card dash-item" data-id="sessions">
+        <h2 class="drag-handle">Session Performance</h2>
+        {col_header}
+        {today_section}
+        {_build_balance_row(balance, balance_start, today_live)}
+        <div class="session-divider"></div>
+        {mar25_section}
+        <div class="session-divider"></div>
+        {all_section}
+    </div>'''
+
+
+def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -> str:
+    """Build side-by-side Live (All), V10, and Paper slot comparison card."""
+    live_stats = compute_stats(live_trades)
+    paper_stats = compute_stats(paper_trades)
+
+    # V10 trades — htf_confluence strategies only
+    v10_strats = {"htf_confluence_pullback", "htf_confluence_vwap", "momentum_continuation"}
+    v10_trades = [t for t in live_trades if t.get("strategy", "") in v10_strats]
+    v10_stats = compute_stats(v10_trades)
+
+    # Today's trades
+    today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    live_today = [t for t in live_trades if t.get("opened_at", 0) >= today_start]
+    paper_today = [t for t in paper_trades if t.get("opened_at", 0) >= today_start]
+    v10_today = [t for t in v10_trades if t.get("opened_at", 0) >= today_start]
+    live_today_stats = compute_stats(live_today)
+    paper_today_stats = compute_stats(paper_today)
+    v10_today_stats = compute_stats(v10_today)
+
+    has_paper = len(paper_trades) > 0
+
+    has_v10 = len(v10_trades) > 0
+
+    def _stat_col(label, live_val, v10_val, paper_val, fmt="", is_pnl=False, is_pct=False):
+        def _fmt(val, has_data):
+            if not has_data:
+                return ("", "--")
+            if is_pnl:
+                return ("positive" if val >= 0 else "negative", f"${val:+.2f}")
+            elif is_pct:
+                return ("positive" if val >= 50 else "negative", f"{val:.1f}%")
+            else:
+                return ("", str(val))
+        l_cls, l_str = _fmt(live_val, True)
+        v_cls, v_str = _fmt(v10_val, has_v10)
+        p_cls, p_str = _fmt(paper_val, has_paper)
+        return f'''<div class="compare-row">
+            <span class="compare-label">{label}</span>
+            <span class="compare-live {l_cls}">{l_str}</span>
+            <span class="compare-v10 {v_cls}">{v_str}</span>
+            <span class="compare-paper {p_cls}">{p_str}</span>
+        </div>'''
+
+    # Recent paper trades list (last 5)
+    recent_paper = ""
+    if has_paper:
+        last5 = paper_trades[-5:]
+        for t in reversed(last5):
+            pnl = t.get("pnl_usdt", 0)
+            sym = escape(t.get("symbol", "?").replace("/USDT:USDT", ""))
+            side = t.get("side", "?").upper()
+            reason = escape(t.get("reason", "?"))
+            cls = "positive" if pnl > 0 else "negative"
+            side_cls = "side-long" if side == "LONG" else "side-short"
+            closed_at = t.get("closed_at", 0)
+            time_str = _from_ts(closed_at).strftime("%m/%d %I:%M%p").lower() if closed_at > 0 else "--"
+            recent_paper += f'''<div class="paper-trade-row">
+                <span class="side-badge {side_cls}" style="font-size:0.7em">{side}</span>
+                <span style="color:var(--text-primary);font-weight:500">{sym}</span>
+                <span class="{cls}" style="font-family:'JetBrains Mono',monospace;font-weight:600">${pnl:+.2f}</span>
+                <span style="color:var(--text-dim);font-size:0.85em">{reason}</span>
+                <span style="color:var(--text-dim);font-size:0.8em;font-family:'JetBrains Mono',monospace">{time_str}</span>
+            </div>'''
+    else:
+        recent_paper = '<div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.85em">Paper slot not active yet. File: trading_state_5m_sma_vwap.json</div>'
+
+    return f'''<div class="glass-card dash-item paper-card" data-id="paper-comparison">
+        <h2 class="drag-handle"><span class="paper-badge">PAPER</span> Live vs Paper Comparison</h2>
+        <div class="compare-header">
+            <span class="compare-label"></span>
+            <span class="compare-col-label live-label">LIVE</span>
+            <span class="compare-col-label v10-label">V10</span>
+            <span class="compare-col-label paper-label">PAPER</span>
+        </div>
+        <div class="compare-section-title">All Time</div>
+        {_stat_col("Trades", live_stats["total"], v10_stats["total"], paper_stats["total"])}
+        {_stat_col("Win Rate", live_stats["win_rate"], v10_stats["win_rate"], paper_stats["win_rate"], is_pct=True)}
+        {_stat_col("PnL", live_stats["total_pnl"], v10_stats["total_pnl"], paper_stats["total_pnl"], is_pnl=True)}
+        {_stat_col("Profit Factor", round(live_stats["profit_factor"], 2) if live_stats["profit_factor"] != float("inf") else 0, round(v10_stats["profit_factor"], 2) if v10_stats["profit_factor"] != float("inf") else 0, round(paper_stats["profit_factor"], 2) if paper_stats["profit_factor"] != float("inf") else 0)}
+        {_stat_col("Avg Win", live_stats["avg_win"], v10_stats["avg_win"], paper_stats["avg_win"], is_pnl=True)}
+        {_stat_col("Avg Loss", -live_stats["avg_loss"], -v10_stats["avg_loss"], -paper_stats["avg_loss"], is_pnl=True)}
+        <div class="compare-section-title" style="margin-top:10px">Today</div>
+        {_stat_col("Trades", live_today_stats["total"], v10_today_stats["total"], paper_today_stats["total"])}
+        {_stat_col("Wins", live_today_stats["wins"], v10_today_stats["wins"], paper_today_stats["wins"])}
+        {_stat_col("Losses", live_today_stats["total"] - live_today_stats["wins"], v10_today_stats["total"] - v10_today_stats["wins"], paper_today_stats["total"] - paper_today_stats["wins"])}
+        {_stat_col("Win Rate", live_today_stats["win_rate"], v10_today_stats["win_rate"], paper_today_stats["win_rate"], is_pct=True)}
+        {_stat_col("PnL", live_today_stats["total_pnl"], v10_today_stats["total_pnl"], paper_today_stats["total_pnl"], is_pnl=True)}
+        <div class="compare-section-title" style="margin-top:10px">Recent Paper Trades</div>
+        {recent_paper}
+    </div>'''
 
 
 # ── Chart generation ────────────────────────────────────────────────────
@@ -578,6 +874,8 @@ def build_content() -> str:
     state = read_state()
     trades = state.get("closed_trades", [])
     stats = compute_stats(trades)
+    paper_state = read_paper_state()
+    paper_trades = paper_state.get("closed_trades", [])
     lines = tail_log(500)
     cycle = parse_latest_cycle(lines)
     regime = parse_regime_status(lines)
@@ -585,10 +883,44 @@ def build_content() -> str:
     # Watchlist needs more history to capture position opens/closes and scanner updates
     wl_lines = tail_log(3000)
     watchlist = parse_watchlist(wl_lines)
-    now = datetime.now().strftime("%I:%M:%S %p")
-    date_str = datetime.now().strftime("%b %d, %Y")
+    now = _now_ca().strftime("%I:%M:%S %p")
+    date_str = _now_ca().strftime("%b %d, %Y")
+
+    # Read balance snapshots from bot log STATS lines
+    balance = 0
+    balance_start_of_day = 0
+    balance_mar25 = 0
+    balance_first = 0
+    _log_file = os.path.join(os.path.dirname(__file__), "logs", "bot.log")
+    _today_date_str = _now_ca().strftime("%Y-%m-%d")
+    if os.path.exists(_log_file):
+        import re as _re2
+        _first_today = False
+        _first_mar25 = False
+        _first_ever = False
+        with open(_log_file, encoding="utf-8", errors="replace") as _lf2:
+            for _ln in _lf2:
+                _m2 = _re2.search(r'Balance: ([\d.]+) USDT', _ln)
+                if _m2:
+                    _bv = float(_m2.group(1))
+                    balance = _bv
+                    if not _first_ever:
+                        balance_first = _bv
+                        _first_ever = True
+                    if not _first_mar25 and "2026-03-25" in _ln:
+                        balance_mar25 = _bv
+                        _first_mar25 = True
+                    if not _first_today and _today_date_str in _ln:
+                        balance_start_of_day = _bv
+                        _first_today = True
+        if balance_start_of_day == 0:
+            balance_start_of_day = balance
+        if balance_mar25 == 0:
+            balance_mar25 = balance_first
 
     audit_html = build_audit_table(trades)
+    paper_html = _build_paper_comparison(trades, paper_trades)
+    session_html = _build_session_card(trades, paper_trades, balance=balance, balance_start=balance_start_of_day, balance_mar25=balance_mar25, balance_first=balance_first)
 
     # Activity feed
     activity_html = ""
@@ -615,9 +947,9 @@ def build_content() -> str:
         chart_section = '<div class="glass-card" style="text-align:center;padding:40px"><p style="color:#7e8aa0">No trades yet — charts appear after first closed trade</p></div>'
 
     # Daily stats
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-    today_trades = [t for t in trades if t.get("closed_at", 0) >= today_start]
-    has_daily = any(t.get("closed_at", 0) > 0 for t in trades)
+    today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    today_trades = [t for t in trades if t.get("opened_at", 0) >= today_start]
+    has_daily = any(t.get("opened_at", 0) > 0 or t.get("closed_at", 0) > 0 for t in trades)
     daily_pnl = sum(t.get("pnl_usdt", 0) for t in today_trades)
     daily_fees = sum(t.get("margin", 0) * 10 * 0.0006 * 2 for t in today_trades)
     daily_real_pnl = daily_pnl - daily_fees
@@ -626,6 +958,8 @@ def build_content() -> str:
     daily_wr = (daily_wins / daily_count * 100) if daily_count > 0 else 0
     current_balance = state.get("peak_balance", 0)
     daily_pct = (daily_pnl / (current_balance - daily_pnl) * 100) if has_daily and (current_balance - daily_pnl) > 0 else 0
+
+    balance_change = balance - balance_start_of_day
 
     # Current drawdown from peak
     peak_bal = state.get("peak_balance", 0)
@@ -651,6 +985,7 @@ def build_content() -> str:
     daily_wr_cls = "positive" if daily_wr >= 50 else "negative"
     pnl_cls = "positive" if stats['total_pnl'] >= 0 else "negative"
     daily_pnl_cls = "positive" if daily_pnl >= 0 else "negative"
+    bal_change_cls = "positive" if balance_change >= 0 else "negative"
 
     return f"""
 <!-- Top bar -->
@@ -671,6 +1006,10 @@ def build_content() -> str:
 <!-- Hero metrics -->
 <div class="hero-row">
     <div class="hero-card">
+        <div class="hero-label">Balance</div>
+        <div class="hero-value" style="color:#89b4fa">${balance:.2f}</div>
+    </div>
+    <div class="hero-card">
         <div class="hero-label">Total PnL</div>
         <div class="hero-value {pnl_cls}">${stats['total_pnl']:+.2f}</div>
     </div>
@@ -680,9 +1019,14 @@ def build_content() -> str:
         <div class="hero-sub">{stats['wins']}W / {stats['losses']}L of {stats['total']}</div>
     </div>
     <div class="hero-card">
-        <div class="hero-label">Today</div>
-        <div class="hero-value {daily_pnl_cls}">{f'${daily_pnl:+.2f}' if has_daily else 'N/A'}</div>
-        <div class="hero-sub">{f'{daily_count} trades &middot; {daily_wr:.0f}% WR' if has_daily else 'No trades yet'}</div>
+        <div class="hero-label">Today (Actual)</div>
+        <div class="hero-value {bal_change_cls}">${balance_change:+.2f}</div>
+        <div class="hero-sub">{daily_count} trades &middot; {daily_wr:.0f}% WR</div>
+    </div>
+    <div class="hero-card">
+        <div class="hero-label">Hidden Costs</div>
+        <div class="hero-value negative">${balance_change - daily_pnl:+.2f}</div>
+        <div class="hero-sub">funding fees &middot; slippage</div>
     </div>
     <div class="hero-card">
         <div class="hero-label">Peak Balance</div>
@@ -732,6 +1076,7 @@ def build_content() -> str:
         <div class="stat-row"><span class="stat-label">Drawdown</span><span class="stat-value {"negative" if current_dd > 0 else "positive"}">{f'${current_dd:.2f}' if current_dd > 0 else '$0.00'}</span></div>
         <div class="stat-row"><span class="stat-label">W / L</span><span class="stat-value">{f'{daily_wins} / {daily_count - daily_wins}' if has_daily else 'N/A'}</span></div>
     </div>
+    {paper_html}
     <div class="glass-card dash-item" data-id="charts">
         <h2 class="drag-handle">Charts</h2>
         {chart_section}
@@ -751,6 +1096,11 @@ def build_content() -> str:
         <h2 class="drag-handle">Performance Audit</h2>
         {audit_html}
     </div>
+</div>
+
+<!-- Session Performance — own row -->
+<div style="max-width:650px;margin:24px auto;padding:0 16px">
+    {session_html}
 </div>
 
 <div class="footer">
@@ -1240,6 +1590,140 @@ tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
 }}
 .audit-log .table-wrap::-webkit-scrollbar {{ width: 4px; }}
 .audit-log .table-wrap::-webkit-scrollbar-thumb {{ background: rgba(96,165,250,0.2); border-radius: 2px; }}
+
+/* ── Paper comparison ── */
+.paper-card {{
+    border-color: rgba(96,165,250,0.2);
+    background: linear-gradient(135deg, rgba(17,24,39,0.65) 0%, rgba(30,58,100,0.15) 100%);
+}}
+.paper-card:hover {{
+    border-color: rgba(96,165,250,0.35);
+    box-shadow: 0 0 16px rgba(96,165,250,0.08);
+}}
+.paper-badge {{
+    display: inline-block;
+    background: rgba(96,165,250,0.15);
+    color: var(--accent-blue);
+    border: 1px solid rgba(96,165,250,0.3);
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-size: 0.85em;
+    letter-spacing: 1px;
+    margin-right: 6px;
+    vertical-align: middle;
+}}
+.compare-header {{
+    display: grid;
+    grid-template-columns: 1fr 90px 90px 90px;
+    gap: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 4px;
+}}
+.compare-col-label {{
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-align: right;
+}}
+.live-label {{ color: var(--positive); }}
+.v10-label {{ color: #fab387; }}
+.paper-label {{ color: var(--accent-blue); }}
+.compare-section-title {{
+    font-size: 0.7em;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 6px 0 3px;
+    border-bottom: 1px solid rgba(100,140,200,0.06);
+}}
+.compare-row {{
+    display: grid;
+    grid-template-columns: 1fr 90px 90px 90px;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 0.85em;
+    border-bottom: 1px solid rgba(100,140,200,0.04);
+}}
+.compare-label {{ color: var(--text-secondary); font-weight: 400; }}
+.compare-live, .compare-v10, .compare-paper {{
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    font-size: 0.95em;
+}}
+.compare-v10 {{ color: #fab387; }}
+.compare-paper {{ color: var(--accent-blue); }}
+.paper-trade-row {{
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 0.82em;
+    border-bottom: 1px solid rgba(100,140,200,0.04);
+}}
+.paper-trade-row:last-child {{ border-bottom: none; }}
+
+/* ── Session breakdown ── */
+.session-section {{
+    margin-bottom: 6px;
+}}
+.session-section-title {{
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(100,140,200,0.06);
+}}
+.session-divider {{
+    height: 1px;
+    background: rgba(100,140,200,0.1);
+    margin: 10px 0;
+}}
+.session-row {{
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(100,140,200,0.04);
+}}
+.session-row:last-child {{ border-bottom: none; }}
+.session-name {{
+    font-size: 0.82em;
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 4px;
+}}
+.session-label-text {{
+    vertical-align: middle;
+}}
+.session-morning .session-name {{ color: #a6e3a1; }}
+.session-afternoon .session-name {{ color: #fab387; }}
+.session-night .session-name {{ color: #89b4fa; }}
+.session-detail-stats {{
+    display: flex;
+    gap: 10px;
+    font-size: 0.8em;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}}
+.session-stat-item {{
+    white-space: nowrap;
+}}
+.session-bar-wrap {{
+    height: 5px;
+    background: rgba(100,140,200,0.08);
+    border-radius: 3px;
+    overflow: hidden;
+}}
+.session-bar {{
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+}}
 
 /* ── Footer ── */
 .footer {{

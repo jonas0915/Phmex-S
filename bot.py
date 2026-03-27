@@ -138,6 +138,14 @@ class Phmex2Bot:
                 capital_pct=0.0,  # 0% for now — paper only
                 paper_mode=True,
             ),
+            StrategySlot(
+                slot_id="5m_sma_vwap",
+                strategy_name="confluence_sma_vwap",
+                timeframe="5m",
+                max_positions=2,
+                capital_pct=0.0,  # Paper only — no real capital
+                paper_mode=True,
+            ),
         ]
 
     def _fetch_htf_data(self, symbol: str):
@@ -820,12 +828,130 @@ class Phmex2Bot:
         if self.cycle_count % 10 == 0:
             self.risk.print_stats(real_balance)
 
+        # Evaluate paper slots (completely isolated — no real orders)
+        try:
+            self._evaluate_paper_slots(self.active_pairs, prices)
+        except Exception as e:
+            logger.debug(f"[PAPER] Slot evaluation error: {e}")
+
         # Log slot status
         for slot in self.slots:
             s = slot.stats_summary()
             mode = "PAPER" if slot.paper_mode else "LIVE"
             status = "KILLED" if slot.is_killed else "ACTIVE" if slot.is_active else "DISABLED"
             logger.info(f"[SLOT] {slot.slot_id} ({mode}/{status}) | {s['trades']} trades | WR: {s['wr']}% | PnL: ${s['pnl']}")
+
+    def _evaluate_paper_slots(self, active_pairs: list, prices: dict):
+        """Evaluate paper slots — simulate entries/exits without placing real orders."""
+        for slot in self.slots:
+            if not slot.paper_mode or not slot.is_active:
+                continue
+
+            strategy_fn = STRATEGIES.get(slot.strategy_name)
+            if not strategy_fn:
+                continue
+
+            # --- Paper exits first (check existing paper positions) ---
+            if slot.slot_id == "5m_sma_vwap" and slot.risk.positions:
+                logger.debug(f"[PAPER] {slot.slot_id} checking {len(slot.risk.positions)} open positions: {list(slot.risk.positions.keys())}")
+            for symbol in list(slot.risk.positions.keys()):
+                price = prices.get(symbol)
+                if not price:
+                    logger.debug(f"[PAPER] {slot.slot_id} no price for {symbol}, skipping exit check")
+                    continue
+                pos = slot.risk.positions[symbol]
+
+                # Check SL
+                if (pos.side == "long" and price <= pos.stop_loss) or \
+                   (pos.side == "short" and price >= pos.stop_loss):
+                    pnl = pos.pnl_usdt(price)
+                    pnl_pct = pos.pnl_percent(price)
+                    slot.risk.close_position(symbol, price, "stop_loss")
+                    notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "stop_loss")
+                    continue
+
+                # Check TP
+                if (pos.side == "long" and price >= pos.take_profit) or \
+                   (pos.side == "short" and price <= pos.take_profit):
+                    pnl = pos.pnl_usdt(price)
+                    pnl_pct = pos.pnl_percent(price)
+                    slot.risk.close_position(symbol, price, "take_profit")
+                    notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "take_profit")
+                    continue
+
+                # Check adverse exit
+                if pos.should_adverse_exit(self.cycle_count, price):
+                    pnl = pos.pnl_usdt(price)
+                    pnl_pct = pos.pnl_percent(price)
+                    slot.risk.close_position(symbol, price, "adverse_exit")
+                    notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "adverse_exit")
+                    continue
+
+                # Check time exit
+                should_exit, is_hard = pos.should_time_exit(self.cycle_count, price)
+                if should_exit:
+                    pnl = pos.pnl_usdt(price)
+                    pnl_pct = pos.pnl_percent(price)
+                    reason = "hard_time_exit" if is_hard else "time_exit"
+                    slot.risk.close_position(symbol, price, reason)
+                    notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, reason)
+                    continue
+
+            # --- Paper entries ---
+            for symbol in active_pairs:
+                if not slot.can_enter(symbol, self.slots):
+                    continue
+
+                price = prices.get(symbol)
+                if not price:
+                    continue
+
+                try:
+                    # Reuse WebSocket candle data (same as live bot — no extra REST calls)
+                    if self._ws_feed and not self._ws_feed.is_stale(symbol):
+                        df = self._ws_feed.get_ohlcv(symbol, limit=Config.CANDLE_LOOKBACK)
+                    else:
+                        df = self.exchange.get_ohlcv(symbol, slot.timeframe, limit=200)
+                    if df is None or len(df) < 50:
+                        continue
+                    df = add_all_indicators(df)
+                    ob = self.exchange.get_order_book(symbol)
+                    htf_df = self._fetch_htf_data(symbol)
+                    try:
+                        signal = strategy_fn(df, ob, htf_df=htf_df)
+                    except TypeError:
+                        signal = strategy_fn(df, ob)
+                except Exception as e:
+                    logger.debug(f"[PAPER] {slot.slot_id} error on {symbol}: {e}")
+                    continue
+
+                if signal.signal == Signal.HOLD:
+                    if "SMA+VWAP gate" in signal.reason:
+                        logger.debug(f"[PAPER] {slot.slot_id} {symbol}: {signal.reason}")
+                    continue
+                if signal.strength < 0.80:
+                    logger.debug(f"[PAPER] {slot.slot_id} {symbol}: strength {signal.strength:.2f} < 0.80")
+                    continue
+
+                direction = "long" if signal.signal == Signal.BUY else "short"
+                margin = Config.TRADE_AMOUNT_USDT
+                atr_val = df.iloc[-2].get("atr", 0) if len(df) > 1 else 0
+
+                slot.risk.open_position(
+                    symbol, price, margin, side=direction,
+                    atr=atr_val, regime="medium",
+                    cycle=self.cycle_count,
+                    strategy=slot.strategy_name
+                )
+                notifier.notify_paper_entry(
+                    symbol, direction, price, margin,
+                    signal.strength, signal.reason
+                )
+                slot.total_entries += 1
+                logger.info(
+                    f"[PAPER] {slot.slot_id} ENTRY {direction.upper()} {symbol} | "
+                    f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}"
+                )
 
     def _set_cooldown_if_loss(self, symbol: str, pnl_pct: float):
         """Set cooldown on a pair after loss: 2 min per loss, 10 min after 3 consecutive.

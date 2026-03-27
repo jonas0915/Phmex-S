@@ -424,8 +424,9 @@ def momentum_continuation_strategy(df: pd.DataFrame, orderbook: dict = None) -> 
     adx_val = last.get("adx", 0)
     rsi = last.get("rsi", 50)
     close = last["close"]
-    volume = last["volume"]
-    vol_avg = df["volume"].iloc[-20:].mean()
+    # Use last COMPLETED candle for volume (iloc[-1] is still forming, has partial volume)
+    volume = prev["volume"]
+    vol_avg = df["volume"].iloc[-21:-1].mean()
     macd_hist = last.get("macd_hist", 0)
     prev_hist = prev.get("macd_hist", 0)
     ema_21 = last.get("ema_21", 0)
@@ -438,7 +439,7 @@ def momentum_continuation_strategy(df: pd.DataFrame, orderbook: dict = None) -> 
     if adx_val < 20:
         return TradeSignal(Signal.HOLD, f"ADX too low for momentum cont ({adx_val:.1f})", 0.0)
 
-    # Gate: volume at least average
+    # Gate: volume at least average (using completed candle)
     if vol_avg <= 0 or volume < vol_avg * 1.0:
         return TradeSignal(Signal.HOLD, f"Volume below average ({volume/max(vol_avg, 1e-10):.2f}x)", 0.0)
 
@@ -736,8 +737,9 @@ def htf_confluence_pullback(df: pd.DataFrame, orderbook: dict = None, htf_df: pd
 
     close = last["close"]
     rsi = last.get("rsi", 50)
-    volume = last["volume"]
-    vol_avg = df["volume"].iloc[-20:].mean()
+    # Use last COMPLETED candle for volume (iloc[-1] is still forming, has partial volume)
+    volume = prev["volume"]
+    vol_avg = df["volume"].iloc[-21:-1].mean()
     vwap = last.get("vwap", 0)
     ema_21 = last.get("ema_21", 0)
     ema_50 = last.get("ema_50", 0)
@@ -751,9 +753,9 @@ def htf_confluence_pullback(df: pd.DataFrame, orderbook: dict = None, htf_df: pd
     if htf_adx < 20:
         return TradeSignal(Signal.HOLD, f"confluence_pullback: 1h ADX {htf_adx:.1f} < 20", 0.0)
 
-    # Volume gate
-    if vol_avg <= 0 or volume < vol_avg * 0.8:
-        return TradeSignal(Signal.HOLD, f"confluence_pullback: vol {volume/max(vol_avg,1e-10):.2f}x < 0.8x", 0.0)
+    # Volume gate — using completed candle vs 20-period avg of completed candles
+    if vol_avg <= 0 or volume < vol_avg * 0.6:
+        return TradeSignal(Signal.HOLD, f"confluence_pullback: vol {volume/max(vol_avg,1e-10):.2f}x < 0.6x", 0.0)
 
     if vwap <= 0 or pd.isna(vwap):
         return TradeSignal(Signal.HOLD, "confluence_pullback: no VWAP", 0.0)
@@ -794,7 +796,7 @@ def htf_confluence_pullback(df: pd.DataFrame, orderbook: dict = None, htf_df: pd
 
         if not momentum_ok:
             side_str = "long" if direction == Signal.BUY else "short"
-            logger.debug(
+            _log.debug(
                 f"confluence_pullback: {side_str} rejected — no momentum confirmation "
                 f"(candle={'green' if last_close > last_open else 'red'}, "
                 f"RSI {prev_rsi:.1f}→{rsi:.1f})"
@@ -902,7 +904,7 @@ def htf_confluence_vwap(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.Dat
 
         if not momentum_ok:
             side_str = "long" if direction == Signal.BUY else "short"
-            logger.debug(
+            _log.debug(
                 f"confluence_vwap: {side_str} rejected — no reversal momentum "
                 f"(candle={'green' if last_close > last_open else 'red'}, "
                 f"RSI {prev_rsi:.1f}→{rsi_fast:.1f})"
@@ -968,6 +970,21 @@ def confluence_strategy(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.Dat
     signals = []
     if htf_adx >= 20:
         signals.append(htf_confluence_pullback(df, orderbook, htf_df))
+    if htf_adx >= 25:
+        mom_signal = momentum_continuation_strategy(df, orderbook)
+        if mom_signal.signal != Signal.HOLD:
+            htf_ema21 = htf_df.iloc[-1].get("ema_21", 0)
+            htf_ema50 = htf_df.iloc[-1].get("ema_50", 0)
+            htf_close = htf_df.iloc[-1].get("close", 0)
+            htf_agrees = (
+                (mom_signal.signal == Signal.BUY and htf_close > htf_ema50) or
+                (mom_signal.signal == Signal.SELL and htf_close < htf_ema50)
+            )
+            if htf_agrees and htf_ema21 != 0 and htf_ema50 != 0:
+                signals.append(mom_signal)
+                _log.debug(f"[CONFLUENCE] momentum_cont passed HTF guard (1h ADX={htf_adx:.1f})")
+            else:
+                _log.debug(f"[CONFLUENCE] momentum_cont blocked by HTF guard (1h EMA21={'>' if htf_ema21>htf_ema50 else '<'}EMA50)")
     if htf_adx < 25:
         signals.append(htf_confluence_vwap(df, orderbook, htf_df))
 
@@ -1254,6 +1271,36 @@ def funding_rate_contrarian_strategy(df, ob, htf_df=None):
     return TradeSignal(direction, reason, strength)
 
 
+def confluence_sma_vwap_strategy(df, orderbook=None, htf_df=None) -> TradeSignal:
+    """Confluence strategy + 1H SMA(9)/SMA(15) trend direction gate.
+    Uses HTF (1h) SMA structure for bias — allows pullbacks on 5m entry."""
+    signal = confluence_strategy(df, orderbook, htf_df)
+    if signal.signal == Signal.HOLD:
+        return signal
+
+    # Use 1H HTF data for SMA trend direction (not 5m)
+    if htf_df is None or len(htf_df) < 20:
+        return signal  # no HTF data, pass through
+
+    # Compute 1h SMA9 and SMA15 on HTF candles
+    htf_close = htf_df["close"]
+    htf_sma9 = htf_close.rolling(9).mean().iloc[-1]
+    htf_sma15 = htf_close.rolling(15).mean().iloc[-1]
+
+    if htf_sma9 == 0 or htf_sma15 == 0:
+        return signal
+
+    # Trend direction gate: SMA9 vs SMA15 on 1h (no price > SMA9 requirement)
+    if signal.signal == Signal.BUY:
+        if not (htf_sma9 > htf_sma15):
+            return TradeSignal(Signal.HOLD, f"SMA+VWAP gate: 1h SMA9 {htf_sma9:.2f} < SMA15 {htf_sma15:.2f}", 0.0)
+    elif signal.signal == Signal.SELL:
+        if not (htf_sma9 < htf_sma15):
+            return TradeSignal(Signal.HOLD, f"SMA+VWAP gate: 1h SMA9 {htf_sma9:.2f} > SMA15 {htf_sma15:.2f}", 0.0)
+
+    return TradeSignal(signal.signal, signal.reason + " +1hSMA", min(signal.strength + 0.03, 1.0))
+
+
 STRATEGIES = {
     "trend_scalp":              trend_scalp_strategy,
     "trend_pullback":           trend_pullback_strategy,
@@ -1263,6 +1310,7 @@ STRATEGIES = {
     "vwap_reversion":           vwap_reversion_strategy,
     "adaptive":                 adaptive_strategy,
     "confluence":               confluence_strategy,
+    "confluence_sma_vwap":      confluence_sma_vwap_strategy,
     "htf_momentum":             htf_momentum_strategy,
     "liq_cascade":              liquidation_cascade_strategy,
     "funding_contrarian":       funding_rate_contrarian_strategy,
