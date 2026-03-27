@@ -223,7 +223,7 @@ def build_audit_table(trades: list[dict]) -> str:
         reason = t.get("reason", "unknown")
         side = t.get("side", "?").upper()
         closed_at = t.get("closed_at", 0)
-        hour = _from_ts(closed_at).strftime("%H:00") if closed_at > 0 else "??"
+        hour = _from_ts(closed_at).strftime("%I:%M %p").lstrip("0") if closed_at > 0 else "??"
         is_win = pnl > 0
 
         for key, bucket in [(sym, pair_stats), (strat, strat_stats), (reason, exit_stats), (side, side_stats), (hour, hourly_stats)]:

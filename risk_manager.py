@@ -189,7 +189,7 @@ class Position:
         return False, False
 
     def should_flat_exit(self, current_cycle: int, current_price: float) -> bool:
-        """Exit stagnant trades after 10 min. Catches trades that would otherwise
+        """Exit stagnant trades after 4 hrs. Catches trades that would otherwise
         bleed to time_exit (89 trades, 2.2% WR, -$34.84).
         Widened from [2.5%, 4%) to [-4%, +4%) to catch near-zero losers too."""
         FLAT_EXIT_CYCLES = 240  # 240 × 60s = 4 hrs
@@ -236,14 +236,42 @@ class RiskManager:
                 self.peak_balance = data.get("peak_balance", 0.0)
                 self.closed_trades = data.get("closed_trades", [])
                 self.trade_results = data.get("trade_results", [])
+                # Restore open positions (paper slot persistence)
+                pos_data = data.get("positions", {})
+                for sym, pd in pos_data.items():
+                    self.positions[sym] = Position(
+                        symbol=pd["symbol"], side=pd["side"],
+                        entry_price=pd["entry_price"], amount=pd["amount"],
+                        margin=pd["margin"], stop_loss=pd["stop_loss"],
+                        take_profit=pd["take_profit"], peak_price=pd.get("peak_price", pd["entry_price"]),
+                        trailing_stop_price=pd.get("trailing_stop_price"),
+                        entry_cycle=pd.get("entry_cycle", 0), opened_at=pd.get("opened_at", 0),
+                        strategy=pd.get("strategy", ""), entry_strength=pd.get("entry_strength", 0),
+                        confidence=pd.get("confidence", 0), ensemble_layers=pd.get("ensemble_layers", ""),
+                    )
+                if pos_data:
+                    logger.info(f"Restored {len(pos_data)} open positions from state")
                 logger.info(f"Loaded state: peak_balance={self.peak_balance:.2f}, trades={len(self.closed_trades)}")
             except Exception as e:
                 logger.warning(f"Could not load state: {e}")
 
     def _save_state(self):
         try:
+            # Serialize open positions for paper slot persistence across restarts
+            pos_data = {}
+            for sym, pos in self.positions.items():
+                pos_data[sym] = {
+                    "symbol": pos.symbol, "side": pos.side,
+                    "entry_price": pos.entry_price, "amount": pos.amount,
+                    "margin": pos.margin, "stop_loss": pos.stop_loss,
+                    "take_profit": pos.take_profit, "peak_price": pos.peak_price,
+                    "trailing_stop_price": pos.trailing_stop_price,
+                    "entry_cycle": pos.entry_cycle, "opened_at": pos.opened_at,
+                    "strategy": pos.strategy, "entry_strength": pos.entry_strength,
+                    "confidence": pos.confidence, "ensemble_layers": pos.ensemble_layers,
+                }
             with open(self.state_file, "w") as f:
-                json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades, "trade_results": self.trade_results}, f)
+                json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades, "trade_results": self.trade_results, "positions": pos_data}, f)
         except Exception as e:
             logger.warning(f"Could not save state: {e}")
 
@@ -347,9 +375,11 @@ class RiskManager:
         kelly = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
 
         if kelly <= 0:
-            # Negative edge — kill switch: size to minimum
-            logger.warning(f"[KELLY] Negative edge ({kelly:.4f}) after {kelly_lookback} trades — kill switch, using ${min_margin}")
-            return min_margin
+            # Negative edge — use fixed margin instead of minimum
+            # v10 trades mixed with v8 losers poison Kelly. Use TRADE_AMOUNT_USDT as floor.
+            fixed = float(os.getenv("TRADE_AMOUNT_USDT", "8.0"))
+            logger.warning(f"[KELLY] Negative edge ({kelly:.4f}) after {kelly_lookback} trades — using fixed ${fixed}")
+            return fixed
 
         # Fractional Kelly (conservative)
         f_kelly = kelly * kelly_fraction
