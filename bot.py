@@ -446,7 +446,7 @@ class Phmex2Bot:
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                     self.risk.close_position(symbol, fill_price, "early_exit")
                     self.exchange.cancel_open_orders(symbol)
-                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "early_exit")
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "early_exit", shadow_skip=getattr(pos, 'shadow_skip', False))
             except Exception as e:
                 logger.debug(f"Early exit check failed for {symbol}: {e}")
 
@@ -473,7 +473,7 @@ class Phmex2Bot:
                 self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                 self.risk.close_position(symbol, fill_price, "flat_exit")
                 self.exchange.cancel_open_orders(symbol)
-                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "flat_exit")
+                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "flat_exit", shadow_skip=getattr(pos, 'shadow_skip', False))
 
         # Adverse exit — bail out of wrong-direction trades early
         for symbol, pos in list(self.risk.positions.items()):
@@ -498,7 +498,7 @@ class Phmex2Bot:
                 self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                 self.risk.close_position(symbol, fill_price, "adverse_exit")
                 self.exchange.cancel_open_orders(symbol)
-                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "adverse_exit")
+                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "adverse_exit", shadow_skip=getattr(pos, 'shadow_skip', False))
                 continue
 
         # Check if exchange already closed positions (exchange SL/TP triggered)
@@ -548,7 +548,7 @@ class Phmex2Bot:
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                     self.risk.close_position(symbol, fill_price, exit_type)
                     self.exchange.cancel_open_orders(symbol)
-                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), exit_type)
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), exit_type, shadow_skip=getattr(pos, 'shadow_skip', False))
 
         # Break-even and trailing stop updates
         for symbol, pos in list(self.risk.positions.items()):
@@ -596,7 +596,7 @@ class Phmex2Bot:
                         continue
                     fill_price = self._extract_fill_price(order, price, is_exit=True)
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
-                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), reason)
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), reason, shadow_skip=getattr(pos, 'shadow_skip', False))
                     self.risk.close_position(symbol, fill_price, reason)
                     self.exchange.cancel_open_orders(symbol)
 
@@ -775,6 +775,14 @@ class Phmex2Bot:
                     logger.debug(f"[TIMING] {symbol} — skipping entry, {5-candle_offset}min to next candle open")
                     continue
 
+                # Shadow logging: tag trades outside profitable time window
+                # Profitable hours (PT): 23,0,1,2,3,6,9 → UTC: 6,7,8,9,10,13,16
+                _PROFITABLE_HOURS_UTC = {6, 7, 8, 9, 10, 13, 16}
+                shadow_skip = datetime.datetime.utcnow().hour not in _PROFITABLE_HOURS_UTC
+                if shadow_skip:
+                    _pt_hour = (datetime.datetime.utcnow().hour - 7) % 24
+                    logger.info(f"[SHADOW] {symbol} {direction} entry at {_pt_hour}:00 PT — outside profitable window")
+
                 # Kelly-aware position sizing (uses $2 min margin during bootstrap)
                 margin = self.risk.calculate_kelly_margin(available, confidence=confidence)
 
@@ -805,7 +813,7 @@ class Phmex2Bot:
                 order = self.exchange.open_long(symbol, margin, price) if direction == "long" else self.exchange.open_short(symbol, margin, price)
                 if order:
                     fill_price = self._extract_fill_price(order, price)
-                    self.risk.open_position(symbol, fill_price, margin, side=direction, atr=atr_val, regime=regime, cycle=self.cycle_count, strategy=strat_name)
+                    self.risk.open_position(symbol, fill_price, margin, side=direction, atr=atr_val, regime=regime, cycle=self.cycle_count, strategy=strat_name, shadow_skip=shadow_skip)
                     pos = self.risk.positions[symbol]
                     fill_amount = self._extract_fill_amount(order, pos.amount)
                     pos.amount = fill_amount
@@ -821,7 +829,7 @@ class Phmex2Bot:
                     available -= margin
                     self._last_entry_time = time.time()
                     logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${margin:.2f} | Conf: {confidence}/6 | {signal.reason} | Strength: {signal.strength:.2f}")
-                    notifier.notify_entry(symbol, direction, fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason)
+                    notifier.notify_entry(symbol, direction, fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason, shadow_skip=shadow_skip)
                 else:
                     logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
 
@@ -1011,7 +1019,7 @@ class Phmex2Bot:
                     logger.info(f"[SYNC] {symbol} closed on exchange (SL/TP triggered) — removing from tracker")
                     self.exchange.cancel_open_orders(symbol)
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(exit_price))
-                    notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), "exchange_close")
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), "exchange_close", shadow_skip=getattr(pos, 'shadow_skip', False))
                     self.risk.close_position(symbol, exit_price, "exchange_close")
         except Exception as e:
             logger.debug(f"Exchange position sync failed: {e}")

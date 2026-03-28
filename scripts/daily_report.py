@@ -295,7 +295,8 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr, 
 
     msg = (
         f"{emoji} <b>Phmex-S Daily Report — {date_str}</b>\n\n"
-        f"💰 Balance: <b>${balance:.2f} USDT</b>\n"
+        f"💰 Balance: <b>${balance:.2f} USDT</b>\n\n"
+        f"🟢 <b>Live Bot</b>\n"
         f"📊 Trades: {len(today_trades)} | WR: {today_wr:.0f}%\n"
         f"💵 PnL: <b>{sign}${today_pnl:.2f}</b>\n"
         f"📈 Trend: {trend}\n"
@@ -366,6 +367,27 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr, 
             f"Today: {len(pt)} trades | {pt_wr:.0f}% WR | {pt_sign}${pt_pnl:.2f}\n"
             f"Total: {len(pc)} trades | {pc_wr:.0f}% WR | {pc_sign}${pc_pnl:.2f}\n"
         )
+
+    # Shadow filter results
+    try:
+        with open(os.path.join(BOT_DIR, "trading_state.json")) as f:
+            _all_state = json.load(f)
+        _all_trades = _all_state.get("closed_trades", [])
+        shadow_today = [t for t in today_trades if t.get("shadow_skip")]
+        shadow_all = [t for t in _all_trades if t.get("shadow_skip")]
+        if shadow_today or shadow_all:
+            s_today_pnl = sum(t.get("pnl_usdt", 0) for t in shadow_today)
+            s_all_pnl = sum(t.get("pnl_usdt", 0) for t in shadow_all)
+            s_sign_t = "+" if s_today_pnl >= 0 else ""
+            s_sign_a = "+" if s_all_pnl >= 0 else ""
+            msg += (
+                f"\n🕐 <b>Shadow Filter (time-of-day)</b>\n"
+                f"Today: {len(shadow_today)} would-skip | {s_sign_t}${s_today_pnl:.2f}\n"
+                f"Total: {len(shadow_all)} would-skip | {s_sign_a}${s_all_pnl:.2f}\n"
+                f"(Negative = money saved by filtering)\n"
+            )
+    except Exception:
+        pass
 
     try:
         import requests

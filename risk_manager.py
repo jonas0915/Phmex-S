@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import time
@@ -239,7 +240,7 @@ class RiskManager:
                 # Restore open positions (paper slot persistence)
                 pos_data = data.get("positions", {})
                 for sym, pd in pos_data.items():
-                    self.positions[sym] = Position(
+                    pos = Position(
                         symbol=pd["symbol"], side=pd["side"],
                         entry_price=pd["entry_price"], amount=pd["amount"],
                         margin=pd["margin"], stop_loss=pd["stop_loss"],
@@ -249,6 +250,9 @@ class RiskManager:
                         strategy=pd.get("strategy", ""), entry_strength=pd.get("entry_strength", 0),
                         confidence=pd.get("confidence", 0), ensemble_layers=pd.get("ensemble_layers", ""),
                     )
+                    pos.shadow_skip = pd.get("shadow_skip", False)
+                    pos.shadow_hour_pt = pd.get("shadow_hour_pt", None)
+                    self.positions[sym] = pos
                 if pos_data:
                     logger.info(f"Restored {len(pos_data)} open positions from state")
                 logger.info(f"Loaded state: peak_balance={self.peak_balance:.2f}, trades={len(self.closed_trades)}")
@@ -269,6 +273,8 @@ class RiskManager:
                     "entry_cycle": pos.entry_cycle, "opened_at": pos.opened_at,
                     "strategy": pos.strategy, "entry_strength": pos.entry_strength,
                     "confidence": pos.confidence, "ensemble_layers": pos.ensemble_layers,
+                    "shadow_skip": getattr(pos, 'shadow_skip', False),
+                    "shadow_hour_pt": getattr(pos, 'shadow_hour_pt', None),
                 }
             with open(self.state_file, "w") as f:
                 json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades, "trade_results": self.trade_results, "positions": pos_data}, f)
@@ -416,7 +422,7 @@ class RiskManager:
             return 0.0
         return (wr * avg_win - (1 - wr) * avg_loss) / avg_win
 
-    def open_position(self, symbol: str, entry_price: float, margin: float, side: str, atr: float = 0.0, regime: str = "medium", cycle: int = 0, strategy: str = "") -> Position:
+    def open_position(self, symbol: str, entry_price: float, margin: float, side: str, atr: float = 0.0, regime: str = "medium", cycle: int = 0, strategy: str = "", shadow_skip: bool = False) -> Position:
         coin_amount = (margin * Config.LEVERAGE) / entry_price
 
         if atr > 0:
@@ -469,6 +475,8 @@ class RiskManager:
             opened_at=time.time(),
             strategy=strategy,
         )
+        position.shadow_skip = shadow_skip
+        position.shadow_hour_pt = (datetime.datetime.utcnow().hour - 7) % 24 if shadow_skip else None
         self.positions[symbol] = position
         sl_mode = f"ATR×{mults['sl'] if atr > 0 else 'fixed'}({atr:.5f})" if atr > 0 else "fixed%"
         logger.info(
@@ -543,6 +551,8 @@ class RiskManager:
             "confidence": pos.confidence,
             "ensemble_layers": pos.ensemble_layers,
             "duration_s": time.time() - pos.opened_at,
+            "shadow_skip": getattr(pos, 'shadow_skip', False),
+            "shadow_hour_pt": getattr(pos, 'shadow_hour_pt', None),
         }
         self.closed_trades.append(trade)
         self._save_state()

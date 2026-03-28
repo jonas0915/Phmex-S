@@ -297,11 +297,16 @@ def build_audit_table(trades: list[dict]) -> str:
             version = "Razor"
         elif trade_idx <= 156:
             version = "Razor v2.1"
+        elif trade_idx <= 217:
+            version = "Clarity"
+        elif trade_idx <= 246:
+            version = "v5-v9"
         else:
-            version = "Sentinel"
+            version = "Pipeline"
         ver_colors = {
             "Genesis": "#888", "Patch": "#4a9eff", "Filter": "#2ecc71",
-            "Razor": "#e74c3c", "Razor v2.1": "#f39c12", "Sentinel": "#9b59b6",
+            "Razor": "#e74c3c", "Razor v2.1": "#f39c12", "Clarity": "#9b59b6",
+            "v5-v9": "#a6e3a1", "Pipeline": "#fab387",
         }
         ver_color = ver_colors.get(version, "#888")
 
@@ -334,13 +339,17 @@ def build_audit_table(trades: list[dict]) -> str:
     </div>'''
 
     return f'''
-    <div class="audit-grid">
-        {_render_breakdown("By Pair", pair_stats)}
-        {_render_breakdown("By Strategy", strat_stats)}
-        {_render_breakdown("By Exit Reason", exit_stats)}
-        {_render_breakdown("By Side", side_stats)}
-        {_render_breakdown("By Hour", hourly_stats, sort_by="trades")}
-        {exit_definitions}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div style="max-height:250px;overflow-y:auto">{_render_breakdown("By Side", side_stats)}</div>
+        <div style="max-height:250px;overflow-y:auto">{_render_breakdown("By Exit Reason", exit_stats)}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div style="max-height:300px;overflow-y:auto">{_render_breakdown("By Hour", hourly_stats, sort_by="trades")}</div>
+        <div style="max-height:300px;overflow-y:auto">{_render_breakdown("By Pair", pair_stats)}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="max-height:250px;overflow-y:auto">{_render_breakdown("By Strategy", strat_stats)}</div>
+        <div>{exit_definitions}</div>
     </div>
     <div class="glass-card audit-log" style="margin-top:12px">
         <h2>Full Trade Log ({len(trades)} trades)</h2>
@@ -785,6 +794,38 @@ def _make_trade_pnl(trades: list[dict]) -> bytes:
     return _fig_to_png(fig)
 
 
+V10_STRATS = {"htf_confluence_pullback", "htf_confluence_vwap", "momentum_continuation"}
+
+
+def _make_cumulative_pnl_v10(trades: list[dict]) -> bytes:
+    """Cumulative PnL chart for v10 Pipeline trades only."""
+    v10 = [t for t in trades if t.get("strategy", "") in V10_STRATS]
+    if not v10:
+        return b""
+    pnls = [t.get("pnl_usdt", 0) for t in v10]
+    cum = []
+    r = 0
+    for p in pnls:
+        r += p
+        cum.append(r)
+    x = list(range(1, len(cum) + 1))
+
+    fig, ax = plt.subplots(figsize=(9, 4), facecolor="#1e1e2e")
+    ax.set_facecolor("#1e1e2e")
+    ax.plot(x, cum, color="#fab387", linewidth=2, marker="o", markersize=3)
+    ax.fill_between(x, cum, 0, where=[c >= 0 for c in cum], color="#a6e3a1", alpha=0.15)
+    ax.fill_between(x, cum, 0, where=[c < 0 for c in cum], color="#f38ba8", alpha=0.15)
+    ax.axhline(y=0, color="#585b70", linestyle="--", alpha=0.5)
+    ax.set_xlabel("Trade #", color="#cdd6f4")
+    ax.set_ylabel("Cumulative PnL (USDT)", color="#cdd6f4")
+    ax.set_title("V10 Pipeline — Cumulative PnL", color="#fab387", fontsize=13)
+    ax.tick_params(colors="#a6adc8")
+    ax.grid(True, alpha=0.15, color="#585b70")
+    for spine in ax.spines.values():
+        spine.set_color("#585b70")
+    return _fig_to_png(fig)
+
+
 def refresh_charts():
     """Regenerate all charts and cache as PNG bytes."""
     state = read_state()
@@ -795,6 +836,7 @@ def refresh_charts():
         charts["pnl_by_pair"] = _make_pnl_by_pair(trades)
         charts["pnl_by_reason"] = _make_pnl_by_reason(trades)
         charts["trade_pnl"] = _make_trade_pnl(trades)
+        charts["cumulative_pnl_v10"] = _make_cumulative_pnl_v10(trades)
     with _chart_lock:
         _chart_cache.update(charts)
 
@@ -920,6 +962,8 @@ def build_content() -> str:
 
     audit_html = build_audit_table(trades)
     paper_html = _build_paper_comparison(trades, paper_trades)
+
+    shadow_html = ''
     session_html = _build_session_card(trades, paper_trades, balance=balance, balance_start=balance_start_of_day, balance_mar25=balance_mar25, balance_first=balance_first)
 
     # Activity feed
@@ -938,6 +982,7 @@ def build_content() -> str:
     if has_charts:
         chart_section = """
         <div class="charts-grid">
+            <div class="chart-box"><img src="/chart/cumulative_pnl_v10" alt="V10 Cumulative PnL"></div>
             <div class="chart-box"><img src="/chart/cumulative_pnl" alt="Cumulative PnL"></div>
             <div class="chart-box"><img src="/chart/pnl_by_pair" alt="PnL by Pair"></div>
             <div class="chart-box"><img src="/chart/pnl_by_reason" alt="PnL by Reason"></div>
@@ -976,6 +1021,26 @@ def build_content() -> str:
     pf_str = f"{pf:.2f}" if pf != float('inf') else "---"
     real_pnl_cls = "positive" if stats['real_pnl'] >= 0 else "negative"
     daily_real_cls = "positive" if daily_real_pnl >= 0 else "negative"
+
+    # Shadow filter stats card
+    shadow_all = [t for t in trades if t.get("shadow_skip")]
+    shadow_today_list = [t for t in today_trades if t.get("shadow_skip")]
+    if shadow_all:
+        s_all_pnl = sum(t.get("pnl_usdt", 0) for t in shadow_all)
+        s_all_wins = sum(1 for t in shadow_all if t.get("pnl_usdt", 0) > 0)
+        s_all_wr = (s_all_wins / len(shadow_all) * 100) if shadow_all else 0
+        s_today_pnl = sum(t.get("pnl_usdt", 0) for t in shadow_today_list)
+        savings = -s_all_pnl
+        sav_cls = "positive" if savings > 0 else "negative"
+        shadow_html = f'''<div class="glass-card dash-item" data-id="shadow">
+        <h2 class="drag-handle">🕐 Shadow Filter</h2>
+        <div class="stat-row"><span class="stat-label">Window</span><span class="stat-value" style="font-size:0.75em">11PM-3AM + 6AM + 9AM PT</span></div>
+        <div class="stat-row"><span class="stat-label">Shadow Trades</span><span class="stat-value">{len(shadow_all)}</span></div>
+        <div class="stat-row"><span class="stat-label">Shadow WR</span><span class="stat-value negative">{s_all_wr:.0f}%</span></div>
+        <div class="stat-row"><span class="stat-label">Shadow PnL</span><span class="stat-value {"positive" if s_all_pnl >= 0 else "negative"}">${s_all_pnl:+.2f}</span></div>
+        <div class="stat-row"><span class="stat-label">Est. Savings</span><span class="stat-value {sav_cls}">${savings:+.2f}</span></div>
+        <div class="stat-row"><span class="stat-label">Today Shadow</span><span class="stat-value">{len(shadow_today_list)} trades | ${s_today_pnl:+.2f}</span></div>
+    </div>'''
 
     # Regime status badge
     regime_cls = "regime-normal" if regime == "Normal" else "regime-warn" if "pause" in regime.lower() or "halt" in regime.lower() else "regime-info"
@@ -1077,6 +1142,7 @@ def build_content() -> str:
         <div class="stat-row"><span class="stat-label">W / L</span><span class="stat-value">{f'{daily_wins} / {daily_count - daily_wins}' if has_daily else 'N/A'}</span></div>
     </div>
     {paper_html}
+    {shadow_html}
     <div class="glass-card dash-item" data-id="charts">
         <h2 class="drag-handle">Charts</h2>
         {chart_section}
