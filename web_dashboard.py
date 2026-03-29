@@ -35,6 +35,7 @@ import matplotlib.dates as mdates
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
 PAPER_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_sma_vwap.json")
+CONTROL_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_v10_control.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
 HOST = "0.0.0.0"
 PORT = 8050
@@ -62,6 +63,15 @@ def read_paper_state() -> dict:
     """Read paper slot state file. Returns empty structure if missing."""
     try:
         with open(PAPER_STATE_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {"peak_balance": 0, "closed_trades": []}
+
+
+def read_control_state() -> dict:
+    """Read V10 control slot state file. Returns empty structure if missing."""
+    try:
+        with open(CONTROL_STATE_FILE, "r") as f:
             return json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         return {"peak_balance": 0, "closed_trades": []}
@@ -681,6 +691,76 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
     </div>'''
 
 
+def _build_control_card(control_trades: list[dict]) -> str:
+    """Build V10 Control (24/7) comparison card showing control slot performance."""
+    if not control_trades:
+        return f'''<div class="glass-card dash-item paper-card" data-id="control-slot">
+            <h2 class="drag-handle"><span class="paper-badge" style="background:rgba(166,227,161,0.15);color:#a6e3a1;border-color:rgba(166,227,161,0.3)">CONTROL</span> V10 Control (24/7)</h2>
+            <div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.85em">Control slot not active yet. File: trading_state_5m_v10_control.json</div>
+        </div>'''
+
+    ctrl_stats = compute_stats(control_trades)
+
+    today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    ctrl_today = [t for t in control_trades if t.get("opened_at", 0) >= today_start]
+    ctrl_today_stats = compute_stats(ctrl_today)
+
+    def _ctrl_row(label, val, is_pnl=False, is_pct=False):
+        if is_pnl:
+            cls = "positive" if val >= 0 else "negative"
+            txt = f"${val:+.2f}"
+        elif is_pct:
+            cls = "positive" if val >= 50 else "negative"
+            txt = f"{val:.1f}%"
+        else:
+            cls = ""
+            txt = str(val)
+        return f'''<div class="compare-row">
+            <span class="compare-label">{label}</span>
+            <span class="{cls}" style="font-family:'JetBrains Mono',monospace;font-weight:600">{txt}</span>
+        </div>'''
+
+    # First trade date
+    first_ts = min((t.get("opened_at", t.get("closed_at", 0)) for t in control_trades), default=0)
+    since_str = _from_ts(first_ts).strftime("%b %d") if first_ts > 0 else "?"
+
+    # Recent trades (last 5)
+    recent_html = ""
+    for t in reversed(control_trades[-5:]):
+        pnl = t.get("pnl_usdt", 0)
+        sym = escape(t.get("symbol", "?").replace("/USDT:USDT", ""))
+        side = t.get("side", "?").upper()
+        reason = escape(t.get("reason", "?"))
+        cls = "positive" if pnl > 0 else "negative"
+        side_cls = "side-long" if side == "LONG" else "side-short"
+        closed_at = t.get("closed_at", 0)
+        time_str = _from_ts(closed_at).strftime("%m/%d %I:%M%p").lower() if closed_at > 0 else "--"
+        recent_html += f'''<div class="paper-trade-row">
+            <span class="side-badge {side_cls}" style="font-size:0.7em">{side}</span>
+            <span style="color:var(--text-primary);font-weight:500">{sym}</span>
+            <span class="{cls}" style="font-family:'JetBrains Mono',monospace;font-weight:600">${pnl:+.2f}</span>
+            <span style="color:var(--text-dim);font-size:0.85em">{reason}</span>
+            <span style="color:var(--text-dim);font-size:0.8em;font-family:'JetBrains Mono',monospace">{time_str}</span>
+        </div>'''
+
+    return f'''<div class="glass-card dash-item paper-card" data-id="control-slot">
+        <h2 class="drag-handle"><span class="paper-badge" style="background:rgba(166,227,161,0.15);color:#a6e3a1;border-color:rgba(166,227,161,0.3)">CONTROL</span> V10 Control (24/7) <span style="font-size:0.55em;color:var(--text-dim);font-weight:400">since {since_str}</span></h2>
+        <div class="compare-section-title">All Time</div>
+        {_ctrl_row("Trades", ctrl_stats["total"])}
+        {_ctrl_row("Win Rate", ctrl_stats["win_rate"], is_pct=True)}
+        {_ctrl_row("PnL", ctrl_stats["total_pnl"], is_pnl=True)}
+        {_ctrl_row("Profit Factor", round(ctrl_stats["profit_factor"], 2) if ctrl_stats["profit_factor"] != float("inf") else 0)}
+        {_ctrl_row("Avg Win", ctrl_stats["avg_win"], is_pnl=True)}
+        {_ctrl_row("Avg Loss", -ctrl_stats["avg_loss"], is_pnl=True)}
+        <div class="compare-section-title" style="margin-top:10px">Today</div>
+        {_ctrl_row("Trades", ctrl_today_stats["total"])}
+        {_ctrl_row("Win Rate", ctrl_today_stats["win_rate"], is_pct=True)}
+        {_ctrl_row("PnL", ctrl_today_stats["total_pnl"], is_pnl=True)}
+        <div class="compare-section-title" style="margin-top:10px">Recent Control Trades</div>
+        {recent_html if recent_html else '<div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.85em">No trades yet</div>'}
+    </div>'''
+
+
 # ── Chart generation ────────────────────────────────────────────────────
 def _fig_to_png(fig) -> bytes:
     buf = io.BytesIO()
@@ -918,6 +998,8 @@ def build_content() -> str:
     stats = compute_stats(trades)
     paper_state = read_paper_state()
     paper_trades = paper_state.get("closed_trades", [])
+    control_state = read_control_state()
+    control_trades = control_state.get("closed_trades", [])
     lines = tail_log(500)
     cycle = parse_latest_cycle(lines)
     regime = parse_regime_status(lines)
@@ -962,6 +1044,7 @@ def build_content() -> str:
 
     audit_html = build_audit_table(trades)
     paper_html = _build_paper_comparison(trades, paper_trades)
+    control_html = _build_control_card(control_trades)
 
     shadow_html = ''
     session_html = _build_session_card(trades, paper_trades, balance=balance, balance_start=balance_start_of_day, balance_mar25=balance_mar25, balance_first=balance_first)
@@ -1142,6 +1225,7 @@ def build_content() -> str:
         <div class="stat-row"><span class="stat-label">W / L</span><span class="stat-value">{f'{daily_wins} / {daily_count - daily_wins}' if has_daily else 'N/A'}</span></div>
     </div>
     {paper_html}
+    {control_html}
     {shadow_html}
     <div class="glass-card dash-item" data-id="charts">
         <h2 class="drag-handle">Charts</h2>

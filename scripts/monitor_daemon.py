@@ -73,13 +73,16 @@ def get_recent_log_lines(minutes=60):
 
 
 def analyze_recent_trades(lines):
-    """Parse entries and exits from recent log lines."""
+    """Parse entries and exits from recent log lines (LIVE only, excludes paper)."""
     entries = []
     exits = []
     for line in lines:
+        # Skip paper slot lines — only count live trades
+        if "[PAPER]" in line or "PAPER" in line:
+            continue
         if "[ENTRY]" in line:
             entries.append(line)
-        if "Position closed" in line:
+        if "Position closed" in line and "[PAPER]" not in line:
             exits.append(line)
     return entries, exits
 
@@ -109,8 +112,8 @@ def load_state():
 
 
 def check_consecutive_losses(lines):
-    """Check for consecutive losses."""
-    recent_exits = [l for l in lines if "Position closed" in l]
+    """Check for consecutive losses (LIVE only, excludes paper)."""
+    recent_exits = [l for l in lines if "Position closed" in l and "[PAPER]" not in l and "PAPER" not in l]
     consecutive = 0
     for exit_line in reversed(recent_exits):
         pnl = parse_pnl(exit_line)

@@ -146,6 +146,14 @@ class Phmex2Bot:
                 capital_pct=0.0,  # Paper only — no real capital
                 paper_mode=True,
             ),
+            StrategySlot(
+                slot_id="5m_v10_control",
+                strategy_name="confluence",
+                timeframe="5m",
+                max_positions=2,
+                capital_pct=0.0,  # Paper only — control group, no time block
+                paper_mode=True,
+            ),
         ]
 
     def _fetch_htf_data(self, symbol: str):
@@ -775,12 +783,20 @@ class Phmex2Bot:
                     logger.debug(f"[TIMING] {symbol} — skipping entry, {5-candle_offset}min to next candle open")
                     continue
 
-                # Shadow logging: tag trades outside profitable time window
+                # Time-of-day filter: block entries during afternoon danger zone (10AM-8PM PT)
+                # 10AM-8PM PT = UTC 17,18,19,20,21,22,23,0,1,2,3
+                _BLOCKED_HOURS_UTC = {17, 18, 19, 20, 21, 22, 23, 0, 1, 2, 3}
+                _utc_hour = datetime.datetime.utcnow().hour
+                _pt_hour = (_utc_hour - 7) % 24
+                if _utc_hour in _BLOCKED_HOURS_UTC:
+                    logger.info(f"[TIME BLOCK] {symbol} {direction} skipped — {_pt_hour}:00 PT is danger zone (10AM-8PM)")
+                    continue
+
+                # Shadow logging: tag trades outside profitable window (remaining hours)
                 # Profitable hours (PT): 23,0,1,2,3,6,9 → UTC: 6,7,8,9,10,13,16
                 _PROFITABLE_HOURS_UTC = {6, 7, 8, 9, 10, 13, 16}
-                shadow_skip = datetime.datetime.utcnow().hour not in _PROFITABLE_HOURS_UTC
+                shadow_skip = _utc_hour not in _PROFITABLE_HOURS_UTC
                 if shadow_skip:
-                    _pt_hour = (datetime.datetime.utcnow().hour - 7) % 24
                     logger.info(f"[SHADOW] {symbol} {direction} entry at {_pt_hour}:00 PT — outside profitable window")
 
                 # Kelly-aware position sizing (uses $2 min margin during bootstrap)

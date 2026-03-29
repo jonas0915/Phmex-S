@@ -221,6 +221,8 @@ class Position:
 class RiskManager:
     def __init__(self, state_file: str = None):
         self.state_file = os.path.join(os.path.dirname(__file__), state_file or "trading_state.json")
+        self.is_paper = state_file is not None and state_file != "trading_state.json"
+        self._log_prefix = "[PAPER] " if self.is_paper else ""
         self.positions: dict[str, Position] = {}
         self.initial_balance: float = 0.0
         self.peak_balance: float = 0.0
@@ -480,7 +482,7 @@ class RiskManager:
         self.positions[symbol] = position
         sl_mode = f"ATR×{mults['sl'] if atr > 0 else 'fixed'}({atr:.5f})" if atr > 0 else "fixed%"
         logger.info(
-            f"Position opened: {side.upper()} {symbol} | Entry: {entry_price:.4f} | "
+            f"{self._log_prefix}Position opened: {side.upper()} {symbol} | Entry: {entry_price:.4f} | "
             f"SL: {stop_loss:.4f} | TP: {take_profit:.4f} | "
             f"Margin: {margin:.2f} USDT | Size: {coin_amount:.6f} ({Config.LEVERAGE}x) | {sl_mode}"
             f" | strat={strategy or 'default'} time_exit=hard240"
@@ -559,7 +561,7 @@ class RiskManager:
 
         sign = "+" if pnl >= 0 else ""
         logger.info(
-            f"Position closed: {pos.side.upper()} {symbol} | Exit: {exit_price:.4f} | "
+            f"{self._log_prefix}Position closed: {pos.side.upper()} {symbol} | Exit: {exit_price:.4f} | "
             f"PnL: {sign}{pnl:.2f} USDT ({sign}{pnl_pct:.2f}%) | Reason: {reason}"
         )
 
