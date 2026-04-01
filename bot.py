@@ -1,3 +1,4 @@
+import signal
 import time
 import datetime
 import subprocess
@@ -334,21 +335,32 @@ class Phmex2Bot:
                 else:
                     logger.info("No open positions found on exchange.")
 
+        def _cycle_timeout_handler(signum, frame):
+            raise TimeoutError("Cycle exceeded 120s — likely hung API call")
+
         self.running = True
         try:
             while self.running:
                 try:
+                    signal.signal(signal.SIGALRM, _cycle_timeout_handler)
+                    signal.alarm(120)  # 120s watchdog per cycle
                     self._run_cycle()
+                    signal.alarm(0)  # cancel watchdog on success
                     self.consecutive_errors = 0
+                except TimeoutError as e:
+                    signal.alarm(0)
+                    self.consecutive_errors += 1
+                    logger.error(f"[WATCHDOG] Cycle timed out ({self.consecutive_errors}): {e}")
                 except Exception as e:
+                    signal.alarm(0)
                     self.consecutive_errors += 1
                     logger.error(f"Cycle error ({self.consecutive_errors}): {e}")
-                    if self.consecutive_errors >= 5:
-                        self.ban_mode = True
-                        self.ban_mode_until = time.time() + 600
-                        logger.warning("[BAN MODE] Entering ban mode for 10 minutes after 5 consecutive errors")
-                        self.consecutive_errors = 0
-                        notifier.notify_ban_mode(10)
+                if self.consecutive_errors >= 5:
+                    self.ban_mode = True
+                    self.ban_mode_until = time.time() + 600
+                    logger.warning("[BAN MODE] Entering ban mode for 10 minutes after 5 consecutive errors")
+                    self.consecutive_errors = 0
+                    notifier.notify_ban_mode(10)
                 time.sleep(Config.LOOP_INTERVAL)
         except KeyboardInterrupt:
             logger.info("Bot stopped by user.")
@@ -494,6 +506,12 @@ class Phmex2Bot:
                 cycles_held = self.cycle_count - pos.entry_cycle
                 held_min = cycles_held * Config.LOOP_INTERVAL / 60
                 roi = pos.pnl_percent(price)
+                # Shadow log: would wider thresholds have held this trade?
+                for alt in [-4.0, -5.0, -6.0]:
+                    if roi > alt:
+                        logger.info(f"[SHADOW ADVERSE] {symbol} — ROI {roi:.1f}% > {alt}% — would HOLD at threshold {alt}%")
+                    else:
+                        logger.info(f"[SHADOW ADVERSE] {symbol} — ROI {roi:.1f}% <= {alt}% — would STILL EXIT at threshold {alt}%")
                 logger.info(f"[ADVERSE EXIT] {symbol} — {roi:.1f}% ROI after {held_min:.0f}min")
                 if pos.side == "long":
                     order = self.exchange.close_long(symbol, pos.amount)

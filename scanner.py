@@ -23,7 +23,7 @@ def _get_scanner_client():
     global _scanner_client
     if _scanner_client is None:
         exchange_class = getattr(ccxt, Config.EXCHANGE)
-        params = {"enableRateLimit": True, "options": {"defaultType": "swap"}}
+        params = {"enableRateLimit": True, "timeout": 10000, "options": {"defaultType": "swap"}}
         if Config.is_live():
             params["apiKey"] = Config.API_KEY
             params["secret"] = Config.API_SECRET
