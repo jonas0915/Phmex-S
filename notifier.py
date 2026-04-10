@@ -27,12 +27,11 @@ def notify_startup(balance: float, pairs: list, mode: str, strategy: str):
         f"Pairs: {', '.join(p.split('/')[0] for p in pairs)}"
     )
 
-def notify_entry(symbol: str, side: str, price: float, margin: float, sl: float, tp: float, strength: float, reason: str, shadow_skip: bool = False):
+def notify_entry(symbol: str, side: str, price: float, margin: float, sl: float, tp: float, strength: float, reason: str):
     emoji = "🟢" if side == "long" else "🔴"
     direction = "LONG" if side == "long" else "SHORT"
-    shadow_tag = " ⏳ SHADOW ZONE" if shadow_skip else ""
     send(
-        f"{emoji} <b>[LIVE] {direction} ENTRY — {symbol}</b>  [{BOT_NAME}]{shadow_tag}\n"
+        f"{emoji} <b>[LIVE] {direction} ENTRY — {symbol}</b>  [{BOT_NAME}]\n"
         f"Price:    ${price:.4f}\n"
         f"Margin:   ${margin:.2f} USDT\n"
         f"SL:       ${sl:.4f}  ({(sl-price)/price*100:+.1f}%)\n"
@@ -41,7 +40,7 @@ def notify_entry(symbol: str, side: str, price: float, margin: float, sl: float,
         f"Reason:   {reason}"
     )
 
-def notify_exit(symbol: str, side: str, entry: float, exit_price: float, pnl: float, pnl_pct: float, reason: str, shadow_skip: bool = False):
+def notify_exit(symbol: str, side: str, entry: float, exit_price: float, pnl: float, pnl_pct: float, reason: str):
     if reason == "take_profit" or reason == "partial_tp":
         emoji = "✅"
         label = "TAKE PROFIT" if reason == "take_profit" else "PARTIAL TP"
@@ -55,12 +54,11 @@ def notify_exit(symbol: str, side: str, entry: float, exit_price: float, pnl: fl
         emoji = "⏹"
         label = reason.upper()
     sign = "+" if pnl >= 0 else ""
-    shadow_tag = "\n⏳ <i>Shadow zone trade</i>" if shadow_skip else ""
     send(
         f"{emoji} <b>[LIVE] {label} — {symbol}</b>  [{BOT_NAME}]\n"
         f"Entry: ${entry:.4f}  →  Exit: ${exit_price:.4f}\n"
         f"PnL:   <b>{sign}${pnl:.2f} USDT ({sign}{pnl_pct:.1f}%)</b>\n"
-        f"Reason: {reason}{shadow_tag}"
+        f"Reason: {reason}"
     )
 
 def notify_partial_tp(symbol: str, side: str, exit_price: float, pnl: float, pnl_pct: float):

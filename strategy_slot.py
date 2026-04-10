@@ -16,7 +16,7 @@ class StrategySlot:
     positions, P&L tracking, and kill switch. Multiple slots run sequentially
     in the main bot loop — never threaded."""
 
-    slot_id: str              # e.g., "5m_scalp", "1h_momentum"
+    slot_id: str              # e.g., "5m_scalp", "5m_mean_revert"
     strategy_name: str        # key in STRATEGIES dict
     timeframe: str            # "5m", "1h", "4h"
     max_positions: int = 2

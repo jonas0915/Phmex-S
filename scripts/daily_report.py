@@ -264,32 +264,6 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
 | PnL | ${today_pnl:.2f} | ${paper_today_pnl:.2f} |
 """
 
-    # V10 control slot comparison (markdown report)
-    v10_ctrl_file = os.path.join(BOT_DIR, "trading_state_5m_legacy_control.json")
-    if os.path.exists(v10_ctrl_file):
-        with open(v10_ctrl_file) as f:
-            v10_state = json.load(f)
-        v10_closed = v10_state.get("closed_trades", [])
-        v10_today = []
-        for t in v10_closed:
-            closed_at = t.get("closed_at", 0)
-            if closed_at:
-                trade_date = datetime.fromtimestamp(closed_at, tz=CA_TZ).strftime("%Y-%m-%d")
-                if trade_date == date_str:
-                    v10_today.append(t)
-        v10_today_wins = sum(1 for t in v10_today if _net(t) > 0)
-        v10_today_pnl = sum(_net(t) for t in v10_today)
-        v10_today_wr = (v10_today_wins / len(v10_today) * 100) if v10_today else 0
-
-        report += f"""
-## V10 Control Slot (24/7 — no time block)
-| Metric | Live | V10 Control |
-|--------|------|-------------|
-| Trades | {len(today_trades)} | {len(v10_today)} |
-| Win Rate | {today_wr:.0f}% | {v10_today_wr:.0f}% |
-| PnL | ${today_pnl:.2f} | ${v10_today_pnl:.2f} |
-"""
-
     # Save
     report_path = os.path.join(REPORT_DIR, f"{date_str}.md")
     with open(report_path, "w") as f:
@@ -386,43 +360,6 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
             f"\n🔵 <b>Paper Slot (ADX+SMA+VWAP)</b>\n"
             f"{len(pt)} trades | {pt_wr:.0f}% WR | {pt_sign}${pt_pnl:.2f}\n"
         )
-
-    # V10 control slot comparison
-    v10_ctrl_file = os.path.join(BOT_DIR, "trading_state_5m_legacy_control.json")
-    if os.path.exists(v10_ctrl_file):
-        with open(v10_ctrl_file) as f:
-            v10s = json.load(f)
-        v10c = v10s.get("closed_trades", [])
-        v10t = [t for t in v10c if t.get("closed_at") and datetime.fromtimestamp(t["closed_at"]).strftime("%Y-%m-%d") == date_str]
-        v10t_wins = sum(1 for t in v10t if _net(t) > 0)
-        v10t_pnl = sum(_net(t) for t in v10t)
-        v10t_wr = (v10t_wins / len(v10t) * 100) if v10t else 0
-        v10t_sign = "+" if v10t_pnl >= 0 else ""
-        msg += (
-            f"\n🔬 <b>V10 Control (24/7 — no time block)</b>\n"
-            f"{len(v10t)} trades | {v10t_wr:.0f}% WR | {v10t_sign}${v10t_pnl:.2f}\n"
-        )
-
-    # Shadow filter results
-    try:
-        with open(os.path.join(BOT_DIR, "trading_state.json")) as f:
-            _all_state = json.load(f)
-        _all_trades = _all_state.get("closed_trades", [])
-        shadow_today = [t for t in today_trades if t.get("shadow_skip")]
-        shadow_all = [t for t in _all_trades if t.get("shadow_skip")]
-        if shadow_today or shadow_all:
-            s_today_pnl = sum(_net(t) for t in shadow_today)
-            s_all_pnl = sum(_net(t) for t in shadow_all)
-            s_sign_t = "+" if s_today_pnl >= 0 else ""
-            s_sign_a = "+" if s_all_pnl >= 0 else ""
-            msg += (
-                f"\n🕐 <b>Shadow Filter (time-of-day)</b>\n"
-                f"Today: {len(shadow_today)} would-skip | {s_sign_t}${s_today_pnl:.2f}\n"
-                f"Total: {len(shadow_all)} would-skip | {s_sign_a}${s_all_pnl:.2f}\n"
-                f"(Negative = money saved by filtering)\n"
-            )
-    except Exception:
-        pass
 
     try:
         import requests

@@ -278,8 +278,6 @@ class RiskManager:
                     "strategy": pos.strategy, "entry_strength": pos.entry_strength,
                     "confidence": pos.confidence, "ensemble_layers": pos.ensemble_layers,
                     "entry_snapshot": getattr(pos, "entry_snapshot", {}),
-                    "shadow_skip": getattr(pos, 'shadow_skip', False),
-                    "shadow_hour_pt": getattr(pos, 'shadow_hour_pt', None),
                 }
             with open(self.state_file, "w") as f:
                 json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades, "trade_results": self.trade_results, "positions": pos_data}, f)
@@ -441,7 +439,7 @@ class RiskManager:
             return 0.0
         return (wr * avg_win - (1 - wr) * avg_loss) / avg_win
 
-    def open_position(self, symbol: str, entry_price: float, margin: float, side: str, atr: float = 0.0, regime: str = "medium", cycle: int = 0, strategy: str = "", shadow_skip: bool = False) -> Position:
+    def open_position(self, symbol: str, entry_price: float, margin: float, side: str, atr: float = 0.0, regime: str = "medium", cycle: int = 0, strategy: str = "") -> Position:
         coin_amount = (margin * Config.LEVERAGE) / entry_price
 
         if atr > 0:
@@ -494,8 +492,6 @@ class RiskManager:
             opened_at=time.time(),
             strategy=strategy,
         )
-        position.shadow_skip = shadow_skip
-        position.shadow_hour_pt = (datetime.datetime.utcnow().hour - 7) % 24 if shadow_skip else None
         self.positions[symbol] = position
         sl_mode = f"ATR×{mults['sl'] if atr > 0 else 'fixed'}({atr:.5f})" if atr > 0 else "fixed%"
         logger.info(
@@ -518,12 +514,10 @@ class RiskManager:
                 margin = Config.TRADE_AMOUNT_USDT
                 logger.warning(f"[SYNC] {symbol} margin=0 from exchange — using default ${margin}")
 
-            # Preserve entry_snapshot (and shadow flags) from any disk-restored position
+            # Preserve entry_snapshot from any disk-restored position
             # so sync from exchange doesn't wipe attribution data captured at entry time.
             existing = self.positions.get(symbol)
             preserved_snapshot = getattr(existing, "entry_snapshot", {}) if existing else {}
-            preserved_shadow_skip = getattr(existing, "shadow_skip", False) if existing else False
-            preserved_shadow_hour = getattr(existing, "shadow_hour_pt", None) if existing else None
 
             if side == "long":
                 stop_loss   = entry_price * (1 - Config.STOP_LOSS_PERCENT / 100)
@@ -547,8 +541,6 @@ class RiskManager:
                 strategy="synced",
                 entry_snapshot=preserved_snapshot,
             )
-            position.shadow_skip = preserved_shadow_skip
-            position.shadow_hour_pt = preserved_shadow_hour
             self.positions[symbol] = position
             logger.info(
                 f"[SYNC] Loaded {side.upper()} {symbol} | Entry: {entry_price:.4f} | "
@@ -614,8 +606,6 @@ class RiskManager:
             "ensemble_layers": pos.ensemble_layers,
             "entry_snapshot": getattr(pos, "entry_snapshot", {}),
             "duration_s": time.time() - pos.opened_at,
-            "shadow_skip": getattr(pos, 'shadow_skip', False),
-            "shadow_hour_pt": getattr(pos, 'shadow_hour_pt', None),
         }
         if fees_pending:
             trade["fees_pending"] = True

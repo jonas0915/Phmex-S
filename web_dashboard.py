@@ -37,7 +37,6 @@ import matplotlib.dates as mdates
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
 PAPER_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_liq_cascade.json")
-CONTROL_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_legacy_control.json")
 FACTORY_STATE_FILE = os.path.join(PROJECT_DIR, "strategy_factory_state.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
 HOST = "0.0.0.0"
@@ -81,15 +80,6 @@ def read_paper_state() -> dict:
     """Read paper slot state file. Returns empty structure if missing."""
     try:
         with open(PAPER_STATE_FILE, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        return {"peak_balance": 0, "closed_trades": []}
-
-
-def read_control_state() -> dict:
-    """Read V10 control slot state file. Returns empty structure if missing."""
-    try:
-        with open(CONTROL_STATE_FILE, "r") as f:
             return json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         return {"peak_balance": 0, "closed_trades": []}
@@ -687,142 +677,12 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
     </div>'''
 
 
-def _build_control_card(control_trades: list[dict], live_trades: list[dict]) -> str:
-    """Build Sentinel v11 vs V10 Control A/B test card — side-by-side comparison."""
-    # Sentinel trades: live trades since Apr 1 (deployment date)
-    sentinel_deploy = datetime(2026, 4, 1, hour=23, minute=1, tzinfo=CA_TZ).timestamp()
-    eval_end = datetime(2026, 4, 7, tzinfo=CA_TZ).timestamp()
-    sentinel_trades = [t for t in live_trades if t.get("opened_at", 0) >= sentinel_deploy]
-    sentinel_stats = compute_stats(sentinel_trades)
-    ctrl_stats = compute_stats(control_trades)
-    # V10 Control is paper: pnl_usdt is already net of simulated fees.
-    # Zero out fees and align real_pnl to total_pnl to avoid double-counting.
-    ctrl_stats["total_fees"] = 0
-    ctrl_stats["real_pnl"] = ctrl_stats["total_pnl"]
-
-    today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-    sentinel_today = [t for t in sentinel_trades if t.get("opened_at", 0) >= today_start]
-    ctrl_today = [t for t in control_trades if t.get("opened_at", 0) >= today_start]
-    sentinel_today_stats = compute_stats(sentinel_today)
-    ctrl_today_stats = compute_stats(ctrl_today)
-    ctrl_today_stats["total_fees"] = 0
-    ctrl_today_stats["real_pnl"] = ctrl_today_stats["total_pnl"]
-
-    has_ctrl = len(control_trades) > 0
-    has_sentinel = len(sentinel_trades) > 0
-
-    # Days into evaluation
-    now_ts = _now_ca().timestamp()
-    days_in = max(1, int((now_ts - sentinel_deploy) / 86400) + 1)
-    days_left = max(0, int((eval_end - now_ts) / 86400))
-    eval_pct = min(100, (days_in / 5) * 100)
-
-    # Verdict logic
-    if not has_ctrl or not has_sentinel:
-        verdict = ("Collecting data...", "var(--text-dim)")
-    elif sentinel_stats["total_pnl"] > ctrl_stats["total_pnl"] and sentinel_stats["win_rate"] > ctrl_stats["win_rate"]:
-        verdict = ("Sentinel winning on all metrics", "var(--positive)")
-    elif sentinel_stats["total_pnl"] > ctrl_stats["total_pnl"]:
-        verdict = ("Sentinel ahead on PnL", "var(--positive)")
-    elif sentinel_stats["total_pnl"] < ctrl_stats["total_pnl"]:
-        verdict = ("V10 ahead — gates may be too tight", "var(--negative)")
-    else:
-        verdict = ("Too close to call", "var(--warning)")
-
-    def _ab_row(label, s_val, c_val, is_pnl=False, is_pct=False):
-        def _fmt(val, has_data):
-            if not has_data:
-                return ("", "--")
-            if is_pnl:
-                return ("positive" if val >= 0 else "negative", f"${val:+.2f}")
-            elif is_pct:
-                return ("positive" if val >= 50 else "negative" if val < 30 else "", f"{val:.1f}%")
-            else:
-                return ("", str(val))
-        s_cls, s_str = _fmt(s_val, has_sentinel)
-        c_cls, c_str = _fmt(c_val, has_ctrl)
-        # Highlight the winner
-        winner_s = ""
-        winner_c = ""
-        if has_sentinel and has_ctrl and s_val != c_val:
-            if is_pnl or is_pct:
-                if s_val > c_val:
-                    winner_s = "font-weight:700;"
-                elif c_val > s_val:
-                    winner_c = "font-weight:700;"
-        return f'''<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:4px 0;border-bottom:1px solid #21262d">
-            <span style="font-size:0.78em;color:var(--text-dim);font-family:'JetBrains Mono',monospace">{label}</span>
-            <span class="{s_cls}" style="font-family:'JetBrains Mono',monospace;font-size:0.82em;text-align:center;{winner_s}">{s_str}</span>
-            <span class="{c_cls}" style="font-family:'JetBrains Mono',monospace;font-size:0.82em;text-align:center;{winner_c}">{c_str}</span>
-        </div>'''
-
-    def _pf(stats):
-        pf = stats.get("profit_factor", 0)
-        return round(pf, 2) if pf != float("inf") else 0
-
-    return f'''<div class="glass-card dash-item" data-id="ab-test">
-        <h2 style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:0.65em;padding:2px 6px;border-radius:3px;background:rgba(210,153,34,0.1);color:var(--warning);border:1px solid rgba(210,153,34,0.25);font-weight:600;letter-spacing:0.04em;font-family:'JetBrains Mono',monospace">A/B TEST</span>
-            Sentinel v11 vs V10 Control
-        </h2>
-
-        <!-- Evaluation progress bar -->
-        <div style="margin:6px 0 10px">
-            <div style="display:flex;justify-content:space-between;font-size:0.7em;color:var(--text-dim);margin-bottom:3px;font-family:'JetBrains Mono',monospace">
-                <span>Day {days_in} of 5</span>
-                <span>{days_left} days left</span>
-            </div>
-            <div style="height:4px;background:var(--bg-deep);border-radius:2px;overflow:hidden">
-                <div style="height:100%;width:{eval_pct:.0f}%;background:var(--warning);border-radius:2px"></div>
-            </div>
-        </div>
-
-        <!-- Verdict -->
-        <div style="text-align:center;padding:6px 10px;margin-bottom:10px;border-radius:3px;background:var(--bg-deep);border:1px solid #21262d">
-            <span style="font-size:0.78em;font-weight:600;color:{verdict[1]};font-family:'JetBrains Mono',monospace">{verdict[0]}</span>
-        </div>
-
-        <!-- Column headers -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:0 0 4px;border-bottom:1px solid #21262d;margin-bottom:4px">
-            <span style="font-size:0.65em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;font-family:'JetBrains Mono',monospace"></span>
-            <span style="font-size:0.65em;text-align:center;font-weight:600;color:var(--positive);text-transform:uppercase;letter-spacing:0.05em;font-family:'JetBrains Mono',monospace">SENTINEL v11</span>
-            <span style="font-size:0.65em;text-align:center;font-weight:600;color:var(--negative);text-transform:uppercase;letter-spacing:0.05em;font-family:'JetBrains Mono',monospace">V10 CONTROL</span>
-        </div>
-
-        <!-- Since deployment -->
-        <div style="font-size:0.7em;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;padding:6px 0 3px;font-family:'JetBrains Mono',monospace">Since Apr 1</div>
-        {_ab_row("Trades", f'{sentinel_stats["total"]} ({sentinel_stats["wins"]}W / {sentinel_stats["total"] - sentinel_stats["wins"]}L)', f'{ctrl_stats["total"]} ({ctrl_stats["wins"]}W / {ctrl_stats["total"] - ctrl_stats["wins"]}L)')}
-        {_ab_row("Win Rate", sentinel_stats["win_rate"], ctrl_stats["win_rate"], is_pct=True)}
-        {_ab_row("PnL", sentinel_stats["total_pnl"], ctrl_stats["total_pnl"], is_pnl=True)}
-        {_ab_row("Fees", sentinel_stats["total_fees"], ctrl_stats["total_fees"], is_pnl=True)}
-        {_ab_row("Real PnL", sentinel_stats["real_pnl"], ctrl_stats["real_pnl"], is_pnl=True)}
-        {_ab_row("Profit Factor", _pf(sentinel_stats), _pf(ctrl_stats))}
-        {_ab_row("Avg Win", sentinel_stats["avg_win"], ctrl_stats["avg_win"], is_pnl=True)}
-        {_ab_row("Avg Loss", -sentinel_stats["avg_loss"], -ctrl_stats["avg_loss"], is_pnl=True)}
-
-        <!-- Today -->
-        <div style="font-size:0.7em;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;padding:6px 0 3px;font-family:'JetBrains Mono',monospace">Today</div>
-        {_ab_row("Trades", f'{sentinel_today_stats["total"]} ({sentinel_today_stats["wins"]}W / {sentinel_today_stats["total"] - sentinel_today_stats["wins"]}L)', f'{ctrl_today_stats["total"]} ({ctrl_today_stats["wins"]}W / {ctrl_today_stats["total"] - ctrl_today_stats["wins"]}L)')}
-        {_ab_row("Win Rate", sentinel_today_stats["win_rate"], ctrl_today_stats["win_rate"], is_pct=True)}
-        {_ab_row("PnL", sentinel_today_stats["total_pnl"], ctrl_today_stats["total_pnl"], is_pnl=True)}
-        {_ab_row("Fees", sentinel_today_stats["total_fees"], ctrl_today_stats["total_fees"], is_pnl=True)}
-        {_ab_row("Real PnL", sentinel_today_stats["real_pnl"], ctrl_today_stats["real_pnl"], is_pnl=True)}
-
-        <!-- What's being tested -->
-        <div style="font-size:0.7em;color:var(--text-dim);margin-top:10px;padding:8px;background:var(--bg-deep);border-radius:3px;border:1px solid #21262d;line-height:1.5;font-family:'JetBrains Mono',monospace">
-            <span style="font-weight:600;color:var(--text-primary)">What&apos;s different:</span> Sentinel v11 adds 3 entry gates (OB imbalance, tape filter, ensemble confidence). V10 control trades the same strategy without gates. Same market, same timeframe.
-        </div>
-    </div>'''
-
-
 # ── Slot lifecycle overview ─────────────────────────────────────────────
-# Mapping from slot_id to strategy name — keep in sync with bot.py lines 100-139
+# Mapping from slot_id to strategy name — keep in sync with bot.py
 _SLOT_STRATEGY_MAP = {
     "5m_scalp": "confluence",
-    "1h_momentum": "htf_momentum",
     "5m_mean_revert": "bb_reversion",
     "5m_liq_cascade": "liq_cascade",
-    "5m_legacy_control": "confluence",
 }
 
 def _build_slots_overview(all_slots: dict[str, dict], factory: dict, sentinels: dict) -> str:
@@ -839,7 +699,7 @@ def _build_slots_overview(all_slots: dict[str, dict], factory: dict, sentinels: 
     # Build slot rows
     rows = ""
     # Known active slots first, then any discovered extras
-    known_order = ["5m_scalp", "1h_momentum", "5m_mean_revert", "5m_liq_cascade", "5m_legacy_control"]
+    known_order = ["5m_scalp", "5m_mean_revert", "5m_liq_cascade"]
     # Add any discovered slots not in known_order
     extra_slots = [s for s in all_slots if s not in known_order and s not in ("v8_245trades",)]
     ordered = known_order + extra_slots
@@ -1082,8 +942,6 @@ def build_content() -> str:
     stats = compute_stats(trades)
     paper_state = read_paper_state()
     paper_trades = paper_state.get("closed_trades", [])
-    control_state = read_control_state()
-    control_trades = control_state.get("closed_trades", [])
     factory_state = read_factory_state()
     all_slot_states = read_all_slot_states()
     sentinels = detect_sentinel_files()
@@ -1119,10 +977,8 @@ def build_content() -> str:
 
     audit_html = build_audit_table(trades)
     paper_html = _build_paper_comparison(trades, paper_trades)
-    control_html = _build_control_card(control_trades, trades)
     slots_html = _build_slots_overview(all_slot_states, factory_state, sentinels)
 
-    shadow_html = ''
     session_html = _build_session_card(trades, paper_trades, balance=balance, balance_start=balance_start_of_day)
 
     # Activity feed
@@ -1180,26 +1036,6 @@ def build_content() -> str:
     real_pnl_cls = "positive" if stats['real_pnl'] >= 0 else "negative"
     daily_real_cls = "positive" if daily_real_pnl >= 0 else "negative"
 
-    # Shadow filter stats card
-    shadow_all = [t for t in trades if t.get("shadow_skip")]
-    shadow_today_list = [t for t in today_trades if t.get("shadow_skip")]
-    if shadow_all:
-        s_all_pnl = sum(_net_pnl(t) for t in shadow_all)
-        s_all_wins = sum(1 for t in shadow_all if _net_pnl(t) > 0)
-        s_all_wr = (s_all_wins / len(shadow_all) * 100) if shadow_all else 0
-        s_today_pnl = sum(_net_pnl(t) for t in shadow_today_list)
-        savings = -s_all_pnl
-        sav_cls = "positive" if savings > 0 else "negative"
-        shadow_html = f'''<div class="glass-card dash-item" data-id="shadow">
-        <h2>Shadow Filter</h2>
-        <div class="stat-row"><span class="stat-label">Window</span><span class="stat-value" style="font-size:0.75em">11PM-3AM + 6AM + 9AM PT</span></div>
-        <div class="stat-row"><span class="stat-label">Shadow Trades</span><span class="stat-value">{len(shadow_all)}</span></div>
-        <div class="stat-row"><span class="stat-label">Shadow WR</span><span class="stat-value negative">{s_all_wr:.0f}%</span></div>
-        <div class="stat-row"><span class="stat-label">Shadow PnL</span><span class="stat-value {"positive" if s_all_pnl >= 0 else "negative"}">${s_all_pnl:+.2f}</span></div>
-        <div class="stat-row"><span class="stat-label">Est. Savings</span><span class="stat-value {sav_cls}">${savings:+.2f}</span></div>
-        <div class="stat-row"><span class="stat-label">Today Shadow</span><span class="stat-value">{len(shadow_today_list)} trades | ${s_today_pnl:+.2f}</span></div>
-    </div>'''
-
     # Regime status badge
     regime_cls = "regime-normal" if regime == "Normal" else "regime-warn" if "pause" in regime.lower() or "halt" in regime.lower() else "regime-info"
 
@@ -1252,9 +1088,8 @@ def build_content() -> str:
 
 <!-- 3-column grid -->
 <div class="dash-grid" id="dash-grid">
-    <!-- Left column: A/B Test, Slots, Sessions -->
+    <!-- Left column: Slots, Sessions -->
     <div class="dash-col">
-        {control_html}
         {slots_html}
         {session_html}
     </div>
@@ -1293,7 +1128,6 @@ def build_content() -> str:
         </div>
         {_build_reconcile_card()}
         {paper_html}
-        {shadow_html}
     </div>
 </div>
 

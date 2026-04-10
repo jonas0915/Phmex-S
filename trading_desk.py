@@ -281,7 +281,7 @@ def _build_api_response():
         exit_reasons[r]["pnl"] = round(exit_reasons[r]["pnl"], 2)
 
     # Paper slot data
-    paper_state_file = os.path.join(os.path.dirname(__file__), "trading_state_5m_sma_vwap.json")
+    paper_state_file = os.path.join(os.path.dirname(__file__), "trading_state_5m_liq_cascade.json")
     paper_data = {"trades": 0, "wr": 0, "pnl": 0, "today_trades": 0, "today_wr": 0, "today_pnl": 0, "recent": []}
     if os.path.exists(paper_state_file):
         try:

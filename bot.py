@@ -192,14 +192,6 @@ class Phmex2Bot:
                 capital_pct=0.4,  # 40% of balance
             ),
             StrategySlot(
-                slot_id="1h_momentum",
-                strategy_name="htf_momentum",
-                timeframe="1h",
-                max_positions=2,
-                capital_pct=0.3,  # 30% of balance
-                paper_mode=True,  # Paper mode first — validate before going live
-            ),
-            StrategySlot(
                 slot_id="5m_mean_revert",
                 strategy_name="bb_reversion",
                 timeframe="5m",
@@ -213,14 +205,6 @@ class Phmex2Bot:
                 timeframe="5m",
                 max_positions=1,
                 capital_pct=0.0,  # 0% for now — paper only
-                paper_mode=True,
-            ),
-            StrategySlot(
-                slot_id="5m_legacy_control",
-                strategy_name="confluence",
-                timeframe="5m",
-                max_positions=2,
-                capital_pct=0.0,  # Paper only — pre-gate-update control for A/B comparison
                 paper_mode=True,
             ),
         ]
@@ -647,7 +631,7 @@ class Phmex2Bot:
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                     self.risk.close_position(symbol, fill_price, "early_exit", fees_usdt=self.exchange.extract_order_fee(order, symbol))
                     self.exchange.cancel_open_orders(symbol)
-                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "early_exit", shadow_skip=getattr(pos, 'shadow_skip', False))
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "early_exit")
             except Exception as e:
                 logger.debug(f"Early exit check failed for {symbol}: {e}")
 
@@ -674,7 +658,7 @@ class Phmex2Bot:
                 self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                 self.risk.close_position(symbol, fill_price, "flat_exit", fees_usdt=self.exchange.extract_order_fee(order, symbol))
                 self.exchange.cancel_open_orders(symbol)
-                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "flat_exit", shadow_skip=getattr(pos, 'shadow_skip', False))
+                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "flat_exit")
 
         # Trend-flip exit — close htf_confluence_pullback positions when 1h EMA flips
         for symbol, pos in list(self.risk.positions.items()):
@@ -701,7 +685,7 @@ class Phmex2Bot:
                 self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                 self.risk.close_position(symbol, fill_price, flip_reason, fees_usdt=self.exchange.extract_order_fee(order, symbol))
                 self.exchange.cancel_open_orders(symbol)
-                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), flip_reason, shadow_skip=getattr(pos, 'shadow_skip', False))
+                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), flip_reason)
                 continue
 
         # Adverse exit — bail out of wrong-direction trades early
@@ -733,7 +717,7 @@ class Phmex2Bot:
                 self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                 self.risk.close_position(symbol, fill_price, "adverse_exit", fees_usdt=self.exchange.extract_order_fee(order, symbol))
                 self.exchange.cancel_open_orders(symbol)
-                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "adverse_exit", shadow_skip=getattr(pos, 'shadow_skip', False))
+                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "adverse_exit")
                 continue
 
         # Check if exchange already closed positions (exchange SL/TP triggered)
@@ -783,7 +767,7 @@ class Phmex2Bot:
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                     self.risk.close_position(symbol, fill_price, exit_type, fees_usdt=self.exchange.extract_order_fee(order, symbol))
                     self.exchange.cancel_open_orders(symbol)
-                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), exit_type, shadow_skip=getattr(pos, 'shadow_skip', False))
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), exit_type)
 
         # Break-even and trailing stop updates
         for symbol, pos in list(self.risk.positions.items()):
@@ -831,7 +815,7 @@ class Phmex2Bot:
                         continue
                     fill_price = self._extract_fill_price(order, price, is_exit=True)
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
-                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), reason, shadow_skip=getattr(pos, 'shadow_skip', False))
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), reason)
                     self.risk.close_position(symbol, fill_price, reason, fees_usdt=self.exchange.extract_order_fee(order, symbol))
                     self.exchange.cancel_open_orders(symbol)
 
@@ -1082,16 +1066,6 @@ class Phmex2Bot:
                     logger.info(f"[TIME BLOCK] {symbol} {direction} skipped — {_pt_hour}:00 PT is danger zone (10AM-2PM/4PM-6PM)")
                     continue
 
-                # Shadow logging: tag trades outside profitable window (remaining hours)
-                # Profitable hours (PT): 3 (60% WR/+$2.00), 9 (50% WR/+$3.91)
-                # PT offset: PDT = UTC-7, so PT 3 = UTC 10, PT 9 = UTC 16
-                # Removed from profitable (net losers): PT 0 (33%/-$2.53), 1 (50%/-$1.48),
-                #   2 (29%/-$3.22), 6 (38%/-$0.77), 23 (36%/-$0.36) — reclassified 2026-04-07
-                _PROFITABLE_HOURS_UTC = {10, 16}
-                shadow_skip = _utc_hour not in _PROFITABLE_HOURS_UTC
-                if shadow_skip:
-                    logger.info(f"[SHADOW] {symbol} {direction} entry at {_pt_hour}:00 PT — outside profitable window")
-
                 # Kelly-aware position sizing (uses $2 min margin during bootstrap)
                 margin = self.risk.calculate_kelly_margin(available, confidence=confidence)
 
@@ -1144,7 +1118,7 @@ class Phmex2Bot:
                 order = self.exchange.open_long(symbol, margin, price) if direction == "long" else self.exchange.open_short(symbol, margin, price)
                 if order:
                     fill_price = self._extract_fill_price(order, price)
-                    self.risk.open_position(symbol, fill_price, margin, side=direction, atr=atr_val, regime=regime, cycle=self.cycle_count, strategy=strat_name, shadow_skip=shadow_skip)
+                    self.risk.open_position(symbol, fill_price, margin, side=direction, atr=atr_val, regime=regime, cycle=self.cycle_count, strategy=strat_name)
                     pos = self.risk.positions[symbol]
                     fill_amount = self._extract_fill_amount(order, pos.amount)
                     pos.amount = fill_amount
@@ -1166,7 +1140,7 @@ class Phmex2Bot:
                         self.risk._save_state()
                     except Exception as _e:
                         logger.debug(f"[SNAPSHOT] live save_state after entry failed: {_e}")
-                    notifier.notify_entry(symbol, direction, fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason, shadow_skip=shadow_skip)
+                    notifier.notify_entry(symbol, direction, fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason)
                 else:
                     logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
 
@@ -1293,60 +1267,59 @@ class Phmex2Bot:
                 margin = Config.TRADE_AMOUNT_USDT
                 atr_val = df.iloc[-2].get("atr", 0) if len(df) > 1 else 0
 
-                # Apply OB + Tape gates to paper slots (skip legacy_control — it's the ungated control)
-                if slot.slot_id != "5m_legacy_control":
-                    # L2 Orderbook gate
-                    if ob is not None:
-                        ob_imb = ob.get("imbalance", 0.0)
-                        ob_bwalls = ob.get("bid_walls", [])
-                        ob_awalls = ob.get("ask_walls", [])
-                        ob_spread = ob.get("spread_pct", 0.0)
-                        if direction == "long" and ob_imb < -0.25:
-                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} LONG blocked — ask imbalance {ob_imb:.2f}")
-                            continue
-                        if direction == "short" and ob_imb > 0.25:
-                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} SHORT blocked — bid imbalance {ob_imb:.2f}")
-                            continue
-                        if direction == "long" and ob_awalls and not ob_bwalls:
-                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} LONG blocked — unmatched ask wall")
-                            continue
-                        if direction == "short" and ob_bwalls and not ob_awalls:
-                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} SHORT blocked — unmatched bid wall")
-                            continue
-                        if ob_spread > 0.15:
-                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} blocked — wide spread {ob_spread:.3f}%")
-                            continue
-                    # Tape gate
-                    flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
-                    if flow and flow.get("trade_count", 0) > 20:
-                        buy_ratio = flow.get("buy_ratio", 0.5)
-                        cvd_slope = flow.get("cvd_slope", 0.0)
-                        divergence = flow.get("divergence")
-                        lt_bias = flow.get("large_trade_bias", 0.0)
-                        if direction == "long" and buy_ratio < 0.45:
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — buy_ratio {buy_ratio:.0%}")
-                            continue
-                        if direction == "short" and buy_ratio > 0.55:
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%}")
-                            continue
-                        if direction == "long" and cvd_slope < -0.3:
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — CVD slope {cvd_slope:.2f}")
-                            continue
-                        if direction == "short" and cvd_slope > 0.3:
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — CVD slope {cvd_slope:.2f}")
-                            continue
-                        if direction == "long" and divergence == "bearish":
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — bearish divergence")
-                            continue
-                        if direction == "short" and divergence == "bullish":
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — bullish divergence")
-                            continue
-                        if direction == "long" and lt_bias < -0.3:
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — large trade bias {lt_bias:.2f}")
-                            continue
-                        if direction == "short" and lt_bias > 0.3:
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — large trade bias {lt_bias:.2f}")
-                            continue
+                # Apply OB + Tape gates to paper slots
+                # L2 Orderbook gate
+                if ob is not None:
+                    ob_imb = ob.get("imbalance", 0.0)
+                    ob_bwalls = ob.get("bid_walls", [])
+                    ob_awalls = ob.get("ask_walls", [])
+                    ob_spread = ob.get("spread_pct", 0.0)
+                    if direction == "long" and ob_imb < -0.25:
+                        logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} LONG blocked — ask imbalance {ob_imb:.2f}")
+                        continue
+                    if direction == "short" and ob_imb > 0.25:
+                        logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} SHORT blocked — bid imbalance {ob_imb:.2f}")
+                        continue
+                    if direction == "long" and ob_awalls and not ob_bwalls:
+                        logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} LONG blocked — unmatched ask wall")
+                        continue
+                    if direction == "short" and ob_bwalls and not ob_awalls:
+                        logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} SHORT blocked — unmatched bid wall")
+                        continue
+                    if ob_spread > 0.15:
+                        logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} blocked — wide spread {ob_spread:.3f}%")
+                        continue
+                # Tape gate
+                flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
+                if flow and flow.get("trade_count", 0) > 20:
+                    buy_ratio = flow.get("buy_ratio", 0.5)
+                    cvd_slope = flow.get("cvd_slope", 0.0)
+                    divergence = flow.get("divergence")
+                    lt_bias = flow.get("large_trade_bias", 0.0)
+                    if direction == "long" and buy_ratio < 0.45:
+                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — buy_ratio {buy_ratio:.0%}")
+                        continue
+                    if direction == "short" and buy_ratio > 0.55:
+                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%}")
+                        continue
+                    if direction == "long" and cvd_slope < -0.3:
+                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — CVD slope {cvd_slope:.2f}")
+                        continue
+                    if direction == "short" and cvd_slope > 0.3:
+                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — CVD slope {cvd_slope:.2f}")
+                        continue
+                    if direction == "long" and divergence == "bearish":
+                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — bearish divergence")
+                        continue
+                    if direction == "short" and divergence == "bullish":
+                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — bullish divergence")
+                        continue
+                    if direction == "long" and lt_bias < -0.3:
+                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — large trade bias {lt_bias:.2f}")
+                        continue
+                    if direction == "short" and lt_bias > 0.3:
+                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — large trade bias {lt_bias:.2f}")
+                        continue
 
                 slot.risk.open_position(
                     symbol, price, margin, side=direction,
@@ -1477,7 +1450,7 @@ class Phmex2Bot:
                     logger.info(f"[SYNC] {symbol} closed on exchange (SL/TP triggered) — removing from tracker")
                     self.exchange.cancel_open_orders(symbol)
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(exit_price))
-                    notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), "exchange_close", shadow_skip=getattr(pos, 'shadow_skip', False))
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), "exchange_close")
                     self.risk.close_position(symbol, exit_price, "exchange_close", fees_usdt=sync_fee)
         except Exception as e:
             logger.debug(f"Exchange position sync failed: {e}")
