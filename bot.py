@@ -108,6 +108,25 @@ def _diagnose_connectivity() -> dict:
     return diag
 
 
+def _check_htf_trend_flip_exit(side: str, htf_df) -> tuple[bool, str]:
+    """Check if 1h EMA21/EMA50 has flipped against position direction.
+
+    Returns (should_exit, reason). Used by htf_confluence_pullback positions only.
+    """
+    if htf_df is None or len(htf_df) == 0:
+        return False, ""
+    last = htf_df.iloc[-1]
+    ema21 = last.get("ema_21")
+    ema50 = last.get("ema_50")
+    if ema21 is None or ema50 is None:
+        return False, ""
+    if side == "long" and ema21 < ema50:
+        return True, "htf_trend_flip_exit"
+    if side == "short" and ema21 > ema50:
+        return True, "htf_trend_flip_exit"
+    return False, ""
+
+
 class Phmex2Bot:
     def __init__(self):
         Config.validate()
@@ -619,6 +638,34 @@ class Phmex2Bot:
                 self.exchange.cancel_open_orders(symbol)
                 notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "flat_exit", shadow_skip=getattr(pos, 'shadow_skip', False))
 
+        # Trend-flip exit — close htf_confluence_pullback positions when 1h EMA flips
+        for symbol, pos in list(self.risk.positions.items()):
+            if symbol not in self.risk.positions:
+                continue
+            if pos.strategy != "htf_confluence_pullback":
+                continue
+            price = prices.get(symbol)
+            if not price:
+                continue
+            htf_df_tuple = self._htf_cache.get(symbol)
+            htf_df = htf_df_tuple[0] if htf_df_tuple else None
+            should_flip, flip_reason = _check_htf_trend_flip_exit(pos.side, htf_df)
+            if should_flip:
+                logger.info(f"[TREND-FLIP EXIT] {symbol} {pos.side} — 1h EMA flipped, closing")
+                if pos.side == "long":
+                    order = self.exchange.close_long(symbol, pos.amount)
+                else:
+                    order = self.exchange.close_short(symbol, pos.amount)
+                if not order:
+                    logger.error(f"[TREND-FLIP EXIT] Close order failed for {symbol}")
+                    continue
+                fill_price = self._extract_fill_price(order, price, is_exit=True)
+                self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
+                self.risk.close_position(symbol, fill_price, flip_reason, fees_usdt=self.exchange.extract_order_fee(order, symbol))
+                self.exchange.cancel_open_orders(symbol)
+                notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), flip_reason, shadow_skip=getattr(pos, 'shadow_skip', False))
+                continue
+
         # Adverse exit — bail out of wrong-direction trades early
         for symbol, pos in list(self.risk.positions.items()):
             if symbol not in self.risk.positions:
@@ -1114,6 +1161,19 @@ class Phmex2Bot:
                     slot.risk.close_position(symbol, price, "take_profit")
                     notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "take_profit")
                     continue
+
+                # Trend-flip exit for htf_confluence_pullback paper positions
+                if slot.strategy_name == "htf_confluence_pullback":
+                    htf_df_tuple = self._htf_cache.get(symbol)
+                    htf_df = htf_df_tuple[0] if htf_df_tuple else None
+                    should_flip, flip_reason = _check_htf_trend_flip_exit(pos.side, htf_df)
+                    if should_flip:
+                        pnl = pos.pnl_usdt(price)
+                        pnl_pct = pos.pnl_percent(price)
+                        logger.info(f"[PAPER TREND-FLIP EXIT] {slot.slot_id} {symbol} {pos.side} — 1h EMA flipped")
+                        slot.risk.close_position(symbol, price, flip_reason)
+                        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, flip_reason)
+                        continue
 
                 # Check adverse exit
                 if pos.should_adverse_exit(self.cycle_count, price):
