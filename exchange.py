@@ -285,7 +285,7 @@ class Exchange:
 
         # Try limit order first (maker)
         try:
-            order = self.client.create_order(symbol, "limit", order_side, amount, limit_price, params={"timeInForce": "GTC", "postOnly": True})
+            order = self.client.create_order(symbol, "limit", order_side, amount, limit_price, params={"timeInForce": "PostOnly"})
             order_id = order.get("id")
             logger.info(f"[MAKER] Limit {order_side} {amount} {symbol} @ {limit_price} (id={order_id})")
 
@@ -463,7 +463,7 @@ class Exchange:
         limit_price = self._round_price(symbol, limit_price)
         try:
             order = self.client.create_order(symbol, "limit", side, amount, limit_price,
-                                             params={"reduceOnly": True, "timeInForce": "GTC", "postOnly": True})
+                                             params={"reduceOnly": True, "timeInForce": "PostOnly"})
             order_id = order.get("id")
             logger.info(f"[MAKER EXIT] Limit {side} {amount} {symbol} @ {limit_price}")
 
