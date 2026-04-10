@@ -1135,7 +1135,7 @@ class Phmex2Bot:
                     available -= pos.margin
                     self._last_entry_time = time.time()
                     logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${pos.margin:.2f} | Conf: {confidence}/7 | {signal.reason} | Strength: {signal.strength:.2f}")
-                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow)
+                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df)
                     try:
                         self.risk._save_state()
                     except Exception as _e:
@@ -1336,7 +1336,7 @@ class Phmex2Bot:
                     f"[PAPER] {slot.slot_id} ENTRY {direction.upper()} {symbol} | "
                     f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}"
                 )
-                snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, slot.strategy_name, signal.strength, price, 0, None, None)
+                snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, slot.strategy_name, signal.strength, price, 0, None, None, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None)
                 if symbol in slot.risk.positions:
                     slot.risk.positions[symbol].entry_snapshot = snap
                     try:
@@ -1344,9 +1344,53 @@ class Phmex2Bot:
                     except Exception as _e:
                         logger.debug(f"[SNAPSHOT] paper save_state after entry failed: {_e}")
 
+    @staticmethod
+    def _classify_regime(last, df=None) -> dict:
+        """Classify market regime from OHLCV indicator row. Pure data, no gates."""
+        try:
+            close = float(last.get("close", 0))
+            adx = float(last.get("adx", 0))
+            atr = float(last.get("atr", 0))
+            ema9 = float(last.get("ema_9", 0))
+            ema21 = float(last.get("ema_21", 0))
+            ema50 = float(last.get("ema_50", 0))
+            ema200 = float(last.get("ema_200", 0))
+            vol = float(last.get("volume", 0))
+            vol_avg = float(df["volume"].iloc[-20:].mean()) if df is not None and len(df) >= 20 else 0
+        except (TypeError, ValueError):
+            return {"label": "UNKNOWN"}
+
+        atr_pct = (atr / close) if close > 0 else 0
+        vol_ratio = (vol / vol_avg) if vol_avg > 0 else 1.0
+        above_ema200 = close > ema200 if ema200 > 0 else True
+        stack_bull = ema9 > ema21 > ema50 > 0
+        stack_bear = 0 < ema9 < ema21 < ema50
+
+        if atr_pct > 0.015 or vol_ratio > 2.5:
+            label = "VOLATILE"
+        elif adx >= 25 and stack_bull and above_ema200:
+            label = "TRENDING_UP"
+        elif adx >= 25 and stack_bear and not above_ema200:
+            label = "TRENDING_DOWN"
+        elif adx < 20:
+            label = "CHOPPY"
+        else:
+            label = "QUIET"
+
+        return {
+            "label": label,
+            "adx": round(adx, 1),
+            "atr_pct": round(atr_pct, 5),
+            "above_ema200": above_ema200,
+            "ema_stack_bull": stack_bull,
+            "ema_stack_bear": stack_bear,
+            "vol_ratio": round(vol_ratio, 2),
+        }
+
     def _log_entry_snapshot(self, symbol: str, direction: str, slot_id: str,
                             strategy: str, strength: float, price: float,
-                            confidence: int, ob: dict | None, flow: dict | None) -> dict:
+                            confidence: int, ob: dict | None, flow: dict | None,
+                            ohlcv_last=None, ohlcv_df=None) -> dict:
         """Append entry conditions snapshot to JSONL for post-hoc analysis.
         Returns the snapshot dict so it can be attached to the Position."""
         import json as _json
@@ -1372,6 +1416,7 @@ class Phmex2Bot:
                 "large_trade_bias": round(flow.get("large_trade_bias", 0), 3),
                 "trade_count": flow.get("trade_count", 0),
             } if flow else None,
+            "regime": self._classify_regime(ohlcv_last, ohlcv_df) if ohlcv_last is not None else None,
         }
         try:
             with open("logs/entry_snapshots.jsonl", "a") as f:
