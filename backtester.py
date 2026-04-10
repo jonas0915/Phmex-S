@@ -22,6 +22,11 @@ from indicators import add_all_indicators
 from strategies import STRATEGIES, Signal, TradeSignal
 from config import Config
 
+# Fee model matching live config
+TAKER_FEE_PCT = 0.06  # per side
+SLIPPAGE_PCT = 0.05   # per side
+
+
 @dataclass
 class BacktestPosition:
     symbol: str
@@ -105,7 +110,7 @@ def load_data(pair, timeframe, days=None):
 
 def run_backtest(pair, strategy_name="confluence", timeframe="5m", days=None,
                  margin_per_trade=8.0, sl_pct=1.2, tp_pct=2.1, adverse_threshold=-5.0,
-                 adverse_cycles=10):
+                 adverse_cycles=10, ae_rule="roi"):
     """Run backtest on historical data."""
     df_raw = load_data(pair, timeframe, days)
     if len(df_raw) < 100:
@@ -197,15 +202,38 @@ def run_backtest(pair, strategy_name="confluence", timeframe="5m", days=None,
                 position = None
                 continue
 
-            # Adverse exit: wrong direction after N bars
-            if bars_held >= adverse_cycles and roi <= adverse_threshold:
+            # Adverse exit check (dispatched by ae_rule)
+            should_ae = False
+            ae_reason = "adverse_exit"
+            if ae_rule == "roi":
+                if bars_held >= adverse_cycles and roi <= adverse_threshold:
+                    should_ae = True
+                    ae_reason = "adverse_exit"
+            elif ae_rule == "trend_flip":
+                # Look up the 1h candle matching this 5m bar's timestamp
+                bar_time = bar["timestamp"] if "timestamp" in df.columns else bar.name
+                if htf_df is not None and len(htf_df) > 0:
+                    htf_mask = htf_df.index <= bar_time
+                    if htf_mask.any():
+                        htf_row = htf_df.loc[htf_mask].iloc[-1]
+                        ema21 = htf_row.get("ema_21", None)
+                        ema50 = htf_row.get("ema_50", None)
+                        if ema21 is not None and ema50 is not None:
+                            if position.side == "long" and ema21 < ema50:
+                                should_ae = True
+                                ae_reason = "htf_trend_flip_exit"
+                            elif position.side == "short" and ema21 > ema50:
+                                should_ae = True
+                                ae_reason = "htf_trend_flip_exit"
+
+            if should_ae:
                 result.trades.append({
                     "symbol": pair, "side": position.side,
                     "entry": position.entry_price, "exit": price,
                     "margin": position.margin,
                     "pnl_usdt": position.pnl_usdt(price),
                     "pnl_pct": roi,
-                    "reason": "adverse_exit", "strategy": position.strategy,
+                    "reason": ae_reason, "strategy": position.strategy,
                     "bars_held": bars_held,
                 })
                 position = None
@@ -346,6 +374,14 @@ def run_backtest(pair, strategy_name="confluence", timeframe="5m", days=None,
             "bars_held": len(df) - 1 - position.entry_bar,
         })
 
+    # Apply round-trip fees + slippage to all trades
+    for t in result.trades:
+        gross_pnl = t["pnl_usdt"]
+        notional = t["entry"] * (t["margin"] * Config.LEVERAGE / t["entry"])
+        fees = notional * (TAKER_FEE_PCT + SLIPPAGE_PCT) * 2 / 100
+        t["fees"] = round(fees, 4)
+        t["pnl_usdt"] = round(gross_pnl - fees, 4)
+
     return result
 
 
@@ -402,6 +438,12 @@ def main():
     parser.add_argument("--sl", type=float, default=1.2, help="Stop loss pct")
     parser.add_argument("--tp", type=float, default=2.1, help="Take profit pct")
     parser.add_argument("--wfo", action="store_true", help="Run walk-forward optimization")
+    parser.add_argument(
+        "--ae-rule",
+        choices=["roi", "trend_flip"],
+        default="roi",
+        help="Adverse exit rule: 'roi' (legacy -5%% after 10 cycles) or 'trend_flip' (1h EMA flip)"
+    )
     args = parser.parse_args()
 
     pairs = [args.pair] if args.pair else [
@@ -416,7 +458,7 @@ def main():
     all_trades = []
     for pair in pairs:
         result = run_backtest(pair, args.strategy, args.timeframe, args.days,
-                             args.margin, args.sl, args.tp)
+                             args.margin, args.sl, args.tp, ae_rule=args.ae_rule)
         if result.trades:
             s = result.summary()
             print(f"\n{pair}: {s['trades']} trades | WR: {s['wr']}% | PnL: ${s['pnl']} | Kelly: {s['kelly']}")
