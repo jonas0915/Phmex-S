@@ -135,10 +135,10 @@ def trend_scalp_strategy(df: pd.DataFrame, orderbook: dict = None) -> TradeSigna
             if ask_walls: ob_adj += 0.03
             if bid_walls: ob_adj -= 0.05  # buy wall opposes short
 
-        # Block entry if order book strongly contradicts (adverse imbalance > 0.3)
-        if direction == Signal.BUY and imbalance < -0.3:
+        # Block entry if order book strongly contradicts (adverse imbalance > 0.25)
+        if direction == Signal.BUY and imbalance < -0.25:
             return TradeSignal(Signal.HOLD, f"OB blocks long — heavy ask imbalance ({imbalance:.2f})", 0.0)
-        if direction == Signal.SELL and imbalance > 0.3:
+        if direction == Signal.SELL and imbalance > 0.25:
             return TradeSignal(Signal.HOLD, f"OB blocks short — heavy bid imbalance ({imbalance:.2f})", 0.0)
 
         strength += ob_adj
@@ -750,8 +750,8 @@ def htf_confluence_pullback(df: pd.DataFrame, orderbook: dict = None, htf_df: pd
     htf_ema50 = htf.get("ema_50", 0)
     htf_close = htf.get("close", 0)
 
-    if htf_adx < 20:
-        return TradeSignal(Signal.HOLD, f"confluence_pullback: 1h ADX {htf_adx:.1f} < 20", 0.0)
+    if htf_adx < 25:
+        return TradeSignal(Signal.HOLD, f"confluence_pullback: 1h ADX {htf_adx:.1f} < 25", 0.0)
 
     # Volume gate — using completed candle vs 20-period avg of completed candles
     if vol_avg <= 0 or volume < vol_avg * 0.6:
@@ -878,8 +878,8 @@ def htf_confluence_vwap(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.Dat
     vwap_dist_pct = (close - vwap) / vwap * 100
 
     # Volume gate
-    if vol_avg <= 0 or volume < vol_avg * 0.7:
-        return TradeSignal(Signal.HOLD, f"confluence_vwap: vol {volume/max(vol_avg,1e-10):.2f}x < 0.7x", 0.0)
+    if vol_avg <= 0 or volume < vol_avg * 0.5:
+        return TradeSignal(Signal.HOLD, f"confluence_vwap: vol {volume/max(vol_avg,1e-10):.2f}x < 0.5x", 0.0)
 
     direction = None
 

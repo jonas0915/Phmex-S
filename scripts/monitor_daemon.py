@@ -128,6 +128,31 @@ def run_monitor():
     now = datetime.now()
     alerts = []
 
+    # Check for restart sentinel (from auto_lifecycle rollback)
+    restart_sentinel = os.path.join(BOT_DIR, ".restart_bot")
+    if os.path.exists(restart_sentinel):
+        import subprocess
+        tg_send("🔄 <b>Restarting bot</b> — auto-rollback triggered restart")
+        result = subprocess.run(["ps", "aux"], capture_output=True, text=True)
+        for line in result.stdout.splitlines():
+            if "Python main.py" in line and "grep" not in line:
+                pid = int(line.split()[1])
+                subprocess.run(["kill", "-9", str(pid)], check=False)
+        import time as _time
+        _time.sleep(3)
+        _log_fh = open(os.path.join(BOT_DIR, "logs", "bot.log"), "a")
+        subprocess.Popen(
+            ["/Library/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python", "main.py"],
+            cwd=BOT_DIR,
+            stdout=_log_fh,
+            stderr=subprocess.STDOUT,
+        )
+        _log_fh.close()
+        os.remove(restart_sentinel)
+        tg_send("✅ <b>Bot restarted</b> successfully")
+        print(f"[MONITOR] Restart sentinel processed — bot restarted")
+        return  # Skip normal monitoring this cycle
+
     # 1. Bot alive check
     bot_alive = check_bot_alive()
     if not bot_alive:

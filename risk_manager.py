@@ -2,7 +2,7 @@ import datetime
 import json
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from config import Config
 from logger import setup_logger
@@ -32,6 +32,7 @@ class Position:
     entry_strength: float = 0.0
     confidence: int = 0
     ensemble_layers: str = ""
+    entry_snapshot: dict = field(default_factory=dict)
 
     def update_trailing_stop(self, current_price: float):
         """Tiered trailing stop — the bigger the winner, the tighter the trail.
@@ -251,6 +252,7 @@ class RiskManager:
                         entry_cycle=pd.get("entry_cycle", 0), opened_at=pd.get("opened_at", 0),
                         strategy=pd.get("strategy", ""), entry_strength=pd.get("entry_strength", 0),
                         confidence=pd.get("confidence", 0), ensemble_layers=pd.get("ensemble_layers", ""),
+                        entry_snapshot=pd.get("entry_snapshot", {}),
                     )
                     pos.shadow_skip = pd.get("shadow_skip", False)
                     pos.shadow_hour_pt = pd.get("shadow_hour_pt", None)
@@ -275,6 +277,7 @@ class RiskManager:
                     "entry_cycle": pos.entry_cycle, "opened_at": pos.opened_at,
                     "strategy": pos.strategy, "entry_strength": pos.entry_strength,
                     "confidence": pos.confidence, "ensemble_layers": pos.ensemble_layers,
+                    "entry_snapshot": getattr(pos, "entry_snapshot", {}),
                     "shadow_skip": getattr(pos, 'shadow_skip', False),
                     "shadow_hour_pt": getattr(pos, 'shadow_hour_pt', None),
                 }
@@ -365,16 +368,20 @@ class RiskManager:
             return min_margin
 
         # Compute Kelly from recent trades
+        def _np(t):
+            n = t.get("net_pnl")
+            return n if n is not None else t.get("pnl_usdt", 0)
+
         recent = self.closed_trades[-kelly_lookback:]
-        wins = [t for t in recent if t["pnl_usdt"] > 0]
-        losses = [t for t in recent if t["pnl_usdt"] <= 0]
+        wins = [t for t in recent if _np(t) > 0]
+        losses = [t for t in recent if _np(t) <= 0]
 
         if not wins or not losses:
             return min_margin
 
         win_rate = len(wins) / len(recent)
-        avg_win = sum(t["pnl_usdt"] for t in wins) / len(wins)
-        avg_loss = abs(sum(t["pnl_usdt"] for t in losses) / len(losses))
+        avg_win = sum(_np(t) for t in wins) / len(wins)
+        avg_loss = abs(sum(_np(t) for t in losses) / len(losses))
 
         if avg_win <= 0:
             return min_margin
@@ -413,13 +420,16 @@ class RiskManager:
         trades = self.closed_trades
         if len(trades) < 20:
             return 0.0
-        wins = [t for t in trades if t.get("pnl_usdt", 0) > 0]
-        losses = [t for t in trades if t.get("pnl_usdt", 0) <= 0]
+        def _np(t):
+            n = t.get("net_pnl")
+            return n if n is not None else t.get("pnl_usdt", 0)
+        wins = [t for t in trades if _np(t) > 0]
+        losses = [t for t in trades if _np(t) <= 0]
         if not wins or not losses:
             return 0.0
         wr = len(wins) / len(trades)
-        avg_win = sum(t["pnl_usdt"] for t in wins) / len(wins)
-        avg_loss = abs(sum(t["pnl_usdt"] for t in losses) / len(losses))
+        avg_win = sum(_np(t) for t in wins) / len(wins)
+        avg_loss = abs(sum(_np(t) for t in losses) / len(losses))
         if avg_win == 0:
             return 0.0
         return (wr * avg_win - (1 - wr) * avg_loss) / avg_win
@@ -501,6 +511,13 @@ class RiskManager:
                 margin = Config.TRADE_AMOUNT_USDT
                 logger.warning(f"[SYNC] {symbol} margin=0 from exchange — using default ${margin}")
 
+            # Preserve entry_snapshot (and shadow flags) from any disk-restored position
+            # so sync from exchange doesn't wipe attribution data captured at entry time.
+            existing = self.positions.get(symbol)
+            preserved_snapshot = getattr(existing, "entry_snapshot", {}) if existing else {}
+            preserved_shadow_skip = getattr(existing, "shadow_skip", False) if existing else False
+            preserved_shadow_hour = getattr(existing, "shadow_hour_pt", None) if existing else None
+
             if side == "long":
                 stop_loss   = entry_price * (1 - Config.STOP_LOSS_PERCENT / 100)
                 take_profit = entry_price * (1 + Config.TAKE_PROFIT_PERCENT / 100)
@@ -521,48 +538,87 @@ class RiskManager:
                 entry_cycle=current_cycle,
                 opened_at=time.time(),
                 strategy="synced",
+                entry_snapshot=preserved_snapshot,
             )
+            position.shadow_skip = preserved_shadow_skip
+            position.shadow_hour_pt = preserved_shadow_hour
             self.positions[symbol] = position
             logger.info(
                 f"[SYNC] Loaded {side.upper()} {symbol} | Entry: {entry_price:.4f} | "
                 f"SL: {stop_loss:.4f} | TP: {take_profit:.4f} | "
                 f"Amount: {amount:.6f} | Margin: {margin:.2f} USDT"
             )
+        if open_positions:
+            self._save_state()
 
-    def close_position(self, symbol: str, exit_price: float, reason: str):
+    def close_position(self, symbol: str, exit_price: float, reason: str, fees_usdt: float = None):
         if symbol not in self.positions:
             return
         pos = self.positions.pop(symbol)
-        pnl      = pos.pnl_usdt(exit_price)
+        pnl      = pos.pnl_usdt(exit_price)  # gross
+        # Resolve fees: live uses actual fee from order; paper uses simulated round-trip
+        fees_pending = False
+        if fees_usdt is None:
+            if self.is_paper:
+                notional = pos.entry_price * pos.amount
+                fee_pct = (Config.TAKER_FEE_PERCENT + Config.SLIPPAGE_PERCENT) * 2 / 100
+                fees_usdt = notional * fee_pct
+            else:
+                fees_usdt = 0.0  # unknown — treat as 0 rather than crash
+                fees_pending = True  # tag for reconciler/daily report backfill
+        elif (not self.is_paper) and fees_usdt == 0:
+            # Live trade with zero fees from extract_order_fee — likely silent failure (I7)
+            fees_pending = True
+        # Live mode keeps pnl_usdt as GROSS for backward compat; paper continues
+        # to subtract sim fees from pnl_usdt so historical paper records stay consistent.
+        if self.is_paper:
+            pnl -= fees_usdt
         pnl_pct  = pnl / pos.margin * 100 if pos.margin > 0 else 0.0
+        funding_usdt = 0.0  # placeholder for future funding tracking
+        gross_pnl = pos.pnl_usdt(exit_price)
+        net_pnl = gross_pnl - fees_usdt - funding_usdt
+        # Ensure reason is never empty — fall back to "exchange_close" if not provided
+        exit_reason = reason or "exchange_close"
 
         trade = {
             "symbol":   symbol,
             "side":     pos.side,
             "entry":    pos.entry_price,
             "exit":     exit_price,
+            # BUG B fix: always persist entry_price/exit_price aliases so
+            # downstream consumers (reports, dashboard, audits) never see
+            # None. Legacy `entry`/`exit` keys preserved above.
+            "entry_price": pos.entry_price,
+            "exit_price":  exit_price,
             "amount":   pos.amount,
             "margin":   pos.margin,
             "pnl_usdt": pnl,
             "pnl_pct":  pnl_pct,
-            "reason":   reason,
+            "fees_usdt": fees_usdt,
+            "funding_usdt": funding_usdt,
+            "net_pnl":  net_pnl,
+            "reason":   exit_reason,
+            "exit_reason": exit_reason,
             "strategy": pos.strategy,
             "opened_at": pos.opened_at,
             "closed_at": time.time(),
             "entry_strength": pos.entry_strength,
             "confidence": pos.confidence,
             "ensemble_layers": pos.ensemble_layers,
+            "entry_snapshot": getattr(pos, "entry_snapshot", {}),
             "duration_s": time.time() - pos.opened_at,
             "shadow_skip": getattr(pos, 'shadow_skip', False),
             "shadow_hour_pt": getattr(pos, 'shadow_hour_pt', None),
         }
+        if fees_pending:
+            trade["fees_pending"] = True
         self.closed_trades.append(trade)
         self._save_state()
 
         sign = "+" if pnl >= 0 else ""
         logger.info(
             f"{self._log_prefix}Position closed: {pos.side.upper()} {symbol} | Exit: {exit_price:.4f} | "
-            f"PnL: {sign}{pnl:.2f} USDT ({sign}{pnl_pct:.2f}%) | Reason: {reason}"
+            f"PnL: {sign}{pnl:.2f} USDT ({sign}{pnl_pct:.2f}%) | Reason: {exit_reason}"
         )
 
     def check_positions(self, prices: dict[str, float]) -> list[tuple[str, str]]:
@@ -575,7 +631,15 @@ class RiskManager:
             if pos.should_take_profit(price):
                 to_close.append((symbol, "take_profit"))
             elif pos.should_stop_loss(price):
-                to_close.append((symbol, "stop_loss"))
+                # BUG A fix: a "stop_loss" line that has been ratcheted
+                # above entry by breakeven/trailing logic (or after a
+                # partial TP that moves SL to entry+0.15%) is really a
+                # profitable exit, not a loss. Classify by PnL sign at
+                # trigger so winners aren't mistagged as stop_loss.
+                if pos.pnl_usdt(price) > 0:
+                    to_close.append((symbol, "take_profit"))
+                else:
+                    to_close.append((symbol, "stop_loss"))
         return to_close
 
     def partial_close_position(self, symbol: str, exit_price: float):
@@ -621,9 +685,12 @@ class RiskManager:
             logger.info("No closed trades yet.")
             return
 
-        wins     = [t for t in self.closed_trades if t["pnl_usdt"] > 0]
-        losses   = [t for t in self.closed_trades if t["pnl_usdt"] <= 0]
-        total_pnl = sum(t["pnl_usdt"] for t in self.closed_trades)
+        def _np(t):
+            n = t.get("net_pnl")
+            return n if n is not None else t.get("pnl_usdt", 0)
+        wins     = [t for t in self.closed_trades if _np(t) > 0]
+        losses   = [t for t in self.closed_trades if _np(t) <= 0]
+        total_pnl = sum(_np(t) for t in self.closed_trades)
         win_rate  = len(wins) / total_trades * 100
         longs     = [t for t in self.closed_trades if t["side"] == "long"]
         shorts    = [t for t in self.closed_trades if t["side"] == "short"]

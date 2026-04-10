@@ -95,7 +95,8 @@ class Exchange:
             best_bid = bids[0][0] if bids else 0
             best_ask = asks[0][0] if asks else 0
 
-            spread_pct = (best_ask - best_bid) / best_bid * 100 if best_bid else 0
+            mid = (best_ask + best_bid) / 2 if (best_ask and best_bid) else 0
+            spread_pct = ((best_ask - best_bid) / mid * 100) if mid else 0
             bid_depth_usdt = sum(b[0] * b[1] for b in bids)
             ask_depth_usdt = sum(a[0] * a[1] for a in asks)
             result = {
@@ -524,6 +525,77 @@ class Exchange:
         except Exception as e:
             logger.warning(f"[MAKER EXIT] Limit failed for {symbol}: {e}")
             return None
+
+    def extract_order_fee(self, order: Optional[dict], symbol: Optional[str] = None) -> float:
+        """Pull total fee (USDT) paid for an order from a ccxt response.
+
+        Tries in order:
+          1. order['fee']['cost']
+          2. sum(order['fees'][*]['cost'])
+          3. fetch_order(id, symbol) and re-check
+          4. fetch_my_trades(symbol, since=...) and sum fees for matching order id
+        Returns 0.0 if nothing can be resolved (caller treats as unknown).
+        """
+        if not order:
+            return 0.0
+        if not Config.is_live():
+            return 0.0
+
+        def _read(o: dict) -> float:
+            try:
+                fee = o.get("fee") if isinstance(o, dict) else None
+                if isinstance(fee, dict) and fee.get("cost") is not None:
+                    return abs(float(fee.get("cost") or 0))
+                fees = o.get("fees") if isinstance(o, dict) else None
+                if isinstance(fees, list) and fees:
+                    total = 0.0
+                    for f in fees:
+                        if isinstance(f, dict) and f.get("cost") is not None:
+                            total += abs(float(f.get("cost") or 0))
+                    if total > 0:
+                        return total
+            except Exception:
+                pass
+            return 0.0
+
+        cost = _read(order)
+        if cost > 0:
+            return cost
+
+        order_id = order.get("id") if isinstance(order, dict) else None
+        sym = symbol or (order.get("symbol") if isinstance(order, dict) else None)
+
+        # Follow-up fetch_order
+        if order_id and sym:
+            try:
+                fetched = self.client.fetch_order(order_id, sym)
+                cost = _read(fetched)
+                if cost > 0:
+                    return cost
+            except Exception as e:
+                logger.debug(f"extract_order_fee fetch_order failed for {sym}: {e}")
+
+        # Fallback: scan recent fills
+        if order_id and sym:
+            try:
+                since = int((time.time() - 600) * 1000)
+                trades = self.client.fetch_my_trades(sym, since=since, limit=20)
+                total = 0.0
+                for t in trades or []:
+                    if t.get("order") == order_id:
+                        fee = t.get("fee") or {}
+                        if fee.get("cost") is not None:
+                            total += abs(float(fee.get("cost") or 0))
+                        else:
+                            for f in t.get("fees") or []:
+                                if f.get("cost") is not None:
+                                    total += abs(float(f.get("cost") or 0))
+                if total > 0:
+                    return total
+            except Exception as e:
+                logger.debug(f"extract_order_fee fetch_my_trades failed for {sym}: {e}")
+
+        return 0.0
 
     def _round_price(self, symbol: str, price: float) -> float:
         """Round price to exchange tick size to avoid rejection."""

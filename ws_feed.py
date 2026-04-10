@@ -40,6 +40,10 @@ class WSDataFeed:
         self._current_candle_start: dict[str, int] = {}
         self._candle_deltas: dict[str, collections.deque] = {}
         self._cvd_total: dict[str, float] = {}
+        # Rolling window of recent trade notionals (for large-trade detection)
+        self._recent_notionals: dict[str, collections.deque] = {}
+        # Rolling window of recent large trades: +1 (buy) / -1 (sell)
+        self._recent_large_sides: dict[str, collections.deque] = {}
 
     # ── Public interface ──────────────────────────────────────────────────────
 
@@ -236,7 +240,7 @@ class WSDataFeed:
                 "buy_volume": 0, "sell_volume": 0, "buy_ratio": 0.5,
                 "delta": 0, "cvd": self._cvd_total[symbol],
                 "cvd_slope": 0, "divergence": None,
-                "large_trade_count": 0, "large_trade_bias": 0.5,
+                "large_trade_count": 0, "large_trade_bias": 0.0,
                 "trade_count": 0, "updated_at": 0,
             }
             self._trade_buffer[symbol] = []
@@ -251,6 +255,7 @@ class WSDataFeed:
                 batch_sell = 0.0
                 batch_count = 0
 
+                trade_costs_sides = []
                 for trade in trades:
                     cost = trade.get("cost", 0) or (
                         trade.get("amount", 0) * trade.get("price", 0))
@@ -262,17 +267,47 @@ class WSDataFeed:
                         self._archive_candle(symbol)
                     self._current_candle_start[symbol] = candle_start
 
-                    if trade.get("side") == "buy":
+                    side = trade.get("side")
+                    if side == "buy":
                         batch_buy += cost
                     else:
                         batch_sell += cost
                     batch_count += 1
+                    trade_costs_sides.append((cost, side))
 
                 with self._lock:
+                    notionals = self._recent_notionals.setdefault(
+                        symbol, collections.deque(maxlen=200))
+                    large_sides = self._recent_large_sides.setdefault(
+                        symbol, collections.deque(maxlen=50))
+
+                    # Large-trade tracking: 5x median of recent notionals
+                    for cost, side in trade_costs_sides:
+                        if cost and cost > 0:
+                            if len(notionals) >= 20:
+                                sorted_n = sorted(notionals)
+                                median = sorted_n[len(sorted_n) // 2]
+                                threshold = max(median * 5.0, 1.0)
+                                if cost >= threshold:
+                                    large_sides.append(1 if side == "buy" else -1)
+                            notionals.append(cost)
+
+                    # Compute large_trade_bias from rolling window
+                    # Floor at 8 large trades — with only 5, a 4-1 split (=0.6) is noise
+                    if len(large_sides) >= 8:
+                        large_buys = sum(1 for s in large_sides if s > 0)
+                        large_sells = sum(1 for s in large_sides if s < 0)
+                        denom = max(1, large_buys + large_sells)
+                        large_bias_val = (large_buys - large_sells) / denom
+                        large_count_val = large_buys + large_sells
+                    else:
+                        large_bias_val = 0.0
+                        large_count_val = len(large_sides)
+
                     flow = self._order_flow.setdefault(symbol, {
                         "buy_volume": 0, "sell_volume": 0, "buy_ratio": 0.5,
                         "delta": 0, "cvd": 0, "cvd_slope": 0, "divergence": None,
-                        "large_trade_count": 0, "large_trade_bias": 0.5,
+                        "large_trade_count": 0, "large_trade_bias": 0.0,
                         "trade_count": 0, "updated_at": 0,
                     })
                     flow["buy_volume"] += batch_buy
@@ -282,15 +317,19 @@ class WSDataFeed:
                     flow["buy_ratio"] = flow["buy_volume"] / total if total > 0 else 0.5
                     flow["delta"] = flow["buy_volume"] - flow["sell_volume"]
                     flow["cvd"] = self._cvd_total.get(symbol, 0) + flow["delta"]
+                    flow["large_trade_bias"] = large_bias_val
+                    flow["large_trade_count"] = large_count_val
                     flow["updated_at"] = _time.time()
 
                     deltas = self._candle_deltas.get(symbol, collections.deque(maxlen=10))
                     if len(deltas) >= 2:
                         half = len(deltas) // 2
                         d_list = list(deltas)
-                        flow["cvd_slope"] = sum(d_list[half:]) - sum(d_list[:half])
+                        delta_diff = sum(d_list[half:]) - sum(d_list[:half])
+                        total_abs = sum(abs(d) for d in d_list)
+                        flow["cvd_slope"] = delta_diff / total_abs if total_abs > 0 else 0.0
                     else:
-                        flow["cvd_slope"] = flow["delta"]
+                        flow["cvd_slope"] = 0.0
 
                     candles = self._cache.get(symbol, [])
                     if len(candles) >= 2:

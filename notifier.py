@@ -92,6 +92,16 @@ def notify_ban_mode(duration_minutes: int):
 def notify_ban_lifted():
     send(f"✅ <b>Connection Restored</b>  [{BOT_NAME}]\nBot is back online and trading.")
 
+def notify_ban_stuck(minutes: int, diag: dict | None = None):
+    diag_str = ""
+    if diag:
+        diag_str = f"\nNetwork: {diag.get('network', '?')} | VPN: {diag.get('vpn', '?')}"
+    send(
+        f"⚠️ <b>BAN MODE STUCK</b>  [{BOT_NAME}]\n"
+        f"Bot stuck in ban mode for {minutes}+ minutes.{diag_str}\n"
+        f"Manual check recommended."
+    )
+
 def notify_shutdown(open_positions: list, balance: float):
     pos_str = ', '.join(open_positions) if open_positions else 'None'
     send(

@@ -18,6 +18,12 @@ STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
 CHART_DIR = os.path.join(PROJECT_DIR, "charts")
 
 
+def _net(t: dict) -> float:
+    """Net PnL when present (post-fees), else fall back to gross pnl_usdt."""
+    n = t.get("net_pnl")
+    return n if n is not None else t.get("pnl_usdt", 0)
+
+
 def read_state() -> dict:
     try:
         with open(STATE_FILE, "r") as f:
@@ -35,7 +41,7 @@ def chart_cumulative_pnl(trades: list[dict], output: str):
     if not trades:
         return
 
-    pnls = [t.get("pnl_usdt", 0) for t in trades]
+    pnls = [_net(t) for t in trades]
     cumulative = []
     running = 0
     for p in pnls:
@@ -54,7 +60,7 @@ def chart_cumulative_pnl(trades: list[dict], output: str):
         for t in trades:
             ts = t.get("closed_at", 0)
             if ts > 0:
-                running += t.get("pnl_usdt", 0)
+                running += _net(t)
                 times.append(datetime.fromtimestamp(ts))
                 cum_with_time.append(running)
         if times:
@@ -83,7 +89,7 @@ def chart_cumulative_pnl(trades: list[dict], output: str):
     )
 
     ax.set_ylabel('Cumulative PnL (USDT)')
-    ax.set_title('Phmex-S — Cumulative PnL')
+    ax.set_title('Phmex-S — Cumulative PnL (net)')
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(output, dpi=150)
@@ -100,7 +106,7 @@ def chart_pnl_by_pair(trades: list[dict], output: str):
     pair_count = defaultdict(int)
     for t in trades:
         sym = t.get("symbol", "?")
-        pair_pnl[sym] += t.get("pnl_usdt", 0)
+        pair_pnl[sym] += _net(t)
         pair_count[sym] += 1
 
     # Sort by PnL
@@ -137,8 +143,8 @@ def chart_pnl_by_exit_reason(trades: list[dict], output: str):
     reason_pnl = defaultdict(float)
     reason_count = defaultdict(int)
     for t in trades:
-        reason = t.get("reason", "unknown")
-        reason_pnl[reason] += t.get("pnl_usdt", 0)
+        reason = t.get("exit_reason") or t.get("reason") or "unknown"
+        reason_pnl[reason] += _net(t)
         reason_count[reason] += 1
 
     reasons = list(reason_pnl.keys())
@@ -168,7 +174,7 @@ def chart_win_loss_distribution(trades: list[dict], output: str):
     if not trades:
         return
 
-    pnls = [t.get("pnl_usdt", 0) for t in trades]
+    pnls = [_net(t) for t in trades]
 
     fig, ax = plt.subplots(figsize=(10, 5))
     colors = ['green' if p >= 0 else 'red' for p in pnls]
@@ -193,7 +199,7 @@ def chart_rolling_win_rate(trades: list[dict], output: str, window: int = 10):
     rolling_wr = []
     for i in range(window, len(trades) + 1):
         batch = trades[i - window:i]
-        wins = sum(1 for t in batch if t.get("pnl_usdt", 0) > 0)
+        wins = sum(1 for t in batch if _net(t) > 0)
         rolling_wr.append(wins / window * 100)
 
     fig, ax = plt.subplots(figsize=(10, 5))

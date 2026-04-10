@@ -7,6 +7,7 @@ Usage:  python web_dashboard.py
 Open:   http://127.0.0.1:8050
 """
 import io
+import glob as _glob
 import json
 import os
 import re
@@ -14,6 +15,7 @@ import subprocess
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 CA_TZ = ZoneInfo("America/Los_Angeles")
@@ -34,8 +36,9 @@ import matplotlib.dates as mdates
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
-PAPER_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_sma_vwap.json")
-CONTROL_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_v10_control.json")
+PAPER_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_liq_cascade.json")
+CONTROL_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_legacy_control.json")
+FACTORY_STATE_FILE = os.path.join(PROJECT_DIR, "strategy_factory_state.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
 HOST = "0.0.0.0"
 PORT = 8050
@@ -49,6 +52,21 @@ _chart_lock = threading.Lock()
 
 def strip_ansi(text: str) -> str:
     return ANSI_RE.sub('', text)
+
+
+def _net_pnl(t: dict) -> float:
+    """Return net_pnl when present (post-fees), else fall back to gross pnl_usdt."""
+    n = t.get("net_pnl")
+    return n if n is not None else t.get("pnl_usdt", 0)
+
+
+def _real_fee(t: dict) -> float:
+    """Return real fees_usdt when present, else estimate (margin*lev*0.06%*2)."""
+    f = t.get("fees_usdt")
+    if f is not None:
+        return f
+    m = t.get("margin", 0) or 0
+    return m * 10 * 0.0006 * 2 if m > 0 else 0
 
 
 def read_state() -> dict:
@@ -75,6 +93,48 @@ def read_control_state() -> dict:
             return json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         return {"peak_balance": 0, "closed_trades": []}
+
+
+def read_factory_state() -> dict:
+    """Read strategy factory state. Returns empty structure if missing."""
+    try:
+        with open(FACTORY_STATE_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {"strategies": {}, "pipeline_log": []}
+
+
+def read_all_slot_states() -> dict[str, dict]:
+    """Discover and read all trading_state_*.json files. Returns {slot_id: state_dict}."""
+    slots = {}
+    for path in _glob.glob(os.path.join(PROJECT_DIR, "trading_state_*.json")):
+        fname = os.path.basename(path)
+        # Extract slot_id: trading_state_5m_liq_cascade.json → 5m_liq_cascade
+        slot_id = fname.replace("trading_state_", "").replace(".json", "")
+        try:
+            with open(path, "r") as f:
+                slots[slot_id] = json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            slots[slot_id] = {"peak_balance": 0, "closed_trades": []}
+    return slots
+
+
+def detect_sentinel_files() -> dict:
+    """Check for active sentinel files (Phase 1 IPC). Returns {type: [details]}."""
+    sentinels = {"paused": False, "kills": [], "pauses": [], "promotes": [], "demotes": [], "restart": False}
+    if os.path.exists(os.path.join(PROJECT_DIR, ".pause_trading")):
+        sentinels["paused"] = True
+    if os.path.exists(os.path.join(PROJECT_DIR, ".restart_bot")):
+        sentinels["restart"] = True
+    for pat, key in [(".kill_*", "kills"), (".pause_*", "pauses"), (".promote_*", "promotes"), (".demote_*", "demotes")]:
+        for path in _glob.glob(os.path.join(PROJECT_DIR, pat)):
+            name = os.path.basename(path)
+            # Skip .pause_trading (already handled above)
+            if name == ".pause_trading":
+                continue
+            slot_id = name.split("_", 1)[1] if "_" in name else name
+            sentinels[key].append(slot_id)
+    return sentinels
 
 
 def tail_log(n: int = 500) -> list[str]:
@@ -209,34 +269,27 @@ def get_recent_activity(lines: list[str], n: int = 12) -> list[str]:
 
 
 def build_audit_table(trades: list[dict]) -> str:
-    """Build a comprehensive performance audit table with all trades and breakdowns."""
+    """Build performance audit with breakdowns and collapsible trade log."""
     if not trades:
         return '<div style="color:#7e8aa0;text-align:center;padding:20px">No trades to audit</div>'
 
-    # Per-pair breakdown
+    # Collect stats
     pair_stats = defaultdict(lambda: {"wins": 0, "losses": 0, "pnl": 0.0, "trades": 0})
-    # Per-strategy breakdown
     strat_stats = defaultdict(lambda: {"wins": 0, "losses": 0, "pnl": 0.0, "trades": 0})
-    # Per-exit-reason breakdown
     exit_stats = defaultdict(lambda: {"wins": 0, "losses": 0, "pnl": 0.0, "trades": 0})
-    # Per-side breakdown
     side_stats = defaultdict(lambda: {"wins": 0, "losses": 0, "pnl": 0.0, "trades": 0})
-    # Hourly breakdown
-    hourly_stats = defaultdict(lambda: {"wins": 0, "losses": 0, "pnl": 0.0, "trades": 0})
 
     for t in trades:
-        pnl = t.get("pnl_usdt", 0)
+        pnl = _net_pnl(t)
         sym = t.get("symbol", "?").replace("/USDT:USDT", "")
         strat = t.get("strategy", "") or ""
         if not strat or strat in ("unknown", "synced"):
             strat = "pre-tracking"
-        reason = t.get("reason", "unknown")
+        reason = t.get("exit_reason") or t.get("reason") or "unknown"
         side = t.get("side", "?").upper()
-        closed_at = t.get("closed_at", 0)
-        hour = _from_ts(closed_at).strftime("%I:%M %p").lstrip("0") if closed_at > 0 else "??"
         is_win = pnl > 0
 
-        for key, bucket in [(sym, pair_stats), (strat, strat_stats), (reason, exit_stats), (side, side_stats), (hour, hourly_stats)]:
+        for key, bucket in [(sym, pair_stats), (strat, strat_stats), (reason, exit_stats), (side, side_stats)]:
             bucket[key]["trades"] += 1
             bucket[key]["pnl"] += pnl
             if is_win:
@@ -244,7 +297,7 @@ def build_audit_table(trades: list[dict]) -> str:
             else:
                 bucket[key]["losses"] += 1
 
-    def _render_breakdown(title, stats_dict, sort_by="pnl"):
+    def _compact_table(title, stats_dict, sort_by="pnl"):
         items = sorted(stats_dict.items(), key=lambda x: x[1][sort_by], reverse=True)
         rows = ""
         for name, s in items:
@@ -254,30 +307,26 @@ def build_audit_table(trades: list[dict]) -> str:
             rows += f'''<tr>
                 <td class="pair-cell">{escape(str(name))}</td>
                 <td style="text-align:center">{s["trades"]}</td>
-                <td style="text-align:center">{s["wins"]}</td>
-                <td style="text-align:center">{s["losses"]}</td>
                 <td class="{wr_cls}" style="text-align:center;font-weight:600">{wr:.0f}%</td>
                 <td class="{pnl_cls}" style="text-align:right;font-weight:600;font-family:'JetBrains Mono',monospace">${s["pnl"]:+.2f}</td>
             </tr>'''
+        col_name = title.replace("By ", "")
         return f'''<div class="audit-section">
-            <h3>{title}</h3>
+            <h3>{escape(title)}</h3>
             <div class="table-wrap"><table>
-                <thead><tr><th>{title.split(" ")[-1]}</th><th style="text-align:center">Trades</th><th style="text-align:center">W</th><th style="text-align:center">L</th><th style="text-align:center">WR%</th><th style="text-align:right">PnL</th></tr></thead>
+                <thead><tr><th>{escape(col_name)}</th><th style="text-align:center">N</th><th style="text-align:center">WR</th><th style="text-align:right">PnL</th></tr></thead>
                 <tbody>{rows}</tbody>
             </table></div>
         </div>'''
 
-    # Full trade log (all trades, newest first)
-    all_rows = ""
-    for i, t in enumerate(reversed(trades)):
-        pnl = t.get("pnl_usdt", 0)
+    # Trade log (last 30 shown, rest behind toggle)
+    def _build_trade_row(t, trade_num, total):
+        pnl = _net_pnl(t)
         pct = t.get("pnl_pct", 0)
         cls = "win" if pnl > 0 else "loss"
         sym = escape(t.get("symbol", "?").replace("/USDT:USDT", ""))
         side = escape(t.get("side", "?").upper())
-        reason = escape(t.get("reason", "?"))
-        raw_strat = t.get("strategy", "") or ""
-        strat = escape(raw_strat if raw_strat and raw_strat not in ("unknown", "synced") else "pre-tracking")
+        reason = escape(t.get("exit_reason") or t.get("reason") or "?")
         side_cls = "side-long" if side == "LONG" else "side-short"
         closed_at = t.get("closed_at", 0)
         opened_at = t.get("opened_at", 0)
@@ -285,90 +334,69 @@ def build_audit_table(trades: list[dict]) -> str:
         duration = ""
         if closed_at > 0 and opened_at > 0:
             dur_min = (closed_at - opened_at) / 60
-            if dur_min >= 60:
-                duration = f"{dur_min/60:.1f}h"
-            else:
-                duration = f"{dur_min:.0f}m"
-        entry = t.get("entry_price", 0)
-        entry_str = f"{entry:.4f}" if entry > 0 else "--"
-        # Estimated fees: 0.06% taker per side × 2 sides × notional (margin × 10x leverage)
+            duration = f"{dur_min/60:.1f}h" if dur_min >= 60 else f"{dur_min:.0f}m"
         margin_val = t.get("margin", 0)
-        fee_est = margin_val * 10 * 0.0006 * 2 if margin_val > 0 else 0
-        # Version model name based on trade index (0-indexed)
-        trade_idx = len(trades) - i - 1  # 0-indexed position in original list
-        trade_num = trade_idx + 1  # 1-indexed for display
-        if trade_idx <= 18:
-            version = "Genesis"
-        elif trade_idx <= 68:
-            version = "Patch"
-        elif trade_idx <= 80:
-            version = "Filter"
-        elif trade_idx <= 105:
-            version = "Razor"
-        elif trade_idx <= 156:
-            version = "Razor v2.1"
-        elif trade_idx <= 217:
-            version = "Clarity"
-        elif trade_idx <= 246:
-            version = "v5-v9"
-        else:
-            version = "Pipeline"
-        ver_colors = {
-            "Genesis": "#888", "Patch": "#4a9eff", "Filter": "#2ecc71",
-            "Razor": "#e74c3c", "Razor v2.1": "#f39c12", "Clarity": "#9b59b6",
-            "v5-v9": "#a6e3a1", "Pipeline": "#fab387",
-        }
+        fee_est = _real_fee(t)
+        trade_idx = trade_num - 1
+        if trade_idx <= 18: version = "Genesis"
+        elif trade_idx <= 68: version = "Patch"
+        elif trade_idx <= 80: version = "Filter"
+        elif trade_idx <= 105: version = "Razor"
+        elif trade_idx <= 156: version = "Razor v2.1"
+        elif trade_idx <= 217: version = "Clarity"
+        elif trade_idx <= 246: version = "v5-v9"
+        elif trade_idx <= 341: version = "Pipeline"
+        else: version = "Sentinel"
+        ver_colors = {"Genesis": "#888", "Patch": "#4a9eff", "Filter": "#2ecc71", "Razor": "#e74c3c", "Razor v2.1": "#f39c12", "Clarity": "#9b59b6", "v5-v9": "#a6e3a1", "Pipeline": "#fab387", "Sentinel": "#00d4aa"}
         ver_color = ver_colors.get(version, "#888")
-
-        all_rows += f'''<tr class="{cls}">
+        return f'''<tr class="{cls}">
             <td>{trade_num}</td>
             <td style="color:{ver_color};font-size:0.8em;font-weight:600">{version}</td>
             <td><span class="side-badge {side_cls}">{side}</span></td>
             <td class="pair-cell">{sym}</td>
-            <td class="pnl-cell">{pnl:+.2f}</td>
+            <td class="pnl-cell">${pnl:+.2f}</td>
             <td class="pnl-cell">{pct:+.1f}%</td>
-            <td style="color:var(--negative);font-size:0.85em">-${fee_est:.2f}</td>
             <td class="reason-cell">{reason}</td>
-            <td style="font-size:0.85em;color:var(--text-dim)">{strat}</td>
             <td class="time-cell">{duration}</td>
             <td class="time-cell">{time_str}</td>
         </tr>'''
 
-    exit_definitions = '''<div class="audit-section">
-        <h3>Exit Types</h3>
-        <div style="font-size:0.82em;line-height:1.7;color:var(--text-secondary)">
-            <div style="margin-bottom:6px"><span style="color:var(--positive);font-weight:600">early_exit</span> — Momentum reversal while in profit (ROI &ge; 3%). Needs 2-of-3 reversal signals, or 1-of-3 at 8%+ ROI.</div>
-            <div style="margin-bottom:6px"><span style="color:var(--accent-blue);font-weight:600">flat_exit</span> — Stagnant trade after 4 hrs. Exits if ROI is between -4% and +4%. Catches trades going nowhere.</div>
-            <div style="margin-bottom:6px"><span style="color:var(--accent-cyan);font-weight:600">exchange_close</span> — SL or TP triggered on the exchange itself. Bot detects position is gone and records it.</div>
-            <div style="margin-bottom:6px"><span style="color:#fab387;font-weight:600">adverse_exit</span> — Trade going wrong direction after hold period. Cuts losses early (at ~-5% ROI) before reaching SL or time exit.</div>
-            <div style="margin-bottom:6px"><span style="color:var(--warning);font-weight:600">stop_loss</span> — Software SL fallback. Trailing stop or breakeven SL triggered by the bot&#39;s own price checks.</div>
-            <div style="margin-bottom:6px"><span style="color:var(--positive);font-weight:600">take_profit</span> — Software TP triggered by bot. Rarely fires — early_exit usually catches profits first.</div>
-            <div style="margin-bottom:6px"><span style="color:var(--negative);font-weight:600">time_exit</span> — Soft clock limit (15-45 min by strategy). Exits if losing at soft limit. Deep losses (&lt; -6%) cut at half soft limit.</div>
-            <div><span style="color:var(--negative);font-weight:600">hard_time_exit</span> — Hard clock limit (45-120 min). Unconditional exit unless ROI &ge; 5% (then extended 50%).</div>
-        </div>
-    </div>'''
+    recent_rows = ""
+    for i, t in enumerate(reversed(trades[-30:])):
+        trade_num = len(trades) - i
+        recent_rows += _build_trade_row(t, trade_num, len(trades))
+
+    older_rows = ""
+    if len(trades) > 30:
+        for i, t in enumerate(reversed(trades[:-30])):
+            trade_num = len(trades) - 30 - i
+            older_rows += _build_trade_row(t, trade_num, len(trades))
+
+    log_header = '<thead><tr><th>#</th><th>Ver</th><th>Side</th><th>Pair</th><th>PnL</th><th>ROI</th><th>Exit</th><th>Dur</th><th>Closed</th></tr></thead>'
+
+    older_section = ""
+    if older_rows:
+        older_section = f'''
+        <details style="margin-top:8px">
+            <summary style="cursor:pointer;color:var(--accent);font-size:0.8em;font-weight:500;padding:6px 0">Show {len(trades)-30} older trades</summary>
+            <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+            <table>{log_header}<tbody>{older_rows}</tbody></table>
+            </div>
+        </details>'''
 
     return f'''
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div style="max-height:250px;overflow-y:auto">{_render_breakdown("By Side", side_stats)}</div>
-        <div style="max-height:250px;overflow-y:auto">{_render_breakdown("By Exit Reason", exit_stats)}</div>
+    <div class="audit-grid">
+        {_compact_table("By Exit Reason", exit_stats)}
+        {_compact_table("By Pair", pair_stats)}
+        {_compact_table("By Side", side_stats)}
+        {_compact_table("By Strategy", strat_stats)}
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div style="max-height:300px;overflow-y:auto">{_render_breakdown("By Hour", hourly_stats, sort_by="trades")}</div>
-        <div style="max-height:300px;overflow-y:auto">{_render_breakdown("By Pair", pair_stats)}</div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div style="max-height:250px;overflow-y:auto">{_render_breakdown("By Strategy", strat_stats)}</div>
-        <div>{exit_definitions}</div>
-    </div>
-    <div class="glass-card audit-log" style="margin-top:12px">
-        <h2>Full Trade Log ({len(trades)} trades)</h2>
-        <div class="table-wrap" style="max-height:500px;overflow-y:auto">
-        <table>
-            <thead><tr><th>#</th><th>Model</th><th>Side</th><th>Pair</th><th>PnL</th><th>ROI</th><th>Fees</th><th>Exit</th><th>Strategy</th><th>Duration</th><th>Closed</th></tr></thead>
-            <tbody>{all_rows}</tbody>
-        </table>
+    <div style="margin-top:10px">
+        <div style="font-size:0.72em;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Recent Trades ({min(30,len(trades))} of {len(trades)})</div>
+        <div class="table-wrap" style="max-height:350px;overflow-y:auto">
+        <table>{log_header}<tbody>{recent_rows}</tbody></table>
         </div>
+        {older_section}
     </div>'''
 
 
@@ -378,21 +406,22 @@ def compute_stats(trades: list[dict]) -> dict:
                 "total_pnl": 0, "total_fees": 0, "real_pnl": 0,
                 "avg_win": 0, "avg_loss": 0, "profit_factor": 0,
                 "best": 0, "worst": 0, "max_dd": 0, "max_dd_pct": 0}
-    wins = [t for t in trades if t.get("pnl_usdt", 0) > 0]
-    losses = [t for t in trades if t.get("pnl_usdt", 0) <= 0]
-    total_pnl = sum(t.get("pnl_usdt", 0) for t in trades)
-    gp = sum(t["pnl_usdt"] for t in wins) if wins else 0
-    gl = abs(sum(t["pnl_usdt"] for t in losses)) if losses else 0
-    best = max(t.get("pnl_usdt", 0) for t in trades)
-    worst = min(t.get("pnl_usdt", 0) for t in trades)
+    wins = [t for t in trades if _net_pnl(t) > 0]
+    losses = [t for t in trades if _net_pnl(t) <= 0]
+    # total_pnl is now NET (post-fees) — this is the honest number
+    total_pnl = sum(_net_pnl(t) for t in trades)
+    gp = sum(_net_pnl(t) for t in wins) if wins else 0
+    gl = abs(sum(_net_pnl(t) for t in losses)) if losses else 0
+    best = max(_net_pnl(t) for t in trades)
+    worst = min(_net_pnl(t) for t in trades)
 
-    # Max drawdown from cumulative curve
+    # Max drawdown from cumulative net curve
     cum = 0
     peak = 0
     max_dd = 0
     max_dd_pct = 0
     for t in trades:
-        cum += t.get("pnl_usdt", 0)
+        cum += _net_pnl(t)
         if cum > peak:
             peak = cum
         dd = peak - cum
@@ -400,9 +429,9 @@ def compute_stats(trades: list[dict]) -> dict:
             max_dd = dd
             max_dd_pct = (dd / peak * 100) if peak > 0 else 0
 
-    # Estimated fees: margin × leverage × 0.06% taker × 2 sides per trade
-    total_fees = sum(t.get("margin", 0) * 10 * 0.0006 * 2 for t in trades)
-    real_pnl = total_pnl - total_fees
+    # Real fees from exchange capture (falls back to estimate for old trades)
+    total_fees = sum(_real_fee(t) for t in trades)
+    real_pnl = total_pnl  # already net
 
     return {
         "total": len(trades), "wins": len(wins), "losses": len(losses),
@@ -415,214 +444,186 @@ def compute_stats(trades: list[dict]) -> dict:
     }
 
 
-def _build_session_card(trades: list[dict], paper_trades: list[dict], balance: float = 0, balance_start: float = 0, balance_mar25: float = 0, balance_first: float = 0) -> str:
-    """Build SESSION PERFORMANCE card with 3 columns: LIVE, V10, PAPER per session."""
-    SESSION_DEFS = [
-        ("Early AM", "earlyam", 0, 6, "&#127747;", "#cba6f7"),          # purple, pre-dawn
-        ("Morning", "morning", 6, 12, "&#9728;&#65039;", "#a6e3a1"),    # sun, green
-        ("Afternoon", "afternoon", 12, 20, "&#9925;", "#fab387"),       # cloud, orange
-        ("Night", "night", 20, 24, "&#9789;&#65039;", "#89b4fa"),       # moon, blue
-    ]
-    TIME_LABELS = ["12:01AM-5:59AM PT", "6AM-12PM PT", "12:01PM-8PM PT", "8:01PM-12AM PT"]
+def _build_reconcile_card() -> str:
+    """Reconciliation status vs Phemex exchange truth.
 
-    V10_STRATS = {"htf_confluence_pullback", "htf_confluence_vwap", "momentum_continuation"}
-
-    def _classify_hour(hour: int) -> int:
-        if 0 <= hour < 6:
-            return 0  # Early AM (12:01AM-5:59AM)
-        elif 6 <= hour < 12:
-            return 1  # Morning (6AM-12PM)
-        elif 12 <= hour < 20:
-            return 2  # Afternoon (12:01PM-8PM)
-        else:
-            return 3  # Night (8:01PM-12AM)
-
-    def _compute_session_stats(trade_list: list[dict]) -> list[dict]:
-        stats = [{"trades": 0, "wins": 0, "pnl": 0.0} for _ in range(4)]
-        for t in trade_list:
-            opened_at = t.get("opened_at", 0)
-            if opened_at <= 0:
-                continue
-            hour = _from_ts(opened_at).hour
-            idx = _classify_hour(hour)
-            pnl = t.get("pnl_usdt", 0)
-            stats[idx]["trades"] += 1
-            stats[idx]["pnl"] += pnl
-            if pnl > 0:
-                stats[idx]["wins"] += 1
-        return stats
-
-    def _fmt_cell(s: dict, has_data: bool) -> str:
-        if not has_data or s["trades"] == 0:
-            return '<span style="color:var(--text-dim);font-size:0.8em">--</span>'
-        pnl_cls = "positive" if s["pnl"] >= 0 else "negative"
-        wr = (s["wins"] / s["trades"] * 100) if s["trades"] > 0 else 0
-        wr_cls = "positive" if wr >= 50 else "negative"
-        return f'{s["trades"]}t {s["wins"]}W <span class="{wr_cls}">{wr:.0f}%</span> <span class="{pnl_cls}" style="font-weight:600">${s["pnl"]:+.2f}</span>'
-
-    # Split trades
-    v10_trades = [t for t in trades if t.get("strategy", "") in V10_STRATS]
-
-    # "Today" starts at midnight PT
-    today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-    today_live = [t for t in trades if t.get("opened_at", 0) >= today_start]
-    today_v10 = [t for t in v10_trades if t.get("opened_at", 0) >= today_start]
-    today_paper = [t for t in paper_trades if t.get("opened_at", 0) >= today_start]
-
-    has_v10 = len(v10_trades) > 0
-    has_paper = len(paper_trades) > 0
-
-    def _render_section(title: str, live_stats: list[dict], v10_stats: list[dict], paper_stats: list[dict]) -> str:
-        has_data = any(s["trades"] > 0 for s in live_stats) or any(s["trades"] > 0 for s in v10_stats) or any(s["trades"] > 0 for s in paper_stats)
-        if not has_data:
-            return f'''<div class="session-section">
-                <div class="session-section-title">{title}</div>
-                <div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.82em">No trades yet</div>
-            </div>'''
-        rows = ""
-        for i, (label, cls, _s, _e, icon, color) in enumerate(SESSION_DEFS):
-            time_lbl = TIME_LABELS[i]
-            live_cell = _fmt_cell(live_stats[i], True)
-            paper_cell = _fmt_cell(paper_stats[i], has_paper)
-            rows += f'''<div class="session-row session-{cls}" style="display:grid;grid-template-columns:140px 1fr 1fr;align-items:center;gap:4px;padding:6px 8px;border-left:3px solid {color}">
-                <div style="font-size:0.85em">{icon} <span style="color:{color};font-weight:600">{escape(label)}</span><br><span style="color:var(--text-dim);font-size:0.75em">{time_lbl}</span></div>
-                <div style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:center">{live_cell}</div>
-                <div style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:center">{paper_cell}</div>
-            </div>'''
-        # Totals row
-        def _sum_stats(stats_list):
-            t = sum(s["trades"] for s in stats_list)
-            w = sum(s["wins"] for s in stats_list)
-            p = sum(s["pnl"] for s in stats_list)
-            return {"trades": t, "wins": w, "pnl": p}
-        live_total = _sum_stats(live_stats)
-        paper_total = _sum_stats(paper_stats)
-        live_tot_cell = _fmt_cell(live_total, True)
-        paper_tot_cell = _fmt_cell(paper_total, has_paper)
-        totals_row = f'''<div style="display:grid;grid-template-columns:140px 1fr 1fr;align-items:center;gap:4px;padding:6px 8px;border-top:1px solid rgba(100,140,200,0.15);margin-top:4px">
-            <div style="font-size:0.82em;font-weight:600;color:var(--text-secondary)">Total</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:center;font-weight:600">{live_tot_cell}</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:center;font-weight:600">{paper_tot_cell}</div>
+    Reads ~/Library/Logs/Phmex-S/reconcile.log written every 4h by
+    scripts/reconcile_phemex.py (launchd: com.phmex.reconcile).
+    """
+    log_path = Path.home() / "Library" / "Logs" / "Phmex-S" / "reconcile.log"
+    if not log_path.exists():
+        return '''<div class="glass-card dash-item" data-id="reconcile">
+            <h2>Reconciliation vs Phemex</h2>
+            <div style="color:var(--text-dim);font-size:0.8em;padding:6px 0">No reconciliation data yet</div>
         </div>'''
-        return f'''<div class="session-section">
-            <div class="session-section-title">{title}</div>
-            {rows}
-            {totals_row}
+    try:
+        mtime = log_path.stat().st_mtime
+        text = log_path.read_text(errors="replace")
+    except Exception as e:
+        return f'''<div class="glass-card dash-item" data-id="reconcile">
+            <h2>Reconciliation vs Phemex</h2>
+            <div style="color:var(--negative);font-size:0.8em">Read error: {escape(str(e))}</div>
         </div>'''
 
-    # Compute stats
-    all_live = _compute_session_stats(trades)
-    all_v10 = _compute_session_stats(v10_trades)
-    all_paper = _compute_session_stats(paper_trades)
-    td_live = _compute_session_stats(today_live)
-    td_v10 = _compute_session_stats(today_v10)
-    td_paper = _compute_session_stats(today_paper)
+    runs = text.split("=== Phemex Reconciliation")
+    if len(runs) < 2:
+        return '''<div class="glass-card dash-item" data-id="reconcile">
+            <h2>Reconciliation vs Phemex</h2>
+            <div style="color:var(--text-dim);font-size:0.8em">Waiting for first run</div>
+        </div>'''
+    latest = runs[-1]
 
-    today_label = f"Today — {_now_ca().strftime('%b %d, %Y')}"
-    today_section = _render_section(today_label, td_live, td_v10, td_paper)
+    discrepancies = 0
+    max_drift = 0.0
+    symbol_count = 0
+    for line in latest.splitlines():
+        line = line.strip()
+        if line.startswith("Discrepancies"):
+            try:
+                discrepancies = int(line.split(":")[-1].strip())
+            except Exception:
+                pass
+        if "/USDT:USDT" in line:
+            symbol_count += 1
+            parts = line.split()
+            try:
+                dnet = float(parts[-2 if "<--" in line else -1].replace("DIFF", "").strip() or 0)
+            except Exception:
+                dnet = 0.0
+            if abs(dnet) > abs(max_drift):
+                max_drift = dnet
 
-    # Since Mar 25 section (when paper slot + current analysis started)
-    mar25_start = datetime(2026, 3, 25, tzinfo=CA_TZ).timestamp()
-    mar25_live = [t for t in trades if t.get("opened_at", 0) >= mar25_start]
-    mar25_v10 = [t for t in v10_trades if t.get("opened_at", 0) >= mar25_start]
-    mar25_paper = paper_trades  # Paper slot started Mar 25/26 so all paper trades qualify
-    m25_live = _compute_session_stats(mar25_live)
-    m25_v10 = _compute_session_stats(mar25_v10)
-    m25_paper = _compute_session_stats(mar25_paper)
-    mar25_section = _render_section("Since Mar 25", m25_live, m25_v10, m25_paper)
-
-    # Find date range for all trades
-    all_dates = [t.get("opened_at", 0) for t in trades if t.get("opened_at", 0) > 0]
-    if all_dates:
-        first = _from_ts(min(all_dates)).strftime("%b %d")
-        last = _from_ts(max(all_dates)).strftime("%b %d, %Y")
-        all_label = f"All Time — {first} to {last}"
+    age_hours = (time.time() - mtime) / 3600
+    if age_hours > 8:
+        status_icon = "&#128308;"  # red circle
+        status_text = "STALE"
+        status_color = "var(--negative)"
+    elif discrepancies > 0:
+        status_icon = "&#128993;"  # yellow circle
+        status_text = f"DRIFT ({discrepancies})"
+        status_color = "var(--warning)"
     else:
-        all_label = "All Time"
-    all_section = _render_section(all_label, all_live, all_v10, all_paper)
+        status_icon = "&#128994;"  # green circle
+        status_text = "CLEAN"
+        status_color = "var(--positive)"
 
-    # Column start dates
-    live_start = ""
-    v10_start = ""
-    paper_start = ""
-    live_dates = [t.get("opened_at", 0) for t in trades if t.get("opened_at", 0) > 0]
-    v10_dates = [t.get("opened_at", 0) for t in v10_trades if t.get("opened_at", 0) > 0]
-    paper_dates = [t.get("opened_at", t.get("closed_at", 0)) for t in paper_trades if t.get("opened_at", t.get("closed_at", 0)) > 0]
-    if live_dates:
-        live_start = f"<br><span style='font-size:0.7em;color:var(--text-dim);font-weight:400'>since {_from_ts(min(live_dates)).strftime('%b %d')}</span>"
-    if v10_dates:
-        v10_start = f"<br><span style='font-size:0.7em;color:var(--text-dim);font-weight:400'>since {_from_ts(min(v10_dates)).strftime('%b %d')}</span>"
-    if paper_dates:
-        paper_start = f"<br><span style='font-size:0.7em;color:var(--text-dim);font-weight:400'>since {_from_ts(min(paper_dates)).strftime('%b %d')}</span>"
-    else:
-        paper_start = f"<br><span style='font-size:0.7em;color:var(--text-dim);font-weight:400'>new</span>"
+    last_ts = datetime.fromtimestamp(mtime, tz=CA_TZ).strftime("%b %d %I:%M %p")
+    age_str = f"{int(age_hours)}h ago" if age_hours >= 1 else f"{int(age_hours*60)}m ago"
 
-    def _build_balance_row(bal_now, bal_then, trade_list):
-        if bal_now <= 0 or bal_then <= 0:
-            return ""
-        change = bal_now - bal_then
-        trade_pnl = sum(t.get("pnl_usdt", 0) for t in trade_list)
-        hidden = change - trade_pnl
-        chg_cls = "positive" if change >= 0 else "negative"
-        hid_cls = "negative" if hidden < 0 else "positive"
-        return f'''<div style="display:grid;grid-template-columns:140px 1fr 1fr;gap:4px;padding:8px;margin-top:4px;background:rgba(100,140,200,0.05);border-radius:6px">
-            <div style="font-size:0.8em;color:var(--text-dim)">
-                <div>Actual P&amp;L</div>
-                <div style="margin-top:4px">Hidden costs</div>
-                <div style="margin-top:2px;font-size:0.75em;color:var(--text-dim)">funding + slippage</div>
+    return f'''<div class="glass-card dash-item" data-id="reconcile">
+        <h2>Reconciliation vs Phemex</h2>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.78em;line-height:1.7">
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d">
+                <span style="color:var(--text-dim)">Status</span>
+                <span style="color:{status_color};font-weight:700">{status_icon} {status_text}</span>
             </div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:0.78em;text-align:center">
-                <div class="{chg_cls}" style="font-weight:600">${change:+.2f}</div>
-                <div class="{hid_cls}" style="margin-top:4px">${hidden:+.2f}</div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d">
+                <span style="color:var(--text-dim)">Last run</span>
+                <span>{last_ts}</span>
             </div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:center;color:var(--text-dim)">
-                <div style="font-size:0.9em">simulated</div>
-                <div style="margin-top:4px">no fees</div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d">
+                <span style="color:var(--text-dim)">Age</span>
+                <span>{age_str}</span>
             </div>
-        </div>'''
-
-    col_header = f'''<div style="display:grid;grid-template-columns:140px 1fr 1fr;gap:4px;padding:4px 8px;margin-bottom:2px">
-        <span></span>
-        <span style="text-align:center;font-size:0.75em;font-weight:700;color:#a6e3a1;text-transform:uppercase;letter-spacing:0.05em">LIVE{live_start}</span>
-        <span style="text-align:center;font-size:0.75em;font-weight:700;color:#89b4fa;text-transform:uppercase;letter-spacing:0.05em">PAPER{paper_start}</span>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d">
+                <span style="color:var(--text-dim)">Symbols</span>
+                <span>{symbol_count}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0">
+                <span style="color:var(--text-dim)">Max drift</span>
+                <span class="{'negative' if abs(max_drift) > 0.05 else ''}">${max_drift:+.2f}</span>
+            </div>
+        </div>
     </div>'''
 
+
+def _build_session_card(trades: list[dict], paper_trades: list[dict], balance: float = 0, balance_start: float = 0) -> str:
+    """Build SESSION PERFORMANCE as a horizontal row of 4 time-of-day tiles."""
+    SESSIONS = [
+        ("Early AM", "12-6 AM", "&#127747;", "#cba6f7"),
+        ("Morning", "6 AM-12 PM", "&#9728;&#65039;", "#a6e3a1"),
+        ("Afternoon", "12-8 PM", "&#9925;", "#fab387"),
+        ("Night", "8 PM-12 AM", "&#9789;&#65039;", "#89b4fa"),
+    ]
+
+    def _classify_hour(hour: int) -> int:
+        if hour < 6: return 0
+        elif hour < 12: return 1
+        elif hour < 20: return 2
+        else: return 3
+
+    def _compute(trade_list):
+        stats = [{"trades": 0, "wins": 0, "pnl": 0.0} for _ in range(4)]
+        for t in trade_list:
+            ts = t.get("opened_at", 0)
+            if ts <= 0: continue
+            idx = _classify_hour(_from_ts(ts).hour)
+            pnl = _net_pnl(t)
+            stats[idx]["trades"] += 1
+            stats[idx]["pnl"] += pnl
+            if pnl > 0: stats[idx]["wins"] += 1
+        return stats
+
+    today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    today_live = [t for t in trades if t.get("opened_at", 0) >= today_start]
+
+    td = _compute(today_live)
+    al = _compute(trades)
+
+    # Build 4 tiles
+    tiles = ""
+    for i, (label, hours, _icon, color) in enumerate(SESSIONS):
+        t_s, a_s = td[i], al[i]
+        # Today stats
+        if t_s["trades"] > 0:
+            t_wr = (t_s["wins"] / t_s["trades"] * 100)
+            t_pnl_cls = "positive" if t_s["pnl"] >= 0 else "negative"
+            t_wr_cls = "positive" if t_wr >= 50 else "negative"
+            today_html = f'''<span class="{t_pnl_cls}" style="font-weight:600">${t_s["pnl"]:+.2f}</span>
+                <span style="color:var(--text-dim);font-size:0.85em">{t_s["trades"]}t</span>
+                <span class="{t_wr_cls}" style="font-size:0.85em">{t_wr:.0f}%</span>'''
+        else:
+            today_html = '<span style="color:var(--text-dim)">--</span>'
+        # All-time stats
+        if a_s["trades"] > 0:
+            a_wr = (a_s["wins"] / a_s["trades"] * 100)
+            a_pnl_cls = "positive" if a_s["pnl"] >= 0 else "negative"
+            a_wr_cls = "positive" if a_wr >= 50 else "negative"
+            all_html = f'''<span class="{a_pnl_cls}" style="font-weight:600">${a_s["pnl"]:+.2f}</span>
+                <span style="color:var(--text-dim);font-size:0.85em">{a_s["trades"]}t</span>
+                <span class="{a_wr_cls}" style="font-size:0.85em">{a_wr:.0f}%</span>'''
+        else:
+            all_html = '<span style="color:var(--text-dim)">--</span>'
+
+        tiles += f'''<div style="text-align:center;padding:8px 6px;border-top:2px solid {color};background:var(--bg-deep);border-radius:0 0 3px 3px">
+            <div style="font-size:0.72em;font-weight:600;color:{color};font-family:'JetBrains Mono',monospace">{escape(label)}</div>
+            <div style="font-size:0.6em;color:var(--text-dim);margin-bottom:6px;font-family:'JetBrains Mono',monospace">{hours} PT</div>
+            <div style="font-size:0.6em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px;font-family:'JetBrains Mono',monospace">Today</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.75em;display:flex;flex-direction:column;align-items:center;gap:1px">{today_html}</div>
+            <div style="font-size:0.6em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;margin:5px 0 2px;font-family:'JetBrains Mono',monospace">All Time</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.75em;display:flex;flex-direction:column;align-items:center;gap:1px">{all_html}</div>
+        </div>'''
+
     return f'''<div class="glass-card dash-item" data-id="sessions">
-        <h2 class="drag-handle">Session Performance</h2>
-        {col_header}
-        {today_section}
-        {_build_balance_row(balance, balance_start, today_live)}
-        <div class="session-divider"></div>
-        {mar25_section}
-        <div class="session-divider"></div>
-        {all_section}
+        <h2>Sessions</h2>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">{tiles}</div>
     </div>'''
 
 
 def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -> str:
-    """Build side-by-side Live (All), V10, and Paper slot comparison card."""
+    """Build side-by-side Live vs Paper (liq_cascade) comparison card."""
     live_stats = compute_stats(live_trades)
     paper_stats = compute_stats(paper_trades)
 
-    # V10 trades — htf_confluence strategies only
-    v10_strats = {"htf_confluence_pullback", "htf_confluence_vwap", "momentum_continuation"}
-    v10_trades = [t for t in live_trades if t.get("strategy", "") in v10_strats]
-    v10_stats = compute_stats(v10_trades)
-
-    # Today's trades
     today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     live_today = [t for t in live_trades if t.get("opened_at", 0) >= today_start]
     paper_today = [t for t in paper_trades if t.get("opened_at", 0) >= today_start]
-    v10_today = [t for t in v10_trades if t.get("opened_at", 0) >= today_start]
     live_today_stats = compute_stats(live_today)
     paper_today_stats = compute_stats(paper_today)
-    v10_today_stats = compute_stats(v10_today)
 
     has_paper = len(paper_trades) > 0
 
-    has_v10 = len(v10_trades) > 0
-
-    def _stat_col(label, live_val, v10_val, paper_val, fmt="", is_pnl=False, is_pct=False):
+    def _stat_col(label, live_val, paper_val, is_pnl=False, is_pct=False):
         def _fmt(val, has_data):
             if not has_data:
                 return ("", "--")
@@ -633,12 +634,10 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
             else:
                 return ("", str(val))
         l_cls, l_str = _fmt(live_val, True)
-        v_cls, v_str = _fmt(v10_val, has_v10)
         p_cls, p_str = _fmt(paper_val, has_paper)
         return f'''<div class="compare-row">
             <span class="compare-label">{label}</span>
             <span class="compare-live {l_cls}">{l_str}</span>
-            <span class="compare-v10 {v_cls}">{v_str}</span>
             <span class="compare-paper {p_cls}">{p_str}</span>
         </div>'''
 
@@ -647,10 +646,10 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
     if has_paper:
         last5 = paper_trades[-5:]
         for t in reversed(last5):
-            pnl = t.get("pnl_usdt", 0)
+            pnl = _net_pnl(t)
             sym = escape(t.get("symbol", "?").replace("/USDT:USDT", ""))
             side = t.get("side", "?").upper()
-            reason = escape(t.get("reason", "?"))
+            reason = escape(t.get("exit_reason") or t.get("reason") or "?")
             cls = "positive" if pnl > 0 else "negative"
             side_cls = "side-long" if side == "LONG" else "side-short"
             closed_at = t.get("closed_at", 0)
@@ -663,101 +662,261 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
                 <span style="color:var(--text-dim);font-size:0.8em;font-family:'JetBrains Mono',monospace">{time_str}</span>
             </div>'''
     else:
-        recent_paper = '<div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.85em">Paper slot not active yet. File: trading_state_5m_sma_vwap.json</div>'
+        recent_paper = '<div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.85em">Paper slot not active yet.</div>'
 
     return f'''<div class="glass-card dash-item paper-card" data-id="paper-comparison">
-        <h2 class="drag-handle"><span class="paper-badge">PAPER</span> Live vs Paper Comparison</h2>
+        <h2><span class="paper-badge">PAPER</span> Live vs Liq Cascade</h2>
         <div class="compare-header">
             <span class="compare-label"></span>
             <span class="compare-col-label live-label">LIVE</span>
-            <span class="compare-col-label v10-label">V10</span>
             <span class="compare-col-label paper-label">PAPER</span>
         </div>
         <div class="compare-section-title">All Time</div>
-        {_stat_col("Trades", live_stats["total"], v10_stats["total"], paper_stats["total"])}
-        {_stat_col("Win Rate", live_stats["win_rate"], v10_stats["win_rate"], paper_stats["win_rate"], is_pct=True)}
-        {_stat_col("PnL", live_stats["total_pnl"], v10_stats["total_pnl"], paper_stats["total_pnl"], is_pnl=True)}
-        {_stat_col("Profit Factor", round(live_stats["profit_factor"], 2) if live_stats["profit_factor"] != float("inf") else 0, round(v10_stats["profit_factor"], 2) if v10_stats["profit_factor"] != float("inf") else 0, round(paper_stats["profit_factor"], 2) if paper_stats["profit_factor"] != float("inf") else 0)}
-        {_stat_col("Avg Win", live_stats["avg_win"], v10_stats["avg_win"], paper_stats["avg_win"], is_pnl=True)}
-        {_stat_col("Avg Loss", -live_stats["avg_loss"], -v10_stats["avg_loss"], -paper_stats["avg_loss"], is_pnl=True)}
+        {_stat_col("Trades", live_stats["total"], paper_stats["total"])}
+        {_stat_col("Win Rate", live_stats["win_rate"], paper_stats["win_rate"], is_pct=True)}
+        {_stat_col("PnL", live_stats["total_pnl"], paper_stats["total_pnl"], is_pnl=True)}
+        {_stat_col("Profit Factor", round(live_stats["profit_factor"], 2) if live_stats["profit_factor"] != float("inf") else 0, round(paper_stats["profit_factor"], 2) if paper_stats["profit_factor"] != float("inf") else 0)}
+        {_stat_col("Avg Win", live_stats["avg_win"], paper_stats["avg_win"], is_pnl=True)}
+        {_stat_col("Avg Loss", -live_stats["avg_loss"], -paper_stats["avg_loss"], is_pnl=True)}
         <div class="compare-section-title" style="margin-top:10px">Today</div>
-        {_stat_col("Trades", live_today_stats["total"], v10_today_stats["total"], paper_today_stats["total"])}
-        {_stat_col("Wins", live_today_stats["wins"], v10_today_stats["wins"], paper_today_stats["wins"])}
-        {_stat_col("Losses", live_today_stats["total"] - live_today_stats["wins"], v10_today_stats["total"] - v10_today_stats["wins"], paper_today_stats["total"] - paper_today_stats["wins"])}
-        {_stat_col("Win Rate", live_today_stats["win_rate"], v10_today_stats["win_rate"], paper_today_stats["win_rate"], is_pct=True)}
-        {_stat_col("PnL", live_today_stats["total_pnl"], v10_today_stats["total_pnl"], paper_today_stats["total_pnl"], is_pnl=True)}
+        {_stat_col("Trades", live_today_stats["total"], paper_today_stats["total"])}
+        {_stat_col("Win Rate", live_today_stats["win_rate"], paper_today_stats["win_rate"], is_pct=True)}
+        {_stat_col("PnL", live_today_stats["total_pnl"], paper_today_stats["total_pnl"], is_pnl=True)}
         <div class="compare-section-title" style="margin-top:10px">Recent Paper Trades</div>
         {recent_paper}
     </div>'''
 
 
-def _build_control_card(control_trades: list[dict]) -> str:
-    """Build V10 Control (24/7) comparison card showing control slot performance."""
-    if not control_trades:
-        return f'''<div class="glass-card dash-item paper-card" data-id="control-slot">
-            <h2 class="drag-handle"><span class="paper-badge" style="background:rgba(166,227,161,0.15);color:#a6e3a1;border-color:rgba(166,227,161,0.3)">CONTROL</span> V10 Control (24/7)</h2>
-            <div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.85em">Control slot not active yet. File: trading_state_5m_v10_control.json</div>
-        </div>'''
-
+def _build_control_card(control_trades: list[dict], live_trades: list[dict]) -> str:
+    """Build Sentinel v11 vs V10 Control A/B test card — side-by-side comparison."""
+    # Sentinel trades: live trades since Apr 1 (deployment date)
+    sentinel_deploy = datetime(2026, 4, 1, hour=23, minute=1, tzinfo=CA_TZ).timestamp()
+    eval_end = datetime(2026, 4, 7, tzinfo=CA_TZ).timestamp()
+    sentinel_trades = [t for t in live_trades if t.get("opened_at", 0) >= sentinel_deploy]
+    sentinel_stats = compute_stats(sentinel_trades)
     ctrl_stats = compute_stats(control_trades)
+    # V10 Control is paper: pnl_usdt is already net of simulated fees.
+    # Zero out fees and align real_pnl to total_pnl to avoid double-counting.
+    ctrl_stats["total_fees"] = 0
+    ctrl_stats["real_pnl"] = ctrl_stats["total_pnl"]
 
     today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    sentinel_today = [t for t in sentinel_trades if t.get("opened_at", 0) >= today_start]
     ctrl_today = [t for t in control_trades if t.get("opened_at", 0) >= today_start]
+    sentinel_today_stats = compute_stats(sentinel_today)
     ctrl_today_stats = compute_stats(ctrl_today)
+    ctrl_today_stats["total_fees"] = 0
+    ctrl_today_stats["real_pnl"] = ctrl_today_stats["total_pnl"]
 
-    def _ctrl_row(label, val, is_pnl=False, is_pct=False):
-        if is_pnl:
-            cls = "positive" if val >= 0 else "negative"
-            txt = f"${val:+.2f}"
-        elif is_pct:
-            cls = "positive" if val >= 50 else "negative"
-            txt = f"{val:.1f}%"
-        else:
-            cls = ""
-            txt = str(val)
-        return f'''<div class="compare-row">
-            <span class="compare-label">{label}</span>
-            <span class="{cls}" style="font-family:'JetBrains Mono',monospace;font-weight:600">{txt}</span>
+    has_ctrl = len(control_trades) > 0
+    has_sentinel = len(sentinel_trades) > 0
+
+    # Days into evaluation
+    now_ts = _now_ca().timestamp()
+    days_in = max(1, int((now_ts - sentinel_deploy) / 86400) + 1)
+    days_left = max(0, int((eval_end - now_ts) / 86400))
+    eval_pct = min(100, (days_in / 5) * 100)
+
+    # Verdict logic
+    if not has_ctrl or not has_sentinel:
+        verdict = ("Collecting data...", "var(--text-dim)")
+    elif sentinel_stats["total_pnl"] > ctrl_stats["total_pnl"] and sentinel_stats["win_rate"] > ctrl_stats["win_rate"]:
+        verdict = ("Sentinel winning on all metrics", "var(--positive)")
+    elif sentinel_stats["total_pnl"] > ctrl_stats["total_pnl"]:
+        verdict = ("Sentinel ahead on PnL", "var(--positive)")
+    elif sentinel_stats["total_pnl"] < ctrl_stats["total_pnl"]:
+        verdict = ("V10 ahead — gates may be too tight", "var(--negative)")
+    else:
+        verdict = ("Too close to call", "var(--warning)")
+
+    def _ab_row(label, s_val, c_val, is_pnl=False, is_pct=False):
+        def _fmt(val, has_data):
+            if not has_data:
+                return ("", "--")
+            if is_pnl:
+                return ("positive" if val >= 0 else "negative", f"${val:+.2f}")
+            elif is_pct:
+                return ("positive" if val >= 50 else "negative" if val < 30 else "", f"{val:.1f}%")
+            else:
+                return ("", str(val))
+        s_cls, s_str = _fmt(s_val, has_sentinel)
+        c_cls, c_str = _fmt(c_val, has_ctrl)
+        # Highlight the winner
+        winner_s = ""
+        winner_c = ""
+        if has_sentinel and has_ctrl and s_val != c_val:
+            if is_pnl or is_pct:
+                if s_val > c_val:
+                    winner_s = "font-weight:700;"
+                elif c_val > s_val:
+                    winner_c = "font-weight:700;"
+        return f'''<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:4px 0;border-bottom:1px solid #21262d">
+            <span style="font-size:0.78em;color:var(--text-dim);font-family:'JetBrains Mono',monospace">{label}</span>
+            <span class="{s_cls}" style="font-family:'JetBrains Mono',monospace;font-size:0.82em;text-align:center;{winner_s}">{s_str}</span>
+            <span class="{c_cls}" style="font-family:'JetBrains Mono',monospace;font-size:0.82em;text-align:center;{winner_c}">{c_str}</span>
         </div>'''
 
-    # First trade date
-    first_ts = min((t.get("opened_at", t.get("closed_at", 0)) for t in control_trades), default=0)
-    since_str = _from_ts(first_ts).strftime("%b %d") if first_ts > 0 else "?"
+    def _pf(stats):
+        pf = stats.get("profit_factor", 0)
+        return round(pf, 2) if pf != float("inf") else 0
 
-    # Recent trades (last 5)
-    recent_html = ""
-    for t in reversed(control_trades[-5:]):
-        pnl = t.get("pnl_usdt", 0)
-        sym = escape(t.get("symbol", "?").replace("/USDT:USDT", ""))
-        side = t.get("side", "?").upper()
-        reason = escape(t.get("reason", "?"))
-        cls = "positive" if pnl > 0 else "negative"
-        side_cls = "side-long" if side == "LONG" else "side-short"
-        closed_at = t.get("closed_at", 0)
-        time_str = _from_ts(closed_at).strftime("%m/%d %I:%M%p").lower() if closed_at > 0 else "--"
-        recent_html += f'''<div class="paper-trade-row">
-            <span class="side-badge {side_cls}" style="font-size:0.7em">{side}</span>
-            <span style="color:var(--text-primary);font-weight:500">{sym}</span>
-            <span class="{cls}" style="font-family:'JetBrains Mono',monospace;font-weight:600">${pnl:+.2f}</span>
-            <span style="color:var(--text-dim);font-size:0.85em">{reason}</span>
-            <span style="color:var(--text-dim);font-size:0.8em;font-family:'JetBrains Mono',monospace">{time_str}</span>
+    return f'''<div class="glass-card dash-item" data-id="ab-test">
+        <h2 style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:0.65em;padding:2px 6px;border-radius:3px;background:rgba(210,153,34,0.1);color:var(--warning);border:1px solid rgba(210,153,34,0.25);font-weight:600;letter-spacing:0.04em;font-family:'JetBrains Mono',monospace">A/B TEST</span>
+            Sentinel v11 vs V10 Control
+        </h2>
+
+        <!-- Evaluation progress bar -->
+        <div style="margin:6px 0 10px">
+            <div style="display:flex;justify-content:space-between;font-size:0.7em;color:var(--text-dim);margin-bottom:3px;font-family:'JetBrains Mono',monospace">
+                <span>Day {days_in} of 5</span>
+                <span>{days_left} days left</span>
+            </div>
+            <div style="height:4px;background:var(--bg-deep);border-radius:2px;overflow:hidden">
+                <div style="height:100%;width:{eval_pct:.0f}%;background:var(--warning);border-radius:2px"></div>
+            </div>
+        </div>
+
+        <!-- Verdict -->
+        <div style="text-align:center;padding:6px 10px;margin-bottom:10px;border-radius:3px;background:var(--bg-deep);border:1px solid #21262d">
+            <span style="font-size:0.78em;font-weight:600;color:{verdict[1]};font-family:'JetBrains Mono',monospace">{verdict[0]}</span>
+        </div>
+
+        <!-- Column headers -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:0 0 4px;border-bottom:1px solid #21262d;margin-bottom:4px">
+            <span style="font-size:0.65em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;font-family:'JetBrains Mono',monospace"></span>
+            <span style="font-size:0.65em;text-align:center;font-weight:600;color:var(--positive);text-transform:uppercase;letter-spacing:0.05em;font-family:'JetBrains Mono',monospace">SENTINEL v11</span>
+            <span style="font-size:0.65em;text-align:center;font-weight:600;color:var(--negative);text-transform:uppercase;letter-spacing:0.05em;font-family:'JetBrains Mono',monospace">V10 CONTROL</span>
+        </div>
+
+        <!-- Since deployment -->
+        <div style="font-size:0.7em;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;padding:6px 0 3px;font-family:'JetBrains Mono',monospace">Since Apr 1</div>
+        {_ab_row("Trades", f'{sentinel_stats["total"]} ({sentinel_stats["wins"]}W / {sentinel_stats["total"] - sentinel_stats["wins"]}L)', f'{ctrl_stats["total"]} ({ctrl_stats["wins"]}W / {ctrl_stats["total"] - ctrl_stats["wins"]}L)')}
+        {_ab_row("Win Rate", sentinel_stats["win_rate"], ctrl_stats["win_rate"], is_pct=True)}
+        {_ab_row("PnL", sentinel_stats["total_pnl"], ctrl_stats["total_pnl"], is_pnl=True)}
+        {_ab_row("Fees", sentinel_stats["total_fees"], ctrl_stats["total_fees"], is_pnl=True)}
+        {_ab_row("Real PnL", sentinel_stats["real_pnl"], ctrl_stats["real_pnl"], is_pnl=True)}
+        {_ab_row("Profit Factor", _pf(sentinel_stats), _pf(ctrl_stats))}
+        {_ab_row("Avg Win", sentinel_stats["avg_win"], ctrl_stats["avg_win"], is_pnl=True)}
+        {_ab_row("Avg Loss", -sentinel_stats["avg_loss"], -ctrl_stats["avg_loss"], is_pnl=True)}
+
+        <!-- Today -->
+        <div style="font-size:0.7em;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;padding:6px 0 3px;font-family:'JetBrains Mono',monospace">Today</div>
+        {_ab_row("Trades", f'{sentinel_today_stats["total"]} ({sentinel_today_stats["wins"]}W / {sentinel_today_stats["total"] - sentinel_today_stats["wins"]}L)', f'{ctrl_today_stats["total"]} ({ctrl_today_stats["wins"]}W / {ctrl_today_stats["total"] - ctrl_today_stats["wins"]}L)')}
+        {_ab_row("Win Rate", sentinel_today_stats["win_rate"], ctrl_today_stats["win_rate"], is_pct=True)}
+        {_ab_row("PnL", sentinel_today_stats["total_pnl"], ctrl_today_stats["total_pnl"], is_pnl=True)}
+        {_ab_row("Fees", sentinel_today_stats["total_fees"], ctrl_today_stats["total_fees"], is_pnl=True)}
+        {_ab_row("Real PnL", sentinel_today_stats["real_pnl"], ctrl_today_stats["real_pnl"], is_pnl=True)}
+
+        <!-- What's being tested -->
+        <div style="font-size:0.7em;color:var(--text-dim);margin-top:10px;padding:8px;background:var(--bg-deep);border-radius:3px;border:1px solid #21262d;line-height:1.5;font-family:'JetBrains Mono',monospace">
+            <span style="font-weight:600;color:var(--text-primary)">What&apos;s different:</span> Sentinel v11 adds 3 entry gates (OB imbalance, tape filter, ensemble confidence). V10 control trades the same strategy without gates. Same market, same timeframe.
+        </div>
+    </div>'''
+
+
+# ── Slot lifecycle overview ─────────────────────────────────────────────
+# Mapping from slot_id to strategy name — keep in sync with bot.py lines 100-139
+_SLOT_STRATEGY_MAP = {
+    "5m_scalp": "confluence",
+    "1h_momentum": "htf_momentum",
+    "5m_mean_revert": "bb_reversion",
+    "5m_liq_cascade": "liq_cascade",
+    "5m_legacy_control": "confluence",
+}
+
+def _build_slots_overview(all_slots: dict[str, dict], factory: dict, sentinels: dict) -> str:
+    """Build a card showing all slots with lifecycle stage, trade count, and status."""
+    strategies = factory.get("strategies", {})
+
+    # Sentinel status banner
+    banner = ""
+    if sentinels.get("paused"):
+        banner = '<div style="background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.2);color:var(--negative);padding:6px 10px;border-radius:3px;margin-bottom:8px;text-align:center;font-weight:600;font-family:\'JetBrains Mono\',monospace;font-size:0.8em">TRADING PAUSED</div>'
+    if sentinels.get("restart"):
+        banner += '<div style="background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.2);color:var(--warning);padding:6px 10px;border-radius:3px;margin-bottom:8px;text-align:center;font-weight:600;font-family:\'JetBrains Mono\',monospace;font-size:0.8em">RESTART PENDING</div>'
+
+    # Build slot rows
+    rows = ""
+    # Known active slots first, then any discovered extras
+    known_order = ["5m_scalp", "1h_momentum", "5m_mean_revert", "5m_liq_cascade", "5m_legacy_control"]
+    # Add any discovered slots not in known_order
+    extra_slots = [s for s in all_slots if s not in known_order and s not in ("v8_245trades",)]
+    ordered = known_order + extra_slots
+
+    for slot_id in ordered:
+        state = all_slots.get(slot_id, {"closed_trades": []})
+        trades = state.get("closed_trades", [])
+        n_trades = len(trades)
+
+        # Determine strategy name and stage from factory
+        strat_name = _SLOT_STRATEGY_MAP.get(slot_id, slot_id)
+        strat_info = strategies.get(strat_name, {})
+        stage = strat_info.get("stage", "unknown")
+
+        # Override stage if sentinel files active
+        if slot_id in sentinels.get("kills", []):
+            stage = "killed"
+        elif slot_id in sentinels.get("pauses", []):
+            stage = "paused"
+        elif slot_id in sentinels.get("promotes", []):
+            stage = "promoting"
+        elif slot_id in sentinels.get("demotes", []):
+            stage = "demoting"
+
+        # Stage badge styling
+        stage_styles = {
+            "live": ("rgba(63,185,80,0.08)", "#3fb950", "rgba(63,185,80,0.2)"),
+            "paper": ("rgba(57,210,192,0.08)", "#39d2c0", "rgba(57,210,192,0.2)"),
+            "killed": ("rgba(248,81,73,0.08)", "#f85149", "rgba(248,81,73,0.2)"),
+            "paused": ("rgba(210,153,34,0.08)", "#d29922", "rgba(210,153,34,0.2)"),
+            "promoting": ("rgba(210,153,34,0.08)", "#d29922", "rgba(210,153,34,0.2)"),
+            "demoting": ("rgba(210,153,34,0.08)", "#d29922", "rgba(210,153,34,0.2)"),
+            "hypothesis": ("rgba(139,148,158,0.08)", "#8b949e", "rgba(139,148,158,0.2)"),
+        }
+        bg, fg, bdr = stage_styles.get(stage, stage_styles["hypothesis"])
+
+        # Compute basic metrics
+        wr = 0
+        pnl = 0
+        if n_trades > 0:
+            wins = sum(1 for t in trades if _net_pnl(t) > 0)
+            wr = (wins / n_trades) * 100
+            pnl = sum(_net_pnl(t) for t in trades)
+
+        wr_cls = "positive" if wr >= 40 else "negative" if wr < 30 else ""
+        pnl_cls = "positive" if pnl > 0 else "negative" if pnl < 0 else ""
+
+        rows += f'''<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #21262d">
+            <div>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:0.78em;font-weight:500;color:var(--text-primary)">{escape(slot_id)}</span>
+                <span style="display:inline-block;font-size:0.6em;padding:1px 5px;border-radius:3px;margin-left:4px;background:{bg};color:{fg};border:1px solid {bdr};font-weight:600;text-transform:uppercase;letter-spacing:0.04em;font-family:'JetBrains Mono',monospace">{escape(stage)}</span>
+            </div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.72em;color:var(--text-dim);text-align:right">{n_trades}t</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:right" class="{wr_cls}">{wr:.0f}%</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:right" class="{pnl_cls}">${pnl:+.2f}</span>
         </div>'''
 
-    return f'''<div class="glass-card dash-item paper-card" data-id="control-slot">
-        <h2 class="drag-handle"><span class="paper-badge" style="background:rgba(166,227,161,0.15);color:#a6e3a1;border-color:rgba(166,227,161,0.3)">CONTROL</span> V10 Control (24/7) <span style="font-size:0.55em;color:var(--text-dim);font-weight:400">since {since_str}</span></h2>
-        <div class="compare-section-title">All Time</div>
-        {_ctrl_row("Trades", ctrl_stats["total"])}
-        {_ctrl_row("Win Rate", ctrl_stats["win_rate"], is_pct=True)}
-        {_ctrl_row("PnL", ctrl_stats["total_pnl"], is_pnl=True)}
-        {_ctrl_row("Profit Factor", round(ctrl_stats["profit_factor"], 2) if ctrl_stats["profit_factor"] != float("inf") else 0)}
-        {_ctrl_row("Avg Win", ctrl_stats["avg_win"], is_pnl=True)}
-        {_ctrl_row("Avg Loss", -ctrl_stats["avg_loss"], is_pnl=True)}
-        <div class="compare-section-title" style="margin-top:10px">Today</div>
-        {_ctrl_row("Trades", ctrl_today_stats["total"])}
-        {_ctrl_row("Win Rate", ctrl_today_stats["win_rate"], is_pct=True)}
-        {_ctrl_row("PnL", ctrl_today_stats["total_pnl"], is_pnl=True)}
-        <div class="compare-section-title" style="margin-top:10px">Recent Control Trades</div>
-        {recent_html if recent_html else '<div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.85em">No trades yet</div>'}
+    # Pipeline log (last 5 events)
+    pipeline = factory.get("pipeline_log", [])
+    log_html = ""
+    if pipeline:
+        for entry in pipeline[-5:]:
+            ts = entry.get("time", "")[:16].replace("T", " ")
+            log_html += f'<div style="font-size:0.68em;color:var(--text-dim);padding:2px 0;font-family:\'JetBrains Mono\',monospace">{ts} — {escape(entry.get("strategy", ""))} — {escape(entry.get("event", ""))}</div>'
+        log_html = f'<div class="compare-section-title" style="margin-top:10px">Pipeline Log</div>{log_html}'
+
+    return f'''<div class="glass-card dash-item" data-id="slots-overview">
+        <h2>Slot Lifecycle</h2>
+        {banner}
+        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;padding:0 0 3px;border-bottom:1px solid #21262d;margin-bottom:3px">
+            <span style="font-size:0.65em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;font-family:'JetBrains Mono',monospace">Slot</span>
+            <span style="font-size:0.65em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;text-align:right;font-family:'JetBrains Mono',monospace">N</span>
+            <span style="font-size:0.65em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;text-align:right;font-family:'JetBrains Mono',monospace">WR</span>
+            <span style="font-size:0.65em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;text-align:right;font-family:'JetBrains Mono',monospace">PnL</span>
+        </div>
+        {rows}
+        {log_html}
     </div>'''
 
 
@@ -774,7 +933,7 @@ def _fig_to_png(fig) -> bytes:
 def _make_cumulative_pnl(trades: list[dict]) -> bytes:
     if not trades:
         return b""
-    pnls = [t.get("pnl_usdt", 0) for t in trades]
+    pnls = [_net_pnl(t) for t in trades]
     cum = []
     r = 0
     for p in pnls:
@@ -790,38 +949,13 @@ def _make_cumulative_pnl(trades: list[dict]) -> bytes:
     ax.axhline(y=0, color="#585b70", linestyle="--", alpha=0.5)
     ax.set_xlabel("Trade #", color="#cdd6f4")
     ax.set_ylabel("Cumulative PnL (USDT)", color="#cdd6f4")
-    ax.set_title("Cumulative PnL", color="#cdd6f4", fontsize=13)
+    ax.set_title("Cumulative PnL (net)", color="#cdd6f4", fontsize=13)
     ax.tick_params(colors="#a6adc8")
     ax.grid(True, alpha=0.15, color="#585b70")
     for spine in ax.spines.values():
         spine.set_color("#585b70")
     return _fig_to_png(fig)
 
-
-def _make_pnl_by_pair(trades: list[dict]) -> bytes:
-    if not trades:
-        return b""
-    pair_pnl = defaultdict(float)
-    for t in trades:
-        sym = t.get("symbol", "?").replace("/USDT:USDT", "")
-        pair_pnl[sym] += t.get("pnl_usdt", 0)
-    sorted_p = sorted(pair_pnl.items(), key=lambda x: x[1], reverse=True)
-    syms = [p[0] for p in sorted_p]
-    vals = [p[1] for p in sorted_p]
-    colors = ["#a6e3a1" if v >= 0 else "#f38ba8" for v in vals]
-
-    fig, ax = plt.subplots(figsize=(9, 4), facecolor="#1e1e2e")
-    ax.set_facecolor("#1e1e2e")
-    ax.bar(syms, vals, color=colors, alpha=0.85, edgecolor="#585b70", linewidth=0.5)
-    ax.axhline(y=0, color="#585b70", linewidth=0.8)
-    ax.set_ylabel("PnL (USDT)", color="#cdd6f4")
-    ax.set_title("PnL by Pair", color="#cdd6f4", fontsize=13)
-    ax.tick_params(colors="#a6adc8")
-    ax.grid(True, alpha=0.15, color="#585b70", axis="y")
-    plt.xticks(rotation=45, ha="right")
-    for spine in ax.spines.values():
-        spine.set_color("#585b70")
-    return _fig_to_png(fig)
 
 
 def _make_pnl_by_reason(trades: list[dict]) -> bytes:
@@ -830,8 +964,8 @@ def _make_pnl_by_reason(trades: list[dict]) -> bytes:
     reason_pnl = defaultdict(float)
     reason_count = defaultdict(int)
     for t in trades:
-        r = t.get("reason", "unknown")
-        reason_pnl[r] += t.get("pnl_usdt", 0)
+        r = t.get("exit_reason") or t.get("reason") or "unknown"
+        reason_pnl[r] += _net_pnl(t)
         reason_count[r] += 1
     reasons = list(reason_pnl.keys())
     vals = [reason_pnl[r] for r in reasons]
@@ -854,56 +988,9 @@ def _make_pnl_by_reason(trades: list[dict]) -> bytes:
     return _fig_to_png(fig)
 
 
-def _make_trade_pnl(trades: list[dict]) -> bytes:
-    if not trades:
-        return b""
-    pnls = [t.get("pnl_usdt", 0) for t in trades]
-    colors = ["#a6e3a1" if p >= 0 else "#f38ba8" for p in pnls]
-
-    fig, ax = plt.subplots(figsize=(9, 4), facecolor="#1e1e2e")
-    ax.set_facecolor("#1e1e2e")
-    ax.bar(range(len(pnls)), pnls, color=colors, alpha=0.85, edgecolor="#585b70", linewidth=0.3)
-    ax.axhline(y=0, color="#585b70", linewidth=0.8)
-    ax.set_xlabel("Trade #", color="#cdd6f4")
-    ax.set_ylabel("PnL (USDT)", color="#cdd6f4")
-    ax.set_title("Individual Trade PnL", color="#cdd6f4", fontsize=13)
-    ax.tick_params(colors="#a6adc8")
-    ax.grid(True, alpha=0.15, color="#585b70", axis="y")
-    for spine in ax.spines.values():
-        spine.set_color("#585b70")
-    return _fig_to_png(fig)
 
 
-V10_STRATS = {"htf_confluence_pullback", "htf_confluence_vwap", "momentum_continuation"}
 
-
-def _make_cumulative_pnl_v10(trades: list[dict]) -> bytes:
-    """Cumulative PnL chart for v10 Pipeline trades only."""
-    v10 = [t for t in trades if t.get("strategy", "") in V10_STRATS]
-    if not v10:
-        return b""
-    pnls = [t.get("pnl_usdt", 0) for t in v10]
-    cum = []
-    r = 0
-    for p in pnls:
-        r += p
-        cum.append(r)
-    x = list(range(1, len(cum) + 1))
-
-    fig, ax = plt.subplots(figsize=(9, 4), facecolor="#1e1e2e")
-    ax.set_facecolor("#1e1e2e")
-    ax.plot(x, cum, color="#fab387", linewidth=2, marker="o", markersize=3)
-    ax.fill_between(x, cum, 0, where=[c >= 0 for c in cum], color="#a6e3a1", alpha=0.15)
-    ax.fill_between(x, cum, 0, where=[c < 0 for c in cum], color="#f38ba8", alpha=0.15)
-    ax.axhline(y=0, color="#585b70", linestyle="--", alpha=0.5)
-    ax.set_xlabel("Trade #", color="#cdd6f4")
-    ax.set_ylabel("Cumulative PnL (USDT)", color="#cdd6f4")
-    ax.set_title("V10 Pipeline — Cumulative PnL", color="#fab387", fontsize=13)
-    ax.tick_params(colors="#a6adc8")
-    ax.grid(True, alpha=0.15, color="#585b70")
-    for spine in ax.spines.values():
-        spine.set_color("#585b70")
-    return _fig_to_png(fig)
 
 
 def refresh_charts():
@@ -913,10 +1000,7 @@ def refresh_charts():
     charts = {}
     if trades:
         charts["cumulative_pnl"] = _make_cumulative_pnl(trades)
-        charts["pnl_by_pair"] = _make_pnl_by_pair(trades)
         charts["pnl_by_reason"] = _make_pnl_by_reason(trades)
-        charts["trade_pnl"] = _make_trade_pnl(trades)
-        charts["cumulative_pnl_v10"] = _make_cumulative_pnl_v10(trades)
     with _chart_lock:
         _chart_cache.update(charts)
 
@@ -1000,6 +1084,9 @@ def build_content() -> str:
     paper_trades = paper_state.get("closed_trades", [])
     control_state = read_control_state()
     control_trades = control_state.get("closed_trades", [])
+    factory_state = read_factory_state()
+    all_slot_states = read_all_slot_states()
+    sentinels = detect_sentinel_files()
     lines = tail_log(500)
     cycle = parse_latest_cycle(lines)
     regime = parse_regime_status(lines)
@@ -1013,41 +1100,30 @@ def build_content() -> str:
     # Read balance snapshots from bot log STATS lines
     balance = 0
     balance_start_of_day = 0
-    balance_mar25 = 0
-    balance_first = 0
     _log_file = os.path.join(os.path.dirname(__file__), "logs", "bot.log")
     _today_date_str = _now_ca().strftime("%Y-%m-%d")
     if os.path.exists(_log_file):
         import re as _re2
         _first_today = False
-        _first_mar25 = False
-        _first_ever = False
         with open(_log_file, encoding="utf-8", errors="replace") as _lf2:
             for _ln in _lf2:
                 _m2 = _re2.search(r'Balance: ([\d.]+) USDT', _ln)
                 if _m2:
                     _bv = float(_m2.group(1))
                     balance = _bv
-                    if not _first_ever:
-                        balance_first = _bv
-                        _first_ever = True
-                    if not _first_mar25 and "2026-03-25" in _ln:
-                        balance_mar25 = _bv
-                        _first_mar25 = True
                     if not _first_today and _today_date_str in _ln:
                         balance_start_of_day = _bv
                         _first_today = True
         if balance_start_of_day == 0:
             balance_start_of_day = balance
-        if balance_mar25 == 0:
-            balance_mar25 = balance_first
 
     audit_html = build_audit_table(trades)
     paper_html = _build_paper_comparison(trades, paper_trades)
-    control_html = _build_control_card(control_trades)
+    control_html = _build_control_card(control_trades, trades)
+    slots_html = _build_slots_overview(all_slot_states, factory_state, sentinels)
 
     shadow_html = ''
-    session_html = _build_session_card(trades, paper_trades, balance=balance, balance_start=balance_start_of_day, balance_mar25=balance_mar25, balance_first=balance_first)
+    session_html = _build_session_card(trades, paper_trades, balance=balance, balance_start=balance_start_of_day)
 
     # Activity feed
     activity_html = ""
@@ -1065,24 +1141,23 @@ def build_content() -> str:
     if has_charts:
         chart_section = """
         <div class="charts-grid">
-            <div class="chart-box"><img src="/chart/cumulative_pnl_v10" alt="V10 Cumulative PnL"></div>
             <div class="chart-box"><img src="/chart/cumulative_pnl" alt="Cumulative PnL"></div>
-            <div class="chart-box"><img src="/chart/pnl_by_pair" alt="PnL by Pair"></div>
             <div class="chart-box"><img src="/chart/pnl_by_reason" alt="PnL by Reason"></div>
-            <div class="chart-box"><img src="/chart/trade_pnl" alt="Trade PnL"></div>
         </div>"""
     else:
         chart_section = '<div class="glass-card" style="text-align:center;padding:40px"><p style="color:#7e8aa0">No trades yet — charts appear after first closed trade</p></div>'
 
     # Daily stats
     today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-    today_trades = [t for t in trades if t.get("opened_at", 0) >= today_start]
+    # Use closed_at for TODAY so trade count and balance delta reconcile
+    # (balance delta is cash-basis = realized PnL settled today)
+    today_trades = [t for t in trades if t.get("closed_at", 0) >= today_start]
     has_daily = any(t.get("opened_at", 0) > 0 or t.get("closed_at", 0) > 0 for t in trades)
-    daily_pnl = sum(t.get("pnl_usdt", 0) for t in today_trades)
-    daily_fees = sum(t.get("margin", 0) * 10 * 0.0006 * 2 for t in today_trades)
-    daily_real_pnl = daily_pnl - daily_fees
+    daily_pnl = sum(_net_pnl(t) for t in today_trades)  # net (post-fees)
+    daily_fees = sum(_real_fee(t) for t in today_trades)
+    daily_real_pnl = daily_pnl  # already net
     daily_count = len(today_trades)
-    daily_wins = sum(1 for t in today_trades if t.get("pnl_usdt", 0) > 0)
+    daily_wins = sum(1 for t in today_trades if _net_pnl(t) > 0)
     daily_wr = (daily_wins / daily_count * 100) if daily_count > 0 else 0
     current_balance = state.get("peak_balance", 0)
     daily_pct = (daily_pnl / (current_balance - daily_pnl) * 100) if has_daily and (current_balance - daily_pnl) > 0 else 0
@@ -1095,7 +1170,7 @@ def build_content() -> str:
     cumulative = 0
     running_peak = 0
     for t in trades:
-        cumulative += t.get("pnl_usdt", 0)
+        cumulative += _net_pnl(t)
         running_peak = max(running_peak, cumulative)
     current_dd = running_peak - cumulative  # current drawdown in $
     current_dd_pct = (current_dd / peak_bal * 100) if peak_bal > 0 else 0
@@ -1109,14 +1184,14 @@ def build_content() -> str:
     shadow_all = [t for t in trades if t.get("shadow_skip")]
     shadow_today_list = [t for t in today_trades if t.get("shadow_skip")]
     if shadow_all:
-        s_all_pnl = sum(t.get("pnl_usdt", 0) for t in shadow_all)
-        s_all_wins = sum(1 for t in shadow_all if t.get("pnl_usdt", 0) > 0)
+        s_all_pnl = sum(_net_pnl(t) for t in shadow_all)
+        s_all_wins = sum(1 for t in shadow_all if _net_pnl(t) > 0)
         s_all_wr = (s_all_wins / len(shadow_all) * 100) if shadow_all else 0
-        s_today_pnl = sum(t.get("pnl_usdt", 0) for t in shadow_today_list)
+        s_today_pnl = sum(_net_pnl(t) for t in shadow_today_list)
         savings = -s_all_pnl
         sav_cls = "positive" if savings > 0 else "negative"
         shadow_html = f'''<div class="glass-card dash-item" data-id="shadow">
-        <h2 class="drag-handle">🕐 Shadow Filter</h2>
+        <h2>Shadow Filter</h2>
         <div class="stat-row"><span class="stat-label">Window</span><span class="stat-value" style="font-size:0.75em">11PM-3AM + 6AM + 9AM PT</span></div>
         <div class="stat-row"><span class="stat-label">Shadow Trades</span><span class="stat-value">{len(shadow_all)}</span></div>
         <div class="stat-row"><span class="stat-label">Shadow WR</span><span class="stat-value negative">{s_all_wr:.0f}%</span></div>
@@ -1140,7 +1215,7 @@ def build_content() -> str:
 <div class="top-bar">
     <div class="top-left">
         <div class="logo">PHMEX-S</div>
-        <div class="logo-sub">Trading Desk Data</div>
+        <div class="logo-sub">Trading Desk</div>
     </div>
     <div class="top-center">
         <span class="regime-badge {regime_cls}">{escape(regime)}</span>
@@ -1151,106 +1226,75 @@ def build_content() -> str:
     </div>
 </div>
 
-<!-- Hero metrics -->
-<div class="hero-row">
-    <div class="hero-card">
-        <div class="hero-label">Balance</div>
-        <div class="hero-value" style="color:#89b4fa">${balance:.2f}</div>
+<!-- Status bar -->
+<div class="status-bar">
+    <div class="status-item">
+        <span class="status-label">BAL</span>
+        <span class="status-value">${balance:.2f}</span>
+        <span class="status-sub">pk ${state.get('peak_balance',0):.2f}</span>
     </div>
-    <div class="hero-card">
-        <div class="hero-label">Total PnL</div>
-        <div class="hero-value {pnl_cls}">${stats['total_pnl']:+.2f}</div>
+    <div class="status-item">
+        <span class="status-label">TODAY</span>
+        <span class="status-value {bal_change_cls}">${balance_change:+.2f}</span>
+        <span class="status-sub">{daily_count}t {daily_wr:.0f}%</span>
     </div>
-    <div class="hero-card">
-        <div class="hero-label">Win Rate</div>
-        <div class="hero-value {wr_cls}">{stats['win_rate']:.1f}%</div>
-        <div class="hero-sub">{stats['wins']}W / {stats['losses']}L of {stats['total']}</div>
+    <div class="status-item">
+        <span class="status-label">ALL</span>
+        <span class="status-value {pnl_cls}">${stats['total_pnl']:+.2f}</span>
+        <span class="status-sub">{stats['wins']}W/{stats['losses']}L {stats['win_rate']:.0f}%</span>
     </div>
-    <div class="hero-card">
-        <div class="hero-label">Today (Actual)</div>
-        <div class="hero-value {bal_change_cls}">${balance_change:+.2f}</div>
-        <div class="hero-sub">{daily_count} trades &middot; {daily_wr:.0f}% WR</div>
-    </div>
-    <div class="hero-card">
-        <div class="hero-label">Hidden Costs</div>
-        <div class="hero-value negative">${balance_change - daily_pnl:+.2f}</div>
-        <div class="hero-sub">funding fees &middot; slippage</div>
-    </div>
-    <div class="hero-card">
-        <div class="hero-label">Peak Balance</div>
-        <div class="hero-value">${state.get('peak_balance',0):.2f}</div>
-    </div>
-    <div class="hero-card">
-        <div class="hero-label">Profit Factor</div>
-        <div class="hero-value">{pf_str}</div>
-    </div>
-    <div class="hero-card">
-        <div class="hero-label">Drawdown</div>
-        <div class="hero-value negative">${current_dd:.2f}</div>
-        <div class="hero-sub">{current_dd_pct:.1f}% from peak</div>
-    </div>
-    <div class="hero-card">
-        <div class="hero-label">Est. Fees Paid</div>
-        <div class="hero-value negative">${stats['total_fees']:.2f}</div>
-        <div class="hero-sub">~${stats['total_fees']/max(stats['total'],1):.2f}/trade &middot; today ${daily_fees:.2f}</div>
+    <div class="status-item">
+        <span class="status-label">DD</span>
+        <span class="status-value negative">${current_dd:.2f}</span>
+        <span class="status-sub">{current_dd_pct:.1f}%</span>
     </div>
 </div>
 
-<!-- Draggable grid -->
+<!-- 3-column grid -->
 <div class="dash-grid" id="dash-grid">
-    <div class="glass-card dash-item" data-id="watchlist">
-        <h2 class="drag-handle">Watchlist</h2>
-        {_build_watchlist_html(watchlist)}
+    <!-- Left column: A/B Test, Slots, Sessions -->
+    <div class="dash-col">
+        {control_html}
+        {slots_html}
+        {session_html}
     </div>
-    <div class="glass-card dash-item" data-id="performance">
-        <h2 class="drag-handle">Performance</h2>
-        <div class="stat-row"><span class="stat-label">Win Rate</span><span class="stat-value {wr_cls}">{stats['win_rate']:.1f}%</span></div>
-        <div class="stat-row"><span class="stat-label">Avg Win</span><span class="stat-value positive">${stats['avg_win']:.2f}</span></div>
-        <div class="stat-row"><span class="stat-label">Avg Loss</span><span class="stat-value negative">${stats['avg_loss']:.2f}</span></div>
-        <div class="stat-row"><span class="stat-label">Best Trade</span><span class="stat-value positive">${stats['best']:+.2f}</span></div>
-        <div class="stat-row"><span class="stat-label">Worst Trade</span><span class="stat-value negative">${stats['worst']:+.2f}</span></div>
-        <div class="stat-row"><span class="stat-label">Max DD %</span><span class="stat-value negative">{stats['max_dd_pct']:.1f}%</span></div>
-        <div class="stat-row"><span class="stat-label">Max Drawdown</span><span class="stat-value negative">${stats['max_dd']:.2f}</span></div>
-        <div class="stat-row"><span class="stat-label">Current DD %</span><span class="stat-value {"negative" if current_dd > 0 else "positive"}">{f'{current_dd_pct:.1f}%' if current_dd > 0 else '0.0%'}</span></div>
-        <div class="stat-row"><span class="stat-label">Current DD</span><span class="stat-value {"negative" if current_dd > 0 else "positive"}">{f'${current_dd:.2f}' if current_dd > 0 else '$0.00'}</span></div>
-    </div>
-    <div class="glass-card dash-item" data-id="today">
-        <h2 class="drag-handle">Today&apos;s Session</h2>
-        <div class="stat-row"><span class="stat-label">Trades</span><span class="stat-value">{daily_count if has_daily else 'N/A'}</span></div>
-        <div class="stat-row"><span class="stat-label">Win Rate</span><span class="stat-value {daily_wr_cls}">{f'{daily_wr:.0f}%' if has_daily else 'N/A'}</span></div>
-        <div class="stat-row"><span class="stat-label">PnL</span><span class="stat-value {daily_pnl_cls}">{f'${daily_pnl:+.2f}' if has_daily else 'N/A'}</span></div>
-        <div class="stat-row"><span class="stat-label">Daily %</span><span class="stat-value {daily_pnl_cls}">{f'{daily_pct:+.1f}%' if has_daily else 'N/A'}</span></div>
-        <div class="stat-row"><span class="stat-label">DD %</span><span class="stat-value {"negative" if current_dd > 0 else "positive"}">{f'{current_dd_pct:.1f}%' if current_dd > 0 else '0.0%'}</span></div>
-        <div class="stat-row"><span class="stat-label">Drawdown</span><span class="stat-value {"negative" if current_dd > 0 else "positive"}">{f'${current_dd:.2f}' if current_dd > 0 else '$0.00'}</span></div>
-        <div class="stat-row"><span class="stat-label">W / L</span><span class="stat-value">{f'{daily_wins} / {daily_count - daily_wins}' if has_daily else 'N/A'}</span></div>
-    </div>
-    {paper_html}
-    {control_html}
-    {shadow_html}
-    <div class="glass-card dash-item" data-id="charts">
-        <h2 class="drag-handle">Charts</h2>
-        {chart_section}
-    </div>
-    <div class="glass-card dash-item" data-id="activity">
-        <h2 class="drag-handle">Activity Feed</h2>
-        <div class="activity-legend">
-            <span class="legend-dot" style="color:var(--positive)">&#9679; Entry</span>
-            <span class="legend-dot" style="color:var(--accent-blue)">&#9679; Exit</span>
-            <span class="legend-dot" style="color:var(--warning)">&#9679; System</span>
-        </div>
-        <div class="activity-scroll">
-        {activity_html if activity_html else '<div class="activity-line act-default">No recent activity</div>'}
-        </div>
-    </div>
-    <div class="glass-card dash-item" data-id="audit">
-        <h2 class="drag-handle">Performance Audit</h2>
-        {audit_html}
-    </div>
-</div>
 
-<!-- Session Performance — own row -->
-<div style="max-width:650px;margin:24px auto;padding:0 16px">
-    {session_html}
+    <!-- Center column: Charts, Audit + Trade Log -->
+    <div class="dash-col">
+        {chart_section}
+        <div class="glass-card dash-item" data-id="audit">
+            <h2>Performance Audit</h2>
+            <div class="perf-summary">
+                <div class="perf-summary-item"><span class="stat-label">Avg Win</span><span class="stat-value positive">${stats['avg_win']:.2f}</span></div>
+                <div class="perf-summary-item"><span class="stat-label">Avg Loss</span><span class="stat-value negative">${stats['avg_loss']:.2f}</span></div>
+                <div class="perf-summary-item"><span class="stat-label">Best Trade</span><span class="stat-value positive">${stats['best']:+.2f}</span></div>
+                <div class="perf-summary-item"><span class="stat-label">Worst Trade</span><span class="stat-value negative">${stats['worst']:+.2f}</span></div>
+            </div>
+            {audit_html}
+        </div>
+    </div>
+
+    <!-- Right column: Activity, Watchlist, Paper, Shadow -->
+    <div class="dash-col">
+        <div class="glass-card dash-item" data-id="activity">
+            <h2>Activity Feed</h2>
+            <div class="activity-legend">
+                <span class="legend-dot" style="color:var(--positive)">&#9679; Entry</span>
+                <span class="legend-dot" style="color:var(--accent)">&#9679; Exit</span>
+                <span class="legend-dot" style="color:var(--warning)">&#9679; System</span>
+            </div>
+            <div class="activity-scroll">
+            {activity_html if activity_html else '<div class="activity-line act-default">No recent activity</div>'}
+            </div>
+        </div>
+        <div class="glass-card dash-item" data-id="watchlist">
+            <h2>Watchlist</h2>
+            {_build_watchlist_html(watchlist)}
+        </div>
+        {_build_reconcile_card()}
+        {paper_html}
+        {shadow_html}
+    </div>
 </div>
 
 <div class="footer">
@@ -1273,21 +1317,18 @@ def build_html() -> str:
 *{{ margin:0; padding:0; box-sizing:border-box; }}
 
 :root {{
-    --bg-deep: #0a0e1a;
-    --bg-mid: #111827;
-    --glass-bg: rgba(17, 24, 39, 0.65);
-    --glass-border: rgba(100, 140, 200, 0.12);
-    --glass-highlight: rgba(120, 160, 220, 0.06);
-    --text-primary: #e2e8f0;
-    --text-secondary: #7e8aa0;
-    --text-dim: #4a5568;
-    --accent-blue: #60a5fa;
-    --accent-cyan: #22d3ee;
-    --accent-teal: #2dd4bf;
-    --positive: #34d399;
-    --negative: #f87171;
-    --warning: #fbbf24;
-    --border-subtle: rgba(100, 140, 200, 0.08);
+    --bg-deep: #0d1117;
+    --panel-bg: #161b22;
+    --panel-border: #21262d;
+    --text-primary: #c9d1d9;
+    --text-secondary: #8b949e;
+    --text-dim: #484f58;
+    --accent: #39d2c0;
+    --positive: #3fb950;
+    --negative: #f85149;
+    --warning: #d29922;
+    --border-subtle: #21262d;
+    --hover-bg: #1c2128;
 }}
 
 body {{
@@ -1296,53 +1337,12 @@ body {{
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
-}}
-
-/* SF skyline background */
-body::before {{
-    content: '';
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background:
-        /* Sky gradient — golden hour over the bay */
-        linear-gradient(180deg,
-            #0a0e1a 0%,
-            #0f172a 25%,
-            #1a1f3a 50%,
-            #1e2744 70%,
-            #1a2640 85%,
-            #162035 100%
-        );
-    z-index: -3;
-}}
-
-/* Skyline silhouette */
-body::after {{
-    content: '';
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    height: 280px;
-    background: linear-gradient(0deg, rgba(10,14,26,0.95) 0%, transparent 100%);
-    z-index: -1;
-    pointer-events: none;
-}}
-
-/* Ambient glow — city lights reflecting on bay */
-.skyline-glow {{
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    height: 200px;
-    background:
-        radial-gradient(ellipse 60% 40% at 30% 100%, rgba(96,165,250,0.04) 0%, transparent 70%),
-        radial-gradient(ellipse 50% 35% at 70% 100%, rgba(34,211,238,0.03) 0%, transparent 70%);
-    z-index: -2;
-    pointer-events: none;
+    padding: 0;
 }}
 
 #content {{
-    max-width: 1600px;
-    margin: 0 auto;
-    padding: 12px 20px 30px;
+    width: 100%;
+    padding: 0;
     position: relative;
 }}
 
@@ -1351,22 +1351,23 @@ body::after {{
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 0 16px;
-    border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: 20px;
+    padding: 8px 16px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--panel-border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }}
 .top-left {{ display: flex; align-items: baseline; gap: 10px; }}
 .logo {{
-    font-size: 1.3em;
+    font-size: 1.1em;
     font-weight: 700;
     letter-spacing: 3px;
-    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
 }}
 .logo-sub {{
-    font-size: 0.65em;
+    font-size: 0.6em;
     font-weight: 500;
     letter-spacing: 4px;
     color: var(--text-dim);
@@ -1376,163 +1377,129 @@ body::after {{
 .top-right {{ text-align: right; }}
 .clock {{
     font-family: 'JetBrains Mono', monospace;
-    font-size: 1.4em;
+    font-size: 1.1em;
     font-weight: 500;
     color: var(--text-primary);
     letter-spacing: 1px;
 }}
 .date {{
-    font-size: 0.75em;
+    font-size: 0.7em;
     color: var(--text-secondary);
-    margin-top: 2px;
+    margin-top: 1px;
+    font-family: 'JetBrains Mono', monospace;
 }}
 
 /* Regime badge */
 .regime-badge {{
     display: inline-block;
-    padding: 4px 14px;
-    border-radius: 20px;
-    font-size: 0.75em;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: 0.7em;
     font-weight: 600;
     letter-spacing: 0.5px;
+    font-family: 'JetBrains Mono', monospace;
 }}
 .regime-normal {{
-    background: rgba(52,211,153,0.12);
+    background: rgba(63,185,80,0.1);
     color: var(--positive);
-    border: 1px solid rgba(52,211,153,0.2);
+    border: 1px solid rgba(63,185,80,0.25);
 }}
 .regime-warn {{
-    background: rgba(251,191,36,0.12);
+    background: rgba(210,153,34,0.1);
     color: var(--warning);
-    border: 1px solid rgba(251,191,36,0.2);
+    border: 1px solid rgba(210,153,34,0.25);
     animation: pulse-warn 2s ease-in-out infinite;
 }}
 .regime-info {{
-    background: rgba(96,165,250,0.12);
-    color: var(--accent-blue);
-    border: 1px solid rgba(96,165,250,0.2);
+    background: rgba(57,210,192,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(57,210,192,0.25);
 }}
 @keyframes pulse-warn {{
     0%, 100% {{ opacity: 1; }}
     50% {{ opacity: 0.7; }}
 }}
 
-/* ── Hero metrics row ── */
-.hero-row {{
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 12px;
-    margin-bottom: 20px;
-}}
-.hero-card {{
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    padding: 16px 18px;
-    text-align: center;
-    transition: border-color 0.3s;
-}}
-.hero-card:hover {{
-    border-color: rgba(96,165,250,0.25);
-}}
-.hero-label {{
-    font-size: 0.7em;
-    font-weight: 500;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 6px;
-}}
-.hero-value {{
-    font-size: 1.6em;
-    font-weight: 700;
-    color: var(--text-primary);
+/* ── Status bar (replaces hero row) ── */
+.status-bar {{
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 8px 16px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--panel-border);
     font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    overflow-x: auto;
+    white-space: nowrap;
 }}
-.hero-sub {{
-    font-size: 0.72em;
+.status-item {{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}}
+.status-label {{
     color: var(--text-dim);
-    margin-top: 4px;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    letter-spacing: 0.5px;
+}}
+.status-value {{
+    font-weight: 600;
+    color: var(--text-primary);
+}}
+.status-sub {{
+    color: var(--text-dim);
+    font-size: 0.9em;
 }}
 
-/* ── Draggable grid ── */
+/* ── 3-column grid ── */
 .dash-grid {{
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: 16px;
-    margin-bottom: 20px;
+    grid-template-columns: 30% 45% 25%;
+    height: calc(100vh - 90px);
+    overflow: hidden;
 }}
-
-/* ── Glass card ── */
-.glass-card {{
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    padding: 16px 18px;
-    transition: border-color 0.3s, box-shadow 0.2s;
-}}
-.glass-card:hover {{
-    border-color: rgba(96,165,250,0.2);
-}}
-
-/* Resizable + draggable cards */
-.dash-item {{
-    resize: both;
-    overflow: auto;
-    min-width: 280px;
-    min-height: 120px;
+.dash-col {{
+    overflow-y: auto;
+    padding: 8px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(96,165,250,0.15) transparent;
+    scrollbar-color: rgba(57,210,192,0.15) transparent;
+}}
+.dash-col::-webkit-scrollbar {{ width: 4px; }}
+.dash-col::-webkit-scrollbar-thumb {{ background: rgba(57,210,192,0.15); border-radius: 2px; }}
+
+/* ── Panel card (replaces glass-card) ── */
+.glass-card {{
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 8px;
+}}
+
+.dash-item {{
+    overflow: auto;
+    min-width: 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(57,210,192,0.15) transparent;
     position: relative;
 }}
-.dash-item::-webkit-scrollbar {{ width: 5px; height: 5px; }}
-.dash-item::-webkit-scrollbar-thumb {{ background: rgba(96,165,250,0.2); border-radius: 3px; }}
-.dash-item::-webkit-resizer {{ display: block; }}
+.dash-item::-webkit-scrollbar {{ width: 4px; height: 4px; }}
+.dash-item::-webkit-scrollbar-thumb {{ background: rgba(57,210,192,0.15); border-radius: 2px; }}
 
-/* Drag handle */
-.drag-handle {{
-    cursor: grab;
-    user-select: none;
-    -webkit-user-select: none;
-    position: relative;
-    padding-right: 20px;
-}}
-.drag-handle:active {{ cursor: grabbing; }}
-.drag-handle::after {{
-    content: '\u2630';
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 0.9em;
-    color: var(--text-dim);
-    opacity: 0.4;
-}}
-.drag-handle:hover::after {{ opacity: 0.8; }}
-
-/* Dragging state */
-.dash-item.dragging {{
-    opacity: 0.5;
-    border: 2px dashed var(--accent-blue);
-}}
-.dash-item.drag-over {{
-    border-color: var(--accent-cyan);
-    box-shadow: 0 0 12px rgba(34,211,238,0.15);
-}}
+/* Section titles */
 
 .glass-card h2 {{
-    font-size: 0.78em;
+    font-size: 10px;
     font-weight: 600;
-    color: var(--accent-blue);
+    color: var(--accent);
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--panel-border);
+    font-family: 'JetBrains Mono', monospace;
 }}
 
 /* ── Stats ── */
@@ -1540,9 +1507,9 @@ body::after {{
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 5px 0;
-    font-size: 0.85em;
-    border-bottom: 1px solid rgba(100,140,200,0.04);
+    padding: 4px 0;
+    font-size: 0.82em;
+    border-bottom: 1px solid rgba(33,38,45,0.5);
 }}
 .stat-row:last-child {{ border-bottom: none; }}
 .stat-label {{ color: var(--text-secondary); font-weight: 400; }}
@@ -1556,23 +1523,23 @@ body::after {{
 
 /* ── Table ── */
 .table-wrap {{ overflow-x: auto; }}
-table {{ width: 100%; border-collapse: collapse; font-size: 0.82em; }}
+table {{ width: 100%; border-collapse: collapse; font-size: 0.8em; }}
 thead th {{
     text-align: left;
     color: var(--text-dim);
     font-weight: 500;
-    font-size: 0.85em;
+    font-size: 0.82em;
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--border-subtle);
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--panel-border);
 }}
 tbody td {{
-    padding: 8px 10px;
-    border-bottom: 1px solid rgba(100,140,200,0.04);
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(33,38,45,0.5);
     color: var(--text-secondary);
 }}
-tbody tr:hover {{ background: rgba(96,165,250,0.04); }}
+tbody tr:hover {{ background: var(--hover-bg); }}
 tr.win .pnl-cell {{ color: var(--positive); font-weight: 600; }}
 tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
 .pair-cell {{ color: var(--text-primary); font-weight: 500; }}
@@ -1583,84 +1550,77 @@ tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
 /* Side badge */
 .side-badge {{
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
+    padding: 2px 6px;
+    border-radius: 3px;
     font-size: 0.8em;
     font-weight: 600;
     letter-spacing: 0.5px;
 }}
 .side-long {{
-    background: rgba(52,211,153,0.12);
+    background: rgba(63,185,80,0.1);
     color: var(--positive);
 }}
 .side-short {{
-    background: rgba(248,113,113,0.12);
+    background: rgba(248,81,73,0.1);
     color: var(--negative);
 }}
 
 /* ── Charts ── */
 .charts-grid {{
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 12px;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
 }}
 .chart-box {{
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    padding: 10px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 6px;
     text-align: center;
 }}
 .chart-box img {{
     width: 100%;
-    border-radius: 8px;
-    opacity: 0.95;
+    border-radius: 2px;
 }}
 
 /* ── Watchlist ── */
 .watchlist-grid {{
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 6px;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 4px;
 }}
 .wl-item {{
-    background: rgba(30,40,60,0.6);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    padding: 8px 10px;
-    font-size: 0.8em;
-    transition: border-color 0.2s, background 0.2s;
+    background: var(--bg-deep);
+    border: 1px solid var(--panel-border);
+    border-radius: 3px;
+    padding: 6px 8px;
+    font-size: 0.78em;
 }}
 .wl-item:hover {{
-    border-color: rgba(96,165,250,0.3);
-    background: rgba(40,55,80,0.6);
+    background: var(--hover-bg);
 }}
 .wl-item .sym {{
     font-weight: 600;
     color: var(--text-primary);
-    font-size: 0.95em;
+    font-size: 0.9em;
 }}
 .wl-item .meta {{
     color: var(--text-dim);
-    font-size: 0.75em;
-    margin-top: 3px;
+    font-size: 0.72em;
+    margin-top: 2px;
 }}
 .wl-item .dot {{
     display: inline-block;
-    width: 7px; height: 7px;
+    width: 6px; height: 6px;
     border-radius: 50%;
-    margin-right: 4px;
+    margin-right: 3px;
     vertical-align: middle;
 }}
 .dot-open {{
     background: var(--positive);
-    box-shadow: 0 0 6px rgba(52,211,153,0.5);
 }}
 .dot-scanner {{
-    background: var(--accent-cyan);
-    box-shadow: 0 0 6px rgba(34,211,238,0.4);
+    background: var(--accent);
 }}
 .dot-base {{ background: var(--text-dim); }}
 .wl-score {{
@@ -1677,350 +1637,270 @@ tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
     max-height: 420px;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: rgba(96,165,250,0.2) transparent;
+    scrollbar-color: rgba(57,210,192,0.15) transparent;
 }}
-.activity-scroll::-webkit-scrollbar {{ width: 4px; }}
-.activity-scroll::-webkit-scrollbar-thumb {{ background: rgba(96,165,250,0.2); border-radius: 2px; }}
+.activity-scroll::-webkit-scrollbar {{ width: 3px; }}
+.activity-scroll::-webkit-scrollbar-thumb {{ background: rgba(57,210,192,0.15); border-radius: 2px; }}
 .activity-line {{
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.68em;
-    padding: 4px 6px;
-    border-radius: 4px;
-    margin-bottom: 2px;
+    font-size: 0.65em;
+    padding: 3px 4px;
+    border-radius: 2px;
+    margin-bottom: 1px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: background 0.2s;
 }}
 .activity-line:hover {{
-    background: rgba(96,165,250,0.06);
+    background: var(--hover-bg);
     white-space: normal;
     word-break: break-all;
 }}
 .act-entry {{ color: var(--positive); }}
-.act-exit {{ color: var(--accent-blue); }}
+.act-exit {{ color: var(--accent); }}
 .act-system {{ color: var(--warning); }}
 .act-default {{ color: var(--text-dim); }}
-.activity-legend {{ display:flex; gap:12px; padding:4px 0 8px; font-size:0.75rem; }}
-.legend-dot {{ display:flex; align-items:center; gap:4px; }}
+.activity-legend {{ display:flex; gap:10px; padding:3px 0 6px; font-size:0.7rem; }}
+.legend-dot {{ display:flex; align-items:center; gap:3px; }}
 
 /* ── Audit ── */
 .audit-grid {{
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 8px;
     margin-bottom: 8px;
 }}
 .audit-section {{
-    background: rgba(20,30,50,0.5);
-    border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-    padding: 12px 14px;
+    background: var(--bg-deep);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 10px 12px;
 }}
 .audit-section h3 {{
-    font-size: 0.72em;
+    font-size: 10px;
     font-weight: 600;
-    color: var(--accent-cyan);
+    color: var(--accent);
     text-transform: uppercase;
     letter-spacing: 1px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
 }}
-.audit-section table {{ font-size: 0.8em; }}
+.audit-section table {{ font-size: 0.78em; }}
 .audit-section thead th {{
-    font-size: 0.82em;
-    padding: 5px 6px;
+    font-size: 0.8em;
+    padding: 4px 5px;
 }}
 .audit-section tbody td {{
-    padding: 4px 6px;
-    font-size: 0.92em;
+    padding: 3px 5px;
+    font-size: 0.9em;
 }}
 .audit-log .table-wrap {{
     scrollbar-width: thin;
-    scrollbar-color: rgba(96,165,250,0.2) transparent;
+    scrollbar-color: rgba(57,210,192,0.15) transparent;
 }}
-.audit-log .table-wrap::-webkit-scrollbar {{ width: 4px; }}
-.audit-log .table-wrap::-webkit-scrollbar-thumb {{ background: rgba(96,165,250,0.2); border-radius: 2px; }}
+.audit-log .table-wrap::-webkit-scrollbar {{ width: 3px; }}
+.audit-log .table-wrap::-webkit-scrollbar-thumb {{ background: rgba(57,210,192,0.15); border-radius: 2px; }}
 
 /* ── Paper comparison ── */
 .paper-card {{
-    border-color: rgba(96,165,250,0.2);
-    background: linear-gradient(135deg, rgba(17,24,39,0.65) 0%, rgba(30,58,100,0.15) 100%);
-}}
-.paper-card:hover {{
-    border-color: rgba(96,165,250,0.35);
-    box-shadow: 0 0 16px rgba(96,165,250,0.08);
+    border-color: var(--panel-border);
+    background: var(--panel-bg);
 }}
 .paper-badge {{
     display: inline-block;
-    background: rgba(96,165,250,0.15);
-    color: var(--accent-blue);
-    border: 1px solid rgba(96,165,250,0.3);
-    border-radius: 4px;
-    padding: 1px 8px;
+    background: rgba(57,210,192,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(57,210,192,0.25);
+    border-radius: 3px;
+    padding: 1px 6px;
     font-size: 0.85em;
     letter-spacing: 1px;
     margin-right: 6px;
     vertical-align: middle;
+    font-family: 'JetBrains Mono', monospace;
 }}
 .compare-header {{
     display: grid;
-    grid-template-columns: 1fr 90px 90px 90px;
-    gap: 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--border-subtle);
+    grid-template-columns: 1fr 80px 80px;
+    gap: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--panel-border);
     margin-bottom: 4px;
 }}
 .compare-col-label {{
-    font-size: 0.7em;
+    font-size: 0.65em;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 1px;
     text-align: right;
+    font-family: 'JetBrains Mono', monospace;
 }}
 .live-label {{ color: var(--positive); }}
-.v10-label {{ color: #fab387; }}
-.paper-label {{ color: var(--accent-blue); }}
+.paper-label {{ color: var(--accent); }}
 .compare-section-title {{
-    font-size: 0.7em;
+    font-size: 10px;
     font-weight: 600;
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 1px;
-    padding: 6px 0 3px;
-    border-bottom: 1px solid rgba(100,140,200,0.06);
+    padding: 5px 0 2px;
+    border-bottom: 1px solid rgba(33,38,45,0.5);
+    font-family: 'JetBrains Mono', monospace;
 }}
 .compare-row {{
     display: grid;
-    grid-template-columns: 1fr 90px 90px 90px;
-    gap: 8px;
+    grid-template-columns: 1fr 80px 80px;
+    gap: 6px;
     align-items: center;
-    padding: 4px 0;
-    font-size: 0.85em;
-    border-bottom: 1px solid rgba(100,140,200,0.04);
+    padding: 3px 0;
+    font-size: 0.82em;
+    border-bottom: 1px solid rgba(33,38,45,0.5);
 }}
 .compare-label {{ color: var(--text-secondary); font-weight: 400; }}
 .compare-live, .compare-v10, .compare-paper {{
     text-align: right;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 500;
-    font-size: 0.95em;
+    font-size: 0.92em;
 }}
-.compare-v10 {{ color: #fab387; }}
-.compare-paper {{ color: var(--accent-blue); }}
+.compare-paper {{ color: var(--accent); }}
 .paper-trade-row {{
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
-    padding: 4px 0;
-    font-size: 0.82em;
-    border-bottom: 1px solid rgba(100,140,200,0.04);
+    padding: 3px 0;
+    font-size: 0.78em;
+    border-bottom: 1px solid rgba(33,38,45,0.5);
 }}
 .paper-trade-row:last-child {{ border-bottom: none; }}
 
 /* ── Session breakdown ── */
 .session-section {{
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }}
 .session-section-title {{
-    font-size: 0.75em;
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 1px;
     color: var(--text-dim);
-    margin-bottom: 6px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid rgba(100,140,200,0.06);
+    margin-bottom: 4px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--panel-border);
+    font-family: 'JetBrains Mono', monospace;
 }}
 .session-divider {{
     height: 1px;
-    background: rgba(100,140,200,0.1);
-    margin: 10px 0;
+    background: var(--panel-border);
+    margin: 8px 0;
 }}
 .session-row {{
-    padding: 7px 0;
-    border-bottom: 1px solid rgba(100,140,200,0.04);
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(33,38,45,0.5);
 }}
 .session-row:last-child {{ border-bottom: none; }}
 .session-name {{
-    font-size: 0.82em;
+    font-size: 0.8em;
     color: var(--text-primary);
     font-weight: 500;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }}
 .session-label-text {{
     vertical-align: middle;
 }}
-.session-morning .session-name {{ color: #a6e3a1; }}
-.session-afternoon .session-name {{ color: #fab387; }}
-.session-night .session-name {{ color: #89b4fa; }}
+.session-morning .session-name {{ color: #3fb950; }}
+.session-afternoon .session-name {{ color: #d29922; }}
+.session-night .session-name {{ color: #39d2c0; }}
 .session-detail-stats {{
     display: flex;
-    gap: 10px;
-    font-size: 0.8em;
+    gap: 8px;
+    font-size: 0.78em;
     font-family: 'JetBrains Mono', monospace;
     color: var(--text-secondary);
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }}
 .session-stat-item {{
     white-space: nowrap;
 }}
 .session-bar-wrap {{
-    height: 5px;
-    background: rgba(100,140,200,0.08);
-    border-radius: 3px;
+    height: 4px;
+    background: rgba(33,38,45,0.8);
+    border-radius: 2px;
     overflow: hidden;
 }}
 .session-bar {{
     height: 100%;
-    border-radius: 3px;
-    transition: width 0.3s;
+    border-radius: 2px;
+}}
+
+/* ── Performance summary row (inside audit card) ── */
+.perf-summary {{
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--panel-border);
+}}
+.perf-summary-item {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 0.82em;
+}}
+.perf-summary-item .stat-label {{
+    font-size: 0.8em;
+}}
+.perf-summary-item .stat-value {{
+    font-size: 1em;
 }}
 
 /* ── Footer ── */
 .footer {{
     text-align: center;
     color: var(--text-dim);
-    font-size: 0.7em;
+    font-size: 0.65em;
     letter-spacing: 0.5px;
-    padding: 16px 0 8px;
+    padding: 8px 0 4px;
+    font-family: 'JetBrains Mono', monospace;
 }}
 
 /* ── Responsive ── */
 @media (max-width: 1200px) {{
-    .dash-grid {{ grid-template-columns: 1fr; }}
-    .hero-row {{ grid-template-columns: repeat(3, 1fr); }}
+    .dash-grid {{ grid-template-columns: 1fr 1fr; height: auto; }}
+}}
+@media (max-width: 800px) {{
+    .dash-grid {{ grid-template-columns: 1fr; height: auto; }}
 }}
 @media (max-width: 768px) {{
-    .hero-row {{ grid-template-columns: repeat(2, 1fr); }}
-    .top-bar {{ flex-direction: column; gap: 8px; text-align: center; }}
+    .top-bar {{ flex-direction: column; gap: 6px; text-align: center; }}
     .top-left {{ justify-content: center; }}
-    #content {{ padding: 8px 12px 20px; }}
+    .status-bar {{ flex-wrap: wrap; }}
 }}
 </style>
 </head>
 <body>
-<div class="skyline-glow"></div>
 <div id="content">
 {content}
 </div>
 <script>
 (function() {{
-  const STORAGE_KEY = 'phmex_dash_layout';
-
-  /* ── Save/Load layout state ── */
-  function saveLayout() {{
-    const grid = document.getElementById('dash-grid');
-    if (!grid) return;
-    const state = {{}};
-    grid.querySelectorAll('.dash-item').forEach((el, i) => {{
-      const id = el.dataset.id;
-      if (!id) return;
-      state[id] = {{ order: i, w: el.style.width || '', h: el.style.height || '' }};
-    }});
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }}
-
-  function applyLayout() {{
-    const grid = document.getElementById('dash-grid');
-    if (!grid) return;
-    let state;
-    try {{ state = JSON.parse(localStorage.getItem(STORAGE_KEY)); }} catch(e) {{ return; }}
-    if (!state) return;
-
-    const items = Array.from(grid.querySelectorAll('.dash-item'));
-    /* Apply saved sizes */
-    items.forEach(el => {{
-      const s = state[el.dataset.id];
-      if (s) {{
-        if (s.w) el.style.width = s.w;
-        if (s.h) el.style.height = s.h;
-      }}
-    }});
-    /* Reorder */
-    items.sort((a, b) => {{
-      const oa = (state[a.dataset.id] || {{}}).order ?? 99;
-      const ob = (state[b.dataset.id] || {{}}).order ?? 99;
-      return oa - ob;
-    }});
-    items.forEach(el => grid.appendChild(el));
-    initDrag();
-  }}
-
-  /* ── Drag and drop ── */
-  let dragEl = null;
-
-  function initDrag() {{
-    const grid = document.getElementById('dash-grid');
-    if (!grid) return;
-
-    grid.querySelectorAll('.dash-item').forEach(item => {{
-      item.setAttribute('draggable', 'false');
-      const handle = item.querySelector('.drag-handle');
-      if (!handle) return;
-
-      handle.addEventListener('mousedown', () => {{
-        item.setAttribute('draggable', 'true');
-      }});
-      handle.addEventListener('mouseup', () => {{
-        item.setAttribute('draggable', 'false');
-      }});
-
-      item.addEventListener('dragstart', (e) => {{
-        dragEl = item;
-        item.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', item.dataset.id);
-      }});
-
-      item.addEventListener('dragend', () => {{
-        item.classList.remove('dragging');
-        item.setAttribute('draggable', 'false');
-        grid.querySelectorAll('.dash-item').forEach(el => el.classList.remove('drag-over'));
-        dragEl = null;
-        saveLayout();
-      }});
-
-      item.addEventListener('dragover', (e) => {{
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        if (item !== dragEl) item.classList.add('drag-over');
-      }});
-
-      item.addEventListener('dragleave', () => {{
-        item.classList.remove('drag-over');
-      }});
-
-      item.addEventListener('drop', (e) => {{
-        e.preventDefault();
-        item.classList.remove('drag-over');
-        if (!dragEl || dragEl === item) return;
-        const allItems = Array.from(grid.querySelectorAll('.dash-item'));
-        const fromIdx = allItems.indexOf(dragEl);
-        const toIdx = allItems.indexOf(item);
-        if (fromIdx < toIdx) {{
-          item.parentNode.insertBefore(dragEl, item.nextSibling);
-        }} else {{
-          item.parentNode.insertBefore(dragEl, item);
-        }}
-        saveLayout();
-      }});
-    }});
-
-    /* Save size on resize (via ResizeObserver) */
-    const ro = new ResizeObserver(() => {{ saveLayout(); }});
-    grid.querySelectorAll('.dash-item').forEach(el => ro.observe(el));
-  }}
-
   /* ── Auto-refresh ── */
-  let scrollY = 0;
   async function refresh() {{
     try {{
       const resp = await fetch('/api/content');
       if (!resp.ok) return;
       const html = await resp.text();
-      scrollY = window.scrollY;
+      const scrollPositions = {{}};
+      document.querySelectorAll('.dash-col').forEach((col, i) => {{
+        scrollPositions[i] = col.scrollTop;
+      }});
+      const mainScroll = window.scrollY;
       document.getElementById('content').innerHTML = html;
-      applyLayout();
-      window.scrollTo(0, scrollY);
+      document.querySelectorAll('.dash-col').forEach((col, i) => {{
+        if (scrollPositions[i] !== undefined) col.scrollTop = scrollPositions[i];
+      }});
+      window.scrollTo(0, mainScroll);
       document.querySelectorAll('.chart-box img').forEach(img => {{
         const src = img.getAttribute('src').split('?')[0];
         img.src = src + '?t=' + Date.now();
@@ -2028,13 +1908,11 @@ tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
     }} catch(e) {{}}
   }}
   setInterval(refresh, 20000);
-
-  /* Initial setup */
-  applyLayout();
 }})();
 </script>
 </body>
 </html>"""
+
 
 
 # ── HTTP handler ─────────────────────────────────────────────────────────

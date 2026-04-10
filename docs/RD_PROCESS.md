@@ -8,103 +8,103 @@ Every strategy goes through these stages:
 HYPOTHESIS → BACKTEST → PAPER → VALIDATE → LIVE → MONITOR → KILL/EVOLVE
 ```
 
+## Current State (Sentinel v11 — 2026-04-02)
+
+| Stage | Strategies |
+|-------|-----------|
+| **Live** | confluence (htf_confluence_pullback) — Sentinel gates |
+| **Paper (gated)** | liq_cascade, bb_reversion (mean revert), htf_momentum |
+| **Paper (control)** | legacy_control (ungated Pipeline replica for A/B) |
+| **Killed** | ATR Gate, V10 Control, SMA+VWAP, 8H Funding |
+
 ## Weekly Cadence
 
 ### Monday: Performance Review
-1. Run recalibration report: `python recalibration.py`
-2. Check each slot's Kelly, WR, PnL
-3. Flag any slot approaching kill thresholds
-4. Review edge decay (compare last 7d vs all-time)
+1. Run daily report: `python scripts/daily_report.py`
+2. Compare live vs legacy_control (Sentinel A/B)
+3. Check each paper slot's WR, PnL, AE rate
+4. Flag any slot approaching kill thresholds
+5. Review edge decay (compare last 7d vs all-time)
 
 ### Wednesday: Strategy Pipeline Check
-1. Run factory report: `python strategy_factory.py report`
-2. Are there strategies in paper mode? Check their progress
-3. Any paper strategies ready for validation? `python strategy_factory.py validate <name>`
-4. Is the idea pipeline dry? Brainstorm new hypotheses
+1. Are paper strategies collecting enough trades? (need 50+ for validation)
+2. Any paper strategy ready for promotion?
+3. Is the idea pipeline dry? Brainstorm new hypotheses
+4. Check gate effectiveness — are [TAPE GATE]/[OB GATE]/[RATE GATE] logs showing expected blocks?
 
 ### Friday: R&D Session
 1. Research new edges (deploy research agents)
-2. Register new hypotheses: `python strategy_factory.py register <name> <hypothesis>`
-3. Backtest promising ideas: `python backtester.py --strategy <name>`
-4. Review killed strategies — is the kill reason still valid?
+2. Review killed strategies — is the kill reason still valid?
+3. Backtest promising ideas if tools available
+4. Save findings to memory/reference_*.md
 
 ### Monthly: Recalibration
-1. Full recalibration: `python recalibration.py`
-2. Walk-forward optimization on all live strategies
-3. Update parameters if OOS Sharpe > IS Sharpe × 0.7
-4. Kill any strategy with negative Kelly after 50+ trades
-5. Promote any paper strategy that passes validation
-6. Save findings to memory
+1. Walk-forward optimization on live strategy parameters
+2. Kill any strategy with negative Kelly after 50+ trades
+3. Promote any paper strategy that passes validation
+4. Review and tighten/loosen gate thresholds based on data
+5. Update memory files with findings
 
-## How to Generate New Strategy Ideas
+## How to Test a New Idea
+1. Write the strategy function in strategies.py (follow existing pattern)
+2. Add as paper slot in bot.py (StrategySlot with paper_mode=True)
+3. Collect 50+ paper trades
+4. Compare against live and legacy_control
+5. If Kelly > 0 and WR > 40%: promote to live
+6. Save research to memory/reference_*.md
 
-### Sources of Edge (Research-Backed)
-1. **Weekend effect** — already implemented (1.3x weekend boost)
-2. **Candle boundary** — already implemented (skip last 2 min)
-3. **Liquidation cascades** — Slot 4 in paper mode
-4. **Funding rate extremes** — Slot 5 in paper mode
-5. **Time-of-day volatility** — trade only during EU/US overlap (14:00-21:00 UTC)
-6. **VPIN regime filter** — detect informed flow, stand aside
-7. **Cross-timeframe momentum** — 4h trend + 5m entry
-8. **Correlation breakdowns** — BTC/ETH correlation divergence
-9. **Volume profile anomalies** — unusual volume at specific price levels
-10. **On-chain signals** — whale movements, exchange flows
-
-### How to Test a New Idea
-1. Register: `python strategy_factory.py register <name> "<hypothesis>"`
-2. Write the strategy function in strategies.py (follow existing pattern)
-3. Backtest: `python backtester.py --strategy <name> --days 30`
-4. If Kelly > 0 and WR > 40%: add as paper slot in bot.py
-5. Collect 50+ paper trades
-6. Validate: `python strategy_factory.py validate <name>`
-7. If passes: `python strategy_factory.py promote <name>`
-
-### Kill Criteria
+## Kill Criteria
 - Negative Kelly after 50+ trades → auto-kill
 - WR < 30% after 25+ trades → auto-kill
 - WR declining 3 consecutive months → flag for review
 - Edge decay > 30% (recent WR vs historical) → investigate
 
+## Top 1% Benchmarks
+
+| Metric | Target | Current (Pipeline baseline) |
+|--------|--------|-----------------------------|
+| AE rate | < 30% | ~50% (Sentinel targeting <30%) |
+| Win rate (live) | > 45% | 35-64% (varies by day) |
+| Monthly return | 3-5% | Negative (drawdown recovery) |
+| Max drawdown | < 15% | 14.6% (at limit) |
+| Paper strategies | 1+ always | 3 gated + 1 control |
+| Live strategies | 1-3 | 1 live |
+
+## Sources of Edge (Research-Backed)
+1. **Weekend effect** — implemented (weekend boost)
+2. **Candle boundary** — implemented (skip last 2 min)
+3. **Liquidation cascades** — paper slot active (liq_cascade)
+4. **Time-of-day filtering** — implemented (blocked hours)
+5. **L2 orderbook gating** — implemented (Sentinel)
+6. **Tape/flow gating** — implemented (Sentinel)
+7. **VPIN regime filter** — unexplored
+8. **Cross-timeframe momentum** — paper slot active (1h_momentum)
+9. **Correlation breakdowns** — unexplored (BTC/ETH divergence)
+10. **Volume profile anomalies** — unexplored
+11. **Mean reversion** — paper slot active (bb_reversion)
+
 ## Key Commands
 
 ```bash
-# Performance
-python recalibration.py                    # Full performance report
-python recalibration.py --days 7           # Last 7 days only
-python recalibration.py --slot <name>      # Specific slot
-
-# Factory
-python strategy_factory.py list            # All strategies by stage
-python strategy_factory.py report          # Pipeline health check
-python strategy_factory.py register <name> <hypothesis>
-python strategy_factory.py test <name>     # Start backtest
-python strategy_factory.py validate <name> # Check promotion criteria
-python strategy_factory.py promote <name>  # Move to live
-python strategy_factory.py kill <name> <reason>
-
-# Backtesting
-python fetch_history.py 30                 # Fetch 30 days of data
-python backtester.py --strategy <name>     # Run backtest
-python backtester.py --wfo                 # Walk-forward optimization
-
 # Bot
-python tracker_update.py status            # Project tracker
+python main.py >> logs/bot.log 2>&1 &     # Start bot
+python scripts/daily_report.py             # Generate daily report
+
+# Dashboard
+python web_dashboard.py                    # Web dashboard (localhost:8050)
+python war_room.py                         # Terminal dashboard
+
+# Analysis
+python recalibration.py                    # Performance report
+python recalibration.py --days 7           # Last 7 days only
+
+# Data
+python fetch_history.py 30                 # Fetch 30 days of OHLCV data
 ```
 
-## Top 1% Benchmarks
-
-| Metric | Target | Current |
-|--------|--------|---------|
-| Portfolio Sharpe | > 1.0 | TBD |
-| Kelly (2+ slots) | Positive | TBD |
-| Monthly recalibration | Running | Built |
-| Paper strategies testing | 1+ always | 4 in paper |
-| Live strategies | 3-5 | 1 live |
-| Monthly return | 3-5% | TBD |
-| Max drawdown | < 15% | TBD |
-| Win rate (combined) | > 45% | 35.9% (v8 baseline) |
-
-## Research Memory Files
-- `memory/reference_deep_research_mar21.md` — Full R&D findings
-- `memory/reference_trading_research.md` — Hedge fund benchmarks
-- `memory/project_v10_pipeline.md` — Build progress
+## Memory References
+- `memory/reference_bot_architecture.md` — Current bot structure (Sentinel)
+- `memory/reference_existing_infrastructure.md` — L2/tape systems and gate status
+- `memory/reference_performance_baseline.md` — Pipeline week baseline for comparison
+- `memory/reference_sentinel.md` — Sentinel deployment details and evaluation plan
+- `memory/lessons.md` — META-RULES and operational lessons

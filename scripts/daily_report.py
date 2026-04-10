@@ -5,6 +5,9 @@ import os
 import re
 from datetime import datetime, timedelta
 from collections import defaultdict
+from zoneinfo import ZoneInfo
+
+CA_TZ = ZoneInfo("America/Los_Angeles")
 
 BOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE_FILE = os.path.join(BOT_DIR, "trading_state.json")
@@ -34,6 +37,18 @@ def parse_log_entries(date_str):
     return entries
 
 
+def _net(t):
+    """Return net_pnl if present, else fall back to gross pnl_usdt."""
+    n = t.get("net_pnl")
+    return n if n is not None else t.get("pnl_usdt", 0)
+
+
+def _fee(t):
+    """Return real fees_usdt if present, else 0 (caller can decide to estimate)."""
+    f = t.get("fees_usdt")
+    return f if f is not None else 0
+
+
 def analyze_trades(state, date_str):
     """Analyze trades for a specific date."""
     trades = state.get("closed_trades", [])
@@ -42,7 +57,7 @@ def analyze_trades(state, date_str):
         # Trade records store closed_at as Unix timestamp (time.time())
         closed_at = t.get("closed_at", 0)
         if closed_at:
-            trade_date = datetime.fromtimestamp(closed_at).strftime("%Y-%m-%d")
+            trade_date = datetime.fromtimestamp(closed_at, tz=CA_TZ).strftime("%Y-%m-%d")
             if trade_date == date_str:
                 today_trades.append(t)
                 continue
@@ -54,13 +69,25 @@ def analyze_trades(state, date_str):
 
 
 def generate_report():
-    today = datetime.now()
+    today = datetime.now(CA_TZ)
     date_str = today.strftime("%Y-%m-%d")
     yesterday = (today - timedelta(days=1)).strftime("%Y-%m-%d")
 
+    # Reconcile fees against Phemex truth BEFORE reading state — prevents
+    # reports from publishing stale/zero fees (known I7 regression).
+    try:
+        import subprocess
+        subprocess.run(
+            ["python3", os.path.join(BOT_DIR, "scripts", "reconcile_phemex.py"), "--apply"],
+            cwd=BOT_DIR,
+            timeout=120,
+            capture_output=True,
+        )
+    except Exception as e:
+        print(f"[WARN] pre-report reconcile failed: {e}")
+
     state = load_state()
     peak = state.get("peak_balance", 0)
-    total_trades = state.get("total_trades", 0)
 
     # Parse balance from bot log STATS line (trading_state.json stores None)
     balance = 0
@@ -74,27 +101,24 @@ def generate_report():
     if balance == 0:
         balance = state.get("balance") or 0
 
-    # Overall stats
     closed = state.get("closed_trades", [])
-    wins = sum(1 for t in closed if t.get("pnl_usdt", 0) > 0)
-    losses = len(closed) - wins
-    total_pnl = sum(t.get("pnl_usdt", 0) for t in closed)
-    wr = (wins / len(closed) * 100) if closed else 0
 
     # Today's trades
     today_trades = analyze_trades(state, date_str)
-    today_wins = sum(1 for t in today_trades if t.get("pnl_usdt", 0) > 0)
+    today_wins = sum(1 for t in today_trades if _net(t) > 0)
     today_losses = len(today_trades) - today_wins
-    today_pnl = sum(t.get("pnl_usdt", 0) for t in today_trades)
+    today_pnl = sum(_net(t) for t in today_trades)
+    today_gross = sum(t.get("pnl_usdt", 0) for t in today_trades)
+    today_fees = sum(_fee(t) for t in today_trades)
     today_wr = (today_wins / len(today_trades) * 100) if today_trades else 0
 
     # By exit reason
     exit_reasons = defaultdict(lambda: {"count": 0, "pnl": 0, "wins": 0})
     for t in today_trades:
-        reason = t.get("reason", t.get("exit_reason", "unknown"))
+        reason = t.get("exit_reason") or t.get("reason") or "unknown"
         exit_reasons[reason]["count"] += 1
-        exit_reasons[reason]["pnl"] += t.get("pnl_usdt", 0)
-        if t.get("pnl_usdt", 0) > 0:
+        exit_reasons[reason]["pnl"] += _net(t)
+        if _net(t) > 0:
             exit_reasons[reason]["wins"] += 1
 
     # By symbol
@@ -102,8 +126,8 @@ def generate_report():
     for t in today_trades:
         sym = t.get("symbol", "unknown")
         symbols[sym]["count"] += 1
-        symbols[sym]["pnl"] += t.get("pnl_usdt", 0)
-        if t.get("pnl_usdt", 0) > 0:
+        symbols[sym]["pnl"] += _net(t)
+        if _net(t) > 0:
             symbols[sym]["wins"] += 1
 
     # By strategy
@@ -111,15 +135,9 @@ def generate_report():
     for t in today_trades:
         strat = t.get("strategy", "unknown")
         strategies[strat]["count"] += 1
-        strategies[strat]["pnl"] += t.get("pnl_usdt", 0)
-        if t.get("pnl_usdt", 0) > 0:
+        strategies[strat]["pnl"] += _net(t)
+        if _net(t) > 0:
             strategies[strat]["wins"] += 1
-
-    # Last 20 trades trend
-    last20 = closed[-20:] if len(closed) >= 20 else closed
-    last20_wins = sum(1 for t in last20 if t.get("pnl_usdt", 0) > 0)
-    last20_pnl = sum(t.get("pnl_usdt", 0) for t in last20)
-    last20_wr = (last20_wins / len(last20) * 100) if last20 else 0
 
     # Build report
     report = f"""# Phmex-S Daily Report — {date_str}
@@ -129,17 +147,13 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
 - Balance: ${balance:.2f} USDT
 - Peak: ${peak:.2f} USDT
 - Drawdown: {((peak - balance) / peak * 100) if peak > 0 else 0:.1f}%
-- Total trades: {total_trades}
-
-## Overall Performance ({len(closed)} closed trades)
-- Win Rate: {wr:.1f}% ({wins}W / {losses}L)
-- Total PnL: ${total_pnl:.2f}
-- Avg PnL/trade: ${total_pnl / len(closed) if closed else 0:.4f}
 
 ## Today ({date_str})
 - Trades: {len(today_trades)} ({today_wins}W / {today_losses}L)
-- Win Rate: {today_wr:.1f}%
-- PnL: ${today_pnl:.2f}
+- Win Rate: {today_wr:.1f}% (net)
+- Gross PnL: ${today_gross:.2f}
+- Fees: ${today_fees:.2f}
+- Net PnL: ${today_pnl:.2f}
 """
 
     if exit_reasons:
@@ -168,8 +182,8 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
             if opened:
                 hour = datetime.fromtimestamp(opened).strftime("%H")
                 hours[hour]["count"] += 1
-                hours[hour]["pnl"] += t.get("pnl_usdt", 0)
-                if t.get("pnl_usdt", 0) > 0:
+                hours[hour]["pnl"] += _net(t)
+                if _net(t) > 0:
                     hours[hour]["wins"] += 1
 
         report += "\n## Today by Hour (UTC)\n"
@@ -197,8 +211,8 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
                 else:
                     key = "🌙 Night (8:01PM-12AM)"
                 sessions[key]["count"] += 1
-                sessions[key]["pnl"] += t.get("pnl_usdt", 0)
-                if t.get("pnl_usdt", 0) > 0:
+                sessions[key]["pnl"] += _net(t)
+                if _net(t) > 0:
                     sessions[key]["wins"] += 1
 
         report += "\n## Today by Session\n"
@@ -208,11 +222,6 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
             report += f"| {s} | {d['count']} | {d['wins']} | {s_wr:.0f}% | ${d['pnl']:.2f} |\n"
 
     report += f"""
-## Last 20 Trades Trend
-- Win Rate: {last20_wr:.1f}% ({last20_wins}W / {len(last20) - last20_wins}L)
-- PnL: ${last20_pnl:.2f}
-- Trend: {"IMPROVING" if last20_wr > wr else "DECLINING" if last20_wr < wr else "STABLE"}
-
 ## Alerts
 """
     alerts = []
@@ -230,7 +239,7 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
         report += f"- {a}\n"
 
     # Paper slot comparison
-    paper_state_file = os.path.join(BOT_DIR, "trading_state_5m_sma_vwap.json")
+    paper_state_file = os.path.join(BOT_DIR, "trading_state_5m_liq_cascade.json")
     if os.path.exists(paper_state_file):
         with open(paper_state_file) as f:
             paper_state = json.load(f)
@@ -239,35 +248,24 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
         for t in paper_closed:
             closed_at = t.get("closed_at", 0)
             if closed_at:
-                trade_date = datetime.fromtimestamp(closed_at).strftime("%Y-%m-%d")
+                trade_date = datetime.fromtimestamp(closed_at, tz=CA_TZ).strftime("%Y-%m-%d")
                 if trade_date == date_str:
                     paper_today.append(t)
-        paper_all_wins = sum(1 for t in paper_closed if t.get("pnl_usdt", 0) > 0)
-        paper_all_pnl = sum(t.get("pnl_usdt", 0) for t in paper_closed)
-        paper_all_wr = (paper_all_wins / len(paper_closed) * 100) if paper_closed else 0
-        paper_today_wins = sum(1 for t in paper_today if t.get("pnl_usdt", 0) > 0)
-        paper_today_pnl = sum(t.get("pnl_usdt", 0) for t in paper_today)
+        paper_today_wins = sum(1 for t in paper_today if _net(t) > 0)
+        paper_today_pnl = sum(_net(t) for t in paper_today)
         paper_today_wr = (paper_today_wins / len(paper_today) * 100) if paper_today else 0
 
         report += f"""
 ## Paper Slot: ADX+SMA+VWAP
-### Today
 | Metric | Live | Paper |
 |--------|------|-------|
 | Trades | {len(today_trades)} | {len(paper_today)} |
 | Win Rate | {today_wr:.0f}% | {paper_today_wr:.0f}% |
 | PnL | ${today_pnl:.2f} | ${paper_today_pnl:.2f} |
-
-### All Time
-| Metric | Live | Paper |
-|--------|------|-------|
-| Trades | {len(closed)} | {len(paper_closed)} |
-| Win Rate | {wr:.0f}% | {paper_all_wr:.0f}% |
-| PnL | ${total_pnl:.2f} | ${paper_all_pnl:.2f} |
 """
 
     # V10 control slot comparison (markdown report)
-    v10_ctrl_file = os.path.join(BOT_DIR, "trading_state_5m_v10_control.json")
+    v10_ctrl_file = os.path.join(BOT_DIR, "trading_state_5m_legacy_control.json")
     if os.path.exists(v10_ctrl_file):
         with open(v10_ctrl_file) as f:
             v10_state = json.load(f)
@@ -276,31 +274,20 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
         for t in v10_closed:
             closed_at = t.get("closed_at", 0)
             if closed_at:
-                trade_date = datetime.fromtimestamp(closed_at).strftime("%Y-%m-%d")
+                trade_date = datetime.fromtimestamp(closed_at, tz=CA_TZ).strftime("%Y-%m-%d")
                 if trade_date == date_str:
                     v10_today.append(t)
-        v10_all_wins = sum(1 for t in v10_closed if t.get("pnl_usdt", 0) > 0)
-        v10_all_pnl = sum(t.get("pnl_usdt", 0) for t in v10_closed)
-        v10_all_wr = (v10_all_wins / len(v10_closed) * 100) if v10_closed else 0
-        v10_today_wins = sum(1 for t in v10_today if t.get("pnl_usdt", 0) > 0)
-        v10_today_pnl = sum(t.get("pnl_usdt", 0) for t in v10_today)
+        v10_today_wins = sum(1 for t in v10_today if _net(t) > 0)
+        v10_today_pnl = sum(_net(t) for t in v10_today)
         v10_today_wr = (v10_today_wins / len(v10_today) * 100) if v10_today else 0
 
         report += f"""
 ## V10 Control Slot (24/7 — no time block)
-### Today
 | Metric | Live | V10 Control |
 |--------|------|-------------|
 | Trades | {len(today_trades)} | {len(v10_today)} |
 | Win Rate | {today_wr:.0f}% | {v10_today_wr:.0f}% |
 | PnL | ${today_pnl:.2f} | ${v10_today_pnl:.2f} |
-
-### All Time
-| Metric | Live | V10 Control |
-|--------|------|-------------|
-| Trades | {len(closed)} | {len(v10_closed)} |
-| Win Rate | {wr:.0f}% | {v10_all_wr:.0f}% |
-| PnL | ${total_pnl:.2f} | ${v10_all_pnl:.2f} |
 """
 
     # Save
@@ -310,11 +297,11 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
     print(f"Report saved: {report_path}")
 
     # Send via Telegram
-    send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr, wr)
+    send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr)
     return report_path
 
 
-def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr, overall_wr):
+def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
     """Send report summary via Telegram."""
     from dotenv import load_dotenv
     load_dotenv(os.path.join(BOT_DIR, ".env"))
@@ -326,7 +313,6 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr, 
         return
 
     # Build concise Telegram message
-    trend = "IMPROVING" if today_wr > overall_wr else "DECLINING" if today_wr < overall_wr else "STABLE"
     sign = "+" if today_pnl >= 0 else ""
     emoji = "📈" if today_pnl >= 0 else "📉"
 
@@ -334,9 +320,10 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr, 
         f"{emoji} <b>Phmex-S Daily Report — {date_str}</b>\n\n"
         f"💰 Balance: <b>${balance:.2f} USDT</b>\n\n"
         f"🟢 <b>Live Bot</b>\n"
-        f"📊 Trades: {len(today_trades)} | WR: {today_wr:.0f}%\n"
-        f"💵 PnL: <b>{sign}${today_pnl:.2f}</b>\n"
-        f"📈 Trend: {trend}\n"
+        f"📊 Trades: {len(today_trades)} | WR: {today_wr:.0f}% (net)\n"
+        f"💵 Net PnL: <b>{sign}${today_pnl:.2f}</b>\n"
+        f"   Gross: ${sum(t.get('pnl_usdt', 0) for t in today_trades):.2f} | "
+        f"Fees: ${sum(_fee(t) for t in today_trades):.2f}\n"
     )
 
     if today_trades:
@@ -345,7 +332,7 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr, 
         syms = defaultdict(lambda: {"pnl": 0, "count": 0})
         for t in today_trades:
             s = t.get("symbol", "?").split("/")[0]
-            syms[s]["pnl"] += t.get("pnl_usdt", 0)
+            syms[s]["pnl"] += _net(t)
             syms[s]["count"] += 1
         msg += "\n<b>By Symbol:</b>\n"
         for s, d in sorted(syms.items(), key=lambda x: x[1]["pnl"], reverse=True):
@@ -369,8 +356,8 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr, 
                 else:
                     period = "🌙 Night (8:01PM-12AM)"
                 hours[period]["count"] += 1
-                hours[period]["pnl"] += t.get("pnl_usdt", 0)
-                if t.get("pnl_usdt", 0) > 0:
+                hours[period]["pnl"] += _net(t)
+                if _net(t) > 0:
                     hours[period]["wins"] += 1
         if hours:
             msg += "\n<b>By Session:</b>\n"
@@ -385,45 +372,35 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr, 
         msg += "\n⚠️ No trades today — market quiet or filters blocking"
 
     # Add paper slot comparison if available
-    paper_state_file = os.path.join(BOT_DIR, "trading_state_5m_sma_vwap.json")
+    paper_state_file = os.path.join(BOT_DIR, "trading_state_5m_liq_cascade.json")
     if os.path.exists(paper_state_file):
         with open(paper_state_file) as f:
             ps = json.load(f)
         pc = ps.get("closed_trades", [])
         pt = [t for t in pc if t.get("closed_at") and datetime.fromtimestamp(t["closed_at"]).strftime("%Y-%m-%d") == date_str]
-        pt_wins = sum(1 for t in pt if t.get("pnl_usdt", 0) > 0)
-        pt_pnl = sum(t.get("pnl_usdt", 0) for t in pt)
+        pt_wins = sum(1 for t in pt if _net(t) > 0)
+        pt_pnl = sum(_net(t) for t in pt)
         pt_wr = (pt_wins / len(pt) * 100) if pt else 0
-        pc_wins = sum(1 for t in pc if t.get("pnl_usdt", 0) > 0)
-        pc_pnl = sum(t.get("pnl_usdt", 0) for t in pc)
-        pc_wr = (pc_wins / len(pc) * 100) if pc else 0
         pt_sign = "+" if pt_pnl >= 0 else ""
-        pc_sign = "+" if pc_pnl >= 0 else ""
         msg += (
             f"\n🔵 <b>Paper Slot (ADX+SMA+VWAP)</b>\n"
-            f"Today: {len(pt)} trades | {pt_wr:.0f}% WR | {pt_sign}${pt_pnl:.2f}\n"
-            f"Total: {len(pc)} trades | {pc_wr:.0f}% WR | {pc_sign}${pc_pnl:.2f}\n"
+            f"{len(pt)} trades | {pt_wr:.0f}% WR | {pt_sign}${pt_pnl:.2f}\n"
         )
 
     # V10 control slot comparison
-    v10_ctrl_file = os.path.join(BOT_DIR, "trading_state_5m_v10_control.json")
+    v10_ctrl_file = os.path.join(BOT_DIR, "trading_state_5m_legacy_control.json")
     if os.path.exists(v10_ctrl_file):
         with open(v10_ctrl_file) as f:
             v10s = json.load(f)
         v10c = v10s.get("closed_trades", [])
         v10t = [t for t in v10c if t.get("closed_at") and datetime.fromtimestamp(t["closed_at"]).strftime("%Y-%m-%d") == date_str]
-        v10t_wins = sum(1 for t in v10t if t.get("pnl_usdt", 0) > 0)
-        v10t_pnl = sum(t.get("pnl_usdt", 0) for t in v10t)
+        v10t_wins = sum(1 for t in v10t if _net(t) > 0)
+        v10t_pnl = sum(_net(t) for t in v10t)
         v10t_wr = (v10t_wins / len(v10t) * 100) if v10t else 0
-        v10c_wins = sum(1 for t in v10c if t.get("pnl_usdt", 0) > 0)
-        v10c_pnl = sum(t.get("pnl_usdt", 0) for t in v10c)
-        v10c_wr = (v10c_wins / len(v10c) * 100) if v10c else 0
         v10t_sign = "+" if v10t_pnl >= 0 else ""
-        v10c_sign = "+" if v10c_pnl >= 0 else ""
         msg += (
             f"\n🔬 <b>V10 Control (24/7 — no time block)</b>\n"
-            f"Today: {len(v10t)} trades | {v10t_wr:.0f}% WR | {v10t_sign}${v10t_pnl:.2f}\n"
-            f"Total: {len(v10c)} trades | {v10c_wr:.0f}% WR | {v10c_sign}${v10c_pnl:.2f}\n"
+            f"{len(v10t)} trades | {v10t_wr:.0f}% WR | {v10t_sign}${v10t_pnl:.2f}\n"
         )
 
     # Shadow filter results
@@ -434,8 +411,8 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr, 
         shadow_today = [t for t in today_trades if t.get("shadow_skip")]
         shadow_all = [t for t in _all_trades if t.get("shadow_skip")]
         if shadow_today or shadow_all:
-            s_today_pnl = sum(t.get("pnl_usdt", 0) for t in shadow_today)
-            s_all_pnl = sum(t.get("pnl_usdt", 0) for t in shadow_all)
+            s_today_pnl = sum(_net(t) for t in shadow_today)
+            s_all_pnl = sum(_net(t) for t in shadow_all)
             s_sign_t = "+" if s_today_pnl >= 0 else ""
             s_sign_a = "+" if s_all_pnl >= 0 else ""
             msg += (

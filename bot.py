@@ -2,6 +2,8 @@ import signal
 import time
 import datetime
 import subprocess
+import os
+import json
 from collections import deque
 from config import Config
 from exchange import Exchange
@@ -38,8 +40,6 @@ def _extract_strategy_name(reason: str) -> str:
         return "htf_confluence_vwap"
     if "liq_cascade" in r:
         return "liq_cascade"
-    if "funding_contrarian" in r:
-        return "funding_contrarian"
     return ""
 
 
@@ -57,8 +57,8 @@ _VPN_SERVERS = [
 _vpn_index = 1  # start at 1 — index 0 (usa-new-york) is the default connect server
 
 
-def _rotate_vpn():
-    """Disconnect and reconnect ExpressVPN to a new server to get a fresh IP."""
+def _rotate_vpn() -> bool:
+    """Disconnect and reconnect ExpressVPN to a new server. Returns True if connected."""
     global _vpn_index
     server = _VPN_SERVERS[_vpn_index % len(_VPN_SERVERS)]
     _vpn_index += 1
@@ -69,9 +69,43 @@ def _rotate_vpn():
         subprocess.run(["expressvpnctl", "connect", server], timeout=30, check=False)
         time.sleep(5)
         result = subprocess.run(["expressvpnctl", "status"], capture_output=True, text=True, timeout=10)
-        logger.info(f"[VPN] {result.stdout.splitlines()[0] if result.stdout else 'status unknown'}")
+        status_line = result.stdout.splitlines()[0] if result.stdout else "status unknown"
+        logger.info(f"[VPN] {status_line}")
+        connected = "Connected" in status_line or "connected" in status_line
+        if not connected:
+            logger.warning(f"[VPN] Rotation to {server} may have failed — status: {status_line}")
+        return connected
     except Exception as e:
         logger.warning(f"[VPN] Rotation failed: {e}")
+        return False
+
+
+def _diagnose_connectivity() -> dict:
+    """Quick connectivity diagnosis: network reachable? VPN connected?"""
+    diag = {"network": "unknown", "vpn": "unknown"}
+    try:
+        result = subprocess.run(
+            ["ping", "-c", "1", "-W", "3", "8.8.8.8"],
+            capture_output=True, timeout=5
+        )
+        diag["network"] = "ok" if result.returncode == 0 else "down"
+    except Exception:
+        diag["network"] = "down"
+    try:
+        result = subprocess.run(
+            ["expressvpnctl", "status"],
+            capture_output=True, text=True, timeout=5
+        )
+        status = result.stdout.strip() if result.stdout else ""
+        if "Connected" in status or "connected" in status:
+            diag["vpn"] = "connected"
+        elif "Not connected" in status or "not connected" in status:
+            diag["vpn"] = "disconnected"
+        else:
+            diag["vpn"] = status[:50] if status else "unknown"
+    except Exception:
+        diag["vpn"] = "unknown"
+    return diag
 
 
 class Phmex2Bot:
@@ -87,13 +121,14 @@ class Phmex2Bot:
         self.consecutive_errors = 0
         self.ban_mode = False
         self.ban_mode_until = 0
+        self.ban_extensions = 0
         self._ws_feed: WSDataFeed | None = None
         self._empty_price_cycles = 0  # consecutive cycles with no ticker data (CDN ban detection)
         self._loss_streak = 0    # consecutive losses for streak-based sizing
         self._pair_cooldown: dict[str, float] = {}  # symbol -> timestamp when cooldown expires
         self._pair_loss_streak: dict[str, int] = {}  # symbol -> consecutive loss count
         self._last_entry_time: float = 0  # global cooldown between any new entry
-        self._trade_results: deque = deque(self.risk.trade_results, maxlen=6)  # rolling window of last 6 trade results (True=win, False=loss)
+        self._trade_results: deque = deque(self.risk.trade_results, maxlen=5)  # rolling window of last 5 trade results (True=win, False=loss)
         self._regime_pause_until: float = 0  # timestamp when regime pause expires
         self._htf_cache: dict[str, tuple] = {}  # symbol -> (DataFrame, fetch_timestamp) for 1h candles
         self._funding_cache: dict[str, tuple] = {}  # symbol -> (data, fetch_timestamp) for funding rates
@@ -132,27 +167,11 @@ class Phmex2Bot:
                 paper_mode=True,
             ),
             StrategySlot(
-                slot_id="8h_funding",
-                strategy_name="funding_contrarian",
-                timeframe="5m",  # Runs on 5m but signal is 8h funding rate
-                max_positions=1,
-                capital_pct=0.0,  # 0% for now — paper only
-                paper_mode=True,
-            ),
-            StrategySlot(
-                slot_id="5m_sma_vwap",
-                strategy_name="confluence_sma_vwap",
-                timeframe="5m",
-                max_positions=2,
-                capital_pct=0.0,  # Paper only — no real capital
-                paper_mode=True,
-            ),
-            StrategySlot(
-                slot_id="5m_v10_control",
+                slot_id="5m_legacy_control",
                 strategy_name="confluence",
                 timeframe="5m",
                 max_positions=2,
-                capital_pct=0.0,  # Paper only — control group, no time block
+                capital_pct=0.0,  # Paper only — pre-gate-update control for A/B comparison
                 paper_mode=True,
             ),
         ]
@@ -308,6 +327,7 @@ class Phmex2Bot:
                 logger.warning("Could not sync open positions at startup — entering ban mode for 2 min to avoid duplicate entries.")
                 self.ban_mode = True
                 self.ban_mode_until = time.time() + 120
+                self.ban_extensions = 0
             elif open_pos:
                 # Sync ALL open positions — don't filter by active_pairs
                 # (positions may exist on pairs not yet in the scanner/config list)
@@ -354,10 +374,11 @@ class Phmex2Bot:
                 except Exception as e:
                     signal.alarm(0)
                     self.consecutive_errors += 1
-                    logger.error(f"Cycle error ({self.consecutive_errors}): {e}")
+                    logger.exception(f"Cycle error ({self.consecutive_errors})")
                 if self.consecutive_errors >= 5:
                     self.ban_mode = True
                     self.ban_mode_until = time.time() + 600
+                    self.ban_extensions = 0
                     logger.warning("[BAN MODE] Entering ban mode for 10 minutes after 5 consecutive errors")
                     self.consecutive_errors = 0
                     notifier.notify_ban_mode(10)
@@ -367,6 +388,92 @@ class Phmex2Bot:
         finally:
             self._shutdown()
 
+    def _process_sentinels(self):
+        """Check for sentinel files and act on them. One-shot: read, act, delete."""
+        import glob as _glob
+
+        # Global pause
+        if os.path.exists(".pause_trading"):
+            if not hasattr(self, '_pause_logged') or not self._pause_logged:
+                logger.info("[SENTINEL] .pause_trading active — skipping all entries (exits still processed)")
+                self._pause_logged = True
+            self._trading_paused = True
+        else:
+            self._trading_paused = False
+            self._pause_logged = False
+
+        # Per-slot kills
+        for path in _glob.glob(".kill_*"):
+            slot_id = path.replace(".kill_", "")
+            for slot in self.slots:
+                if slot.slot_id == slot_id:
+                    slot.enabled = False
+                    for sym in list(slot.risk.positions.keys()):
+                        pos = slot.risk.positions[sym]
+                        if pos.side == "long":
+                            self.exchange.close_long(sym, pos.amount)
+                        else:
+                            self.exchange.close_short(sym, pos.amount)
+                        self.exchange.cancel_open_orders(sym)
+                        logger.info(f"[SENTINEL] Closing {sym} for killed slot {slot_id}")
+                    logger.warning(f"[SENTINEL] Slot '{slot_id}' KILLED")
+                    notifier.send(f"🔪 Slot <b>{slot_id}</b> killed via sentinel")
+                    break
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+        # Per-slot pauses (auto-expire after 24 hrs)
+        for path in _glob.glob(".pause_*"):
+            if path == ".pause_trading":
+                continue
+            slot_id = path.replace(".pause_", "")
+            mtime = os.path.getmtime(path)
+            if time.time() - mtime > 86400:
+                os.remove(path)
+                logger.info(f"[SENTINEL] Pause expired for slot '{slot_id}' (24 hrs)")
+                continue
+            for slot in self.slots:
+                if slot.slot_id == slot_id:
+                    slot.enabled = False
+
+        # Promote: paper → live
+        for path in _glob.glob(".promote_*"):
+            slot_id = path.replace(".promote_", "")
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                capital_pct = data.get("capital_pct", 0.10)
+            except Exception:
+                capital_pct = 0.10
+            for slot in self.slots:
+                if slot.slot_id == slot_id:
+                    slot.paper_mode = False
+                    slot.capital_pct = capital_pct
+                    logger.warning(f"[SENTINEL] Slot '{slot_id}' PROMOTED to live at {capital_pct*100:.0f}%")
+                    notifier.send(f"🚀 Slot <b>{slot_id}</b> promoted to live ({capital_pct*100:.0f}% capital)")
+                    break
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
+        # Demote: live → paper
+        for path in _glob.glob(".demote_*"):
+            slot_id = path.replace(".demote_", "")
+            for slot in self.slots:
+                if slot.slot_id == slot_id:
+                    slot.paper_mode = True
+                    slot.capital_pct = 0.0
+                    logger.warning(f"[SENTINEL] Slot '{slot_id}' DEMOTED to paper")
+                    notifier.send(f"⬇️ Slot <b>{slot_id}</b> demoted to paper")
+                    break
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
     def _run_cycle(self):
         import time as _time_module
         if self.ban_mode:
@@ -374,20 +481,36 @@ class Phmex2Bot:
                 return
             # Use WS connectivity check instead of REST endpoint test
             if self._ws_feed and self._ws_feed.is_connected:
-                test = True
+                recovery_failed = False
             else:
                 sym = self.active_pairs[0] if self.active_pairs else None
-                test = self.exchange.get_ohlcv(sym, Config.TIMEFRAME, limit=3) if sym else None
-            if not test or (hasattr(test, '__len__') and len(test) == 0):
+                test = self.exchange.get_ohlcv(sym, Config.TIMEFRAME, limit=5) if sym else None
+                recovery_failed = test is None or test.empty
+            if recovery_failed:
+                # Diagnose why recovery failed
+                diag = _diagnose_connectivity()
+                self.ban_extensions += 1
+                logger.warning(
+                    f"[BAN MODE] Still blocked (extension #{self.ban_extensions}) — "
+                    f"network={diag['network']} vpn={diag['vpn']}"
+                )
+                # Re-rotate VPN every 2 failed recoveries
+                if self.ban_extensions % 2 == 0:
+                    logger.info(f"[BAN MODE] Re-rotating VPN after {self.ban_extensions} failed recoveries")
+                    _rotate_vpn()
+                # Telegram escalation after 60 min (6 extensions)
+                if self.ban_extensions > 0 and self.ban_extensions % 6 == 0:
+                    notifier.notify_ban_stuck(self.ban_extensions * 10, diag)
                 self.ban_mode_until = _time_module.time() + 600
-                logger.warning("[BAN MODE] Still blocked, extending pause 10 minutes")
                 return
             else:
                 self.ban_mode = False
                 self.consecutive_errors = 0
+                self.ban_extensions = 0
                 logger.info("[BAN MODE] Connection restored, resuming trading")
                 notifier.notify_ban_lifted()
 
+        self._process_sentinels()
         self.cycle_count += 1
         logger.info(f"Cycle #{self.cycle_count} | Positions: {len(self.risk.positions)}")
 
@@ -439,6 +562,7 @@ class Phmex2Bot:
                 self.ban_mode = True
                 self.ban_mode_until = time.time() + 600
                 self._empty_price_cycles = 0
+                self.ban_extensions = 0
                 logger.warning("[BAN MODE] All OHLCV fetches failed 3 cycles — CDN ban detected, rotating VPN and pausing 10 min")
                 _rotate_vpn()
                 notifier.notify_ban_mode(10)
@@ -464,7 +588,7 @@ class Phmex2Bot:
                         continue
                     fill_price = self._extract_fill_price(order, price, is_exit=True)
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
-                    self.risk.close_position(symbol, fill_price, "early_exit")
+                    self.risk.close_position(symbol, fill_price, "early_exit", fees_usdt=self.exchange.extract_order_fee(order, symbol))
                     self.exchange.cancel_open_orders(symbol)
                     notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "early_exit", shadow_skip=getattr(pos, 'shadow_skip', False))
             except Exception as e:
@@ -491,7 +615,7 @@ class Phmex2Bot:
                     continue
                 fill_price = self._extract_fill_price(order, price, is_exit=True)
                 self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
-                self.risk.close_position(symbol, fill_price, "flat_exit")
+                self.risk.close_position(symbol, fill_price, "flat_exit", fees_usdt=self.exchange.extract_order_fee(order, symbol))
                 self.exchange.cancel_open_orders(symbol)
                 notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "flat_exit", shadow_skip=getattr(pos, 'shadow_skip', False))
 
@@ -522,7 +646,7 @@ class Phmex2Bot:
                     continue
                 fill_price = self._extract_fill_price(order, price, is_exit=True)
                 self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
-                self.risk.close_position(symbol, fill_price, "adverse_exit")
+                self.risk.close_position(symbol, fill_price, "adverse_exit", fees_usdt=self.exchange.extract_order_fee(order, symbol))
                 self.exchange.cancel_open_orders(symbol)
                 notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "adverse_exit", shadow_skip=getattr(pos, 'shadow_skip', False))
                 continue
@@ -572,7 +696,7 @@ class Phmex2Bot:
                         continue
                     fill_price = self._extract_fill_price(order, price, is_exit=True)
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
-                    self.risk.close_position(symbol, fill_price, exit_type)
+                    self.risk.close_position(symbol, fill_price, exit_type, fees_usdt=self.exchange.extract_order_fee(order, symbol))
                     self.exchange.cancel_open_orders(symbol)
                     notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), exit_type, shadow_skip=getattr(pos, 'shadow_skip', False))
 
@@ -623,7 +747,7 @@ class Phmex2Bot:
                     fill_price = self._extract_fill_price(order, price, is_exit=True)
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
                     notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), reason, shadow_skip=getattr(pos, 'shadow_skip', False))
-                    self.risk.close_position(symbol, fill_price, reason)
+                    self.risk.close_position(symbol, fill_price, reason, fees_usdt=self.exchange.extract_order_fee(order, symbol))
                     self.exchange.cancel_open_orders(symbol)
 
         # Check for new entry signals
@@ -652,14 +776,25 @@ class Phmex2Bot:
                 continue
             indicator_cache[sym] = df_ind
 
+        if getattr(self, '_trading_paused', False):
+            return  # exits already processed above, skip entries
+
         for symbol in self.active_pairs:
             if symbol in self.risk.positions:
                 continue
-            # Global cooldown: 30s between any new entry (continue, not break)
-            if time.time() - self._last_entry_time < 30:
+            # Global cooldown: 2 min between any new entry (continue, not break)
+            if time.time() - self._last_entry_time < 120:
                 continue
             # Per-pair cooldown: skip pair after losses
             if symbol in self._pair_cooldown and time.time() < self._pair_cooldown[symbol]:
+                continue
+            # Per-symbol daily trade cap: max 3 trades per symbol per day
+            day_start = time.time() - (time.time() % 86400)  # midnight UTC
+            daily_trades = sum(1 for t in self.risk.closed_trades
+                               if t.get("symbol") == symbol and t.get("opened_at", 0) > day_start)
+            daily_trades += 1 if symbol in self.risk.positions else 0  # count open positions too
+            if daily_trades >= 3:
+                logger.debug(f"[RATE GATE] {symbol} — daily cap reached ({daily_trades} trades today)")
                 continue
 
             if not self.risk.can_open_trade(real_balance):
@@ -755,38 +890,66 @@ class Phmex2Bot:
                     cvd_data=cvd_data, hurst_val=hurst_val, funding_data=funding_data,
                     strategy=strat_name, flow=flow
                 )
-                # Strategy-aware confidence thresholds
-                # Start conservative: all at 3. Lower reversion to 2 after proving adverse_exit works.
+                # Strategy-aware confidence thresholds (raised to 4/7 on 2026-04-07)
                 CONFIDENCE_THRESHOLDS = {
-                    "htf_confluence_pullback": 3,
-                    "htf_confluence_vwap": 3,
-                    "vwap_reversion": 3,
-                    "bb_mean_reversion": 3,
-                    "momentum_continuation": 3,
-                    "trend_pullback": 3,
-                    "keltner_squeeze": 3,
+                    "htf_confluence_pullback": 4,
+                    "htf_confluence_vwap": 4,
+                    "vwap_reversion": 4,
+                    "bb_mean_reversion": 4,
+                    "momentum_continuation": 4,
+                    "trend_pullback": 4,
+                    "keltner_squeeze": 4,
+                    "liq_cascade": 4,
                 }
-                min_confidence = CONFIDENCE_THRESHOLDS.get(strat_name, 3)
+                min_confidence = CONFIDENCE_THRESHOLDS.get(strat_name, 4)
 
                 if confidence < min_confidence:
                     logger.info(
-                        f"[ENSEMBLE SKIP] {symbol} {direction} — confidence {confidence}/{min_confidence} "
-                        f"too low for {strat_name}, need {min_confidence}+"
+                        f"[ENSEMBLE SKIP] {symbol} {direction} — BLOCKED: ensemble confidence {confidence}/7 "
+                        f"< {min_confidence}/7 minimum (strat={strat_name})"
                     )
                     continue
 
-                # Order flow extreme veto — block entry if real money strongly disagrees
+                # Order flow / tape veto — block entry if real money strongly disagrees
+                if not (flow and flow.get("trade_count", 0) > 20):
+                    logger.info(f"[TAPE GATE SKIP] {symbol} {direction} — low volume (trade_count={flow.get('trade_count', 0) if flow else 'no_flow'}) — tape gates inactive")
                 if flow and flow.get("trade_count", 0) > 20:
                     buy_ratio = flow.get("buy_ratio", 0.5)
-                    if direction == "long" and buy_ratio < 0.30:
+                    cvd_slope = flow.get("cvd_slope", 0.0)
+                    divergence = flow.get("divergence")
+                    lt_bias = flow.get("large_trade_bias", 0.0)
+                    if direction == "long" and buy_ratio < 0.45:
                         logger.info(
-                            f"[FLOW VETO] {symbol} LONG blocked — buy_ratio {buy_ratio:.0%} "
+                            f"[TAPE GATE] {symbol} LONG blocked — buy_ratio {buy_ratio:.0%} "
                             f"({flow.get('trade_count', 0)} trades, sellers dominating)")
                         continue
-                    if direction == "short" and buy_ratio > 0.70:
+                    if direction == "short" and buy_ratio > 0.55:
                         logger.info(
-                            f"[FLOW VETO] {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%} "
+                            f"[TAPE GATE] {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%} "
                             f"({flow.get('trade_count', 0)} trades, buyers dominating)")
+                        continue
+                    # cvd_slope absolute gate — skip for pullback/reversion strategies
+                    # Pullbacks have negative CVD by definition (sellers pushing the dip),
+                    # so this gate would systematically block legitimate pullback longs.
+                    # The divergence gate below is the contextual version that handles this correctly.
+                    if strat_name not in ("htf_confluence_pullback", "bb_reversion"):
+                        if direction == "long" and cvd_slope < -0.3:
+                            logger.info(f"[TAPE GATE] {symbol} LONG blocked — CVD slope {cvd_slope:.2f} (selling accelerating)")
+                            continue
+                        if direction == "short" and cvd_slope > 0.3:
+                            logger.info(f"[TAPE GATE] {symbol} SHORT blocked — CVD slope {cvd_slope:.2f} (buying accelerating)")
+                            continue
+                    if direction == "long" and divergence == "bearish":
+                        logger.info(f"[TAPE GATE] {symbol} LONG blocked — bearish divergence (price up, sellers gaining)")
+                        continue
+                    if direction == "short" and divergence == "bullish":
+                        logger.info(f"[TAPE GATE] {symbol} SHORT blocked — bullish divergence (price down, buyers gaining)")
+                        continue
+                    if direction == "long" and lt_bias < -0.3:
+                        logger.info(f"[TAPE GATE] {symbol} LONG blocked — large trade bias {lt_bias:.2f} (whales selling)")
+                        continue
+                    if direction == "short" and lt_bias > 0.3:
+                        logger.info(f"[TAPE GATE] {symbol} SHORT blocked — large trade bias {lt_bias:.2f} (whales buying)")
                         continue
 
                 # Apply funding rate strength modifier
@@ -801,18 +964,23 @@ class Phmex2Bot:
                     logger.debug(f"[TIMING] {symbol} — skipping entry, {5-candle_offset}min to next candle open")
                     continue
 
-                # Time-of-day filter: block entries during afternoon danger zone (10AM-8PM PT)
-                # 10AM-8PM PT = UTC 17,18,19,20,21,22,23,0,1,2,3
-                _BLOCKED_HOURS_UTC = {17, 18, 19, 20, 21, 22, 23, 0, 1, 2, 3}
+                # Time-of-day filter: block entries during toxic hours only
+                # Blocked: 10AM-2PM PT + 4PM-6PM PT (data: 29% WR/-7.32, 25% WR/-4.90, 23% WR/-4.82)
+                # Open: 2PM-4PM PT (48% WR/+2.54), 6PM-8PM PT (40% WR)
+                # 10AM-2PM PT = UTC 17,18,19,20 | 4PM-6PM PT = UTC 23,0
+                _BLOCKED_HOURS_UTC = {17, 18, 19, 20, 23, 0}
                 _utc_hour = datetime.datetime.utcnow().hour
                 _pt_hour = (_utc_hour - 7) % 24
                 if _utc_hour in _BLOCKED_HOURS_UTC:
-                    logger.info(f"[TIME BLOCK] {symbol} {direction} skipped — {_pt_hour}:00 PT is danger zone (10AM-8PM)")
+                    logger.info(f"[TIME BLOCK] {symbol} {direction} skipped — {_pt_hour}:00 PT is danger zone (10AM-2PM/4PM-6PM)")
                     continue
 
                 # Shadow logging: tag trades outside profitable window (remaining hours)
-                # Profitable hours (PT): 23,0,1,2,3,6,9 → UTC: 6,7,8,9,10,13,16
-                _PROFITABLE_HOURS_UTC = {6, 7, 8, 9, 10, 13, 16}
+                # Profitable hours (PT): 3 (60% WR/+$2.00), 9 (50% WR/+$3.91)
+                # PT offset: PDT = UTC-7, so PT 3 = UTC 10, PT 9 = UTC 16
+                # Removed from profitable (net losers): PT 0 (33%/-$2.53), 1 (50%/-$1.48),
+                #   2 (29%/-$3.22), 6 (38%/-$0.77), 23 (36%/-$0.36) — reclassified 2026-04-07
+                _PROFITABLE_HOURS_UTC = {10, 16}
                 shadow_skip = _utc_hour not in _PROFITABLE_HOURS_UTC
                 if shadow_skip:
                     logger.info(f"[SHADOW] {symbol} {direction} entry at {_pt_hour}:00 PT — outside profitable window")
@@ -844,6 +1012,28 @@ class Phmex2Bot:
                 except Exception:
                     pass
 
+                # L2 Orderbook gate — block entry on adverse book conditions
+                if ob is not None:
+                    ob_imb = ob.get("imbalance", 0.0)
+                    ob_bwalls = ob.get("bid_walls", [])
+                    ob_awalls = ob.get("ask_walls", [])
+                    ob_spread = ob.get("spread_pct", 0.0)
+                    if direction == "long" and ob_imb < -0.25:
+                        logger.info(f"[OB GATE] {symbol} LONG blocked — ask imbalance {ob_imb:.2f}")
+                        continue
+                    if direction == "short" and ob_imb > 0.25:
+                        logger.info(f"[OB GATE] {symbol} SHORT blocked — bid imbalance {ob_imb:.2f}")
+                        continue
+                    if direction == "long" and ob_awalls and not ob_bwalls:
+                        logger.info(f"[OB GATE] {symbol} LONG blocked — unmatched ask wall")
+                        continue
+                    if direction == "short" and ob_bwalls and not ob_awalls:
+                        logger.info(f"[OB GATE] {symbol} SHORT blocked — unmatched bid wall")
+                        continue
+                    if ob_spread > 0.15:
+                        logger.info(f"[OB GATE] {symbol} blocked — wide spread {ob_spread:.3f}%")
+                        continue
+
                 order = self.exchange.open_long(symbol, margin, price) if direction == "long" else self.exchange.open_short(symbol, margin, price)
                 if order:
                     fill_price = self._extract_fill_price(order, price)
@@ -851,6 +1041,7 @@ class Phmex2Bot:
                     pos = self.risk.positions[symbol]
                     fill_amount = self._extract_fill_amount(order, pos.amount)
                     pos.amount = fill_amount
+                    pos.margin = (fill_amount * fill_price) / Config.LEVERAGE  # actual margin, not requested
                     pos.entry_strength = signal.strength
                     pos.confidence = confidence
                     pos.ensemble_layers = ",".join(layers)
@@ -860,9 +1051,14 @@ class Phmex2Bot:
                     if not pos.sl_order_id:
                         pos.sl_order_id = "software"
                         logger.warning(f"[SL FALLBACK] Exchange SL failed for {direction.upper()} {symbol} — using software SL@{pos.stop_loss:.4f} TP@{pos.take_profit:.4f}")
-                    available -= margin
+                    available -= pos.margin
                     self._last_entry_time = time.time()
-                    logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${margin:.2f} | Conf: {confidence}/6 | {signal.reason} | Strength: {signal.strength:.2f}")
+                    logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${pos.margin:.2f} | Conf: {confidence}/7 | {signal.reason} | Strength: {signal.strength:.2f}")
+                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow)
+                    try:
+                        self.risk._save_state()
+                    except Exception as _e:
+                        logger.debug(f"[SNAPSHOT] live save_state after entry failed: {_e}")
                     notifier.notify_entry(symbol, direction, fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason, shadow_skip=shadow_skip)
                 else:
                     logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
@@ -894,8 +1090,6 @@ class Phmex2Bot:
                 continue
 
             # --- Paper exits first (check existing paper positions) ---
-            if slot.slot_id == "5m_sma_vwap" and slot.risk.positions:
-                logger.debug(f"[PAPER] {slot.slot_id} checking {len(slot.risk.positions)} open positions: {list(slot.risk.positions.keys())}")
             for symbol in list(slot.risk.positions.keys()):
                 price = prices.get(symbol)
                 if not price:
@@ -979,6 +1173,61 @@ class Phmex2Bot:
                 margin = Config.TRADE_AMOUNT_USDT
                 atr_val = df.iloc[-2].get("atr", 0) if len(df) > 1 else 0
 
+                # Apply OB + Tape gates to paper slots (skip legacy_control — it's the ungated control)
+                if slot.slot_id != "5m_legacy_control":
+                    # L2 Orderbook gate
+                    if ob is not None:
+                        ob_imb = ob.get("imbalance", 0.0)
+                        ob_bwalls = ob.get("bid_walls", [])
+                        ob_awalls = ob.get("ask_walls", [])
+                        ob_spread = ob.get("spread_pct", 0.0)
+                        if direction == "long" and ob_imb < -0.25:
+                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} LONG blocked — ask imbalance {ob_imb:.2f}")
+                            continue
+                        if direction == "short" and ob_imb > 0.25:
+                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} SHORT blocked — bid imbalance {ob_imb:.2f}")
+                            continue
+                        if direction == "long" and ob_awalls and not ob_bwalls:
+                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} LONG blocked — unmatched ask wall")
+                            continue
+                        if direction == "short" and ob_bwalls and not ob_awalls:
+                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} SHORT blocked — unmatched bid wall")
+                            continue
+                        if ob_spread > 0.15:
+                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} blocked — wide spread {ob_spread:.3f}%")
+                            continue
+                    # Tape gate
+                    flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
+                    if flow and flow.get("trade_count", 0) > 20:
+                        buy_ratio = flow.get("buy_ratio", 0.5)
+                        cvd_slope = flow.get("cvd_slope", 0.0)
+                        divergence = flow.get("divergence")
+                        lt_bias = flow.get("large_trade_bias", 0.0)
+                        if direction == "long" and buy_ratio < 0.45:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — buy_ratio {buy_ratio:.0%}")
+                            continue
+                        if direction == "short" and buy_ratio > 0.55:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%}")
+                            continue
+                        if direction == "long" and cvd_slope < -0.3:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — CVD slope {cvd_slope:.2f}")
+                            continue
+                        if direction == "short" and cvd_slope > 0.3:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — CVD slope {cvd_slope:.2f}")
+                            continue
+                        if direction == "long" and divergence == "bearish":
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — bearish divergence")
+                            continue
+                        if direction == "short" and divergence == "bullish":
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — bullish divergence")
+                            continue
+                        if direction == "long" and lt_bias < -0.3:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — large trade bias {lt_bias:.2f}")
+                            continue
+                        if direction == "short" and lt_bias > 0.3:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — large trade bias {lt_bias:.2f}")
+                            continue
+
                 slot.risk.open_position(
                     symbol, price, margin, side=direction,
                     atr=atr_val, regime="medium",
@@ -994,28 +1243,71 @@ class Phmex2Bot:
                     f"[PAPER] {slot.slot_id} ENTRY {direction.upper()} {symbol} | "
                     f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}"
                 )
+                snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, slot.strategy_name, signal.strength, price, 0, None, None)
+                if symbol in slot.risk.positions:
+                    slot.risk.positions[symbol].entry_snapshot = snap
+                    try:
+                        slot.risk._save_state()
+                    except Exception as _e:
+                        logger.debug(f"[SNAPSHOT] paper save_state after entry failed: {_e}")
+
+    def _log_entry_snapshot(self, symbol: str, direction: str, slot_id: str,
+                            strategy: str, strength: float, price: float,
+                            confidence: int, ob: dict | None, flow: dict | None) -> dict:
+        """Append entry conditions snapshot to JSONL for post-hoc analysis.
+        Returns the snapshot dict so it can be attached to the Position."""
+        import json as _json
+        snapshot = {
+            "ts": int(time.time()),
+            "symbol": symbol,
+            "direction": direction,
+            "slot": slot_id,
+            "strategy": strategy,
+            "strength": round(strength, 3),
+            "confidence": confidence,
+            "price": round(price, 6),
+            "ob": {
+                "imbalance": round(ob.get("imbalance", 0), 3),
+                "bid_walls": len(ob.get("bid_walls", [])),
+                "ask_walls": len(ob.get("ask_walls", [])),
+                "spread_pct": round(ob.get("spread_pct", 0), 4),
+            } if ob else None,
+            "flow": {
+                "buy_ratio": round(flow.get("buy_ratio", 0), 3),
+                "cvd_slope": round(flow.get("cvd_slope", 0), 4),
+                "divergence": flow.get("divergence"),
+                "large_trade_bias": round(flow.get("large_trade_bias", 0), 3),
+                "trade_count": flow.get("trade_count", 0),
+            } if flow else None,
+        }
+        try:
+            with open("logs/entry_snapshots.jsonl", "a") as f:
+                f.write(_json.dumps(snapshot) + "\n")
+        except Exception as e:
+            logger.debug(f"[SNAPSHOT] Failed to write: {e}")
+        return snapshot
 
     def _set_cooldown_if_loss(self, symbol: str, pnl_pct: float):
-        """Set cooldown on a pair after loss: 2 min per loss, 10 min after 3 consecutive.
+        """Set cooldown on a pair after loss: 10 min per loss, 4 hr after 3 consecutive.
         Also tracks global loss streak for regime filter."""
         if pnl_pct < 0:
             # Per-pair cooldown
             self._pair_loss_streak[symbol] = self._pair_loss_streak.get(symbol, 0) + 1
             streak = self._pair_loss_streak[symbol]
             if streak >= 3:
-                self._pair_cooldown[symbol] = time.time() + 7200  # 2 hr after 3 consecutive losses
+                self._pair_cooldown[symbol] = time.time() + 14400  # 4 hr after 3 consecutive losses
                 self._pair_loss_streak[symbol] = 0
-                logger.info(f"[BLACKLIST] {symbol} blocked for 2 hours after {streak} consecutive losses")
+                logger.info(f"[BLACKLIST] {symbol} blocked for 4 hours after {streak} consecutive losses")
             else:
-                self._pair_cooldown[symbol] = time.time() + 120  # 2 min after any loss
-                logger.info(f"[COOLDOWN] {symbol} blocked for 2 min (streak: {streak})")
-            # Global regime filter: 4 of last 6 trades lost → 15 min pause
+                self._pair_cooldown[symbol] = time.time() + 600  # 10 min after any loss
+                logger.info(f"[RATE GATE] {symbol} blocked for 10 min (streak: {streak})")
+            # Global regime filter: 3 of last 5 trades lost → 30 min pause
             self._trade_results.append(False)
             losses = sum(1 for r in self._trade_results if not r)
-            if len(self._trade_results) >= 6 and losses >= 4:
-                self._regime_pause_until = time.time() + 900  # 15 min pause
-                logger.warning(f"[REGIME] Rolling window: {losses}/6 losses — pausing 15 min")
-                notifier.notify_ban_mode(15)  # reuse ban notification for regime pause
+            if len(self._trade_results) >= 5 and losses >= 3:
+                self._regime_pause_until = time.time() + 1800  # 30 min pause
+                logger.warning(f"[REGIME] Rolling window: {losses}/5 losses — pausing 30 min")
+                notifier.notify_ban_mode(30)  # reuse ban notification for regime pause
                 self._trade_results.clear()  # reset window after pause
             self._persist_trade_results()
         else:
@@ -1040,21 +1332,33 @@ class Phmex2Bot:
                     pos = self.risk.positions[symbol]
                     # Try to get actual fill price from recent trades
                     exit_price = prices.get(symbol, pos.entry_price)
+                    sync_fee = 0.0
                     try:
-                        recent = self.exchange.client.fetch_my_trades(symbol, limit=5)
+                        recent = self.exchange.client.fetch_my_trades(symbol, limit=10)
                         if recent:
                             last_trade = recent[-1]
                             fill = float(last_trade.get("price", 0))
                             if fill > 0:
                                 exit_price = fill
                                 logger.info(f"[SYNC] {symbol} real exit fill: {exit_price}")
+                            # Sum fees from the most recent reduce-only fill(s)
+                            try:
+                                fee = last_trade.get("fee") or {}
+                                if fee.get("cost") is not None:
+                                    sync_fee = abs(float(fee.get("cost") or 0))
+                                else:
+                                    for f in last_trade.get("fees") or []:
+                                        if f.get("cost") is not None:
+                                            sync_fee += abs(float(f.get("cost") or 0))
+                            except Exception:
+                                pass
                     except Exception:
                         pass
                     logger.info(f"[SYNC] {symbol} closed on exchange (SL/TP triggered) — removing from tracker")
                     self.exchange.cancel_open_orders(symbol)
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(exit_price))
                     notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), "exchange_close", shadow_skip=getattr(pos, 'shadow_skip', False))
-                    self.risk.close_position(symbol, exit_price, "exchange_close")
+                    self.risk.close_position(symbol, exit_price, "exchange_close", fees_usdt=sync_fee)
         except Exception as e:
             logger.debug(f"Exchange position sync failed: {e}")
 

@@ -1285,14 +1285,14 @@ function updateBlotter(trades){
     return;
   }
   tbody.innerHTML = last5.map(t=>{
-    const pnl = t.pnl_usdt ?? t.pnl ?? t.realized_pnl ?? 0;
+    const pnl = t.net_pnl ?? t.pnl_usdt ?? t.pnl ?? t.realized_pnl ?? 0;
     const pnlCls = pnl>=0 ? 'log-green':'log-red';
     const pnlStr = `${pnl>=0?'+':''}${parseFloat(pnl).toFixed(2)}`;
     const raw = t.closed_at||t.time||'';
     const ts = typeof raw==='number' ? new Date(raw*1000).toTimeString().substring(0,5) : String(raw).substring(11,16) || '--:--';
     const sym = (t.symbol||'??').replace('/USDT:USDT','').replace('/USDT','');
     const side = (t.side||t.direction||'?').toUpperCase();
-    const reason = t.reason||t.exit_reason||'-';
+    const reason = t.exit_reason||t.reason||'-';
     const isNew = !prevTradeIds.has(t.id||String(t.closed_at)||ts);
     const flashCls = isNew ? (pnl>=0?'blotter-row flash-green':'blotter-row flash-red') : 'blotter-row';
     return `<tr class="${flashCls}">
