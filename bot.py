@@ -177,6 +177,7 @@ class Phmex2Bot:
         self._pair_cooldown: dict[str, float] = {}  # symbol -> timestamp when cooldown expires
         self._pair_loss_streak: dict[str, int] = {}  # symbol -> consecutive loss count
         self._last_entry_time: float = 0  # global cooldown between any new entry
+        self._last_htf_entry_time: float = 0  # cluster throttle: 1 htf entry per 30 min
         self._trade_results: deque = deque(self.risk.trade_results, maxlen=5)  # rolling window of last 5 trade results (True=win, False=loss)
         self._regime_pause_until: float = 0  # timestamp when regime pause expires
         self._htf_cache: dict[str, tuple] = {}  # symbol -> (DataFrame, fetch_timestamp) for 1h candles
@@ -1066,6 +1067,12 @@ class Phmex2Bot:
                     logger.info(f"[TIME BLOCK] {symbol} {direction} skipped — {_pt_hour}:00 PT is danger zone (10AM-2PM/4PM-6PM)")
                     continue
 
+                # Cluster throttle: max 1 htf_confluence_pullback entry per 30 min
+                # Data: 27/57 htf cluster entries = -$14.10. Solo entries = -$0.37 (breakeven).
+                if strat_name == "htf_confluence_pullback" and time.time() - self._last_htf_entry_time < 1800:
+                    logger.info(f"[HTF THROTTLE] {symbol} {direction} skipped — htf entry {(time.time() - self._last_htf_entry_time)/60:.0f}min ago, need 30min gap")
+                    continue
+
                 # Kelly-aware position sizing (uses $2 min margin during bootstrap)
                 margin = self.risk.calculate_kelly_margin(available, confidence=confidence)
 
@@ -1134,6 +1141,8 @@ class Phmex2Bot:
                         logger.warning(f"[SL FALLBACK] Exchange SL failed for {direction.upper()} {symbol} — using software SL@{pos.stop_loss:.4f} TP@{pos.take_profit:.4f}")
                     available -= pos.margin
                     self._last_entry_time = time.time()
+                    if strat_name == "htf_confluence_pullback":
+                        self._last_htf_entry_time = time.time()
                     logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${pos.margin:.2f} | Conf: {confidence}/7 | {signal.reason} | Strength: {signal.strength:.2f}")
                     pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df)
                     try:
