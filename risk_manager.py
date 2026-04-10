@@ -316,6 +316,13 @@ class RiskManager:
                 self._save_state()
 
         drawdown = self._drawdown_percent(balance)
+
+        # 8% soft drawdown tier — 15min pause (early warning before hard tiers)
+        soft_pause = self._soft_dd_tier_pause_seconds(balance)
+        if soft_pause > 0 and self._drawdown_pause_until < time.time():
+            self._drawdown_pause_until = time.time() + soft_pause
+            logger.warning(f"[DD] Soft 8% drawdown tier ({drawdown:.1f}%) — pausing {soft_pause}s")
+
         if drawdown >= 30.0:
             self._drawdown_pause_until = time.time() + 5400  # 1.5 hours
             logger.warning(f"[DRAWDOWN] {drawdown:.1f}% — SEVERE. Halting entries for 1.5 hours.")
@@ -668,6 +675,15 @@ class RiskManager:
             f"PnL on half: {sign}{pnl:.2f} USDT ({sign}{pnl_pct:.2f}%) | Remainder running with SL @ entry"
         )
         return half_amount
+
+    def _soft_dd_tier_pause_seconds(self, current_balance: float) -> int:
+        """8% soft drawdown tier — 15min pause, early warning before 20% hard tier."""
+        if self.peak_balance <= 0 or current_balance <= 0:
+            return 0
+        dd_pct = (self.peak_balance - current_balance) / self.peak_balance * 100.0
+        if dd_pct >= 8.0 and dd_pct < 20.0:
+            return 900
+        return 0
 
     def update_peak_balance(self, balance: float):
         if balance > self.peak_balance:

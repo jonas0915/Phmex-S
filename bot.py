@@ -43,6 +43,36 @@ def _extract_strategy_name(reason: str) -> str:
     return ""
 
 
+def _compute_today_net_pnl(closed_trades: list) -> float:
+    """Sum today's net_pnl (or pnl_usdt fallback). Uses America/Los_Angeles day boundary."""
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+    PT = ZoneInfo("America/Los_Angeles")
+    today_str = _dt.now(PT).strftime("%Y-%m-%d")
+    total = 0.0
+    for t in closed_trades:
+        closed_at = t.get("closed_at")
+        if not closed_at:
+            continue
+        if _dt.fromtimestamp(closed_at, tz=PT).strftime("%Y-%m-%d") != today_str:
+            continue
+        net = t.get("net_pnl")
+        if net is None:
+            net = t.get("pnl_usdt", 0.0)
+        total += float(net or 0.0)
+    return total
+
+
+def _should_halt_daily_loss(today_net: float, balance: float, threshold_pct: float = 3.0) -> bool:
+    if balance <= 0:
+        return False
+    return today_net <= -(balance * threshold_pct / 100.0)
+
+
+def _should_halt_consecutive_losses(loss_streak: int, threshold: int = 5) -> bool:
+    return loss_streak >= threshold
+
+
 # ExpressVPN server rotation list — cycled through on each CDN ban
 _VPN_SERVERS = [
     "usa-new-york",
@@ -406,6 +436,14 @@ class Phmex2Bot:
             logger.info("Bot stopped by user.")
         finally:
             self._shutdown()
+
+    def _set_pause_sentinel(self, reason: str) -> None:
+        """Create the .pause_trading sentinel file with a reason note."""
+        try:
+            with open(".pause_trading", "w") as f:
+                f.write(f"{int(time.time())}\n{reason}\n")
+        except Exception as e:
+            logger.warning(f"Failed to write pause sentinel: {e}")
 
     def _process_sentinels(self):
         """Check for sentinel files and act on them. One-shot: read, act, delete."""
@@ -825,6 +863,28 @@ class Phmex2Bot:
 
         if getattr(self, '_trading_paused', False):
             return  # exits already processed above, skip entries
+
+        # --- Extended kill switches (daily loss + consecutive loss) ---
+        today_net = _compute_today_net_pnl(self.risk.closed_trades)
+        if _should_halt_daily_loss(today_net, real_balance):
+            reason = f"DAILY LOSS HALT: today net ${today_net:.2f} exceeds -3% of ${real_balance:.2f}"
+            self._set_pause_sentinel(reason)
+            logger.warning(f"[KILL SWITCH] {reason}")
+            try:
+                notifier.send(f"⛔ {reason}")
+            except Exception:
+                pass
+            return
+
+        if _should_halt_consecutive_losses(self._loss_streak):
+            reason = f"CONSECUTIVE LOSS HALT: {self._loss_streak} losses in a row — 4h cooldown"
+            self._set_pause_sentinel(reason)
+            logger.warning(f"[KILL SWITCH] {reason}")
+            try:
+                notifier.send(f"⛔ {reason}")
+            except Exception:
+                pass
+            return
 
         for symbol in self.active_pairs:
             if symbol in self.risk.positions:
