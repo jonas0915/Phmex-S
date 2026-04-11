@@ -1064,15 +1064,17 @@ class Phmex2Bot:
                     logger.debug(f"[TIMING] {symbol} — skipping entry, {5-candle_offset}min to next candle open")
                     continue
 
-                # Time-of-day filter: block entries during toxic hours only
-                # Blocked: 10AM-2PM PT + 4PM-6PM PT (data: 29% WR/-7.32, 25% WR/-4.90, 23% WR/-4.82)
-                # Open: 2PM-4PM PT (48% WR/+2.54), 6PM-8PM PT (40% WR)
-                # 10AM-2PM PT = UTC 17,18,19,20 | 4PM-6PM PT = UTC 23,0
-                _BLOCKED_HOURS_UTC = {17, 18, 19, 20, 23, 0}
+                # Time-of-day filter: block entries during toxic PT hours (PDT = UTC-7)
+                # Blocked PT hours → UTC (verified Apr 10, 395-trade analysis):
+                #   10 AM-1 PM PT (28% WR/-$12.17)    → UTC 17,18,19,20
+                #   5-7 PM PT (26% WR/-$16.11)        → UTC 0,1,2
+                # Open: 12-10 AM, 2-5 PM, 8 PM-12 AM PT
+                _BLOCKED_HOURS_UTC = {0, 1, 2, 17, 18, 19, 20}
                 _utc_hour = datetime.datetime.utcnow().hour
                 _pt_hour = (_utc_hour - 7) % 24
                 if _utc_hour in _BLOCKED_HOURS_UTC:
-                    logger.info(f"[TIME BLOCK] {symbol} {direction} skipped — {_pt_hour}:00 PT is danger zone (10AM-2PM/4PM-6PM)")
+                    _pt_label = f"{_pt_hour % 12 or 12}:00 {'AM' if _pt_hour < 12 else 'PM'}"
+                    logger.info(f"[TIME BLOCK] {symbol} {direction} skipped — {_pt_label} PT is blocked")
                     continue
 
                 # Cluster throttle: max 1 htf_confluence_pullback entry per 30 min
