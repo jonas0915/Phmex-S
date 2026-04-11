@@ -639,8 +639,107 @@ def main():
 
 
 def generate_fix_specs(failures: list[CheckResult]):
-    """Stub — implemented in Task 5."""
-    pass
+    """Call Claude Sonnet to generate fix specs for each failure with diagnostics."""
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        logger.info("No ANTHROPIC_API_KEY — skipping fix spec generation")
+        return
+
+    actionable = [f for f in failures if f.diagnostics]
+    if not actionable:
+        logger.info("No actionable diagnostics — skipping fix specs")
+        return
+
+    try:
+        import anthropic
+    except ImportError:
+        logger.warning("anthropic package not installed — skipping fix specs")
+        return
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    for failure in actionable:
+        slug = failure.name.replace("_", "-")
+        spec_pattern = os.path.join(FIX_DIR, f"*-{slug}.md")
+        existing = glob_mod.glob(spec_pattern)
+
+        recent_existing = None
+        for f in existing:
+            if time.time() - os.path.getmtime(f) < 86400:
+                recent_existing = f
+                break
+
+        if recent_existing:
+            _append_to_existing_spec(recent_existing, failure)
+            continue
+
+        _generate_new_spec(client, failure, slug)
+
+
+def _append_to_existing_spec(filepath: str, failure: CheckResult):
+    """Append new evidence to an existing fix spec."""
+    timestamp = now_pt_12hr()
+    appendix = (
+        f"\n\n---\n\n## Update — {timestamp}\n\n"
+        f"**Status:** Issue persists\n\n"
+        f"**New Evidence:**\n```\n{failure.diagnostics}\n```\n"
+    )
+    with open(filepath, "a") as f:
+        f.write(appendix)
+    logger.info(f"Appended new evidence to {os.path.basename(filepath)}")
+
+
+def _generate_new_spec(client, failure: CheckResult, slug: str):
+    """Generate a new fix spec via Claude Sonnet."""
+    prompt = (
+        f"Issue: {failure.name} — {failure.severity}\n"
+        f"Description: {failure.message}\n\n"
+        f"Evidence:\n{failure.diagnostics}\n\n"
+        f"Context:\n"
+        f"- Bot: Phmex-S Sentinel v11, crypto perpetual futures scalper on Phemex\n"
+        f"- Stack: Python 3.14, ccxt, WebSocket feeds, 60s main loop\n"
+        f"- Key files: bot.py (main loop), risk_manager.py (exits), "
+        f"strategies.py (signals), exchange.py (API)\n"
+        f"- The bot is LIVE with real money — safety is paramount\n\n"
+        f"Write a fix spec with these sections:\n"
+        f"1. Problem — what is wrong (1-2 sentences)\n"
+        f"2. Root Cause Analysis — why it happened\n"
+        f"3. Proposed Fix — specific code changes with file paths\n"
+        f"4. Files to Change — list of file:line references\n"
+        f"5. Risk Assessment — what could go wrong with the fix\n"
+    )
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=2000,
+            system=(
+                "You are a senior Python developer reviewing a live crypto trading bot. "
+                "Write concise, actionable fix specs. Include specific file paths and "
+                "code snippets. Prioritize safety — this bot trades real money."
+            ),
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        spec_content = response.content[0].text
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H")
+        filename = f"{timestamp}-{slug}.md"
+        filepath = os.path.join(FIX_DIR, filename)
+
+        header = (
+            f"# Fix Proposal: {failure.message}\n\n"
+            f"**Generated:** {now_pt_12hr()}\n"
+            f"**Severity:** {failure.severity}\n"
+            f"**Check:** {failure.name}\n\n"
+            f"---\n\n"
+        )
+
+        with open(filepath, "w") as f:
+            f.write(header + spec_content)
+
+        logger.info(f"Fix spec written: {filename}")
+    except Exception as e:
+        logger.error(f"Failed to generate fix spec for {failure.name}: {e}")
 
 
 if __name__ == "__main__":
