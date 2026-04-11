@@ -22,6 +22,7 @@ class Config:
     TRADE_AMOUNT_USDT = float(os.getenv("TRADE_AMOUNT_USDT", "8.0"))
     TRADE_AMOUNT_PERCENT = float(os.getenv("TRADE_AMOUNT_PERCENT", "2.0"))  # fallback if fixed not set — not currently used by the sizing logic
     MAX_OPEN_TRADES = int(os.getenv("MAX_OPEN_TRADES", "3"))
+    DAILY_SYMBOL_CAP = int(os.getenv("DAILY_SYMBOL_CAP", "3"))
     MAX_DRAWDOWN_PERCENT = float(os.getenv("MAX_DRAWDOWN_PERCENT", "10.0"))
 
     # Strategy
@@ -76,3 +77,5 @@ class Config:
             raise ValueError("TRADE_AMOUNT_PERCENT must be between 0 and 100")
         if cls.MAX_OPEN_TRADES < 1:
             raise ValueError("MAX_OPEN_TRADES must be at least 1")
+        if cls.DAILY_SYMBOL_CAP < 1:
+            raise ValueError("DAILY_SYMBOL_CAP must be at least 1")
