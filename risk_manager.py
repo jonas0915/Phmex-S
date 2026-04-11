@@ -111,37 +111,74 @@ class Position:
 
     def should_exit_early(self, current_price: float, df) -> bool:
         """Exit early if momentum has reversed and we're in profit.
-        Lowered to 3% ROI — early_exit was 100% WR (+$16.24), fires more often at lower threshold."""
+        Signal #4 (peak drawdown) added 2026-04-10: catches reversals at profit peaks
+        where lagging indicators (RSI, MACD, EMA) still read bullish."""
         try:
             pnl_pct = self.pnl_percent(current_price)
             if pnl_pct < 3.0:
                 return False
 
+            # Update peak_price inline — trailing stop loop runs later in cycle
+            if self.side == "long" and current_price > self.peak_price:
+                self.peak_price = current_price
+            elif self.side == "short" and (current_price < self.peak_price or self.peak_price == 0.0):
+                self.peak_price = current_price
+
             last = df.iloc[-1]
             prev = df.iloc[-2]
             signals = 0
 
+            # Signal 1: RSI reversal
             if self.side == "long":
                 if last.get("rsi", 50) < 45:
                     signals += 1
-                if "macd" in last and "macd_signal" in last:
-                    if last["macd"] < last["macd_signal"] and prev["macd"] >= prev["macd_signal"]:
-                        signals += 1
-                if "ema_9" in last and "ema_9" in prev:
-                    if last["close"] < last["ema_9"] and prev["close"] < prev["ema_9"]:
-                        signals += 1
             else:
                 if last.get("rsi", 50) > 55:
                     signals += 1
-                if "macd" in last and "macd_signal" in last:
+
+            # Signal 2: MACD fresh bearish crossover
+            if "macd" in last and "macd_signal" in last:
+                if self.side == "long":
+                    if last["macd"] < last["macd_signal"] and prev["macd"] >= prev["macd_signal"]:
+                        signals += 1
+                else:
                     if last["macd"] > last["macd_signal"] and prev["macd"] <= prev["macd_signal"]:
                         signals += 1
-                if "ema_9" in last and "ema_9" in prev:
+
+            # Signal 3: Price below EMA-9 for 2 consecutive candles
+            if "ema_9" in last and "ema_9" in prev:
+                if self.side == "long":
+                    if last["close"] < last["ema_9"] and prev["close"] < prev["ema_9"]:
+                        signals += 1
+                else:
                     if last["close"] > last["ema_9"] and prev["close"] > prev["ema_9"]:
                         signals += 1
 
-            # At 8%+ ROI, relax to 1 signal — data shows 16 trades leaked at 8-22% ROI
-            # because 2-of-3 signals weren't present. 1-of-3 captures them.
+            # Signal 4: Peak drawdown — forward-looking reversal detection
+            peak_roi = 0.0
+            drawdown_from_peak = 0.0
+            if self.peak_price > 0 and self.peak_price != self.entry_price:
+                if self.side == "long":
+                    peak_roi = (self.peak_price - self.entry_price) / self.entry_price * 100 * Config.LEVERAGE
+                    drawdown_from_peak = (self.peak_price - current_price) / self.peak_price * 100 * Config.LEVERAGE
+                else:
+                    peak_roi = (self.entry_price - self.peak_price) / self.entry_price * 100 * Config.LEVERAGE
+                    drawdown_from_peak = (current_price - self.peak_price) / self.peak_price * 100 * Config.LEVERAGE
+
+                # Tier 1: peak >= 8% + drawdown >= 3% → immediate exit (no signal count)
+                if peak_roi >= 8.0 and drawdown_from_peak >= 3.0:
+                    logger.info(f"[EARLY EXIT] {self.symbol} — peak drawdown trigger: "
+                                f"peak_roi={peak_roi:.1f}%, drawdown={drawdown_from_peak:.1f}%, pnl={pnl_pct:.1f}%")
+                    return True
+
+                # Tier 2: peak 5-8% + drawdown >= 2% → count as 1 signal
+                if peak_roi >= 5.0 and drawdown_from_peak >= 2.0:
+                    signals += 1
+
+            logger.debug(f"[EARLY EXIT CHECK] {self.symbol} — ROI: {pnl_pct:.1f}%, signals: {signals}/4, "
+                         f"peak_roi: {peak_roi:.1f}%, drawdown: {drawdown_from_peak:.1f}%")
+
+            # At 8%+ ROI, relax to 1 signal. Below 8%, need 2 signals.
             if pnl_pct >= 8.0:
                 return signals >= 1
             return signals >= 2
