@@ -142,23 +142,190 @@ def now_pt_12hr() -> str:
 
 # ── check stubs (implemented in later tasks) ───────────────────────────
 def check_process_alive() -> CheckResult:
-    return CheckResult("process_alive", "OK", "Not implemented yet")
+    """Check 1: Is the bot process running? Auto-restart if dead."""
+    try:
+        result = subprocess.run(
+            ["bash", "-c", "ps aux | grep 'Python.*main' | grep -v grep"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.stdout.strip():
+            pid = result.stdout.strip().split()[1]
+            return CheckResult("process_alive", "OK", f"Bot running (PID {pid})")
+
+        # Bot is dead — attempt auto-restart
+        logger.warning("Bot process not found — attempting auto-restart")
+        restart_cmd = (
+            f"cd {BOT_DIR} && rm -rf __pycache__ && "
+            "/Library/Frameworks/Python.framework/Versions/3.14/Resources/"
+            "Python.app/Contents/MacOS/Python main.py >> logs/bot.log 2>&1 &"
+        )
+        subprocess.run(["bash", "-c", restart_cmd], timeout=15)
+        time.sleep(10)
+
+        # Re-check
+        result = subprocess.run(
+            ["bash", "-c", "ps aux | grep 'Python.*main' | grep -v grep"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.stdout.strip():
+            pid = result.stdout.strip().split()[1]
+            return CheckResult("process_alive", "WARNING",
+                               f"Bot was dead — auto-restarted (PID {pid})",
+                               "Bot process was not found. Auto-restart succeeded.")
+        else:
+            return CheckResult("process_alive", "CRITICAL",
+                               "Bot is DOWN — auto-restart FAILED",
+                               "Bot process not found. Auto-restart attempted but process did not start. "
+                               "Check logs/bot.log for crash reason.")
+    except Exception as e:
+        return CheckResult("process_alive", "WARNING",
+                           f"Could not check process: {e}", str(e))
 
 
 def check_log_errors() -> CheckResult:
-    return CheckResult("log_errors", "OK", "Not implemented yet")
+    """Check 2: Scan last 60 min of bot.log for ERROR/CRITICAL entries."""
+    BENIGN_PATTERNS = ["[TIMEOUT]", "fetch_funding_rate", "Rate limit"]
+    lines = get_recent_log_lines(minutes=60)
+    error_lines = []
+    for line in lines:
+        if " ERROR " in line or " CRITICAL " in line:
+            if not any(bp in line for bp in BENIGN_PATTERNS):
+                error_lines.append(line)
+
+    # Deduplicate by message pattern (strip timestamp + level)
+    unique_patterns = set()
+    for line in error_lines:
+        match = re.match(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \w+ (.+)", line)
+        if match:
+            unique_patterns.add(match.group(1)[:100])
+
+    if len(unique_patterns) > MAX_LOG_ERRORS:
+        sample = "\n".join(error_lines[:20])
+        return CheckResult("log_errors", "WARNING",
+                           f"{len(unique_patterns)} unique error patterns in last hour",
+                           f"Found {len(error_lines)} total error lines, "
+                           f"{len(unique_patterns)} unique patterns.\n\nSample:\n{sample}")
+    return CheckResult("log_errors", "OK",
+                        f"{len(unique_patterns)} error pattern(s) — within threshold")
 
 
 def check_ws_freshness() -> CheckResult:
-    return CheckResult("ws_freshness", "OK", "Not implemented yet")
+    """Check 3: Grep bot.log for WS stale/reconnect events in last hour."""
+    lines = get_recent_log_lines(minutes=60)
+    stale_events = [l for l in lines if "[STALE]" in l or "[WS] reconnect" in l.lower()
+                    or "ws reconnect" in l.lower() or "WebSocket" in l and "disconnect" in l.lower()]
+
+    if len(stale_events) > MAX_WS_STALE_EVENTS:
+        sample = "\n".join(stale_events[:10])
+        return CheckResult("ws_freshness", "WARNING",
+                           f"{len(stale_events)} WS stale/reconnect events in last hour",
+                           f"WebSocket instability detected.\n\nEvents:\n{sample}")
+    return CheckResult("ws_freshness", "OK",
+                        f"{len(stale_events)} WS event(s) — within threshold")
 
 
 def check_position_desync() -> CheckResult:
-    return CheckResult("position_desync", "OK", "Not implemented yet")
+    """Check 4: Compare trading_state.json positions vs exchange positions."""
+    try:
+        import ccxt as ccxt_lib
+        exchange_name = os.getenv("EXCHANGE", "phemex")
+        client = getattr(ccxt_lib, exchange_name)({
+            "apiKey": os.getenv("API_KEY", ""),
+            "secret": os.getenv("API_SECRET", ""),
+            "enableRateLimit": True,
+            "timeout": 10000,
+            "options": {"defaultType": "swap"},
+        })
+        client.load_markets()
+
+        raw_positions = client.fetch_positions()
+        exchange_positions = {}
+        for p in raw_positions:
+            contracts = float(p.get("contracts", 0) or 0)
+            if contracts > 0:
+                exchange_positions[p["symbol"]] = {
+                    "side": p.get("side", ""),
+                    "contracts": contracts,
+                    "entryPrice": p.get("entryPrice"),
+                }
+
+        state = load_state()
+        local_positions = set()
+        if "positions" in state and isinstance(state["positions"], dict):
+            local_positions = set(state["positions"].keys())
+
+        exchange_syms = set(exchange_positions.keys())
+        ghost = exchange_syms - local_positions
+        phantom = local_positions - exchange_syms
+
+        issues = []
+        if ghost:
+            issues.append(f"Ghost position(s) on exchange not in state: {', '.join(ghost)}")
+        if phantom:
+            issues.append(f"Phantom position(s) in state not on exchange: {', '.join(phantom)}")
+
+        if ghost:
+            return CheckResult("position_desync", "CRITICAL",
+                               f"Position desync: {'; '.join(issues)}",
+                               json.dumps({"ghost": list(ghost), "phantom": list(phantom),
+                                           "exchange": {k: v for k, v in exchange_positions.items()}}))
+        if phantom:
+            return CheckResult("position_desync", "WARNING",
+                               f"Position desync: {'; '.join(issues)}",
+                               json.dumps({"phantom": list(phantom)}))
+
+        return CheckResult("position_desync", "OK",
+                           f"Positions in sync ({len(exchange_syms)} open)")
+    except Exception as e:
+        return CheckResult("position_desync", "WARNING",
+                           f"Could not check positions: {e}", str(e))
 
 
 def check_balance_anomaly() -> CheckResult:
-    return CheckResult("balance_anomaly", "OK", "Not implemented yet")
+    """Check 5: Verify balance hasn't dropped more than expected from trades."""
+    try:
+        import ccxt as ccxt_lib
+        exchange_name = os.getenv("EXCHANGE", "phemex")
+        client = getattr(ccxt_lib, exchange_name)({
+            "apiKey": os.getenv("API_KEY", ""),
+            "secret": os.getenv("API_SECRET", ""),
+            "enableRateLimit": True,
+            "timeout": 10000,
+            "options": {"defaultType": "swap"},
+        })
+        balance = client.fetch_balance()
+        current_balance = float(balance.get("USDT", {}).get("total", 0))
+
+        state = load_state()
+        peak_balance = state.get("peak_balance", 0)
+        closed_trades = state.get("closed_trades", [])
+
+        recent_pnl = 0.0
+        for trade in closed_trades[-50:]:
+            pnl = trade.get("pnl_usdt", 0)
+            if isinstance(pnl, (int, float)):
+                recent_pnl += pnl
+
+        if peak_balance > 0:
+            diff = peak_balance - current_balance
+
+            if diff > BALANCE_CRITICAL_USD and diff > abs(recent_pnl) + BALANCE_CRITICAL_USD:
+                return CheckResult("balance_anomaly", "CRITICAL",
+                                   f"Balance ${current_balance:.2f} is ${diff:.2f} below peak "
+                                   f"(${peak_balance:.2f}) — exceeds trade PnL explanation",
+                                   f"Current: ${current_balance:.2f}, Peak: ${peak_balance:.2f}, "
+                                   f"Recent PnL sum: ${recent_pnl:.2f}, Unexplained gap: "
+                                   f"${diff - abs(recent_pnl):.2f}")
+            if diff > BALANCE_WARNING_USD and diff > abs(recent_pnl) + BALANCE_WARNING_USD:
+                return CheckResult("balance_anomaly", "WARNING",
+                                   f"Balance ${current_balance:.2f} is ${diff:.2f} below peak",
+                                   f"Current: ${current_balance:.2f}, Peak: ${peak_balance:.2f}")
+
+        return CheckResult("balance_anomaly", "OK",
+                           f"Balance ${current_balance:.2f} — within expected range")
+    except Exception as e:
+        return CheckResult("balance_anomaly", "WARNING",
+                           f"Could not check balance: {e}", str(e))
 
 
 def check_syntax() -> CheckResult:
