@@ -303,101 +303,63 @@ class Exchange:
                 else:
                     raise
 
-    def _try_limit_then_market(self, symbol: str, side: str, amount: float, limit_price: float) -> Optional[dict]:
-        """Place limit order at maker price, wait up to 3s for fill, fallback to market.
-        Maker fee = 0.01% vs taker 0.06% — saves 83% on fees."""
+    def _try_limit_entry(self, symbol: str, side: str, amount: float, limit_price: float) -> Optional[dict]:
+        """Place limit-only entry order. No market fallback — if unfilled, skip the trade.
+        Maker fee = 0.01% vs taker 0.06%. Missing a fill is better than overpaying 6x fees."""
         limit_price = self._round_price(symbol, limit_price)
         order_side = "buy" if side == "long" else "sell"
 
-        # Try limit order first (maker)
         try:
             order = self.client.create_order(symbol, "limit", order_side, amount, limit_price, params={"timeInForce": "PostOnly"})
             order_id = order.get("id")
             logger.info(f"[MAKER] Limit {order_side} {amount} {symbol} @ {limit_price} (id={order_id})")
 
-            # Wait up to 3s for fill
-            for _ in range(6):
+            # Wait up to 5s for fill (10 polls × 0.5s)
+            for _ in range(10):
                 time.sleep(0.5)
                 try:
                     fetched = self.client.fetch_order(order_id, symbol)
                     status = fetched.get("status", "")
                     if status == "closed":
-                        logger.info(f"[MAKER] Limit filled for {symbol}")
+                        logger.info(f"[FILL] {symbol} {order_side} — MAKER @ {fetched.get('average', limit_price)}")
                         return fetched
-                    if status == "canceled" or status == "cancelled":
-                        break
+                    if status in ("canceled", "cancelled"):
+                        # PostOnly rejected (would have crossed spread)
+                        logger.info(f"[FILL MISS] {symbol} — PostOnly rejected, skipping entry")
+                        return None
                 except Exception:
                     pass
 
-            # Not filled — cancel and fall through to market
+            # Not filled — cancel and skip (no market fallback)
             try:
                 self.client.cancel_order(order_id, symbol)
-                # Check for partial fill after cancel
-                try:
-                    fetched = self.client.fetch_order(order_id, symbol)
-                    filled_amount = fetched.get("filled", 0) or 0
-                    if fetched.get("status") == "closed":
-                        logger.info(f"[MAKER] Limit filled (raced cancel) for {symbol}")
-                        return fetched
-                    if filled_amount > 0:
-                        remaining = amount - filled_amount
-                        logger.info(f"[MAKER] Partial fill {filled_amount}/{amount} {symbol}, market for remaining {remaining}")
-                        if remaining > 0:
-                            remaining = self._round_amount(symbol, remaining)
-                            if remaining > 0:
-                                try:
-                                    if side == "long":
-                                        mkt = self.client.create_market_buy_order(symbol, remaining)
-                                    else:
-                                        mkt = self.client.create_market_sell_order(symbol, remaining)
-                                    logger.info(f"[TAKER] Market {order_side} {remaining} {symbol} (partial fill remainder)")
-                                    return mkt
-                                except Exception as me:
-                                    logger.error(f"Market remainder failed for {symbol}: {me}")
-                                    return fetched  # Return partial fill info
-                        return fetched  # Remaining rounded to 0, partial fill is enough
-                    else:
-                        logger.info(f"[MAKER] Limit not filled, cancelled — falling back to market for {symbol}")
-                except Exception:
-                    logger.info(f"[MAKER] Limit cancelled, falling back to market for {symbol}")
-            except Exception:
-                # May already be filled or cancelled
+                # Check for race: filled between our last poll and cancel
                 try:
                     fetched = self.client.fetch_order(order_id, symbol)
                     if fetched.get("status") == "closed":
+                        logger.info(f"[FILL] {symbol} {order_side} — MAKER @ {fetched.get('average', limit_price)} (raced cancel)")
                         return fetched
-                    # Check for partial fill on cancel failure too
                     filled_amount = float(fetched.get("filled", 0) or 0)
                     if filled_amount > 0:
-                        remaining = amount - filled_amount
-                        remaining = self._round_amount(symbol, remaining)
-                        if remaining > 0:
-                            try:
-                                if side == "long":
-                                    rem_order = self.client.create_market_buy_order(symbol, remaining)
-                                else:
-                                    rem_order = self.client.create_market_sell_order(symbol, remaining)
-                                logger.info(f"[MAKER] Cancel failed but partial fill {filled_amount} — market remainder {remaining} {symbol}")
-                                return rem_order
-                            except Exception as me:
-                                logger.error(f"Market remainder failed for {symbol}: {me}")
-                                return fetched
+                        # Partial fill — keep it, don't chase remainder with market
+                        logger.info(f"[FILL] {symbol} {order_side} — MAKER partial {filled_amount}/{amount}")
                         return fetched
                 except Exception:
                     pass
-        except Exception as e:
-            logger.warning(f"[MAKER] Limit order failed for {symbol}: {e} — using market")
+            except Exception:
+                # Cancel failed — check if filled
+                try:
+                    fetched = self.client.fetch_order(order_id, symbol)
+                    if fetched.get("status") == "closed":
+                        return fetched
+                except Exception:
+                    pass
 
-        # Fallback: market order (taker)
-        try:
-            if side == "long":
-                order = self.client.create_market_buy_order(symbol, amount)
-            else:
-                order = self.client.create_market_sell_order(symbol, amount)
-            logger.info(f"[TAKER] Market {order_side} {amount} {symbol} (fallback)")
-            return order
+            logger.info(f"[FILL MISS] {symbol} {order_side} — limit not filled in 5s, skipping entry")
+            return None
+
         except Exception as e:
-            logger.error(f"Market order also failed for {symbol}: {e}")
+            logger.warning(f"[FILL MISS] {symbol} — limit order failed: {e}, skipping entry")
             return None
 
     def open_long(self, symbol: str, margin_usdt: float, price: float = None) -> Optional[dict]:
@@ -416,7 +378,7 @@ class Exchange:
         # Use best bid for maker entry (buy at bid = maker)
         ob = self.get_order_book(symbol, depth=5)
         limit_price = ob["best_bid"] if ob and ob.get("best_bid") else price
-        return self._try_limit_then_market(symbol, "long", amount, limit_price)
+        return self._try_limit_entry(symbol, "long", amount, limit_price)
 
     def close_long(self, symbol: str, coin_amount: float) -> Optional[dict]:
         if not Config.is_live():
@@ -459,7 +421,7 @@ class Exchange:
         # Use best ask for maker entry (sell at ask = maker)
         ob = self.get_order_book(symbol, depth=5)
         limit_price = ob["best_ask"] if ob and ob.get("best_ask") else price
-        return self._try_limit_then_market(symbol, "short", amount, limit_price)
+        return self._try_limit_entry(symbol, "short", amount, limit_price)
 
     def close_short(self, symbol: str, coin_amount: float) -> Optional[dict]:
         if not Config.is_live():
@@ -493,7 +455,7 @@ class Exchange:
             order_id = order.get("id")
             logger.info(f"[MAKER EXIT] Limit {side} {amount} {symbol} @ {limit_price}")
 
-            for _ in range(4):  # 2s total
+            for _ in range(8):  # 4s total — more time for maker fill on exits
                 time.sleep(0.5)
                 try:
                     fetched = self.client.fetch_order(order_id, symbol)
