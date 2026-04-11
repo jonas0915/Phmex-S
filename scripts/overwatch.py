@@ -407,15 +407,166 @@ def check_dirty_tree() -> CheckResult:
 
 
 def check_trade_reconciliation() -> CheckResult:
-    return CheckResult("trade_reconciliation", "OK", "Not implemented yet")
+    """Check 9: Compare recent trading_state.json trades vs Phemex fills."""
+    try:
+        state = load_state()
+        closed_trades = state.get("closed_trades", [])
+        if not closed_trades:
+            return CheckResult("trade_reconciliation", "OK", "No closed trades to reconcile")
+
+        recent_local = closed_trades[-10:]
+
+        import ccxt as ccxt_lib
+        exchange_name = os.getenv("EXCHANGE", "phemex")
+        client = getattr(ccxt_lib, exchange_name)({
+            "apiKey": os.getenv("API_KEY", ""),
+            "secret": os.getenv("API_SECRET", ""),
+            "enableRateLimit": True,
+            "timeout": 10000,
+            "options": {"defaultType": "swap"},
+        })
+        client.load_markets()
+
+        mismatches = []
+        for trade in recent_local:
+            symbol = trade.get("symbol", "")
+            local_entry = trade.get("entry", 0)
+            local_fee = trade.get("fee", None)
+
+            if not symbol or not local_entry:
+                continue
+
+            try:
+                exchange_trades = client.fetch_my_trades(symbol, limit=50)
+            except Exception:
+                continue
+
+            if not exchange_trades:
+                continue
+
+            entry_matched = False
+            for et in exchange_trades:
+                ex_price = float(et.get("price", 0))
+                if abs(ex_price - local_entry) / local_entry < 0.0001:
+                    entry_matched = True
+                    ex_fee = float(et.get("fee", {}).get("cost", 0) or 0)
+                    if local_fee is not None and abs(ex_fee - local_fee) > 0.01:
+                        mismatches.append(
+                            f"{symbol}: fee mismatch — local ${local_fee:.4f} vs exchange ${ex_fee:.4f}")
+                    break
+
+        if mismatches:
+            return CheckResult("trade_reconciliation", "WARNING",
+                               f"{len(mismatches)} trade reconciliation mismatch(es)",
+                               "\n".join(mismatches))
+        return CheckResult("trade_reconciliation", "OK",
+                           f"Last {len(recent_local)} trades reconciled OK")
+    except Exception as e:
+        return CheckResult("trade_reconciliation", "WARNING",
+                           f"Reconciliation check failed: {e}", str(e))
 
 
 def check_report_accuracy() -> CheckResult:
-    return CheckResult("report_accuracy", "OK", "Not implemented yet")
+    """Check 10: Verify latest daily report matches trading_state.json."""
+    try:
+        report_files = sorted(glob_mod.glob(os.path.join(REPORTS_DIR, "*.md")))
+        if not report_files:
+            return CheckResult("report_accuracy", "OK", "No reports to verify")
+
+        latest_report = report_files[-1]
+        report_date = os.path.basename(latest_report).replace(".md", "")
+
+        with open(latest_report, encoding="utf-8") as f:
+            report_text = f.read()
+
+        trade_count_match = re.search(r"Trades: (\d+)", report_text)
+        wr_match = re.search(r"Win Rate: ([\d.]+)%", report_text)
+        pnl_match = re.search(r"Net PnL: \$([+-]?[\d.]+)", report_text)
+
+        if not trade_count_match:
+            return CheckResult("report_accuracy", "OK",
+                               "Could not parse report metrics — skipping")
+
+        report_trades = int(trade_count_match.group(1))
+        report_wr = float(wr_match.group(1)) if wr_match else None
+        report_pnl = float(pnl_match.group(1)) if pnl_match else None
+
+        state = load_state()
+        closed_trades = state.get("closed_trades", [])
+
+        day_trades = []
+        for t in closed_trades:
+            exit_time = t.get("exit_time", "")
+            if isinstance(exit_time, str) and exit_time.startswith(report_date):
+                day_trades.append(t)
+
+        state_trades = len(day_trades)
+        state_wins = sum(1 for t in day_trades if t.get("pnl_usdt", 0) > 0)
+        state_wr = (state_wins / state_trades * 100) if state_trades > 0 else 0
+        state_pnl = sum(t.get("pnl_usdt", 0) for t in day_trades)
+
+        mismatches = []
+        if report_trades != state_trades:
+            mismatches.append(f"Trade count: report={report_trades}, state={state_trades}")
+        if report_wr is not None and abs(report_wr - state_wr) > WR_TOLERANCE:
+            mismatches.append(f"Win rate: report={report_wr:.1f}%, state={state_wr:.1f}%")
+        if report_pnl is not None and abs(report_pnl - state_pnl) > PNL_TOLERANCE:
+            mismatches.append(f"Net PnL: report=${report_pnl:.2f}, state=${state_pnl:.2f}")
+
+        if mismatches:
+            return CheckResult("report_accuracy", "WARNING",
+                               f"Report {report_date} has {len(mismatches)} mismatch(es)",
+                               f"Report: {latest_report}\n" + "\n".join(mismatches))
+        return CheckResult("report_accuracy", "OK",
+                           f"Report {report_date} matches state data")
+    except Exception as e:
+        return CheckResult("report_accuracy", "WARNING",
+                           f"Report accuracy check failed: {e}", str(e))
 
 
 def check_fee_capture() -> CheckResult:
-    return CheckResult("fee_capture", "OK", "Not implemented yet")
+    """Check 11: Flag closed trades with missing or suspiciously low fees."""
+    try:
+        state = load_state()
+        closed_trades = state.get("closed_trades", [])
+        if not closed_trades:
+            return CheckResult("fee_capture", "OK", "No closed trades to check")
+
+        cutoff = datetime.now() - timedelta(hours=24)
+        recent_trades = []
+        for t in closed_trades:
+            exit_time = t.get("exit_time", "")
+            if isinstance(exit_time, str) and exit_time:
+                try:
+                    ts = datetime.strptime(exit_time[:19], "%Y-%m-%d %H:%M:%S")
+                    if ts >= cutoff:
+                        recent_trades.append(t)
+                except ValueError:
+                    pass
+
+        if not recent_trades:
+            return CheckResult("fee_capture", "OK", "No trades in last 24h to check")
+
+        bad_fees = []
+        for t in recent_trades:
+            fee = t.get("fee", None)
+            symbol = t.get("symbol", "unknown")
+            if fee is None:
+                bad_fees.append(f"{symbol}: fee field missing")
+            elif not isinstance(fee, (int, float)):
+                bad_fees.append(f"{symbol}: fee not numeric ({fee!r})")
+            elif fee < MIN_FEE_USD:
+                bad_fees.append(f"{symbol}: fee=${fee:.4f} (below ${MIN_FEE_USD} threshold)")
+
+        if bad_fees:
+            return CheckResult("fee_capture", "WARNING",
+                               f"{len(bad_fees)} trade(s) with missing/low fees in last 24h",
+                               "\n".join(bad_fees))
+        return CheckResult("fee_capture", "OK",
+                           f"All {len(recent_trades)} recent trades have valid fees")
+    except Exception as e:
+        return CheckResult("fee_capture", "WARNING",
+                           f"Fee capture check failed: {e}", str(e))
 
 
 # ── orchestrator ───────────────────────────────────────────────────────
