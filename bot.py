@@ -368,6 +368,14 @@ class Phmex2Bot:
                 if open_pos:
                     self.risk.sync_positions(open_pos, current_cycle=self.cycle_count)
                     logger.info(f"Synced {len(open_pos)} open position(s) from exchange")
+                    # Refresh peak_price — may be stale if bot was down while price moved
+                    for sym, pos in self.risk.positions.items():
+                        try:
+                            ticker = self.exchange.get_ticker(sym)
+                            if ticker and "last" in ticker:
+                                pos.update_trailing_stop(float(ticker["last"]))
+                        except Exception as e:
+                            logger.debug(f"Could not refresh peak_price for {sym}: {e}")
                     # Place exchange SL/TP for synced positions (they have sl_order_id=None)
                     for sym, pos in self.risk.positions.items():
                         if pos.sl_order_id is None:
