@@ -56,6 +56,8 @@ def parse_args():
 
 
 def main():
+    import socket
+    socket.setdefaulttimeout(10)  # 10s hard ceiling on all socket ops including DNS
     _check_pidfile()
     args = parse_args()
 
