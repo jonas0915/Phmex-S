@@ -329,15 +329,81 @@ def check_balance_anomaly() -> CheckResult:
 
 
 def check_syntax() -> CheckResult:
-    return CheckResult("syntax", "OK", "Not implemented yet")
+    """Check 6: py_compile all core .py files."""
+    failures = []
+    for filename in CORE_PY_FILES:
+        filepath = os.path.join(BOT_DIR, filename)
+        if not os.path.exists(filepath):
+            continue
+        result = subprocess.run(
+            ["python3", "-m", "py_compile", filepath],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode != 0:
+            failures.append(f"{filename}: {result.stderr.strip()}")
+
+    if failures:
+        return CheckResult("syntax", "CRITICAL",
+                           f"Syntax errors in {len(failures)} file(s): "
+                           f"{', '.join(f.split(':')[0] for f in failures)}",
+                           "\n".join(failures))
+    return CheckResult("syntax", "OK", f"All {len(CORE_PY_FILES)} files compile clean")
 
 
 def check_pycache_stale() -> CheckResult:
-    return CheckResult("pycache_stale", "OK", "Not implemented yet")
+    """Check 7: Flag if any .pyc is older than its .py source."""
+    cache_dir = os.path.join(BOT_DIR, "__pycache__")
+    if not os.path.exists(cache_dir):
+        return CheckResult("pycache_stale", "OK", "No __pycache__ directory")
+
+    stale = []
+    for pyc_file in glob_mod.glob(os.path.join(cache_dir, "*.pyc")):
+        basename = os.path.basename(pyc_file)
+        source_name = basename.split(".")[0] + ".py"
+        source_path = os.path.join(BOT_DIR, source_name)
+
+        if os.path.exists(source_path):
+            pyc_mtime = os.path.getmtime(pyc_file)
+            src_mtime = os.path.getmtime(source_path)
+            if pyc_mtime < src_mtime:
+                stale.append(source_name)
+
+    if stale:
+        return CheckResult("pycache_stale", "WARNING",
+                           f"Stale __pycache__ for: {', '.join(stale)}",
+                           f"These .pyc files are older than their .py source. "
+                           f"Bot may be running old bytecode. "
+                           f"Fix: rm -rf __pycache__ && restart bot.\n"
+                           f"Stale files: {', '.join(stale)}")
+    return CheckResult("pycache_stale", "OK", "All bytecode up to date")
 
 
 def check_dirty_tree() -> CheckResult:
-    return CheckResult("dirty_tree", "OK", "Not implemented yet")
+    """Check 8: Uncommitted changes on core bot files."""
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True, timeout=10, cwd=BOT_DIR,
+        )
+        dirty_core = []
+        for line in result.stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+            filepath = line[3:].strip()
+            filename = os.path.basename(filepath)
+            if filename in CORE_BOT_FILES:
+                dirty_core.append(f"{line[:2].strip()} {filename}")
+
+        if dirty_core:
+            return CheckResult("dirty_tree", "WARNING",
+                               f"Uncommitted changes in: {', '.join(f.split()[-1] for f in dirty_core)}",
+                               f"Core bot files have uncommitted changes. "
+                               f"Running code may not match git history.\n"
+                               f"Files: {'; '.join(dirty_core)}")
+        return CheckResult("dirty_tree", "OK", "Working tree clean for core files")
+    except Exception as e:
+        return CheckResult("dirty_tree", "WARNING",
+                           f"Could not check git status: {e}", str(e))
 
 
 def check_trade_reconciliation() -> CheckResult:
