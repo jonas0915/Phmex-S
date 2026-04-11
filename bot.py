@@ -397,10 +397,11 @@ class Phmex2Bot:
             while self.running:
                 try:
                     signal.signal(signal.SIGALRM, _cycle_timeout_handler)
-                    signal.alarm(120)  # 120s watchdog per cycle
+                    signal.alarm(180)  # 120s cycle + 60s sleep
                     self._run_cycle()
-                    signal.alarm(0)  # cancel watchdog on success
                     self.consecutive_errors = 0
+                    time.sleep(Config.LOOP_INTERVAL)
+                    signal.alarm(0)  # cancel watchdog after sleep completes
                 except TimeoutError as e:
                     signal.alarm(0)
                     self.consecutive_errors += 1
@@ -416,7 +417,6 @@ class Phmex2Bot:
                     logger.warning("[BAN MODE] Entering ban mode for 10 minutes after 5 consecutive errors")
                     self.consecutive_errors = 0
                     notifier.notify_ban_mode(10)
-                time.sleep(Config.LOOP_INTERVAL)
         except KeyboardInterrupt:
             logger.info("Bot stopped by user.")
         finally:
@@ -885,8 +885,8 @@ class Phmex2Bot:
             daily_trades = sum(1 for t in self.risk.closed_trades
                                if t.get("symbol") == symbol and t.get("opened_at", 0) > day_start)
             daily_trades += 1 if symbol in self.risk.positions else 0  # count open positions too
-            if daily_trades >= 3:
-                logger.debug(f"[RATE GATE] {symbol} — daily cap reached ({daily_trades} trades today)")
+            if daily_trades >= Config.DAILY_SYMBOL_CAP:
+                logger.debug(f"[RATE GATE] {symbol} — daily cap reached ({daily_trades}/{Config.DAILY_SYMBOL_CAP} trades today)")
                 continue
 
             if not self.risk.can_open_trade(real_balance):
