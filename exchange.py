@@ -2,6 +2,7 @@ import ccxt
 import time
 import pandas as pd
 from typing import Optional
+import concurrent.futures
 from config import Config
 from logger import setup_logger
 
@@ -43,11 +44,23 @@ class Exchange:
                     else:
                         logger.warning(f"Could not load markets after 3 attempts — CDN may be blocked: {e}")
 
+    def _call_with_timeout(self, fn, *args, timeout=15, **kwargs):
+        """Run fn in a thread with hard timeout. Returns None on timeout."""
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(fn, *args, **kwargs)
+            try:
+                return future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                logger.warning(f"[TIMEOUT] {fn.__name__} timed out after {timeout}s — likely DNS hang")
+                return None
+
     def get_balance(self, currency: str) -> float:
         if not Config.is_live():
             return self.paper_balances.get(currency, 0.0)
         try:
-            balance = self.client.fetch_balance()
+            balance = self._call_with_timeout(self.client.fetch_balance)
+            if balance is None:
+                return self._last_balance.get(currency, 0.0)
             free  = float(balance["free"].get(currency, 0.0))
             total = float(balance["total"].get(currency, 0.0))
             self._last_balance[currency] = free
@@ -65,7 +78,9 @@ class Exchange:
 
     def get_ohlcv(self, symbol: str, timeframe: str, limit: int = 100) -> Optional[pd.DataFrame]:
         try:
-            ohlcv = self.client.fetch_ohlcv(symbol, timeframe, limit=limit)
+            ohlcv = self._call_with_timeout(self.client.fetch_ohlcv, symbol, timeframe, limit=limit)
+            if ohlcv is None:
+                return None
             df = pd.DataFrame(ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
             df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
             df.set_index("timestamp", inplace=True)
@@ -76,7 +91,9 @@ class Exchange:
 
     def get_order_book(self, symbol: str, depth: int = 20) -> Optional[dict]:
         try:
-            ob = self.client.fetch_order_book(symbol, limit=depth)
+            ob = self._call_with_timeout(self.client.fetch_order_book, symbol, limit=depth)
+            if ob is None:
+                return None
             bids = ob.get("bids", [])
             asks = ob.get("asks", [])
             if not bids or not asks:
@@ -121,7 +138,9 @@ class Exchange:
     def get_recent_trades(self, symbol: str, limit: int = 100) -> Optional[dict]:
         """Fetch recent trades (tape) and compute aggressor stats."""
         try:
-            trades = self.client.fetch_trades(symbol, limit=limit)
+            trades = self._call_with_timeout(self.client.fetch_trades, symbol, limit=limit)
+            if trades is None:
+                return None
             if not trades or len(trades) < 10:
                 return None
 
@@ -183,7 +202,9 @@ class Exchange:
         """Compute Cumulative Volume Delta from recent trades.
         CVD divergence (price making new low but CVD rising) = high-conviction reversal signal."""
         try:
-            trades = self.client.fetch_trades(symbol, limit=limit)
+            trades = self._call_with_timeout(self.client.fetch_trades, symbol, limit=limit)
+            if trades is None:
+                return None
             if not trades or len(trades) < 20:
                 return None
 
@@ -227,7 +248,9 @@ class Exchange:
     def get_funding_rate(self, symbol: str) -> Optional[dict]:
         """Fetch current funding rate. Extreme rates signal contrarian opportunities."""
         try:
-            funding = self.client.fetch_funding_rate(symbol)
+            funding = self._call_with_timeout(self.client.fetch_funding_rate, symbol)
+            if funding is None:
+                return None
             rate = float(funding.get("fundingRate", 0) or 0)
             return {
                 "rate": rate,
@@ -240,7 +263,10 @@ class Exchange:
 
     def get_ticker(self, symbol: str) -> Optional[dict]:
         try:
-            return self.client.fetch_ticker(symbol)
+            result = self._call_with_timeout(self.client.fetch_ticker, symbol)
+            if result is None:
+                return None
+            return result
         except Exception as e:
             logger.error(f"Failed to fetch ticker for {symbol}: {e}")
             return None
@@ -716,7 +742,9 @@ class Exchange:
     def get_open_positions(self) -> list[dict]:
         """Fetch open positions from the exchange (live mode only)."""
         try:
-            raw = self.client.fetch_positions()
+            raw = self._call_with_timeout(self.client.fetch_positions)
+            if raw is None:
+                return None
             result = []
             for p in raw:
                 contracts = abs(p.get("contracts") or 0)
