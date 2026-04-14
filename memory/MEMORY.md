@@ -1,0 +1,24 @@
+# Memory Index
+
+- **[🟢 SESSION HANDOFF](SESSION_HANDOFF.md) — START HERE next session. Loop freeze fix + early exit signal #4 deployed. Monitoring for DNS timeout triggers and peak drawdown fires.**
+- [Samsung Remote](reference_samsung_remote.md) — Jonas's Samsung TV remote webapp at ~/Desktop/SamsungRemote, runs on port 7777
+- [Lessons](lessons.md) — Operational lessons and rules
+- [Bot Architecture](reference_bot_architecture.md) — Phmex-S entry logic, cooldowns, exits, config values, slot system
+- [Existing Infrastructure](reference_existing_infrastructure.md) — L2 orderbook and tape/flow systems already built — check before proposing new
+- [Performance Baseline](reference_performance_baseline.md) — Daily bot performance data Mar 26–Apr 1, slot comparison, AE analysis
+- [Sentinel Deployment](reference_sentinel.md) — v11 deployed 2026-04-01 23:01 PT, 3-layer entry gates, legacy_control A/B. Includes Apr 7 post-mortem (original eval was corrupted).
+- [Sentinel Gate Forensics](reference_sentinel_gate_forensics.md) — Apr 7 forensics: 3 of 4 Sentinel tape gates were broken from deploy (cvd_slope dimensional mismatch, large_trade_bias hardcoded, silent skip on low trade_count). Root causes + fixes.
+- [Recursive Improvement](reference_recursive_improvement.md) — Phase 1 spec: auto-lifecycle, telegram commander, entry snapshots
+- Skills: `/trade-audit` (full trade analysis), `/verify-work` (multi-level verification), `/pre-restart-audit` (mandatory before restart)
+- **Truth Pipeline (2026-04-08)** — reconcile_phemex.py --apply (atomic fee patcher), launchd every 15min, daily_report.py reconciles pre-run. Kills fee=$0 lies.
+- **Data bugs fixed 2026-04-08** — stop_loss mistag (PnL-sign classify), entry_price/exit_price aliases, entry_snapshot persistence across sync_positions. Bot PID post-restart: 21214.
+- **[2026-04-09 5-fix spec](../docs/superpowers/specs/2026-04-09-phmex-s-5-fixes.md)** — AE exit rule, postOnly 1-line bug fix (maker rate is 0%!), kill switch extension, slot cleanup, backtester extension. 2-week recovery plan.
+- **FIXED: exchange.py:288 postOnly bug** — deployed Fix 2 on 2026-04-09, awaiting first maker fill to confirm.
+- **Backtester extended (2026-04-09)** — fees+slippage model + `--ae-rule {roi,trend_flip}` flag. 90-day CSV data refreshed. Calibration: pessimistic (2.7x overtrade). AE sweep: inconclusive (keep ROI default).
+- **Weekly forensics (2026-04-09)** — `scripts/weekly_forensics.py` + launchd `com.phmex.forensics` (Sundays 8 PM PT). Deterministic pattern detector, no LLM.
+- [Launchd TCC](feedback_launchd_tcc.md) — launchd jobs can't write logs to ~/Desktop, use ~/Library/Logs/ instead
+- [PID Lock Check](feedback_pid_lock_check.md) — always check ps + .bot.pid + log activity before declaring bot dead; the PID lockfile blocks restarts
+- **Loop freeze fix (2026-04-10)** — socket.setdefaulttimeout(10), _call_with_timeout on all REST reads, sleep inside watchdog. Triggered by SUI +10%→-12% on Apr 9 DNS outage.
+- **Early exit signal #4 (2026-04-10)** — peak drawdown: `return True` at peak_roi>=8% + drawdown>=3%. Catches profit peaks where lagging indicators miss.
+- **DAILY_SYMBOL_CAP configurable (2026-04-10)** — moved from hardcoded 3 to .env. T3 analysis: 31% WR on n=13, keep at 3 until more data.
+- **Orphan-position defense (2026-04-13)** — 3-layer bot defense + overwatch Check #12 + launchd plist fix. Triggered by BTC short -45% orphan from limit-only race. See lessons.md "Orphan positions — the three-layer defense".

@@ -303,12 +303,85 @@ class Exchange:
                 else:
                     raise
 
+    def _position_ground_truth(self, symbol: str, side: str, pre_amount: float = 0.0) -> Optional[dict]:
+        """Final safety net: query exchange for any position on this symbol/side.
+
+        Returns a synthetic order-like dict if a position exists on-exchange whose amount is
+        GREATER than the pre-call snapshot. This delta check is critical — without it, we'd
+        mis-adopt a user's pre-existing manual position as "our fill" and register it with
+        wrong sizing. The callers MUST snapshot `pre_amount` BEFORE submitting any order,
+        otherwise set pre_amount=0 and accept the risk of matching a pre-existing position.
+
+        The returned `filled` and `amount` fields report only the DELTA (what our order added),
+        so downstream sizing/margin calc reflects the actual order, not the full exchange position.
+        """
+        EPSILON = 1e-9
+        try:
+            positions = self.get_open_positions()
+            if not positions:
+                return None
+            for p in positions:
+                if p.get("symbol") != symbol:
+                    continue
+                if p.get("side") != side:
+                    continue
+                amount = float(p.get("amount") or 0)
+                entry = float(p.get("entry_price") or 0)
+                if amount <= 0 or entry <= 0:
+                    continue
+                # Only trust as "our fill" if the position grew beyond the pre-snapshot.
+                if amount <= pre_amount + EPSILON:
+                    logger.info(
+                        f"[GROUND TRUTH] {symbol} {side.upper()} position exists (amount={amount}) "
+                        f"but no growth vs pre-snapshot ({pre_amount}) — not attributing to our order"
+                    )
+                    continue
+                delta = amount - pre_amount
+                logger.warning(
+                    f"[GROUND TRUTH] {symbol} {side.upper()} delta fill detected "
+                    f"(pre={pre_amount}, now={amount}, delta={delta}, entry={entry}) "
+                    f"— recovering from lost order tracking"
+                )
+                return {
+                    "symbol": symbol,
+                    "average": entry,
+                    "price": entry,
+                    "filled": delta,
+                    "amount": delta,
+                    "status": "closed",
+                    "source": "ground_truth",
+                    "exchange_total_amount": amount,
+                }
+        except Exception as e:
+            logger.error(f"[GROUND TRUTH] fetch_positions failed for {symbol}: {e}")
+        return None
+
     def _try_limit_entry(self, symbol: str, side: str, amount: float, limit_price: float) -> Optional[dict]:
         """Place limit-only entry order. No market fallback — if unfilled, skip the trade.
-        Maker fee = 0.01% vs taker 0.06%. Missing a fill is better than overpaying 6x fees."""
+        Maker fee = 0.01% vs taker 0.06%. Missing a fill is better than overpaying 6x fees.
+
+        Every early-return path that says "no fill" MUST end by confirming with the exchange
+        that no position materialized. Any races here create unmanaged orphan positions
+        (real-money incident 2026-04-13)."""
         limit_price = self._round_price(symbol, limit_price)
         order_side = "buy" if side == "long" else "sell"
 
+        # Pre-call snapshot — _position_ground_truth uses this to verify that any newly-found
+        # position actually grew beyond what existed before. Prevents mis-adopting the user's
+        # pre-existing manual position or a stale prior-instance position as "our fill".
+        pre_amount = 0.0
+        try:
+            _pre = self.get_open_positions() or []
+            for _p in _pre:
+                if _p.get("symbol") == symbol and _p.get("side") == side:
+                    pre_amount = float(_p.get("amount") or 0)
+                    break
+        except Exception as e:
+            logger.warning(f"[PRE-SNAPSHOT] {symbol} {side} failed: {e} — ground-truth delta check may be unreliable")
+        # Expose for the bot.py Layer-2 safety net after open_long/open_short returns None
+        self._last_entry_pre_amount = {"symbol": symbol, "side": side, "pre_amount": pre_amount, "ts": time.time()}
+
+        order_id = None
         try:
             order = self.client.create_order(symbol, "limit", order_side, amount, limit_price, params={"timeInForce": "PostOnly"})
             order_id = order.get("id")
@@ -324,13 +397,21 @@ class Exchange:
                         logger.info(f"[FILL] {symbol} {order_side} — MAKER @ {fetched.get('average', limit_price)}")
                         return fetched
                     if status in ("canceled", "cancelled"):
-                        # PostOnly rejected (would have crossed spread)
+                        # PostOnly rejected — but check if it filled before cancel
+                        _filled = float(fetched.get("filled", 0) or 0)
+                        if _filled > 0:
+                            logger.info(f"[FILL] {symbol} {order_side} — MAKER @ {fetched.get('average', limit_price)} (filled before cancel)")
+                            return fetched
+                        # Confirm with exchange that no position materialized before giving up
+                        gt = self._position_ground_truth(symbol, side, pre_amount=pre_amount)
+                        if gt:
+                            return gt
                         logger.info(f"[FILL MISS] {symbol} — PostOnly rejected, skipping entry")
                         return None
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"[POLL] fetch_order failed for {symbol} id={order_id}: {e}")
 
-            # Not filled — cancel and skip (no market fallback)
+            # Not filled in 5s — cancel and skip (no market fallback)
             try:
                 self.client.cancel_order(order_id, symbol)
                 # Check for race: filled between our last poll and cancel
@@ -344,22 +425,38 @@ class Exchange:
                         # Partial fill — keep it, don't chase remainder with market
                         logger.info(f"[FILL] {symbol} {order_side} — MAKER partial {filled_amount}/{amount}")
                         return fetched
-                except Exception:
-                    pass
-            except Exception:
-                # Cancel failed — check if filled
+                except Exception as e:
+                    logger.warning(f"[POST-CANCEL] fetch_order failed for {symbol} id={order_id}: {e} — falling through to ground-truth check")
+            except Exception as e:
+                # Cancel failed — check if filled via fetch_order, then ground truth
+                logger.warning(f"[CANCEL FAIL] {symbol} id={order_id}: {e}")
                 try:
                     fetched = self.client.fetch_order(order_id, symbol)
                     if fetched.get("status") == "closed":
                         return fetched
-                except Exception:
-                    pass
+                    _filled_cf = float(fetched.get("filled", 0) or 0)
+                    if _filled_cf > 0:
+                        logger.info(f"[FILL] {symbol} {order_side} — MAKER partial {_filled_cf}/{amount} (cancel failed)")
+                        return fetched
+                except Exception as e2:
+                    logger.warning(f"[CANCEL FAIL] fetch_order also failed for {symbol} id={order_id}: {e2} — falling through to ground-truth check")
+
+            # Final safety net: before declaring "no fill", confirm with the exchange that
+            # no position exists. Any exception path above may have lost track of a real fill.
+            gt = self._position_ground_truth(symbol, side, pre_amount=pre_amount)
+            if gt:
+                return gt
 
             logger.info(f"[FILL MISS] {symbol} {order_side} — limit not filled in 5s, skipping entry")
             return None
 
         except Exception as e:
             logger.warning(f"[FILL MISS] {symbol} — limit order failed: {e}, skipping entry")
+            # Even an exception on create_order can leave a live order if it timed out
+            # after the exchange received it. Check ground truth.
+            gt = self._position_ground_truth(symbol, side, pre_amount=pre_amount)
+            if gt:
+                return gt
             return None
 
     def open_long(self, symbol: str, margin_usdt: float, price: float = None) -> Optional[dict]:
@@ -447,7 +544,7 @@ class Exchange:
             return None
 
     def _try_limit_exit(self, symbol: str, side: str, amount: float, limit_price: float) -> Optional[dict]:
-        """Try limit exit for maker fees. Shorter timeout than entry (2s) since exits are more urgent."""
+        """Try limit exit for maker fees. 4s timeout (8 polls x 0.5s), market fallback if unfilled."""
         limit_price = self._round_price(symbol, limit_price)
         try:
             order = self.client.create_order(symbol, "limit", side, amount, limit_price,

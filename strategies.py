@@ -1304,7 +1304,8 @@ def confluence_sma_vwap_strategy(df, orderbook=None, htf_df=None) -> TradeSignal
 STRATEGIES = {
     "trend_scalp":              trend_scalp_strategy,
     "trend_pullback":           trend_pullback_strategy,
-    "bb_reversion":             bb_mean_reversion_strategy,
+    "bb_mean_reversion":        bb_mean_reversion_strategy,
+    "bb_reversion":             bb_mean_reversion_strategy,  # legacy alias
     "keltner_squeeze":          keltner_squeeze_strategy,
     "momentum_continuation":    momentum_continuation_strategy,
     "vwap_reversion":           vwap_reversion_strategy,

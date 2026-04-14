@@ -66,18 +66,27 @@ TG_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TG_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 
-def tg_send(message: str):
-    """Send Telegram message. Silent failure if not configured."""
+def tg_send(message: str) -> bool:
+    """Send Telegram message. Returns True on success. Logs both success and failure
+    at INFO level so the overwatch log always records whether alerts went out
+    (previously a silent no-op when creds were missing — created false sense of coverage)."""
     if not TG_TOKEN or not TG_CHAT_ID:
-        return
+        logger.warning("Telegram alert NOT sent — TELEGRAM_TOKEN/TELEGRAM_CHAT_ID missing from env")
+        return False
     try:
-        requests.post(
+        resp = requests.post(
             f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage",
             json={"chat_id": TG_CHAT_ID, "text": message, "parse_mode": "HTML"},
             timeout=10,
         )
+        if resp.status_code == 200:
+            logger.info(f"Telegram alert sent ({len(message)} chars)")
+            return True
+        logger.error(f"Telegram send HTTP {resp.status_code}: {resp.text[:200]}")
+        return False
     except Exception as e:
-        logger.debug(f"Telegram send failed: {e}")
+        logger.error(f"Telegram send failed: {e}")
+        return False
 
 
 # ── check result ───────────────────────────────────────────────────────
@@ -135,7 +144,8 @@ def utc_to_pt_12hr(utc_hour: int) -> str:
 
 def now_pt_12hr() -> str:
     """Current time in 12-hour PT format."""
-    utc_now = datetime.utcnow()
+    from datetime import timezone
+    utc_now = datetime.now(timezone.utc)
     pt = utc_now - timedelta(hours=7)
     return pt.strftime("%-I:%M %p PT")
 
@@ -249,6 +259,8 @@ def check_position_desync() -> CheckResult:
                     "entryPrice": p.get("entryPrice"),
                 }
 
+        # Read state AFTER exchange query to minimize race window.
+        # Then re-read to confirm — only flag desync if it persists in both reads.
         state = load_state()
         local_positions = set()
         if "positions" in state and isinstance(state["positions"], dict):
@@ -257,6 +269,17 @@ def check_position_desync() -> CheckResult:
         exchange_syms = set(exchange_positions.keys())
         ghost = exchange_syms - local_positions
         phantom = local_positions - exchange_syms
+
+        # Confirm with second read — eliminates race conditions from bot
+        # opening/closing positions between our exchange query and state read
+        if ghost or phantom:
+            time.sleep(2)
+            state2 = load_state()
+            local2 = set()
+            if "positions" in state2 and isinstance(state2["positions"], dict):
+                local2 = set(state2["positions"].keys())
+            ghost = exchange_syms - local2
+            phantom = local2 - exchange_syms
 
         issues = []
         if ghost:
@@ -395,8 +418,9 @@ def check_dirty_tree() -> CheckResult:
                 dirty_core.append(f"{line[:2].strip()} {filename}")
 
         if dirty_core:
+            names = ', '.join(f.split()[-1].replace('.', '·') for f in dirty_core)
             return CheckResult("dirty_tree", "WARNING",
-                               f"Uncommitted changes in: {', '.join(f.split()[-1] for f in dirty_core)}",
+                               f"Uncommitted changes in: {names}",
                                f"Core bot files have uncommitted changes. "
                                f"Running code may not match git history.\n"
                                f"Files: {'; '.join(dirty_core)}")
@@ -569,9 +593,77 @@ def check_fee_capture() -> CheckResult:
                            f"Fee capture check failed: {e}", str(e))
 
 
+def check_unrealized_drawdown() -> CheckResult:
+    """Check 12: Flag any open exchange position whose unrealized PnL vs initial margin
+    is worse than -30%. Catches runaway losers — tracked or orphan — before they liquidate.
+    check_balance_anomaly only inspects REALIZED PnL, so an open -45% position goes unflagged
+    there (real-money incident 2026-04-13)."""
+    try:
+        import ccxt as ccxt_lib
+        exchange_name = os.getenv("EXCHANGE", "phemex")
+        client = getattr(ccxt_lib, exchange_name)({
+            "apiKey": os.getenv("API_KEY", ""),
+            "secret": os.getenv("API_SECRET", ""),
+            "enableRateLimit": True,
+            "timeout": 10000,
+            "options": {"defaultType": "swap"},
+        })
+        client.load_markets()
+
+        raw_positions = client.fetch_positions()
+        runaway = []
+        watch = []
+        total_open = 0
+        for p in raw_positions:
+            contracts = float(p.get("contracts", 0) or 0)
+            if contracts <= 0:
+                continue
+            total_open += 1
+            unrealized = p.get("unrealizedPnl")
+            initial_margin = p.get("initialMargin") or p.get("collateral") or 0
+            try:
+                unrealized = float(unrealized) if unrealized is not None else None
+                initial_margin = float(initial_margin) if initial_margin else 0.0
+            except (TypeError, ValueError):
+                continue
+            if unrealized is None or initial_margin <= 0:
+                continue
+            roi_on_margin = unrealized / initial_margin
+            symbol = p.get("symbol", "?")
+            side = p.get("side", "?")
+            entry = p.get("entryPrice", "?")
+            mark = p.get("markPrice", "?")
+            row = (
+                f"{symbol} {side.upper()} entry={entry} mark={mark} "
+                f"uPnL=${unrealized:.2f} margin=${initial_margin:.2f} ROI={roi_on_margin*100:+.1f}%"
+            )
+            if roi_on_margin <= -0.50:
+                runaway.append(row)
+            elif roi_on_margin <= -0.30:
+                watch.append(row)
+
+        if runaway:
+            return CheckResult(
+                "unrealized_drawdown", "CRITICAL",
+                f"Runaway position(s) below -50% ROI-on-margin: " + "; ".join(runaway),
+                json.dumps({"runaway": runaway, "watch": watch}),
+            )
+        if watch:
+            return CheckResult(
+                "unrealized_drawdown", "WARNING",
+                f"Position(s) below -30% ROI-on-margin: " + "; ".join(watch),
+                json.dumps({"watch": watch}),
+            )
+        return CheckResult("unrealized_drawdown", "OK",
+                           f"All {total_open} open position(s) within drawdown limits")
+    except Exception as e:
+        return CheckResult("unrealized_drawdown", "WARNING",
+                           f"Unrealized drawdown check failed: {e}", str(e))
+
+
 # ── orchestrator ───────────────────────────────────────────────────────
 def run_all_checks() -> list[CheckResult]:
-    """Run all 11 checks and return results."""
+    """Run all 12 checks and return results."""
     checks = [
         check_process_alive,
         check_log_errors,
@@ -584,6 +676,7 @@ def run_all_checks() -> list[CheckResult]:
         check_trade_reconciliation,
         check_report_accuracy,
         check_fee_capture,
+        check_unrealized_drawdown,
     ]
     results = []
     for check_fn in checks:
@@ -630,24 +723,46 @@ def main():
     failures = [r for r in results if r.severity != "OK"]
     if failures:
         logger.info(f"{len(failures)} issue(s) found")
-        send_alert(failures)
-        generate_fix_specs(failures)
+        # Send Telegram alert FIRST — must not be blocked by a fix-spec generator crash
+        # or Anthropic API outage (real-money events need to fire-and-forget to Telegram).
+        try:
+            send_alert(failures)
+        except Exception as e:
+            logger.exception(f"send_alert crashed: {e}")
+        try:
+            generate_fix_specs(failures)
+        except Exception as e:
+            logger.exception(f"generate_fix_specs crashed: {e}")
     else:
         logger.info("All checks passed — no alert sent")
 
     logger.info("=== Overwatch run complete ===")
 
 
+FIX_SPEC_SKIP_WHEN_WARNING = {"dirty_tree", "pycache_stale"}
+# These checks are workflow-hygiene warnings — Claude's auto-generated "git commit" or "clear cache"
+# specs don't add value and burn Anthropic tokens every run. CRITICAL findings (e.g. position_desync,
+# unrealized_drawdown at -50%) still generate specs because they describe real bugs.
+
+
 def generate_fix_specs(failures: list[CheckResult]):
-    """Call Claude Sonnet to generate fix specs for each failure with diagnostics."""
+    """Call Claude Sonnet to generate fix specs for each failure with diagnostics.
+
+    Skips fix-spec generation for warnings on checks in FIX_SPEC_SKIP_WHEN_WARNING
+    (workflow-hygiene issues where Claude's spec is boilerplate). CRITICAL always generates.
+    """
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         logger.info("No ANTHROPIC_API_KEY — skipping fix spec generation")
         return
 
-    actionable = [f for f in failures if f.diagnostics]
+    actionable = [
+        f for f in failures
+        if f.diagnostics
+        and not (f.severity == "WARNING" and f.name in FIX_SPEC_SKIP_WHEN_WARNING)
+    ]
     if not actionable:
-        logger.info("No actionable diagnostics — skipping fix specs")
+        logger.info("No actionable diagnostics after filter — skipping fix specs")
         return
 
     try:
@@ -689,23 +804,86 @@ def _append_to_existing_spec(filepath: str, failure: CheckResult):
     logger.info(f"Appended new evidence to {os.path.basename(filepath)}")
 
 
+CODEBASE_MAP = """\
+## Phmex-S Codebase Map
+
+### Architecture
+Phemex-S is a 10x leveraged crypto scalping bot on Phemex perpetual futures via ccxt. \
+60-second main loop, 5m candles, WebSocket OHLCV feed with REST fallback. \
+Persists state to trading_state.json. Manages risk through Position objects with \
+trailing stops, time exits, adverse exits, and 4-signal early exit.
+
+### bot.py (Main Loop & Entry Logic)
+- Class: TradingBot [line 161]
+- Key methods: start:311 | _run_cycle:527 (main loop body) | _evaluate_paper_slots:1180 \
+| _process_sentinels:441 (file-based halt/kill/pause) | _sync_exchange_closes:1478 \
+| _persist_trade_results:1473 | _fetch_htf_data:221
+- Entry flow: strategy signal → global cooldown → per-pair cooldown → daily cap \
+→ ensemble confidence (4/7) → tape gate → OB gate → order placement
+- Watchdog: signal.alarm(180) covers cycle + sleep
+
+### risk_manager.py (Position Management & Exits)
+- Class: Position [line 17]: symbol, side, entry_price, amount, margin, stop_loss, \
+take_profit, trailing_stop_price, peak_price, strategy, confidence
+- Exit methods: should_exit_early:112 (4 signals: RSI, MACD crossover, EMA-9, peak drawdown) \
+| update_trailing_stop:37 (tiered 3-5% trail) | should_stop_loss:93 | should_take_profit:104 \
+| should_time_exit:211 | should_adverse_exit:200 | check_breakeven:241
+- pnl_percent:194 returns ROI on margin (10x amplified — 1% price = 10% ROI)
+- Class: RiskManager [line 260]: open_position:479 | close_position:590 \
+| sync_positions:542 | check_positions:658 | calculate_kelly_margin:392
+
+### strategies.py (Signal Generation)
+- Returns TradeSignal(signal=BUY/SELL/HOLD, reason, strength 0.0-1.0)
+- Active: confluence:953 (primary), htf_confluence_pullback (HTF confirmation)
+- Available: trend_scalp:22 | bb_reversion:158 | trend_pullback:257 | keltner_squeeze:357 \
+| momentum_continuation:410 | vwap_reversion:551 | htf_momentum:1013 | liq_cascade:1109
+
+### exchange.py (Phemex API via ccxt)
+- Class: Exchange [line 13]
+- _call_with_timeout:47 wraps ALL REST calls in 15s thread timeout (returns None on hang)
+- Read: get_ohlcv:79 | get_balance:57 | get_ticker:264 | get_order_book:92 \
+| get_recent_trades:138 | get_funding_rate:248 | get_open_positions:742
+- Write: open_long:403 | close_long:421 | open_short:446 | close_short:464 \
+| place_sl_tp:640 | cancel_open_orders:717
+- Helpers: _coin_amount:274 | _round_price:626 | _round_amount:633
+
+### ws_feed.py (WebSocket Data Stream)
+- Class: WSDataFeed [line 17] — ccxt.pro WebSocket in background thread
+- start:50 (blocks 30s) | seed:60 (REST backfill) | get_ohlcv (cached DataFrame)
+- is_connected checks if any symbol updated in last 120s (not just cache existence)
+
+### notifier.py (Telegram Alerts)
+- send:6 | notify_entry:30 | notify_exit:43 | notify_ban_mode:82 | notify_shutdown:103
+
+### State File (trading_state.json)
+- peak_balance: float
+- positions: {"BTC/USDT:USDT": {side, entry_price, amount, margin, stop_loss, \
+take_profit, strategy, opened_at, peak_price, sl_order_id, tp_order_id}}
+- closed_trades: [{symbol, side, entry, exit, amount, margin, pnl_usdt, pnl_pct, \
+fees_usdt, net_pnl, reason, exit_reason, strategy, opened_at, closed_at, duration_s}]
+
+### Key Patterns & Constraints
+- ccxt clients are NOT thread-safe — background threads must create their own instance
+- Fill prices from fetch_positions(), NOT order response (Phemex returns stale price)
+- SL=1.2%, TP=2.1% — confirmed good, do not change
+- Must rm -rf __pycache__ before restart (stale bytecode bug)
+- flat_exit=240 cycles (4hrs) is INTENTIONAL — short flat_exit lost $22
+- 12-hour PT time format always (PDT = UTC-7)
+"""
+
+
 def _generate_new_spec(client, failure: CheckResult, slug: str):
     """Generate a new fix spec via Claude Sonnet."""
     prompt = (
         f"Issue: {failure.name} — {failure.severity}\n"
         f"Description: {failure.message}\n\n"
         f"Evidence:\n{failure.diagnostics}\n\n"
-        f"Context:\n"
-        f"- Bot: Phmex-S Sentinel v11, crypto perpetual futures scalper on Phemex\n"
-        f"- Stack: Python 3.14, ccxt, WebSocket feeds, 60s main loop\n"
-        f"- Key files: bot.py (main loop), risk_manager.py (exits), "
-        f"strategies.py (signals), exchange.py (API)\n"
-        f"- The bot is LIVE with real money — safety is paramount\n\n"
+        f"{CODEBASE_MAP}\n\n"
         f"Write a fix spec with these sections:\n"
         f"1. Problem — what is wrong (1-2 sentences)\n"
-        f"2. Root Cause Analysis — why it happened\n"
-        f"3. Proposed Fix — specific code changes with file paths\n"
-        f"4. Files to Change — list of file:line references\n"
+        f"2. Root Cause Analysis — why it happened, referencing specific methods/lines\n"
+        f"3. Proposed Fix — specific code changes with exact file paths and line numbers\n"
+        f"4. Files to Change — file:line references from the codebase map above\n"
         f"5. Risk Assessment — what could go wrong with the fix\n"
     )
 
@@ -714,9 +892,11 @@ def _generate_new_spec(client, failure: CheckResult, slug: str):
             model="claude-sonnet-4-20250514",
             max_tokens=2000,
             system=(
-                "You are a senior Python developer reviewing a live crypto trading bot. "
-                "Write concise, actionable fix specs. Include specific file paths and "
-                "code snippets. Prioritize safety — this bot trades real money."
+                "You are a senior Python developer who knows the Phmex-S trading bot codebase "
+                "intimately. Write concise, actionable fix specs with EXACT file paths and line "
+                "numbers from the codebase map provided. Reference specific methods, classes, and "
+                "patterns. This bot trades real money — safety is paramount. Never propose changes "
+                "to SL/TP values, flat_exit cycles, or other parameters marked as intentional."
             ),
             messages=[{"role": "user", "content": prompt}],
         )

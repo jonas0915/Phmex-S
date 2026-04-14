@@ -194,7 +194,7 @@ class Phmex2Bot:
             ),
             StrategySlot(
                 slot_id="5m_mean_revert",
-                strategy_name="bb_reversion",
+                strategy_name="bb_mean_reversion",
                 timeframe="5m",
                 max_positions=1,      # conservative — mean reversion is riskier
                 capital_pct=0.3,      # 30% allocation (less than momentum/scalp)
@@ -729,8 +729,10 @@ class Phmex2Bot:
                 notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "adverse_exit")
                 continue
 
-        # Check if exchange already closed positions (exchange SL/TP triggered)
-        if Config.is_live() and self.risk.positions:
+        # Bidirectional exchange sync — detect (A) closed-on-exchange positions AND
+        # (B) untracked orphan positions. Must run even when self.risk.positions is empty,
+        # because the orphan case by definition means bot thinks there are none.
+        if Config.is_live():
             self._sync_exchange_closes(prices)
 
         # Verify SL orders still active — re-place if cancelled (skip software-managed)
@@ -1032,7 +1034,7 @@ class Phmex2Bot:
                     # Pullbacks have negative CVD by definition (sellers pushing the dip),
                     # so this gate would systematically block legitimate pullback longs.
                     # The divergence gate below is the contextual version that handles this correctly.
-                    if strat_name not in ("htf_confluence_pullback", "bb_reversion"):
+                    if strat_name not in ("htf_confluence_pullback", "bb_mean_reversion"):
                         if direction == "long" and cvd_slope < -0.3:
                             logger.info(f"[TAPE GATE] {symbol} LONG blocked — CVD slope {cvd_slope:.2f} (selling accelerating)")
                             continue
@@ -1052,13 +1054,30 @@ class Phmex2Bot:
                         logger.info(f"[TAPE GATE] {symbol} SHORT blocked — large trade bias {lt_bias:.2f} (whales buying)")
                         continue
 
+                # Standalone divergence check — always active, even when tape gates skipped
+                # Divergence = price direction vs CVD direction; valid at any volume
+                # When trade_count > 20, the check inside the tape gate block (above) fires first.
+                # This is the safety net for low-volume conditions where tape gates are skipped.
+                if flow and flow.get("divergence"):
+                    _div = flow["divergence"]
+                    if direction == "long" and _div == "bearish":
+                        self._log_gotaway("divergence_bearish", symbol, direction, strat_name,
+                                          signal.strength, confidence, price, ob, flow, df)
+                        logger.info(f"[DIVERGENCE GATE] {symbol} LONG blocked — bearish divergence (always-on)")
+                        continue
+                    if direction == "short" and _div == "bullish":
+                        self._log_gotaway("divergence_bullish", symbol, direction, strat_name,
+                                          signal.strength, confidence, price, ob, flow, df)
+                        logger.info(f"[DIVERGENCE GATE] {symbol} SHORT blocked — bullish divergence (always-on)")
+                        continue
+
                 # Apply funding rate strength modifier
                 if funding_data and funding_data.get("strength_mod"):
                     signal = TradeSignal(signal.signal, signal.reason, signal.strength + funding_data["strength_mod"])
 
                 # Candle-boundary entry bias: prefer entries near 5m candle opens
                 # Research: +0.58bps at candle boundaries (t-stat > 9)
-                now_min = datetime.datetime.utcnow().minute
+                now_min = datetime.datetime.now(datetime.timezone.utc).minute
                 candle_offset = now_min % 5  # 0 = candle just opened, 4 = about to close
                 if candle_offset >= 3:  # Last 2 minutes of candle — skip, wait for next open
                     logger.debug(f"[TIMING] {symbol} — skipping entry, {5-candle_offset}min to next candle open")
@@ -1070,7 +1089,7 @@ class Phmex2Bot:
                 #   5-7 PM PT (26% WR/-$16.11)        → UTC 0,1,2
                 # Open: 12-10 AM, 2-5 PM, 8 PM-12 AM PT
                 _BLOCKED_HOURS_UTC = {0, 1, 2, 17, 18, 19, 20}
-                _utc_hour = datetime.datetime.utcnow().hour
+                _utc_hour = datetime.datetime.now(datetime.timezone.utc).hour
                 _pt_hour = (_utc_hour - 7) % 24
                 if _utc_hour in _BLOCKED_HOURS_UTC:
                     _pt_label = f"{_pt_hour % 12 or 12}:00 {'AM' if _pt_hour < 12 else 'PM'}"
@@ -1087,7 +1106,7 @@ class Phmex2Bot:
                 margin = self.risk.calculate_kelly_margin(available, confidence=confidence)
 
                 # Weekend sizing boost: +85-92% weekend returns (p < 0.001)
-                if datetime.datetime.utcnow().weekday() in (5, 6):  # Saturday=5, Sunday=6
+                if datetime.datetime.now(datetime.timezone.utc).weekday() in (5, 6):  # Saturday=5, Sunday=6
                     margin = min(margin * 1.3, 10.0)  # cap at $10 (MAX_TRADE_MARGIN)
 
                 if margin > available:
@@ -1132,6 +1151,24 @@ class Phmex2Bot:
                         logger.info(f"[OB GATE] {symbol} blocked — wide spread {ob_spread:.3f}%")
                         continue
 
+                # QUIET regime gate — block low-momentum entries
+                # QUIET = 5m ADX 20-25, no EMA stack alignment (0% WR in 48hr audit)
+                # Allow through if flow CVD strongly confirms the trade direction
+                _regime_snap = self._classify_regime(df.iloc[-1], df)
+                if _regime_snap.get("label") == "QUIET":
+                    _flow_confirms = False
+                    if flow and flow.get("trade_count", 0) > 5:
+                        if direction == "long" and flow.get("cvd_slope", 0) > 0.2:
+                            _flow_confirms = True
+                        if direction == "short" and flow.get("cvd_slope", 0) < -0.2:
+                            _flow_confirms = True
+                    if not _flow_confirms:
+                        self._log_gotaway("quiet_regime", symbol, direction, strat_name,
+                                          signal.strength, confidence, price, ob, flow, df)
+                        logger.info(f"[REGIME GATE] {symbol} {direction.upper()} blocked — QUIET regime "
+                                    f"(5m ADX={_regime_snap.get('adx', '?')}) with no flow confirmation")
+                        continue
+
                 order = self.exchange.open_long(symbol, margin, price) if direction == "long" else self.exchange.open_short(symbol, margin, price)
                 if order:
                     fill_price = self._extract_fill_price(order, price)
@@ -1154,13 +1191,71 @@ class Phmex2Bot:
                     if strat_name == "htf_confluence_pullback":
                         self._last_htf_entry_time = time.time()
                     logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${pos.margin:.2f} | Conf: {confidence}/7 | {signal.reason} | Strength: {signal.strength:.2f}")
-                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df)
+                    _htf_adx_val = float(htf_df.iloc[-1].get("adx", 0)) if htf_df is not None and len(htf_df) > 0 else None
+                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df, htf_adx=_htf_adx_val)
                     try:
                         self.risk._save_state()
                     except Exception as _e:
                         logger.debug(f"[SNAPSHOT] live save_state after entry failed: {_e}")
                     notifier.notify_entry(symbol, direction, fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason)
                 else:
+                    # Before declaring "signal lost", verify no position materialized on-exchange.
+                    # Race window: our order-tracking thinks nothing filled, but a late fill
+                    # could have created an orphan (real-money incident 2026-04-13).
+                    # CRITICAL: use the pre-snapshot amount captured by _try_limit_entry so we
+                    # don't mis-adopt a pre-existing manual position as "our fill".
+                    if Config.is_live():
+                        pre_snap = getattr(self.exchange, "_last_entry_pre_amount", None) or {}
+                        pre_amt = 0.0
+                        if pre_snap.get("symbol") == symbol and pre_snap.get("side") == direction:
+                            pre_amt = float(pre_snap.get("pre_amount") or 0.0)
+                        try:
+                            gt = self.exchange._position_ground_truth(symbol, direction, pre_amount=pre_amt)
+                        except Exception as _e:
+                            gt = None
+                            logger.error(f"[ENTRY SAFETY] ground-truth check failed for {symbol}: {_e}")
+                        if gt:
+                            gt_entry = float(gt.get("average") or price)
+                            gt_amount = float(gt.get("filled") or 0)
+                            if gt_amount <= 0:
+                                logger.error(f"[ENTRY SAFETY] {symbol} ground-truth returned zero amount — refusing to adopt, logging 'signal lost'")
+                                logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
+                                continue
+                            logger.warning(
+                                f"[ENTRY SAFETY] {symbol} {direction.upper()} orphan detected after 'signal lost' — "
+                                f"adopting position @ {gt_entry} (amount={gt_amount})"
+                            )
+                            self.risk.open_position(symbol, gt_entry, margin, side=direction, atr=atr_val, regime=regime, cycle=self.cycle_count, strategy=strat_name)
+                            pos = self.risk.positions[symbol]
+                            pos.amount = gt_amount
+                            pos.margin = (gt_amount * gt_entry) / Config.LEVERAGE
+                            pos.entry_strength = signal.strength
+                            pos.confidence = confidence
+                            pos.ensemble_layers = ",".join(layers)
+                            sl_tp = self.exchange.place_sl_tp(symbol, direction, pos.amount, pos.stop_loss, pos.take_profit)
+                            pos.sl_order_id = sl_tp.get("sl_order_id")
+                            pos.tp_order_id = sl_tp.get("tp_order_id")
+                            if not pos.sl_order_id:
+                                pos.sl_order_id = "software"
+                            available -= pos.margin
+                            self._last_entry_time = time.time()
+                            if strat_name == "htf_confluence_pullback":
+                                self._last_htf_entry_time = time.time()
+                            try:
+                                self.risk._save_state()
+                            except Exception as _e:
+                                logger.warning(f"[ENTRY SAFETY] _save_state after orphan-adopt failed for {symbol}: {_e}")
+                            try:
+                                notifier.send(
+                                    f"⚠️ ORPHAN ADOPTED on entry\n"
+                                    f"{symbol} {direction.upper()}\n"
+                                    f"Entry: {gt_entry} | Amount: {pos.amount}\n"
+                                    f"SL: {pos.stop_loss:.4f} | TP: {pos.take_profit:.4f}"
+                                )
+                            except Exception as _e:
+                                logger.warning(f"[ENTRY SAFETY] Telegram alert for orphan-adopt failed: {_e}")
+                            notifier.notify_entry(symbol, direction, gt_entry, pos.margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason + " (orphan-adopted)")
+                            continue
                     logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
 
         if self.cycle_count % 10 == 0:
@@ -1340,6 +1435,40 @@ class Phmex2Bot:
                         logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — large trade bias {lt_bias:.2f}")
                         continue
 
+                # Shadow-tag: which LIVE gates would have blocked this trade?
+                _gate_tags = []
+                _strat_name = _extract_strategy_name(signal.reason)
+                _conf, _layers = self._compute_confidence(
+                    direction, df, ob, htf_df=htf_df,
+                    cvd_data=self._ws_feed.get_order_flow(symbol) if self._ws_feed else None,
+                    hurst_val=None, funding_data=None,
+                    strategy=_strat_name, flow=flow
+                )
+                if _conf < 4:
+                    _gate_tags.append(f"confidence:{_conf}/7<4")
+                _utc_hr = datetime.datetime.now(datetime.timezone.utc).hour
+                if _utc_hr in {0, 1, 2, 17, 18, 19, 20}:
+                    _gate_tags.append(f"time_block:UTC{_utc_hr}")
+                if time.time() - self._last_entry_time < 120:
+                    _gate_tags.append("global_cooldown")
+                _regime_snap = self._classify_regime(df.iloc[-1], df)
+                if _regime_snap.get("label") == "QUIET":
+                    _fc = False
+                    if flow and flow.get("trade_count", 0) > 5:
+                        if direction == "long" and flow.get("cvd_slope", 0) > 0.2:
+                            _fc = True
+                        if direction == "short" and flow.get("cvd_slope", 0) < -0.2:
+                            _fc = True
+                    if not _fc:
+                        _gate_tags.append("quiet_regime")
+                if flow and flow.get("divergence"):
+                    if direction == "long" and flow["divergence"] == "bearish":
+                        _gate_tags.append("divergence_bearish")
+                    if direction == "short" and flow["divergence"] == "bullish":
+                        _gate_tags.append("divergence_bullish")
+                _would_block = len(_gate_tags) > 0
+                _tag_str = ",".join(_gate_tags) if _gate_tags else "none"
+
                 slot.risk.open_position(
                     symbol, price, margin, side=direction,
                     atr=atr_val, regime="medium",
@@ -1351,13 +1480,15 @@ class Phmex2Bot:
                     signal.strength, signal.reason
                 )
                 slot.total_entries += 1
+                _block_label = f" [WOULD BLOCK: {_tag_str}]" if _would_block else ""
                 logger.info(
                     f"[PAPER] {slot.slot_id} ENTRY {direction.upper()} {symbol} | "
-                    f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}"
+                    f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}{_block_label}"
                 )
-                snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, slot.strategy_name, signal.strength, price, 0, None, None, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None)
+                snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, slot.strategy_name, signal.strength, price, 0, None, flow, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None)
                 if symbol in slot.risk.positions:
                     slot.risk.positions[symbol].entry_snapshot = snap
+                    slot.risk.positions[symbol].gate_tags = _tag_str
                     try:
                         slot.risk._save_state()
                     except Exception as _e:
@@ -1406,10 +1537,43 @@ class Phmex2Bot:
             "vol_ratio": round(vol_ratio, 2),
         }
 
+    def _log_gotaway(self, reason: str, symbol: str, direction: str, strategy: str,
+                     strength: float, confidence: int, price: float,
+                     ob: dict | None, flow: dict | None, df=None):
+        """Log a trade that was blocked by defensive gates for later analysis."""
+        import json as _json
+        entry = {
+            "ts": int(time.time()),
+            "reason": reason,
+            "symbol": symbol,
+            "direction": direction,
+            "strategy": strategy,
+            "strength": round(strength, 3),
+            "confidence": confidence,
+            "price": round(price, 6),
+            "ob": {
+                "imbalance": round(ob.get("imbalance", 0), 3),
+                "spread_pct": round(ob.get("spread_pct", 0), 4),
+            } if ob else None,
+            "flow": {
+                "buy_ratio": round(flow.get("buy_ratio", 0), 3),
+                "cvd_slope": round(flow.get("cvd_slope", 0), 4),
+                "divergence": flow.get("divergence"),
+                "large_trade_bias": round(flow.get("large_trade_bias", 0), 3),
+                "trade_count": flow.get("trade_count", 0),
+            } if flow else None,
+            "regime": self._classify_regime(df.iloc[-1], df) if df is not None and len(df) > 0 else None,
+        }
+        try:
+            with open("logs/gotAway.jsonl", "a") as f:
+                f.write(_json.dumps(entry) + "\n")
+        except Exception:
+            pass
+
     def _log_entry_snapshot(self, symbol: str, direction: str, slot_id: str,
                             strategy: str, strength: float, price: float,
                             confidence: int, ob: dict | None, flow: dict | None,
-                            ohlcv_last=None, ohlcv_df=None) -> dict:
+                            ohlcv_last=None, ohlcv_df=None, htf_adx: float = None) -> dict:
         """Append entry conditions snapshot to JSONL for post-hoc analysis.
         Returns the snapshot dict so it can be attached to the Position."""
         import json as _json
@@ -1436,6 +1600,7 @@ class Phmex2Bot:
                 "trade_count": flow.get("trade_count", 0),
             } if flow else None,
             "regime": self._classify_regime(ohlcv_last, ohlcv_df) if ohlcv_last is not None else None,
+            "htf_adx": round(htf_adx, 1) if htf_adx is not None else None,
         }
         try:
             with open("logs/entry_snapshots.jsonl", "a") as f:
@@ -1478,12 +1643,29 @@ class Phmex2Bot:
         self.risk._save_state()
 
     def _sync_exchange_closes(self, prices: dict):
-        """Detect positions closed by exchange SL/TP orders so we don't double-close."""
+        """Bidirectional per-cycle position reconciliation against the exchange:
+
+          (A) Exchange-closed positions that the bot still tracks (SL/TP fired) — close them locally.
+          (B) Exchange-OPEN positions that the bot does NOT track (orphans) — auto-adopt with
+              ATR/% SL + TP placed on the exchange, send Telegram alert.
+
+          Case (B) added 2026-04-13 after a BTC short orphan ran to -45% unrealized because
+          a race in _try_limit_entry let a late fill slip through without being recorded.
+          Defense in depth: exchange.py adds a ground-truth check, bot.py adds entry-failure
+          adoption, this function is the belt-and-suspenders catch-all.
+        """
         try:
             exchange_positions = self.exchange.get_open_positions()
-            if exchange_positions is None:
-                return  # API failed, skip sync this cycle
-            exchange_symbols = {p["symbol"] for p in exchange_positions}
+        except Exception as e:
+            logger.warning(f"[SYNC] fetch_positions failed: {e} — skipping sync this cycle")
+            return
+        if exchange_positions is None:
+            return  # API failed, skip sync this cycle (treat as unknown, not as "no positions")
+        exchange_map = {p["symbol"]: p for p in exchange_positions}
+        exchange_symbols = set(exchange_map.keys())
+
+        # --- (A) Closes: tracked locally but gone from exchange ---
+        try:
             for symbol in list(self.risk.positions.keys()):
                 if symbol not in exchange_symbols:
                     pos = self.risk.positions[symbol]
@@ -1517,7 +1699,89 @@ class Phmex2Bot:
                     notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), "exchange_close")
                     self.risk.close_position(symbol, exit_price, "exchange_close", fees_usdt=sync_fee)
         except Exception as e:
-            logger.debug(f"Exchange position sync failed: {e}")
+            logger.warning(f"[SYNC] (A) close-detection path failed: {e} — continuing to orphan scan")
+
+        # --- (B) Orphans: open on exchange but not tracked locally ---
+        # Snapshotted after (A) so any positions just closed locally are excluded.
+        # Runs independently of (A) — a bug in close-detection must not block orphan discovery.
+        try:
+            tracked_symbols = set(self.risk.positions.keys())
+            # NOTE: list comprehension is materialized before _adopt_orphan_position can mutate
+            # self.risk.positions. Safe, but if refactored to a generator this becomes a bug.
+            orphans = [p for p in exchange_positions if p["symbol"] not in tracked_symbols]
+            for orphan in orphans:
+                try:
+                    self._adopt_orphan_position(orphan)
+                except Exception as e:
+                    logger.error(f"[ORPHAN] Failed to adopt {orphan.get('symbol')}: {e}")
+        except Exception as e:
+            logger.warning(f"[SYNC] (B) orphan-scan path failed: {e}")
+
+    def _adopt_orphan_position(self, orphan: dict):
+        """Adopt an exchange-visible position that the bot isn't tracking.
+
+        - Calls risk.open_position to register it (with % SL fallback — ATR isn't available post-hoc)
+        - Places SL/TP on exchange
+        - Adds symbol to active_pairs so it's priced every cycle
+        - Sends Telegram alert (real-money event — must not be silent)
+        """
+        symbol = orphan["symbol"]
+        side = orphan["side"]
+        entry_price = float(orphan["entry_price"])
+        amount = float(orphan["amount"])
+        margin = float(orphan.get("margin") or (amount * entry_price / max(Config.LEVERAGE, 1)))
+
+        logger.warning(
+            f"[ORPHAN] Adopting untracked position: {symbol} {side.upper()} "
+            f"@ {entry_price} amount={amount} margin=${margin:.2f}"
+        )
+
+        # Register with risk manager (falls through to configured % SL since atr=0)
+        self.risk.open_position(
+            symbol, entry_price, margin,
+            side=side, atr=0.0, regime="medium",
+            cycle=self.cycle_count, strategy="orphan_adopted",
+        )
+        pos = self.risk.positions[symbol]
+        pos.amount = amount
+        pos.margin = margin
+
+        # Place SL/TP on the exchange so the broker protects this position
+        try:
+            sl_tp = self.exchange.place_sl_tp(symbol, side, amount, pos.stop_loss, pos.take_profit)
+            pos.sl_order_id = sl_tp.get("sl_order_id")
+            pos.tp_order_id = sl_tp.get("tp_order_id")
+            if not pos.sl_order_id:
+                pos.sl_order_id = "software"
+                logger.warning(f"[ORPHAN] Exchange SL placement failed for {symbol} — software SL@{pos.stop_loss:.4f}")
+        except Exception as e:
+            pos.sl_order_id = "software"
+            logger.error(f"[ORPHAN] SL/TP placement failed for {symbol}: {e} — software SL@{pos.stop_loss:.4f}")
+
+        # Make sure this symbol is priced on future cycles
+        try:
+            if symbol not in self.active_pairs:
+                self.active_pairs.append(symbol)
+        except Exception:
+            pass
+
+        # Persist immediately so a restart doesn't re-orphan it
+        try:
+            self.risk._save_state()
+        except Exception as e:
+            logger.debug(f"[ORPHAN] _save_state after adoption failed: {e}")
+
+        # Telegram alert — this is a real-money event, must not be silent
+        try:
+            notifier.send(
+                f"⚠️ ORPHAN POSITION ADOPTED (per-cycle scan)\n"
+                f"{symbol} {side.upper()}\n"
+                f"Entry: {entry_price} | Amount: {amount} | Margin: ${margin:.2f}\n"
+                f"SL: {pos.stop_loss:.4f} | TP: {pos.take_profit:.4f}\n"
+                f"Cycle: #{self.cycle_count}"
+            )
+        except Exception:
+            pass
 
     def _extract_fill_price(self, order: dict, fallback: float, is_exit: bool = False) -> float:
         """Get real fill price from exchange.

@@ -643,6 +643,7 @@ class RiskManager:
             "ensemble_layers": pos.ensemble_layers,
             "entry_snapshot": getattr(pos, "entry_snapshot", {}),
             "duration_s": time.time() - pos.opened_at,
+            "gate_tags": getattr(pos, "gate_tags", None),
         }
         if fees_pending:
             trade["fees_pending"] = True
