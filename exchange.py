@@ -387,8 +387,12 @@ class Exchange:
             order_id = order.get("id")
             logger.info(f"[MAKER] Limit {order_side} {amount} {symbol} @ {limit_price} (id={order_id})")
 
-            # Wait up to 5s for fill (10 polls × 0.5s)
-            for _ in range(10):
+            # Wait up to 20s for fill (40 polls × 0.5s).
+            # Was 5s pre-2026-04-13 — produced 1.5% fill rate on Phemex; book moved
+            # away from PostOnly price faster than 5s. Widened after forensic showed
+            # 66 signals → 1 fill in 7 days. The ground-truth safety net below catches
+            # any late-fill race beyond the cancel.
+            for _ in range(40):
                 time.sleep(0.5)
                 try:
                     fetched = self.client.fetch_order(order_id, symbol)
@@ -447,7 +451,7 @@ class Exchange:
             if gt:
                 return gt
 
-            logger.info(f"[FILL MISS] {symbol} {order_side} — limit not filled in 5s, skipping entry")
+            logger.info(f"[FILL MISS] {symbol} {order_side} — limit not filled in 20s, skipping entry")
             return None
 
         except Exception as e:
