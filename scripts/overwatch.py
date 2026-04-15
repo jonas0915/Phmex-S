@@ -889,7 +889,7 @@ def _generate_new_spec(client, failure: CheckResult, slug: str):
 
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=2000,
             system=(
                 "You are a senior Python developer who knows the Phmex-S trading bot codebase "
