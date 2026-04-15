@@ -666,12 +666,14 @@ class RiskManager:
             if pos.should_take_profit(price):
                 to_close.append((symbol, "take_profit"))
             elif pos.should_stop_loss(price):
-                # BUG A fix: a "stop_loss" line that has been ratcheted
-                # above entry by breakeven/trailing logic (or after a
-                # partial TP that moves SL to entry+0.15%) is really a
-                # profitable exit, not a loss. Classify by PnL sign at
-                # trigger so winners aren't mistagged as stop_loss.
-                if pos.pnl_usdt(price) > 0:
+                # Classify trail fires vs hard-SL fires. A trail fire is any
+                # should_stop_loss trigger where trailing_stop_price is armed
+                # (set by update_trailing_stop once ROI >= 5%). PnL sign
+                # distinguishes profitable trail (trailing_stop) from losing
+                # trail (stop_loss). Pure hard-SL hits never arm trailing_stop_price.
+                if pos.trailing_stop_price is not None and pos.pnl_usdt(price) > 0:
+                    to_close.append((symbol, "trailing_stop"))
+                elif pos.pnl_usdt(price) > 0:
                     to_close.append((symbol, "take_profit"))
                 else:
                     to_close.append((symbol, "stop_loss"))

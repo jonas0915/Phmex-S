@@ -50,6 +50,9 @@ def notify_exit(symbol: str, side: str, entry: float, exit_price: float, pnl: fl
     elif reason == "early_exit":
         emoji = "⚡"
         label = "EARLY EXIT"
+    elif reason == "trailing_stop":
+        emoji = "🎯"
+        label = "TRAILING STOP"
     else:
         emoji = "⏹"
         label = reason.upper()
