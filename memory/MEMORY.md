@@ -1,6 +1,8 @@
 # Memory Index
 
-- **[🟢 SESSION HANDOFF](SESSION_HANDOFF.md) — START HERE next session. Phase 2 v2 spec drafted + audited; C2/C3/I9 bot fixes NOT landed (block Phase 2a); dashboard lockdown needed (0.0.0.0 zero-auth).**
+- **[🟢 SESSION HANDOFF](SESSION_HANDOFF.md) — START HERE next session. Bot restarted PID 24017 with TP 16% ROI + adverse -3% ROI + trailing-stop mistag fix. Phase 2 v2 spec drafted; C2/C3/I9 bot fixes still block Phase 2a fee work.**
+- **TP/Adverse tightened (2026-04-14)** — TAKE_PROFIT_PERCENT 2.1→1.6 (TP fires ~2× more often); ADVERSE_EXIT_THRESHOLD -5.0→-3.0 (expected +$9.42/13d).
+- **Trailing-stop mistag fixed (2026-04-14)** — risk_manager.py:668-679 now emits `trailing_stop` exit_reason; notifier.py adds 🎯 TRAILING STOP label. Extends BUG-A fix from lessons.md:219-222.
 - [Phase 2 v2 Audit](reference_phase2_v2_audit.md) — Audit of Phase 2 spec, v1→v2 changes, prereq status. Read before resuming Phase 2.
 - [Samsung Remote](reference_samsung_remote.md) — Jonas's Samsung TV remote webapp at ~/Desktop/SamsungRemote, runs on port 7777
 - [Lessons](lessons.md) — Operational lessons and rules

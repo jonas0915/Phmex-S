@@ -1,72 +1,82 @@
 # Session Handoff — Resume Here
 
-**Last session ended:** 2026-04-14 ~9:20 PM PT
-**Session focus:** Audit Phase 2 recursive-improvement proposal + draft ship-ready v2
-**Bot PID:** 80190 (started 8:55 PM PT 2026-04-14)
-**Balance (from today's report):** $74.66 USDT (peak $76.24, DD 2.1%)
+**Last session ended:** 2026-04-14 ~10:30 PM PT
+**Session grade:** A — Phase 2 v2 spec drafted + audited, TP/AE tightened, trailing-stop mistag fixed, 3 commits, bot restarted clean
+**Bot PID:** 24017 (restarted 2026-04-14 10:26 PM PT)
+**Balance at restart:** $69.97 USDT (was $74.66 in earlier report; difference reflects open-position MTM)
 
 ---
 
-## Where we left off
+## What was deployed this session
 
-Drafted **Phase 2 v2 spec** (ship-ready rewrite of v1): [docs/superpowers/specs/2026-04-14-recursive-improvement-phase2-design-v2.md](../docs/superpowers/specs/2026-04-14-recursive-improvement-phase2-design-v2.md). V1 is at same path without `-v2` suffix (kept as audit evidence).
+### Code commits
 
-**Jonas said:** "save this. i need to work on this more." — continue here next session.
+1. **`6eb243d` chore: migrate overwatch LLM to claude-sonnet-4-6** — `claude-sonnet-4-20250514` retires 2026-07-14
+2. **`5982b8c` docs: Phase 2 recursive-improvement v1 spec + audit-driven v2 rewrite**
+3. **`76540af` fix: tag trailing-stop exits as trailing_stop (not take_profit/stop_loss)** — extends BUG-A fix from lessons.md:219-222
 
----
+### Live config changes (`.env`, uncommitted)
+| Setting | From | To | Effect |
+|---|---|---|---|
+| TAKE_PROFIT_PERCENT | 2.1 (21% ROI) | 1.6 (16% ROI) | TP fires ~2× more often |
+| ADVERSE_EXIT_THRESHOLD | -5.0 | -3.0 | Adverse exit tightens; expected +$9.42 / 13d |
 
-## What was done this session
-
-1. **Migrated overwatch model** to `claude-sonnet-4-6` (was `claude-sonnet-4-20250514` which retires 2026-07-14). [scripts/overwatch.py:892](../scripts/overwatch.py#L892). Not yet restarted — next overwatch run picks it up.
-
-2. **Audited Phase 2 v1 spec** with 4 parallel agents:
-   - Infrastructure accuracy (mostly correct; `compute_kelly_margin` → actual name is `calculate_kelly_margin`; snapshot start 2026-04-06 not 04-07)
-   - Prior-R&D alignment (v1 **silently diverged** from `reference_recursive_improvement.md:41-72` revised ordering)
-   - Lessons compliance (v1 **violated** CLAUDE.md pre-restart-audit + dashboard-propagation rules → RED verdict)
-   - Empirical claims (v1's "XRP micro-lot noise" framing unsupported — today's XRP was a scratch trade with a log-format bug, not Kelly noise)
-
-3. **Drafted Phase 2 v2** addressing all audit issues — see spec file.
-
-4. **Researched 5 open questions** with 3 parallel agents (2 are Jonas-policy):
-   - **Q1 Bot fixes C1/C2/C3/I9/I18:** Only **C1 landed**. C2, C3, I9 NOT landed (block Phase 2a per `reference_recursive_improvement.md:52`). I18 defanged by slot removal.
-   - **Q2 Reconcile CLEAN streak:** **5 runs clean** → Phase 2a precondition satisfied.
-   - **Q4 Dashboard:** Bound `0.0.0.0` with **zero auth** → must lock down before Phase 2c panels.
+### Pre-existing `.env` changes that ALSO landed at restart (Jonas confirmed intentional)
+- TRADE_AMOUNT_USDT 5.0 → 10.0 (matches CLAUDE.md doc)
+- DAILY_SYMBOL_CAP=3 added (matches config.py default)
+- SOL/USDT:USDT added to SCANNER_BLACKLIST
 
 ---
 
-## Open decisions for Jonas
+## Phase 2 spec status
 
-Before Phase 2a kicks off, resolve:
+- **v1** (REVISE verdict, audit evidence): `docs/superpowers/specs/2026-04-14-recursive-improvement-phase2-design.md`
+- **v2** (ship-ready draft): `docs/superpowers/specs/2026-04-14-recursive-improvement-phase2-design-v2.md`
+- **Audit findings durable record:** `memory/reference_phase2_v2_audit.md`
 
-1. **Restart order**: C2/C3/I9 as "Phase 2.0 — bot fix prereqs" before 2a fee reduction? Or reorder to ship 2c observability + dashboard lockdown first (low-risk, unblocks everything)?
-2. **Autonomous mutation cap**: v2 proposes 1/day + 2/week. Tighten further?
-3. **Snapshot backtester sample floor**: v2 proposes 30 per variant. Bump to 50?
-4. **Dashboard lockdown**: flip `web_dashboard.py:42` to `127.0.0.1` (1-line fix, local-view only), or add Basic-Auth with `.env` token?
+### Open decisions before Phase 2a kicks off
+1. **Phase ordering** — ship corrected 2c (observability + dashboard lockdown) first while C2/C3/I9 bot fixes land in parallel? Or strict prereq ordering (fix C2/C3/I9 first)?
+2. **Autonomous mutation cap** — v2 proposes 1/day + 2/week. Tighten?
+3. **Backtester sample floor** — v2 proposes 30 per variant. Bump to 50?
+4. **Dashboard lockdown** — flip web_dashboard.py:42 to 127.0.0.1 (1-line) or add Basic-Auth?
 
----
-
-## Key context to carry forward
-
-- **V1 of Phase 2 spec is still in the repo** — if you want to retire it, rename or delete `docs/superpowers/specs/2026-04-14-recursive-improvement-phase2-design.md` (the one without `-v2`).
-- **Parameter changelog is empty** (`parameter_changelog.json` = `[]`). `auto_lifecycle.scan_rollbacks` reads it but has nothing to watch. Phase 2d retrofit fixes this.
-- **Overwatch model fix is uncommitted** — `scripts/overwatch.py` shows as modified. Not critical (runs every 4h), but worth a commit note next session.
-- **MIN_TRADE_MARGIN investigation parked** — v1's XRP framing was wrong. If you want a $3 floor, new justification needed.
-
----
-
-## Bot status to monitor (carried from 04-10 handoff, still relevant)
-
-1. `[TIMEOUT]` log entries — DNS wrap
-2. `[EARLY EXIT] peak drawdown trigger` — signal #4 fires
-3. Maker fill rate (postOnly fix from 04-09)
-4. Orphan-position defense layers (3 live since 04-13)
-5. Overwatch Check #12 (-30%/-50% drawdown alert)
+### Prereq status (verified 2026-04-14)
+- **C1 LANDED** (commit 2c89ad8). **C2/C3/I9 NOT LANDED** (block Phase 2a fee reduction). I18 defanged by slot removal.
+- **Reconcile CLEAN streak: 5 runs** (Phase 2a precondition met)
+- **Dashboard bound 0.0.0.0 zero-auth** (must lock before adding sensitive panels)
 
 ---
 
-## Today's trading summary (from report)
+## What to monitor next 24-48h
 
+1. **Trailing stop fires now appear as `trailing_stop` exit_reason** — first report tomorrow should show non-zero bucket. If still zero, trail isn't firing in the new bot session.
+2. **Adverse_exit count** — should drop ~30-40% with -3% threshold (was 38/85 = 45%)
+3. **TP fire rate** — expect ~2× more frequent; today's 0% (hard 21% TP never fired in Sentinel) should become non-zero
+4. **Net PnL trend** — tighter TP shrinks avg winner; watch for regression
+5. **TRADE_AMOUNT_USDT 2× change** — at $10 margin × 10x = $100 notional per trade; today's −$0.70 net day at 2× would have been ~−$1.40
+
+---
+
+## Outstanding follow-ups
+
+- **`.env` is tracked in git** despite being in .gitignore. Future hygiene task: `git rm --cached .env` (Jonas's call, not urgent — keys already rotated 04-13).
+- **Phase 1 deliverables uncommitted in git** — `scripts/auto_lifecycle.py`, `scripts/telegram_commander.py`, `scripts/reconcile_phemex.py` etc. are in prod but never committed. Worth a dedicated "backfill Phase 1 into git" session.
+- **`backtest.py:65` TP_CAP_PCT=2.15 stale** vs `.env` 1.6. Non-blocking for live; affects future backtests only.
+- **MEMORY.md reference_bot_architecture.md:31** still shows adverse_exit at -5% — needs update to -3% post next session reconcile.
+
+---
+
+## Active monitoring (carried from prior sessions, still relevant)
+- `[TIMEOUT]` log entries (DNS wrap from 04-10)
+- `[EARLY EXIT] peak drawdown trigger` (Signal #4 from 04-10)
+- Maker fill rate (postOnly fix from 04-09)
+- Orphan-position 3-layer defense (live since 04-13)
+- Overwatch Check #12 (-30%/-50% drawdown alert)
+- Overwatch model now `claude-sonnet-4-6` (next 4h run picks up)
+
+---
+
+## Today's trading summary (from morning report — pre-restart)
 - 8 trades, 5W/3L, 62.5% WR
 - Net PnL −$0.70 (gross −$0.39, fees $0.30)
-- 2 adverse exits cost −$1.77 (SUI −$1.17, BTC −$0.60)
-- Paper ADX+SMA+VWAP slot +$2.03 vs live −$0.70 — **regime slot beat live by $2.73 → reinforces Phase 2b regime gating priority**
+- Paper ADX+SMA+VWAP slot +$2.03 vs live −$0.70 → reinforces Phase 2b regime gating priority
