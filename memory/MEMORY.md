@@ -1,6 +1,7 @@
 # Memory Index
 
-- **[🟢 SESSION HANDOFF](SESSION_HANDOFF.md) — START HERE next session. Loop freeze fix + early exit signal #4 deployed. Monitoring for DNS timeout triggers and peak drawdown fires.**
+- **[🟢 SESSION HANDOFF](SESSION_HANDOFF.md) — START HERE next session. Phase 2 v2 spec drafted + audited; C2/C3/I9 bot fixes NOT landed (block Phase 2a); dashboard lockdown needed (0.0.0.0 zero-auth).**
+- [Phase 2 v2 Audit](reference_phase2_v2_audit.md) — Audit of Phase 2 spec, v1→v2 changes, prereq status. Read before resuming Phase 2.
 - [Samsung Remote](reference_samsung_remote.md) — Jonas's Samsung TV remote webapp at ~/Desktop/SamsungRemote, runs on port 7777
 - [Lessons](lessons.md) — Operational lessons and rules
 - [Bot Architecture](reference_bot_architecture.md) — Phmex-S entry logic, cooldowns, exits, config values, slot system
