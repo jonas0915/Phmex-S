@@ -39,7 +39,7 @@ STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
 PAPER_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_liq_cascade.json")
 FACTORY_STATE_FILE = os.path.join(PROJECT_DIR, "strategy_factory_state.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
-HOST = "0.0.0.0"
+HOST = "127.0.0.1"
 PORT = 8050
 CHART_INTERVAL = 30  # seconds between chart refreshes
 ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
@@ -527,7 +527,7 @@ def _build_reconcile_card() -> str:
     </div>'''
 
 
-def _build_session_card(trades: list[dict], paper_trades: list[dict], balance: float = 0, balance_start: float = 0) -> str:
+def _build_session_card(trades: list[dict], paper_trades: list[dict], **_kwargs) -> str:
     """Build SESSION PERFORMANCE as a horizontal row of 4 time-of-day tiles."""
     SESSIONS = [
         ("Early AM", "12-6 AM", "&#127747;", "#cba6f7"),
@@ -632,6 +632,31 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
         </div>'''
 
     # Recent paper trades list (last 5)
+    # Gate tag summary for paper trades
+    gate_summary = ""
+    tagged = [t for t in paper_trades if t.get("gate_tags") and t["gate_tags"] != "none"]
+    untagged = [t for t in paper_trades if not t.get("gate_tags") or t["gate_tags"] == "none"]
+    if paper_trades:
+        _would_pass = len(untagged)
+        _would_block = len(tagged)
+        _pass_pnl = sum(_net_pnl(t) for t in untagged)
+        _block_pnl = sum(_net_pnl(t) for t in tagged)
+        _pass_wr = (sum(1 for t in untagged if _net_pnl(t) > 0) / len(untagged) * 100) if untagged else 0
+        _block_wr = (sum(1 for t in tagged if _net_pnl(t) > 0) / len(tagged) * 100) if tagged else 0
+        _pass_cls = "positive" if _pass_pnl >= 0 else "negative"
+        _block_cls = "positive" if _block_pnl >= 0 else "negative"
+        gate_summary = f'''<div class="compare-section-title" style="margin-top:10px">Gate Shadow Tags</div>
+            <div class="compare-row">
+                <span class="compare-label">Would PASS live</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:0.8em;color:var(--text-primary)">{_would_pass}t / {_pass_wr:.0f}%</span>
+                <span class="{_pass_cls}" style="font-family:'JetBrains Mono',monospace;font-size:0.8em">${_pass_pnl:+.2f}</span>
+            </div>
+            <div class="compare-row">
+                <span class="compare-label">Would be BLOCKED</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:0.8em;color:var(--text-primary)">{_would_block}t / {_block_wr:.0f}%</span>
+                <span class="{_block_cls}" style="font-family:'JetBrains Mono',monospace;font-size:0.8em">${_block_pnl:+.2f}</span>
+            </div>'''
+
     recent_paper = ""
     if has_paper:
         last5 = paper_trades[-5:]
@@ -640,6 +665,12 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
             sym = escape(t.get("symbol", "?").replace("/USDT:USDT", ""))
             side = t.get("side", "?").upper()
             reason = escape(t.get("exit_reason") or t.get("reason") or "?")
+            tags = t.get("gate_tags", "")
+            tag_badge = ""
+            if tags and tags != "none":
+                tag_badge = f'<span style="font-size:0.6em;padding:1px 4px;border-radius:2px;background:rgba(248,81,73,0.1);color:#f85149;border:1px solid rgba(248,81,73,0.2);margin-left:3px">{escape(tags)}</span>'
+            elif tags == "none":
+                tag_badge = '<span style="font-size:0.6em;padding:1px 4px;border-radius:2px;background:rgba(63,185,80,0.1);color:#3fb950;border:1px solid rgba(63,185,80,0.2);margin-left:3px">PASS</span>'
             cls = "positive" if pnl > 0 else "negative"
             side_cls = "side-long" if side == "LONG" else "side-short"
             closed_at = t.get("closed_at", 0)
@@ -649,6 +680,7 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
                 <span style="color:var(--text-primary);font-weight:500">{sym}</span>
                 <span class="{cls}" style="font-family:'JetBrains Mono',monospace;font-weight:600">${pnl:+.2f}</span>
                 <span style="color:var(--text-dim);font-size:0.85em">{reason}</span>
+                {tag_badge}
                 <span style="color:var(--text-dim);font-size:0.8em;font-family:'JetBrains Mono',monospace">{time_str}</span>
             </div>'''
     else:
@@ -672,6 +704,7 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
         {_stat_col("Trades", live_today_stats["total"], paper_today_stats["total"])}
         {_stat_col("Win Rate", live_today_stats["win_rate"], paper_today_stats["win_rate"], is_pct=True)}
         {_stat_col("PnL", live_today_stats["total_pnl"], paper_today_stats["total_pnl"], is_pnl=True)}
+        {gate_summary}
         <div class="compare-section-title" style="margin-top:10px">Recent Paper Trades</div>
         {recent_paper}
     </div>'''
@@ -681,7 +714,7 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
 # Mapping from slot_id to strategy name — keep in sync with bot.py
 _SLOT_STRATEGY_MAP = {
     "5m_scalp": "confluence",
-    "5m_mean_revert": "bb_reversion",
+    "5m_mean_revert": "bb_mean_reversion",
     "5m_liq_cascade": "liq_cascade",
 }
 
@@ -955,23 +988,27 @@ def build_content() -> str:
     now = _now_ca().strftime("%I:%M:%S %p")
     date_str = _now_ca().strftime("%b %d, %Y")
 
-    # Read balance snapshots from bot log STATS lines
+    # Read balance snapshots from bot log STATS lines (tail only — avoid full scan)
     balance = 0
     balance_start_of_day = 0
     _log_file = os.path.join(os.path.dirname(__file__), "logs", "bot.log")
     _today_date_str = _now_ca().strftime("%Y-%m-%d")
     if os.path.exists(_log_file):
-        import re as _re2
+        try:
+            _tail_lines = subprocess.check_output(
+                ["tail", "-n", "2000", _log_file], text=True, errors="replace"
+            ).splitlines()
+        except Exception:
+            _tail_lines = []
         _first_today = False
-        with open(_log_file, encoding="utf-8", errors="replace") as _lf2:
-            for _ln in _lf2:
-                _m2 = _re2.search(r'Balance: ([\d.]+) USDT', _ln)
-                if _m2:
-                    _bv = float(_m2.group(1))
-                    balance = _bv
-                    if not _first_today and _today_date_str in _ln:
-                        balance_start_of_day = _bv
-                        _first_today = True
+        for _ln in _tail_lines:
+            _m2 = re.search(r'Balance: ([\d.]+) USDT', _ln)
+            if _m2:
+                _bv = float(_m2.group(1))
+                balance = _bv
+                if not _first_today and _today_date_str in _ln:
+                    balance_start_of_day = _bv
+                    _first_today = True
         if balance_start_of_day == 0:
             balance_start_of_day = balance
 
@@ -1015,21 +1052,19 @@ def build_content() -> str:
     daily_count = len(today_trades)
     daily_wins = sum(1 for t in today_trades if _net_pnl(t) > 0)
     daily_wr = (daily_wins / daily_count * 100) if daily_count > 0 else 0
-    current_balance = state.get("peak_balance", 0)
+    current_balance = balance if balance > 0 else state.get("peak_balance", 0)
     daily_pct = (daily_pnl / (current_balance - daily_pnl) * 100) if has_daily and (current_balance - daily_pnl) > 0 else 0
 
     balance_change = balance - balance_start_of_day
 
-    # Current drawdown from peak
+    # Current drawdown from peak (use actual balance, not cumulative PnL)
     peak_bal = state.get("peak_balance", 0)
-    # Estimate current balance: peak - max_dd + recent trades
-    cumulative = 0
-    running_peak = 0
-    for t in trades:
-        cumulative += _net_pnl(t)
-        running_peak = max(running_peak, cumulative)
-    current_dd = running_peak - cumulative  # current drawdown in $
-    current_dd_pct = (current_dd / peak_bal * 100) if peak_bal > 0 else 0
+    if peak_bal > 0 and current_balance > 0:
+        current_dd = max(0, peak_bal - current_balance)
+        current_dd_pct = (current_dd / peak_bal * 100)
+    else:
+        current_dd = 0
+        current_dd_pct = 0
 
     pf = stats['profit_factor']
     pf_str = f"{pf:.2f}" if pf != float('inf') else "---"
