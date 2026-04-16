@@ -1416,12 +1416,15 @@ class Phmex2Bot:
                     if direction == "short" and buy_ratio > 0.55:
                         logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%}")
                         continue
-                    if direction == "long" and cvd_slope < -0.3:
-                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — CVD slope {cvd_slope:.2f}")
-                        continue
-                    if direction == "short" and cvd_slope > 0.3:
-                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — CVD slope {cvd_slope:.2f}")
-                        continue
+                    # CVD slope gate — carve-out for pullback/reversion (matches live bot line 1037)
+                    _paper_strat = self._extract_strategy_name(signal.reason)
+                    if _paper_strat not in ("htf_confluence_pullback", "bb_mean_reversion"):
+                        if direction == "long" and cvd_slope < -0.3:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — CVD slope {cvd_slope:.2f}")
+                            continue
+                        if direction == "short" and cvd_slope > 0.3:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — CVD slope {cvd_slope:.2f}")
+                            continue
                     if direction == "long" and divergence == "bearish":
                         logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — bearish divergence")
                         continue
@@ -1675,22 +1678,28 @@ class Phmex2Bot:
                     try:
                         recent = self.exchange.client.fetch_my_trades(symbol, limit=10)
                         if recent:
-                            last_trade = recent[-1]
-                            fill = float(last_trade.get("price", 0))
-                            if fill > 0:
-                                exit_price = fill
-                                logger.info(f"[SYNC] {symbol} real exit fill: {exit_price}")
-                            # Sum fees from the most recent reduce-only fill(s)
-                            try:
-                                fee = last_trade.get("fee") or {}
-                                if fee.get("cost") is not None:
-                                    sync_fee = abs(float(fee.get("cost") or 0))
-                                else:
-                                    for f in last_trade.get("fees") or []:
-                                        if f.get("cost") is not None:
-                                            sync_fee += abs(float(f.get("cost") or 0))
-                            except Exception:
-                                pass
+                            # Filter to trades after position entry to avoid picking up the entry fill
+                            entry_ts_ms = int(pos.opened_at * 1000)
+                            close_trades = [tr for tr in recent if (tr.get("timestamp") or 0) > entry_ts_ms]
+                            last_trade = close_trades[-1] if close_trades else None
+                            if last_trade:
+                                fill = float(last_trade.get("price", 0))
+                                if fill > 0:
+                                    exit_price = fill
+                                    logger.info(f"[SYNC] {symbol} real exit fill: {exit_price}")
+                                # Sum fees from the confirmed close trade
+                                try:
+                                    fee = last_trade.get("fee") or {}
+                                    if fee.get("cost") is not None:
+                                        sync_fee = abs(float(fee.get("cost") or 0))
+                                    else:
+                                        for f in last_trade.get("fees") or []:
+                                            if f.get("cost") is not None:
+                                                sync_fee += abs(float(f.get("cost") or 0))
+                                except Exception:
+                                    pass
+                            else:
+                                logger.debug(f"[SYNC] {symbol} no post-entry close trade found yet — using mark price")
                     except Exception:
                         pass
                     logger.info(f"[SYNC] {symbol} closed on exchange (SL/TP triggered) — removing from tracker")
