@@ -62,7 +62,7 @@ REGIME_MULTS = {
 
 # SL floor/cap: 1.2% of entry price, cap at 3x floor
 SL_FLOOR_PCT = 1.2  # percent
-TP_CAP_PCT = 2.15   # max TP distance (matches .env TAKE_PROFIT_PERCENT)
+TP_CAP_PCT = 1.6    # max TP distance (matches .env TAKE_PROFIT_PERCENT)
 
 # Strategy time exits — values in CYCLES (15s each) from live bot.
 # Convert to 1m candles: candles = cycles / 4
