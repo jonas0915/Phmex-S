@@ -1175,8 +1175,24 @@ class Phmex2Bot:
                     self.risk.open_position(symbol, fill_price, margin, side=direction, atr=atr_val, regime=regime, cycle=self.cycle_count, strategy=strat_name)
                     pos = self.risk.positions[symbol]
                     fill_amount = self._extract_fill_amount(order, pos.amount)
+                    actual_margin = (fill_amount * fill_price) / Config.LEVERAGE
+                    _min_margin = float(os.getenv("MIN_TRADE_MARGIN", "10.0"))
+                    if actual_margin < _min_margin:
+                        # Partial fill below minimum — close immediately to free the slot
+                        logger.warning(f"[SKIP] {symbol} partial fill ${actual_margin:.4f} < ${_min_margin:.2f} min — closing to free slot")
+                        self.exchange.cancel_open_orders(symbol)
+                        close_ok = (
+                            self.exchange.close_long(symbol, fill_amount)
+                            if direction == "long"
+                            else self.exchange.close_short(symbol, fill_amount)
+                        )
+                        if close_ok:
+                            self.risk.close_position(symbol, fill_price, "min_margin_skip")
+                        else:
+                            logger.error(f"[SKIP] {symbol} emergency close failed — leaving in tracker for exit loop")
+                        continue
                     pos.amount = fill_amount
-                    pos.margin = (fill_amount * fill_price) / Config.LEVERAGE  # actual margin, not requested
+                    pos.margin = actual_margin
                     pos.entry_strength = signal.strength
                     pos.confidence = confidence
                     pos.ensemble_layers = ",".join(layers)
