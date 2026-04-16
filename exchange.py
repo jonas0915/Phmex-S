@@ -222,7 +222,10 @@ class Exchange:
             mid = len(cvd_values) // 2
             first_half_avg = sum(cvd_values[:mid]) / mid if mid > 0 else 0
             second_half_avg = sum(cvd_values[mid:]) / (len(cvd_values) - mid) if len(cvd_values) > mid else 0
-            cvd_slope = second_half_avg - first_half_avg
+            total_volume = sum(
+                abs(t.get("amount", 0) * t.get("price", 0)) for t in trades
+            )
+            cvd_slope = (second_half_avg - first_half_avg) / total_volume if total_volume > 0 else 0.0
 
             # Detect divergence: compare price direction vs CVD direction
             # Use first and last trade prices
