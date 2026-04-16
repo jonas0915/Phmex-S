@@ -1176,7 +1176,7 @@ class Phmex2Bot:
                     pos = self.risk.positions[symbol]
                     fill_amount = self._extract_fill_amount(order, pos.amount)
                     actual_margin = (fill_amount * fill_price) / Config.LEVERAGE
-                    _min_margin = float(os.getenv("MIN_TRADE_MARGIN", "10.0"))
+                    _min_margin = float(os.getenv("MIN_TRADE_MARGIN", "10.0")) * 0.5
                     if actual_margin < _min_margin:
                         # Partial fill below minimum — close immediately to free the slot
                         logger.warning(f"[SKIP] {symbol} partial fill ${actual_margin:.4f} < ${_min_margin:.2f} min — closing to free slot")
