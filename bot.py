@@ -1417,7 +1417,7 @@ class Phmex2Bot:
                         logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%}")
                         continue
                     # CVD slope gate — carve-out for pullback/reversion (matches live bot line 1037)
-                    _paper_strat = self._extract_strategy_name(signal.reason)
+                    _paper_strat = _extract_strategy_name(signal.reason)
                     if _paper_strat not in ("htf_confluence_pullback", "bb_mean_reversion"):
                         if direction == "long" and cvd_slope < -0.3:
                             logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — CVD slope {cvd_slope:.2f}")
