@@ -53,6 +53,82 @@ def strip_ansi(text: str) -> str:
     return ANSI_RE.sub('', text)
 
 
+def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
+    """Parse bot.log for gate rejection counts over the last max_age_hours."""
+    import re as _re
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    counts = {}
+    label_map = [
+        ("Tape gate",      "[TAPE GATE]"),
+        ("OB gate",        "[OB GATE]"),
+        ("Ensemble <4/7",  "ENSEMBLE SKIP"),
+        ("Time block",     "time_block"),
+        ("ADX too low",    "ADX"),
+        ("Low volume",     "low vol"),
+        ("No confluence",  "No confluence"),
+        ("Choppy market",  "Choppy"),
+        ("Cooldown",       "cooldown"),
+        ("QUIET regime",   "QUIET regime"),
+        ("Divergence",     "divergence"),
+    ]
+    try:
+        with open(log_file, "r", errors="replace") as fh:
+            for line in fh:
+                if not any(kw.lower() in line.lower() for _, kw in label_map):
+                    continue
+                ts_match = _re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                if ts_match:
+                    try:
+                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        if ts < cutoff:
+                            continue
+                    except ValueError:
+                        pass
+                for label, keyword in label_map:
+                    if keyword.lower() in line.lower():
+                        counts[label] = counts.get(label, 0) + 1
+                        break
+    except (FileNotFoundError, PermissionError):
+        pass
+    return dict(sorted(counts.items(), key=lambda x: -x[1]))
+
+
+def _reconcile_status(max_age_hours: int = 24) -> dict:
+    """Parse reconcile.log for CLEAN streak and last drift message."""
+    import re as _re
+    from datetime import datetime, timedelta, timezone
+    import os as _os
+    rec_log = _os.path.expanduser("~/Library/Logs/Phmex-S/reconcile.log")
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    results = []
+    try:
+        with open(rec_log, "r", errors="replace") as fh:
+            for line in fh:
+                if "discrepanc" not in line.lower() and "CLEAN" not in line and "DRIFT" not in line:
+                    continue
+                ts_match = _re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                if ts_match:
+                    try:
+                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        if ts >= cutoff:
+                            results.append(line.strip())
+                    except ValueError:
+                        pass
+    except (FileNotFoundError, PermissionError):
+        return {"streak": 0, "last": "reconcile.log not found", "drifts": []}
+    clean_streak = 0
+    drifts = []
+    for line in reversed(results):
+        if "Total discrepancies: 0" in line or "CLEAN" in line:
+            clean_streak += 1
+        else:
+            drifts.append(line)
+            break
+    last = results[-1] if results else "No reconcile runs in last 24h"
+    return {"streak": clean_streak, "last": last, "drifts": drifts[:3]}
+
+
 def _net_pnl(t: dict) -> float:
     """Return net_pnl when present (post-fees), else fall back to gross pnl_usdt."""
     n = t.get("net_pnl")
@@ -524,6 +600,43 @@ def _build_reconcile_card() -> str:
                 <span class="{'negative' if abs(max_drift) > 0.05 else ''}">${max_drift:+.2f}</span>
             </div>
         </div>
+    </div>'''
+
+
+def _build_observability_panel() -> str:
+    """Build Phase 2c observability HTML panel."""
+    from html import escape as _esc
+    # --- Gates ---
+    stats = _gate_stats(LOG_FILE)
+    if stats:
+        total_blocks = sum(stats.values())
+        gate_rows = ""
+        for label, count in list(stats.items())[:8]:
+            pct = count / total_blocks * 100 if total_blocks else 0
+            gate_rows += f'<tr><td style="padding:4px 8px;font-size:13px">{_esc(label)}</td><td style="padding:4px 8px;text-align:right;font-family:monospace">{count:,}</td><td style="padding:4px 8px;text-align:right;color:#888;font-size:12px">{pct:.0f}%</td></tr>'
+        gates_html = f'<div style="margin-bottom:8px;color:#888;font-size:12px">{total_blocks:,} total blocks (last 24h)</div><div class="table-wrap"><table><thead><tr><th>Gate</th><th style="text-align:right">Blocks</th><th style="text-align:right">%</th></tr></thead><tbody>{gate_rows}</tbody></table></div>'
+    else:
+        gates_html = '<div style="color:#888;font-size:13px">No gate rejections found in log</div>'
+
+    # --- Reconcile ---
+    rec = _reconcile_status()
+    streak_color = "#4caf50" if rec["streak"] >= 4 else "#ff9800" if rec["streak"] >= 1 else "#f44336"
+    streak_label = f'<span style="color:{streak_color};font-weight:700">{rec["streak"]} CLEAN</span>'
+    if rec["drifts"]:
+        drift_html = "".join(f'<div style="color:#ff9800;font-size:12px">{_esc(d)}</div>' for d in rec["drifts"])
+    else:
+        drift_html = '<div style="color:#4caf50;font-size:12px">No drift in last 24h</div>'
+    last_run_html = f'<div style="color:#888;font-size:12px;margin-top:4px">{_esc(rec["last"][:120])}</div>'
+
+    return f'''<div class="glass-card dash-item" data-id="obs-gates">
+        <h2>Gate Rejection Breakdown (24h)</h2>
+        {gates_html}
+    </div>
+    <div class="glass-card dash-item" data-id="obs-reconcile" style="margin-top:12px">
+        <h2>Reconcile Status</h2>
+        <div style="margin-bottom:8px">Streak: {streak_label}</div>
+        {drift_html}
+        {last_run_html}
     </div>'''
 
 
@@ -1162,6 +1275,7 @@ def build_content() -> str:
             {_build_watchlist_html(watchlist)}
         </div>
         {_build_reconcile_card()}
+        {_build_observability_panel()}
         {paper_html}
     </div>
 </div>
