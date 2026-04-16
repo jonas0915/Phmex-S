@@ -33,16 +33,17 @@ from strategies import Signal, TradeSignal, adaptive_strategy
 TAKER_FEE_PCT = 0.06       # 0.06% per side
 SLIPPAGE_PCT = 0.05         # 0.05% simulated slippage
 LEVERAGE = 10
-TRADE_SIZE_USD = 15.0       # margin per trade
-STARTING_BALANCE = 37.0     # approximate current balance
-SCALP_MIN_STRENGTH = 0.70
+TRADE_SIZE_USD = 10.0       # margin per trade (matches .env TRADE_AMOUNT_USDT)
+STARTING_BALANCE = 74.38    # approximate current balance (updated 2026-04-15)
+SCALP_MIN_STRENGTH = 0.75   # matches live bot min_strength (raised Mar 20)
 MAX_OPEN_TRADES = 3
 
 DEFAULT_PAIRS = [
-    "BTC/USDT:USDT", "ETH/USDT:USDT", "SOL/USDT:USDT", "DOGE/USDT:USDT",
-    "XRP/USDT:USDT", "WIF/USDT:USDT", "NEAR/USDT:USDT", "SUI/USDT:USDT",
-    "RENDER/USDT:USDT", "FET/USDT:USDT", "ARB/USDT:USDT", "OP/USDT:USDT",
-    "INJ/USDT:USDT", "TIA/USDT:USDT",
+    # SOL, NEAR, FET, OP, TIA, TRUMP, BNB blacklisted — excluded from backtest
+    "BTC/USDT:USDT", "ETH/USDT:USDT", "DOGE/USDT:USDT",
+    "XRP/USDT:USDT", "WIF/USDT:USDT", "SUI/USDT:USDT",
+    "RENDER/USDT:USDT", "ARB/USDT:USDT",
+    "INJ/USDT:USDT", "LINK/USDT:USDT",
 ]
 DEFAULT_DAYS = 7
 DEFAULT_TIMEFRAME = "1m"
