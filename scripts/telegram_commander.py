@@ -188,6 +188,122 @@ async def cmd_overwatch(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Overwatch failed: {e}", parse_mode="HTML")
 
 
+async def cmd_gates(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Top gate rejection reasons from last 24h."""
+    if not check_auth(update):
+        return
+    import re as _re
+    from datetime import datetime, timedelta, timezone
+    log_file = os.path.join(BOT_DIR, "logs", "bot.log")
+    label_map = [
+        ("Tape gate",      "[TAPE GATE]"),
+        ("OB gate",        "[OB GATE]"),
+        ("Ensemble <4/7",  "ENSEMBLE SKIP"),
+        ("Time block",     "time_block"),
+        ("ADX too low",    "ADX"),
+        ("Low volume",     "low vol"),
+        ("No confluence",  "No confluence"),
+        ("Choppy",         "Choppy"),
+        ("Cooldown",       "cooldown"),
+    ]
+    counts = {}
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    try:
+        with open(log_file, "r", errors="replace") as fh:
+            for line in fh:
+                if not any(kw.lower() in line.lower() for _, kw in label_map):
+                    continue
+                ts_m = _re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                if ts_m:
+                    try:
+                        ts = datetime.strptime(ts_m.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        if ts < cutoff:
+                            continue
+                    except ValueError:
+                        pass
+                for label, kw in label_map:
+                    if kw.lower() in line.lower():
+                        counts[label] = counts.get(label, 0) + 1
+                        break
+    except FileNotFoundError:
+        await update.message.reply_text("bot\u00b7log not found")
+        return
+    if not counts:
+        await update.message.reply_text("No gate rejections in last 24h")
+        return
+    total = sum(counts.values())
+    lines_out = [f"\U0001f6ab Gate Blocks (24h) \u2014 {total:,} total\n"]
+    for label, cnt in sorted(counts.items(), key=lambda x: -x[1])[:8]:
+        pct = cnt / total * 100
+        lines_out.append(f"  {label}: {cnt:,} ({pct:.0f}%)")
+    await update.message.reply_text("\n".join(lines_out))
+
+
+async def cmd_fees(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Fee total today + reconcile CLEAN streak."""
+    if not check_auth(update):
+        return
+    from datetime import datetime, timezone
+    state_file = os.path.join(BOT_DIR, "trading_state.json")
+    fee_today = 0.0
+    try:
+        with open(state_file) as f:
+            state = json.load(f)
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        for t in state.get("closed_trades", []):
+            opened = t.get("opened_at", 0)
+            if datetime.fromtimestamp(opened, tz=timezone.utc).strftime("%Y-%m-%d") == today_str:
+                fee_today += abs(t.get("fees_usdt", 0) or 0)
+    except Exception:
+        pass
+    rec_log = os.path.expanduser("~/Library/Logs/Phmex-S/reconcile.log")
+    streak = 0
+    try:
+        with open(rec_log, "r", errors="replace") as fh:
+            lines_r = fh.readlines()
+        for line in reversed(lines_r):
+            if "Total discrepancies: 0" in line or "CLEAN" in line:
+                streak += 1
+            else:
+                break
+    except FileNotFoundError:
+        streak = -1
+    streak_str = f"{streak} CLEAN" if streak >= 0 else "log not found"
+    await update.message.reply_text(f"\U0001f4b8 Fees\nToday: ${fee_today:.4f}\nReconcile streak: {streak_str}")
+
+
+async def cmd_drift(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Last reconcile run result + drift alerts."""
+    if not check_auth(update):
+        return
+    import re as _re
+    from datetime import datetime, timedelta, timezone
+    rec_log = os.path.expanduser("~/Library/Logs/Phmex-S/reconcile.log")
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    results = []
+    try:
+        with open(rec_log, "r", errors="replace") as fh:
+            for line in fh:
+                if "discrepanc" not in line.lower() and "CLEAN" not in line and "DRIFT" not in line:
+                    continue
+                ts_m = _re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                if ts_m:
+                    try:
+                        ts = datetime.strptime(ts_m.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        if ts >= cutoff:
+                            results.append(line.strip())
+                    except ValueError:
+                        pass
+    except FileNotFoundError:
+        await update.message.reply_text("reconcile\u00b7log not found")
+        return
+    if not results:
+        await update.message.reply_text("No reconcile runs in last 24h")
+        return
+    msg = "\U0001f50d Reconcile (24h)\n" + "\n".join(r[:100] for r in results[-5:])
+    await update.message.reply_text(msg)
+
+
 def main():
     if not TOKEN or not CHAT_ID:
         print("ERROR: TELEGRAM_TOKEN and TELEGRAM_CHAT_ID must be set in .env")
@@ -224,6 +340,9 @@ def main():
         app.add_handler(CommandHandler("pause", cmd_pause))
         app.add_handler(CommandHandler("resume", cmd_resume))
         app.add_handler(CommandHandler("overwatch", cmd_overwatch))
+        app.add_handler(CommandHandler("gates", cmd_gates))
+        app.add_handler(CommandHandler("fees", cmd_fees))
+        app.add_handler(CommandHandler("drift", cmd_drift))
 
         logger.info("Telegram Commander started")
         print("Telegram Commander started. Polling...")
