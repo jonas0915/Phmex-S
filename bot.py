@@ -182,6 +182,7 @@ class Phmex2Bot:
         self._regime_pause_until: float = 0  # timestamp when regime pause expires
         self._htf_cache: dict[str, tuple] = {}  # symbol -> (DataFrame, fetch_timestamp) for 1h candles
         self._funding_cache: dict[str, tuple] = {}  # symbol -> (data, fetch_timestamp) for funding rates
+        self._divergence_cooldown: dict[str, dict] = {}  # symbol -> {"blocked_at": float, "clean_cycles": int}
 
         # Strategy slots framework — independent trading units (additive, main loop still uses self.risk)
         self.slots = [
@@ -1012,6 +1013,21 @@ class Phmex2Bot:
                     )
                     continue
 
+                # Divergence cooldown — require 3 clean cycles OR 10 min after a divergence block
+                if symbol in self._divergence_cooldown:
+                    _dc = self._divergence_cooldown[symbol]
+                    _dc_elapsed = time.time() - _dc["blocked_at"]
+                    if _dc_elapsed >= 600 or _dc["clean_cycles"] >= 3:
+                        del self._divergence_cooldown[symbol]  # cooldown expired, allow through
+                    else:
+                        # Count clean cycles (cycles where divergence is absent for this symbol)
+                        if not (flow and flow.get("divergence")):
+                            self._divergence_cooldown[symbol]["clean_cycles"] += 1
+                        logger.info(
+                            f"[DIVERGENCE COOLDOWN] {symbol} {direction} blocked — "
+                            f"{_dc['clean_cycles']}/3 clean cycles, {_dc_elapsed:.0f}s elapsed")
+                        continue
+
                 # Order flow / tape veto — block entry if real money strongly disagrees
                 if not (flow and flow.get("trade_count", 0) > 20):
                     logger.info(f"[TAPE GATE SKIP] {symbol} {direction} — low volume (trade_count={flow.get('trade_count', 0) if flow else 'no_flow'}) — tape gates inactive")
@@ -1055,9 +1071,11 @@ class Phmex2Bot:
                             logger.info(f"[TAPE GATE] {symbol} SHORT blocked — CVD slope {cvd_slope:.2f} (buying accelerating)")
                             continue
                     if direction == "long" and divergence == "bearish":
+                        self._divergence_cooldown[symbol] = {"blocked_at": time.time(), "clean_cycles": 0}
                         logger.info(f"[TAPE GATE] {symbol} LONG blocked — bearish divergence (price up, sellers gaining)")
                         continue
                     if direction == "short" and divergence == "bullish":
+                        self._divergence_cooldown[symbol] = {"blocked_at": time.time(), "clean_cycles": 0}
                         logger.info(f"[TAPE GATE] {symbol} SHORT blocked — bullish divergence (price down, buyers gaining)")
                         continue
                     if direction == "long" and lt_bias < -0.3:
@@ -1074,11 +1092,13 @@ class Phmex2Bot:
                 if flow and flow.get("divergence"):
                     _div = flow["divergence"]
                     if direction == "long" and _div == "bearish":
+                        self._divergence_cooldown[symbol] = {"blocked_at": time.time(), "clean_cycles": 0}
                         self._log_gotaway("divergence_bearish", symbol, direction, strat_name,
                                           signal.strength, confidence, price, ob, flow, df)
                         logger.info(f"[DIVERGENCE GATE] {symbol} LONG blocked — bearish divergence (always-on)")
                         continue
                     if direction == "short" and _div == "bullish":
+                        self._divergence_cooldown[symbol] = {"blocked_at": time.time(), "clean_cycles": 0}
                         self._log_gotaway("divergence_bullish", symbol, direction, strat_name,
                                           signal.strength, confidence, price, ob, flow, df)
                         logger.info(f"[DIVERGENCE GATE] {symbol} SHORT blocked — bullish divergence (always-on)")
