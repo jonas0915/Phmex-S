@@ -1,82 +1,92 @@
 # Session Handoff — Resume Here
 
-**Last session ended:** 2026-04-14 ~10:30 PM PT
-**Session grade:** A — Phase 2 v2 spec drafted + audited, TP/AE tightened, trailing-stop mistag fixed, 3 commits, bot restarted clean
-**Bot PID:** 24017 (restarted 2026-04-14 10:26 PM PT)
-**Balance at restart:** $69.97 USDT (was $74.66 in earlier report; difference reflects open-position MTM)
+**Last session ended:** 2026-04-16 ~10:30 PM PT
+**Session grade:** A- — major entry gate hardening + scanner redesign shipped, 7 commits
+**Bot PID:** 30967 (restarted 2026-04-16 10:18 PM PT)
+**Balance at session end:** ~$72.82 USDT (peak $76.24, drawdown 4.5%)
 
 ---
 
 ## What was deployed this session
 
-### Code commits
+### Code commits (tonight)
+1. **`18fe372`** feat: block 2 AM PT (UTC 9) — 26% WR, -$4.22 all-time
+2. **`9c8dfca`** feat: soft tape gate — block buy_ratio <40%/>60% when trade_count 5-20
+3. **`0cf8072`** feat: divergence gate cooldown — 3 clean cycles or 10 min before re-entry
+4. **`75ac65a`** feat: add _compute_history_scores() + scanner config updates
+5. **`f2bc79d`** feat: rewrite volatility_scan() with composite history x market scoring
+6. **`1c8101b`** feat: remove daily symbol cap gate, add RATE WATCH monitoring log
+7. **`fe362fd`** config: scanner top_n 5→8, min_volume 10M→3M, add min_history_trades=10
 
-1. **`6eb243d` chore: migrate overwatch LLM to claude-sonnet-4-6** — `claude-sonnet-4-20250514` retires 2026-07-14
-2. **`5982b8c` docs: Phase 2 recursive-improvement v1 spec + audit-driven v2 rewrite**
-3. **`76540af` fix: tag trailing-stop exits as trailing_stop (not take_profit/stop_loss)** — extends BUG-A fix from lessons.md:219-222
-
-### Live config changes (`.env`, uncommitted)
-| Setting | From | To | Effect |
-|---|---|---|---|
-| TAKE_PROFIT_PERCENT | 2.1 (21% ROI) | 1.6 (16% ROI) | TP fires ~2× more often |
-| ADVERSE_EXIT_THRESHOLD | -5.0 | -3.0 | Adverse exit tightens; expected +$9.42 / 13d |
-
-### Pre-existing `.env` changes that ALSO landed at restart (Jonas confirmed intentional)
-- TRADE_AMOUNT_USDT 5.0 → 10.0 (matches CLAUDE.md doc)
-- DAILY_SYMBOL_CAP=3 added (matches config.py default)
-- SOL/USDT:USDT added to SCANNER_BLACKLIST
-
----
-
-## Phase 2 spec status
-
-- **v1** (REVISE verdict, audit evidence): `docs/superpowers/specs/2026-04-14-recursive-improvement-phase2-design.md`
-- **v2** (ship-ready draft): `docs/superpowers/specs/2026-04-14-recursive-improvement-phase2-design-v2.md`
-- **Audit findings durable record:** `memory/reference_phase2_v2_audit.md`
-
-### Open decisions before Phase 2a kicks off
-1. **Phase ordering** — ship corrected 2c (observability + dashboard lockdown) first while C2/C3/I9 bot fixes land in parallel? Or strict prereq ordering (fix C2/C3/I9 first)?
-2. **Autonomous mutation cap** — v2 proposes 1/day + 2/week. Tighten?
-3. **Backtester sample floor** — v2 proposes 30 per variant. Bump to 50?
-4. **Dashboard lockdown** — flip web_dashboard.py:42 to 127.0.0.1 (1-line) or add Basic-Auth?
-
-### Prereq status (verified 2026-04-14)
-- **C1 LANDED** (commit 2c89ad8). **C2/C3/I9 NOT LANDED** (block Phase 2a fee reduction). I18 defanged by slot removal.
-- **Reconcile CLEAN streak: 5 runs** (Phase 2a precondition met)
-- **Dashboard bound 0.0.0.0 zero-auth** (must lock before adding sensitive panels)
+### Changes summary
+| Change | File | What |
+|---|---|---|
+| 2 AM PT time block | bot.py:1091 | UTC 9 added to `_BLOCKED_HOURS_UTC` — 26% WR, -$4.22 all-time |
+| Soft tape gate | bot.py:~1017 | buy_ratio <40%/>60% blocks entry when trade_count 5-20 |
+| Divergence cooldown | bot.py:1014 + init | `_divergence_cooldown` dict — 3 clean cycles OR 10 min before re-entry |
+| History score helper | scanner.py | `_compute_history_scores()` — sigmoid(avg_net_pnl × 10) per symbol |
+| Composite scanner | scanner.py | `volatility_scan()` rewritten — composite = history × market score |
+| Daily cap removed | bot.py:894 | Hard cap gate replaced with `[RATE WATCH]` monitoring log at 4+ entries |
+| Scanner params | .env | SCANNER_TOP_N 5→8, SCANNER_MIN_VOLUME $10M→$3M, SCANNER_MIN_HISTORY_TRADES=10 |
 
 ---
 
-## What to monitor next 24-48h
+## New scanner — what to watch
 
-1. **Trailing stop fires now appear as `trailing_stop` exit_reason** — first report tomorrow should show non-zero bucket. If still zero, trail isn't firing in the new bot session.
-2. **Adverse_exit count** — should drop ~30-40% with -3% threshold (was 38/85 = 45%)
-3. **TP fire rate** — expect ~2× more frequent; today's 0% (hard 21% TP never fired in Sentinel) should become non-zero
-4. **Net PnL trend** — tighter TP shrinks avg winner; watch for regression
-5. **TRADE_AMOUNT_USDT 2× change** — at $10 margin × 10x = $100 notional per trade; today's −$0.70 net day at 2× would have been ~−$1.40
+First scan result (10:18 PM PT):
+- **New symbols in rotation**: ORDI, XLM, AAVE, TAO (were never in the old watchlist)
+- **Dropped**: LINK (low history score + flat market)
+- **Scores are all very small (0.001–0.012)** because market was flat tonight (-0.5% BTC). `market_score = change_norm × vol_rank`, and vol_rank is normalized by BTC's $369M volume, making smaller caps near zero. This is correct behavior on flat days — on active days scores will spread more.
+- **SUI hist=0.22** — accurately reflects its poor track record
+- **ORDI had +91.8% 24h** but scored only 0.006 due to tiny vol_rank ($4.7M vs $369M BTC)
 
----
-
-## Outstanding follow-ups
-
-- **`.env` is tracked in git** despite being in .gitignore. Future hygiene task: `git rm --cached .env` (Jonas's call, not urgent — keys already rotated 04-13).
-- **Phase 1 deliverables uncommitted in git** — `scripts/auto_lifecycle.py`, `scripts/telegram_commander.py`, `scripts/reconcile_phemex.py` etc. are in prod but never committed. Worth a dedicated "backfill Phase 1 into git" session.
-- **`backtest.py:65` TP_CAP_PCT=2.15 stale** vs `.env` 1.6. Non-blocking for live; affects future backtests only.
-- **MEMORY.md reference_bot_architecture.md:31** still shows adverse_exit at -5% — needs update to -3% post next session reconcile.
+**Monitor next 24-48h:**
+1. Do new symbols (ORDI, XLM, AAVE, TAO) generate valid signals?
+2. Do scores spread meaningfully on a volatile day?
+3. Any `[RATE WATCH]` lines — how often does a symbol exceed 4 entries/day?
+4. Gate fixes (soft tape, divergence cooldown) — do they reduce adverse_exits?
 
 ---
 
-## Active monitoring (carried from prior sessions, still relevant)
+## Root causes found in Apr 16 trade audit
+
+1. **Tape gate inactive overnight** — trade_count ≤ 20 during 12-3 AM PT = gate always skipped
+2. **Divergence gate cleared in 1 cycle** — bot re-entered immediately after repeated blocks
+3. **Daily cap burned before daylight** — XRP/SUI/LINK hit 3/3 by 3:29 AM PT, zero daytime trades
+4. **Scanner locked to 5 symbols** — BTC/ETH had ADX 13-20 (no signals), capped symbols locked out
+
+---
+
+## Phase 2 status (unchanged)
+
+### Next: Phase 2a (fee reduction)
+- All prereqs met (C1/C2/C3/I9 landed)
+- Verify maker/taker ratio from exchange order history
+- Completion gate: fee rate ≤ 50% of pre-deploy rate over 48h
+
+### Open decisions (still pending)
+- Phase 2b regime-aware slot gating
+- Phase 2d changelog writer
+- Autonomous mutation cap: 1/day + 2/week (TBD)
+
+---
+
+## Outstanding follow-ups (carried forward)
+
+- **`.env` tracked in git** — `git rm --cached .env` needed (Jonas's call, keys rotated 04-13)
+- **backfill_fees.py** — has hardcoded machine-specific paths, not committed yet
+- **Phase 2a** — fee reduction work unblocked
+- **Scanner vol_rank tuning** — BTC dominates vol_rank; may need log normalization after a few days of data
+- **Fee data in trading_state.json** — `fee_usdt` field is 0 for all 417 trades. Real net loss is worse than reported. Root cause unknown.
+
+---
+
+## Active monitoring (carried forward)
+- `[RATE WATCH]` log lines — new, monitors high-frequency symbol entries
+- `[TAPE GATE SOFT]` log lines — new, fires on thin tape with extreme buy ratio
+- `[DIVERGENCE COOLDOWN]` log lines — new, fires when divergence cooldown active
 - `[TIMEOUT]` log entries (DNS wrap from 04-10)
-- `[EARLY EXIT] peak drawdown trigger` (Signal #4 from 04-10)
 - Maker fill rate (postOnly fix from 04-09)
 - Orphan-position 3-layer defense (live since 04-13)
-- Overwatch Check #12 (-30%/-50% drawdown alert)
-- Overwatch model now `claude-sonnet-4-6` (next 4h run picks up)
-
----
-
-## Today's trading summary (from morning report — pre-restart)
-- 8 trades, 5W/3L, 62.5% WR
-- Net PnL −$0.70 (gross −$0.39, fees $0.30)
-- Paper ADX+SMA+VWAP slot +$2.03 vs live −$0.70 → reinforces Phase 2b regime gating priority
+- Overwatch hourly health checks
+- Reconcile every 15min

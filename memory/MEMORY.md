@@ -1,6 +1,6 @@
 # Memory Index
 
-- **[🟢 SESSION HANDOFF](SESSION_HANDOFF.md) — START HERE next session. Bot restarted PID 24017 with TP 16% ROI + adverse -3% ROI + trailing-stop mistag fix. Phase 2 v2 spec drafted; C2/C3/I9 bot fixes still block Phase 2a fee work.**
+- **[🟢 SESSION HANDOFF](SESSION_HANDOFF.md) — START HERE next session. Bot PID 30967 (restarted Apr 16 10:18 PM PT). 7 commits: 2AM PT block, soft tape gate, divergence cooldown, performance-weighted scanner (8 symbols, composite scoring), daily cap removed. Phase 2a unblocked.**
 - **TP/Adverse tightened (2026-04-14)** — TAKE_PROFIT_PERCENT 2.1→1.6 (TP fires ~2× more often); ADVERSE_EXIT_THRESHOLD -5.0→-3.0 (expected +$9.42/13d).
 - **Trailing-stop mistag fixed (2026-04-14)** — risk_manager.py:668-679 now emits `trailing_stop` exit_reason; notifier.py adds 🎯 TRAILING STOP label. Extends BUG-A fix from lessons.md:219-222.
 - [Phase 2 v2 Audit](reference_phase2_v2_audit.md) — Audit of Phase 2 spec, v1→v2 changes, prereq status. Read before resuming Phase 2.
