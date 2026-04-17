@@ -60,8 +60,9 @@ class Config:
 
     # Dynamic scanner
     SCANNER_ENABLED = os.getenv("SCANNER_ENABLED", "true").lower() == "true"
-    SCANNER_TOP_N = int(os.getenv("SCANNER_TOP_N", "5"))           # top N gainers to trade
-    SCANNER_MIN_VOLUME = float(os.getenv("SCANNER_MIN_VOLUME", "5000000"))  # min 24h USDT volume
+    SCANNER_TOP_N = int(os.getenv("SCANNER_TOP_N", "8"))            # top N symbols to trade
+    SCANNER_MIN_VOLUME = float(os.getenv("SCANNER_MIN_VOLUME", "3000000"))  # min 24h USDT volume
+    SCANNER_MIN_HISTORY_TRADES = int(os.getenv("SCANNER_MIN_HISTORY_TRADES", "10"))  # min trades before history score applies
     SCANNER_REFRESH_CYCLES = int(os.getenv("SCANNER_REFRESH_CYCLES", "100"))  # refresh every N cycles
     SCANNER_BLACKLIST = [s.strip() for s in os.getenv("SCANNER_BLACKLIST", "").split(",") if s.strip()]
 
@@ -77,5 +78,3 @@ class Config:
             raise ValueError("TRADE_AMOUNT_PERCENT must be between 0 and 100")
         if cls.MAX_OPEN_TRADES < 1:
             raise ValueError("MAX_OPEN_TRADES must be at least 1")
-        if cls.DAILY_SYMBOL_CAP < 1:
-            raise ValueError("DAILY_SYMBOL_CAP must be at least 1")

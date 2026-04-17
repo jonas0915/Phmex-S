@@ -3,6 +3,8 @@ Phmex2 Volume Scanner
 Continuously scans Phemex USDT perpetuals for the highest-volume pairs.
 Ranks by 24h turnover, applies spread filter, returns top N.
 """
+import json
+import math
 import time
 import threading
 import ccxt
@@ -10,6 +12,45 @@ from config import Config
 from logger import setup_logger
 
 logger = setup_logger()
+
+
+def _compute_history_scores(state_path: str = "trading_state.json",
+                             min_trades: int = None) -> dict[str, float]:
+    """
+    Load trading_state.json and compute a history score per symbol.
+    Returns {symbol: score} only for symbols with >= min_trades closed live trades.
+    Score = sigmoid(avg_net_pnl_per_trade * 10), maps to [0,1] with 0.5 at breakeven.
+    Symbols with < min_trades are absent — caller uses 0.5 (neutral) as default.
+    """
+    if min_trades is None:
+        min_trades = Config.SCANNER_MIN_HISTORY_TRADES
+    try:
+        with open(state_path) as f:
+            state = json.load(f)
+    except Exception as e:
+        logger.warning(f"[SCANNER] Could not load {state_path} for history scores: {e}")
+        return {}
+
+    # Accumulate per-symbol net PnL from closed live trades only
+    symbol_pnl: dict[str, list[float]] = {}
+    for t in state.get("closed_trades", []):
+        if t.get("is_paper"):
+            continue
+        sym = t.get("symbol")
+        if not sym:
+            continue
+        net = (t.get("pnl_usdt") or 0.0) - (t.get("fee_usdt") or 0.0)
+        symbol_pnl.setdefault(sym, []).append(net)
+
+    scores: dict[str, float] = {}
+    for sym, pnl_list in symbol_pnl.items():
+        if len(pnl_list) < min_trades:
+            continue
+        avg = sum(pnl_list) / len(pnl_list)
+        scores[sym] = 1.0 / (1.0 + math.exp(-10.0 * avg))
+
+    return scores
+
 
 # Background scanner state
 _scan_lock = threading.Lock()
