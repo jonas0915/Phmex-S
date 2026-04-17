@@ -1084,11 +1084,12 @@ class Phmex2Bot:
                     continue
 
                 # Time-of-day filter: block entries during toxic PT hours (PDT = UTC-7)
-                # Blocked PT hours → UTC (verified Apr 10, 395-trade analysis):
-                #   10 AM-1 PM PT (28% WR/-$12.17)    → UTC 17,18,19,20
-                #   5-7 PM PT (26% WR/-$16.11)        → UTC 0,1,2
-                # Open: 12-10 AM, 2-5 PM, 8 PM-12 AM PT
-                _BLOCKED_HOURS_UTC = {0, 1, 2, 17, 18, 19, 20}
+                # Blocked PT hours → UTC (verified Apr 10–16, 417-trade analysis):
+                #   2 AM PT   (26% WR/-$4.22 all-time)    → UTC 9
+                #   10 AM-1 PM PT (28% WR/-$12.17)        → UTC 17,18,19,20
+                #   5-7 PM PT (26% WR/-$16.11)            → UTC 0,1,2
+                # Open: 12-2 AM, 3-10 AM, 2-5 PM, 8 PM-12 AM PT
+                _BLOCKED_HOURS_UTC = {0, 1, 2, 9, 17, 18, 19, 20}
                 _utc_hour = datetime.datetime.now(datetime.timezone.utc).hour
                 _pt_hour = (_utc_hour - 7) % 24
                 if _utc_hour in _BLOCKED_HOURS_UTC:
