@@ -121,20 +121,24 @@ def scan_top_gainers(client, top_n: int = None, min_volume: float = None) -> lis
 
 def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list[str]:
     """
-    Volume-based scan — ranks all USDT perpetuals by 24h volume.
-    Applies spread filter to reject illiquid pairs.
-    Returns top_n symbols by highest 24h volume.
+    Performance-weighted scan — ranks USDT perpetuals by composite score.
+    composite = history_score x market_score
+    history_score: sigmoid(avg_net_pnl) from trading_state.json (neutral 0.5 if < min_trades)
+    market_score:  abs(change_24h)/15 x (symbol_volume/max_volume) — movement x liquidity
+    Fallback: if all market scores are 0, uses history_score x vol_rank only.
     """
     top_n = top_n or Config.SCANNER_TOP_N
     min_volume = min_volume or Config.SCANNER_MIN_VOLUME
+    pool_size = top_n * 4  # wider candidate pool for scoring
 
-    # Step 1: Filter by 24h volume and change
+    # Step 1: Fetch all tickers
     try:
         tickers = client.fetch_tickers()
     except Exception as e:
         logger.error(f"[SCALPSCAN] Failed to fetch tickers: {e}")
         return None  # signal failure so caller keeps current pairs
 
+    # Step 2: Build universe — USDT perps above volume floor, not blacklisted
     universe = []
     for symbol, t in tickers.items():
         if not symbol.endswith("/USDT:USDT"):
@@ -151,17 +155,41 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
         except Exception:
             continue
 
-    # Pre-filter: remove blacklisted pairs (keep both up and down movers for long/short)
     universe = [x for x in universe if x["symbol"] not in Config.SCANNER_BLACKLIST]
+    if not universe:
+        logger.warning("[SCALPSCAN] No qualifying pairs found, keeping current pairs.")
+        return None
 
-    # Rank by 24h volume — highest volume = most liquid, most volatile
+    # Step 3: Take top pool_size candidates by volume
     universe.sort(key=lambda x: x["volume"], reverse=True)
-    # Take extra candidates for spread filtering
-    candidates = universe[:top_n * 2]
+    candidates = universe[:pool_size]
 
-    # Spread filter: reject illiquid pairs with wide bid-ask spread
+    # Step 4: Load history scores from trading_state.json
+    history_scores = _compute_history_scores()
+
+    # Step 5: Compute composite score for each candidate
+    max_vol = max(c["volume"] for c in candidates) if candidates else 1.0
+    for c in candidates:
+        hist  = history_scores.get(c["symbol"], 0.5)
+        change_norm = min(abs(c["change_24h"]) / 15.0, 1.0)
+        vol_rank    = c["volume"] / max_vol
+        mkt   = change_norm * vol_rank
+        c["history_score"] = hist
+        c["market_score"]  = mkt
+        c["composite"]     = hist * mkt
+
+    # Fallback: if all market scores are 0, use history x vol_rank
+    if all(c["composite"] == 0 for c in candidates):
+        logger.warning("[SCALPSCAN] All market scores zero — falling back to history x vol_rank")
+        for c in candidates:
+            c["composite"] = c["history_score"] * (c["volume"] / max_vol)
+
+    # Step 6: Sort by composite score descending
+    candidates.sort(key=lambda x: x["composite"], reverse=True)
+
+    # Step 7: Spread-filter top candidates, stop at top_n passes
     filtered = []
-    for item in candidates:
+    for item in candidates[:top_n * 2]:
         symbol = item["symbol"]
         try:
             ob = client.fetch_order_book(symbol, limit=5)
@@ -173,7 +201,7 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
                     logger.debug(f"[SCANNER] {symbol} spread too wide ({spread_pct:.3f}%), skipping")
                     continue
             filtered.append(item)
-            time.sleep(1)  # rate limit friendly
+            time.sleep(1)
         except Exception:
             filtered.append(item)  # if OB fetch fails, keep the pair
         if len(filtered) >= top_n:
@@ -182,15 +210,16 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
     top = filtered[:top_n]
 
     if top:
-        logger.info(f"[SCALPSCAN] Top {len(top)} by volume:")
+        logger.info(f"[SCALPSCAN] Top {len(top)} by composite score:")
         for c in top:
             logger.info(
-                f"  {c['symbol']:<25} vol=${c['volume']:,.0f} | "
-                f"24h={c['change_24h']:>+5.1f}%"
+                f"  {c['symbol']:<25} score={c['composite']:.3f}"
+                f" (hist={c['history_score']:.2f} x mkt={c['market_score']:.2f})"
+                f" | vol=${c['volume']:,.0f} | 24h={c['change_24h']:>+5.1f}%"
             )
     else:
-        logger.warning("[SCALPSCAN] No results, keeping current pairs.")
-        return None  # signal failure so caller keeps current pairs
+        logger.warning("[SCALPSCAN] No results after spread filter, keeping current pairs.")
+        return None
 
     return [c["symbol"] for c in top]
 
