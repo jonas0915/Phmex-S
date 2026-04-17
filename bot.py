@@ -891,14 +891,13 @@ class Phmex2Bot:
             # Per-pair cooldown: skip pair after losses
             if symbol in self._pair_cooldown and time.time() < self._pair_cooldown[symbol]:
                 continue
-            # Per-symbol daily trade cap: max 3 trades per symbol per day
+            # Daily trade counter — no hard cap, but log when a symbol trades frequently
             day_start = time.time() - (time.time() % 86400)  # midnight UTC
             daily_trades = sum(1 for t in self.risk.closed_trades
                                if t.get("symbol") == symbol and t.get("opened_at", 0) > day_start)
             daily_trades += 1 if symbol in self.risk.positions else 0  # count open positions too
-            if daily_trades >= Config.DAILY_SYMBOL_CAP:
-                logger.debug(f"[RATE GATE] {symbol} — daily cap reached ({daily_trades}/{Config.DAILY_SYMBOL_CAP} trades today)")
-                continue
+            if daily_trades >= 4:
+                logger.info(f"[RATE WATCH] {symbol} — {daily_trades + 1}th entry today (no cap, monitoring)")
 
             if not self.risk.can_open_trade(real_balance):
                 break
