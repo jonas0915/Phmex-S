@@ -1015,6 +1015,19 @@ class Phmex2Bot:
                 # Order flow / tape veto — block entry if real money strongly disagrees
                 if not (flow and flow.get("trade_count", 0) > 20):
                     logger.info(f"[TAPE GATE SKIP] {symbol} {direction} — low volume (trade_count={flow.get('trade_count', 0) if flow else 'no_flow'}) — tape gates inactive")
+                    # Soft gate: even at low volume, block on extreme seller/buyer dominance
+                    if flow and 5 <= flow.get("trade_count", 0) <= 20:
+                        _soft_ratio = flow.get("buy_ratio", 0.5)
+                        if direction == "long" and _soft_ratio < 0.40:
+                            logger.info(
+                                f"[TAPE GATE SOFT] {symbol} LONG blocked — buy_ratio {_soft_ratio:.0%} "
+                                f"(thin tape, {flow.get('trade_count')} trades, sellers overwhelming)")
+                            continue
+                        if direction == "short" and _soft_ratio > 0.60:
+                            logger.info(
+                                f"[TAPE GATE SOFT] {symbol} SHORT blocked — buy_ratio {_soft_ratio:.0%} "
+                                f"(thin tape, {flow.get('trade_count')} trades, buyers overwhelming)")
+                            continue
                 if flow and flow.get("trade_count", 0) > 20:
                     buy_ratio = flow.get("buy_ratio", 0.5)
                     cvd_slope = flow.get("cvd_slope", 0.0)
