@@ -1,90 +1,103 @@
 # Session Handoff — Resume Here
 
-**Last session ended:** 2026-04-16 ~10:30 PM PT
-**Session grade:** A- — major entry gate hardening + scanner redesign shipped, 7 commits
-**Bot PID:** 30967 (restarted 2026-04-16 10:18 PM PT)
-**Balance at session end:** ~$72.82 USDT (peak $76.24, drawdown 4.5%)
+**Last session ended:** 2026-04-17 ~8:00 PM PT
+**Session grade:** A — major feature session, 15 commits, all verified live
+**Bot PID:** 26384 (restarted 2026-04-17 7:45 PM PT)
+**Dashboard PID:** ~active (port 8050)
+**Balance at session end:** ~$73.57 USDT (peak $76.24, drawdown 3.5%)
 
 ---
 
-## What was deployed this session
+## What was deployed this session (3 features, 15 commits)
 
-### Code commits (tonight)
-1. **`18fe372`** feat: block 2 AM PT (UTC 9) — 26% WR, -$4.22 all-time
-2. **`9c8dfca`** feat: soft tape gate — block buy_ratio <40%/>60% when trade_count 5-20
-3. **`0cf8072`** feat: divergence gate cooldown — 3 clean cycles or 10 min before re-entry
-4. **`75ac65a`** feat: add _compute_history_scores() + scanner config updates
-5. **`f2bc79d`** feat: rewrite volatility_scan() with composite history x market scoring
-6. **`1c8101b`** feat: remove daily symbol cap gate, add RATE WATCH monitoring log
-7. **`fe362fd`** config: scanner top_n 5→8, min_volume 10M→3M, add min_history_trades=10
+### Feature 1: `htf_l2_anticipation` strategy — parallel to `htf_confluence_pullback`
+Runs alongside the existing confluence pullback strategy. Replaces the `bouncing = close > prev_close` candle confirmation with L2/tape confirmation:
+- **3 required signals:** `buy_ratio > 0.55` (longs) / `< 0.45` (shorts), `cvd_slope` directional (>0 long, <0 short), `bid_depth > ask_depth` (longs) / opposite (shorts)
+- **3 boosters:** `large_trade_bias > 0.2` (+0.03), bid/ask wall within 1% (+0.02), no adverse wall within 0.5% (+0.02)
+- Shares HTF trend, VWAP, pullback-to-EMA, RSI, volume gates with original — only confirmation layer differs
+- HTF cluster throttle (30 min) and trend-flip exit extended to cover both strategies
 
-### Changes summary
-| Change | File | What |
-|---|---|---|
-| 2 AM PT time block | bot.py:1091 | UTC 9 added to `_BLOCKED_HOURS_UTC` — 26% WR, -$4.22 all-time |
-| Soft tape gate | bot.py:~1017 | buy_ratio <40%/>60% blocks entry when trade_count 5-20 |
-| Divergence cooldown | bot.py:1014 + init | `_divergence_cooldown` dict — 3 clean cycles OR 10 min before re-entry |
-| History score helper | scanner.py | `_compute_history_scores()` — sigmoid(avg_net_pnl × 10) per symbol |
-| Composite scanner | scanner.py | `volatility_scan()` rewritten — composite = history × market score |
-| Daily cap removed | bot.py:894 | Hard cap gate replaced with `[RATE WATCH]` monitoring log at 4+ entries |
-| Scanner params | .env | SCANNER_TOP_N 5→8, SCANNER_MIN_VOLUME $10M→$3M, SCANNER_MIN_HISTORY_TRADES=10 |
+### Feature 2: L2 Anticipation Signal Monitor dashboard panel
+New panel on right column of dashboard. Reads `l2_snapshot.json` and renders a live table:
+- Columns: Symbol, buy_ratio, cvd_slope, depth bid/ask ratio, whale bias, READY status
+- READY column shows **direction**: ✅ LONG 3/3, ✅ SHORT 3/3, ⚠️ MIXED NL/NS, 🟠 N/3, 🔴 0/3
+- Dropped duplicate Reconcile Status card in same session
 
----
+### Feature 3: Real-time L2 snapshot writer thread
+Daemon thread writes `l2_snapshot.json` every 5 seconds (was 60s main-loop). Dashboard polls every 3s (was 20s). End-to-end latency: ~4s average, 8s worst case. No API calls — reads from ws_feed in-memory cache and `_ob_depth_cache` populated by main loop.
 
-## New scanner — what to watch
-
-First scan result (10:18 PM PT):
-- **New symbols in rotation**: ORDI, XLM, AAVE, TAO (were never in the old watchlist)
-- **Dropped**: LINK (low history score + flat market)
-- **Scores are all very small (0.001–0.012)** because market was flat tonight (-0.5% BTC). `market_score = change_norm × vol_rank`, and vol_rank is normalized by BTC's $369M volume, making smaller caps near zero. This is correct behavior on flat days — on active days scores will spread more.
-- **SUI hist=0.22** — accurately reflects its poor track record
-- **ORDI had +91.8% 24h** but scored only 0.006 due to tiny vol_rank ($4.7M vs $369M BTC)
-
-**Monitor next 24-48h:**
-1. Do new symbols (ORDI, XLM, AAVE, TAO) generate valid signals?
-2. Do scores spread meaningfully on a volatile day?
-3. Any `[RATE WATCH]` lines — how often does a symbol exceed 4 entries/day?
-4. Gate fixes (soft tape, divergence cooldown) — do they reduce adverse_exits?
+### Commits (chronological)
+```
+042bdd8 feat: wire htf_l2_anticipation into confluence router + STRATEGIES dict
+ffbcdc0 feat: pass flow dict to strategy_fn + extract htf_l2_anticipation name
+f47ec7e feat: include htf_l2_anticipation in trend_strats + HTF cluster throttle
+420c029 fix: extend HTF throttle update + trend-flip exit to htf_l2_anticipation
+b649d41 docs: L2 signal dashboard panel spec
+78874e6 feat: bot writes l2_snapshot.json each cycle for dashboard
+75bced6 feat: add L2 Anticipation Signal Monitor dashboard panel
+ca554f3 refactor: remove duplicate Reconcile Status card from observability panel
+3f619c4 fix(dashboard): L2 panel READY column shows direction (LONG/SHORT/MIXED)
+2990f0f docs: L2 realtime snapshot thread spec
+6c7dad1 feat: L2 snapshot writer moved to 5s daemon thread (real-time)
+3653b52 fix: set self.running=True before L2 writer thread start (race fix)
+40bdbdd feat(dashboard): poll every 3s for real-time L2 panel updates
+```
 
 ---
 
-## Root causes found in Apr 16 trade audit
+## What to monitor next 24-48h
 
-1. **Tape gate inactive overnight** — trade_count ≤ 20 during 12-3 AM PT = gate always skipped
-2. **Divergence gate cleared in 1 cycle** — bot re-entered immediately after repeated blocks
-3. **Daily cap burned before daylight** — XRP/SUI/LINK hit 3/3 by 3:29 AM PT, zero daytime trades
-4. **Scanner locked to 5 symbols** — BTC/ETH had ADX 13-20 (no signals), capped symbols locked out
+1. **htf_l2_anticipation trade count** — should start accumulating. Compare against `htf_confluence_pullback` on same setups.
+2. **L2 signal alignment** — does any symbol hit ✅ LONG 3/3 or SHORT 3/3 reliably? If not, thresholds may need tuning.
+3. **Thread stability** — `[L2_LIVE]` write failures in bot.log. Should be none.
+4. **Dashboard responsiveness** — L2 panel values should visibly change every 5s during active markets.
+5. **Snapshot file mtime** — should update every 5s (check with `stat -f %Sm l2_snapshot.json`).
+
+## Success criteria (after 50 htf_l2_anticipation trades)
+- WR ≥ 43.9% (htf_confluence_pullback baseline)
+- Net PnL per trade > -$0.08
+- Fires earlier than pullback strategy on same setups
+- Adverse exit rate ≤ existing rate (~5.5%)
 
 ---
 
-## Phase 2 status (unchanged)
+## Architecture snapshot
 
-### Next: Phase 2a (fee reduction)
-- All prereqs met (C1/C2/C3/I9 landed)
-- Verify maker/taker ratio from exchange order history
-- Completion gate: fee rate ≤ 50% of pre-deploy rate over 48h
+### Entry gate flow (unchanged from prior session)
+Signal → Global cooldown → Per-pair cooldown → Divergence cooldown → Ensemble conf → Tape gate + soft tape gate → Divergence gate → Funding → Time blocks → HTF cluster throttle → Kelly → OB → QUIET regime → Entry
 
-### Open decisions (still pending)
-- Phase 2b regime-aware slot gating
-- Phase 2d changelog writer
-- Autonomous mutation cap: 1/day + 2/week (TBD)
+### New in this session
+- **2 confluence strategies** now fire in parallel: `htf_confluence_pullback` (baseline) + `htf_l2_anticipation` (new)
+- **`_ob_depth_cache`** in Phmex2Bot: depth data populated by main loop (60s), read by live writer thread (5s)
+- **`_l2_live_writer_loop`** daemon thread: writes `l2_snapshot.json` every 5s
+
+### Files touched
+- `bot.py` — +200 lines (strategy router, flow passing, threading, L2 cache)
+- `strategies.py` — +160 lines (htf_l2_anticipation function, STRATEGIES dict entry)
+- `web_dashboard.py` — +130 lines (L2 panel + -18 lines for duplicate Reconcile removal)
+- `l2_snapshot.json` — new runtime file, 8 symbols, ~2 KB
+- `docs/superpowers/specs/` — 3 new spec docs
+- `docs/superpowers/plans/` — 3 new plan docs
 
 ---
 
 ## Outstanding follow-ups (carried forward)
 
 - **`.env` tracked in git** — `git rm --cached .env` needed (Jonas's call, keys rotated 04-13)
-- **backfill_fees.py** — has hardcoded machine-specific paths, not committed yet
-- **Phase 2a** — fee reduction work unblocked
-- **Scanner vol_rank tuning** — BTC dominates vol_rank; may need log normalization after a few days of data
-- **Fee data in trading_state.json** — `fee_usdt` field is 0 for all 417 trades. Real net loss is worse than reported. Root cause unknown.
+- **backfill_fees.py** — hardcoded paths, not committed
+- **Phase 2a (fee reduction)** — still unblocked, not started
+- **Scanner vol_rank tuning** — BTC dominates, may need log normalization after more data
+- **Fee data in trading_state.json** — `fee_usdt` field is 0 for all trades (pre-existing issue)
+- **L2 anticipation tuning** — hardcoded thresholds (0.55/0.45, ±0.1, 1.2x/0.83x). Promote to config after 50 trades.
+- **Dashboard Sessions + Charts panels** — flagged as low-value in audit, left for now. Revisit after 2 weeks.
 
 ---
 
 ## Active monitoring (carried forward)
-- `[RATE WATCH]` log lines — new, monitors high-frequency symbol entries
-- `[TAPE GATE SOFT]` log lines — new, fires on thin tape with extreme buy ratio
-- `[DIVERGENCE COOLDOWN]` log lines — new, fires when divergence cooldown active
+- `[L2_LIVE]` log lines — new, thread health
+- `[RATE WATCH]` log lines — since Apr 16, cap removed
+- `[TAPE GATE SOFT]` log lines — since Apr 16
+- `[DIVERGENCE COOLDOWN]` log lines — since Apr 16
 - `[TIMEOUT]` log entries (DNS wrap from 04-10)
 - Maker fill rate (postOnly fix from 04-09)
 - Orphan-position 3-layer defense (live since 04-13)

@@ -1,6 +1,6 @@
 # Memory Index
 
-- **[🟢 SESSION HANDOFF](SESSION_HANDOFF.md) — START HERE next session. Bot PID 30967 (restarted Apr 16 10:18 PM PT). 7 commits: 2AM PT block, soft tape gate, divergence cooldown, performance-weighted scanner (8 symbols, composite scoring), daily cap removed. Phase 2a unblocked.**
+- **[🟢 SESSION HANDOFF](SESSION_HANDOFF.md) — START HERE next session. Bot PID 26384 (restarted Apr 17 7:45 PM PT). Apr 17 session shipped 13 commits across 3 features: htf_l2_anticipation strategy (parallel to htf_confluence_pullback, L2/tape-confirmed entries), L2 dashboard monitor panel (direction-aware READY column), real-time 5s snapshot writer thread (dashboard polls every 3s).**
 - **TP/Adverse tightened (2026-04-14)** — TAKE_PROFIT_PERCENT 2.1→1.6 (TP fires ~2× more often); ADVERSE_EXIT_THRESHOLD -5.0→-3.0 (expected +$9.42/13d).
 - **Trailing-stop mistag fixed (2026-04-14)** — risk_manager.py:668-679 now emits `trailing_stop` exit_reason; notifier.py adds 🎯 TRAILING STOP label. Extends BUG-A fix from lessons.md:219-222.
 - [Phase 2 v2 Audit](reference_phase2_v2_audit.md) — Audit of Phase 2 spec, v1→v2 changes, prereq status. Read before resuming Phase 2.
