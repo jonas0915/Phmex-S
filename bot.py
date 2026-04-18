@@ -420,6 +420,9 @@ class Phmex2Bot:
         def _cycle_timeout_handler(signum, frame):
             raise TimeoutError("Cycle exceeded 120s — likely hung API call")
 
+        # Set running flag before starting thread so loop guard evaluates correctly
+        self.running = True
+
         # Start L2 snapshot live writer thread (updates every 5s for real-time dashboard)
         threading.Thread(
             target=self._l2_live_writer_loop,
@@ -427,8 +430,6 @@ class Phmex2Bot:
             name="l2-live-writer",
         ).start()
         logger.info("[L2_LIVE] Snapshot writer thread started (5s interval)")
-
-        self.running = True
         try:
             while self.running:
                 try:
