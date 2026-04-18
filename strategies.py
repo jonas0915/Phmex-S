@@ -1111,7 +1111,7 @@ def htf_l2_anticipation(
     return TradeSignal(direction, reason, min(strength, 0.92))
 
 
-def confluence_strategy(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.DataFrame = None) -> TradeSignal:
+def confluence_strategy(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.DataFrame = None, flow: dict = None) -> TradeSignal:
     """
     Master router for v7.0 Confluence. Routes to HTF-confirmed strategies
     based on 1h ADX regime. Requires multi-timeframe data.
@@ -1131,6 +1131,7 @@ def confluence_strategy(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.Dat
     signals = []
     if htf_adx >= 20:
         signals.append(htf_confluence_pullback(df, orderbook, htf_df))
+        signals.append(htf_l2_anticipation(df, orderbook, htf_df, flow))
     if htf_adx >= 25:
         mom_signal = momentum_continuation_strategy(df, orderbook)
         if mom_signal.signal != Signal.HOLD:
@@ -1476,4 +1477,5 @@ STRATEGIES = {
     "htf_momentum":             htf_momentum_strategy,
     "liq_cascade":              liquidation_cascade_strategy,
     "funding_contrarian":       funding_rate_contrarian_strategy,
+    "htf_l2_anticipation":      htf_l2_anticipation,
 }
