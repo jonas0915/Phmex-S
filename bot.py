@@ -676,7 +676,7 @@ class Phmex2Bot:
         for symbol, pos in list(self.risk.positions.items()):
             if symbol not in self.risk.positions:
                 continue
-            if pos.strategy != "htf_confluence_pullback":
+            if pos.strategy not in ("htf_confluence_pullback", "htf_l2_anticipation"):
                 continue
             price = prices.get(symbol)
             if not price:
@@ -1240,7 +1240,7 @@ class Phmex2Bot:
                         logger.warning(f"[SL FALLBACK] Exchange SL failed for {direction.upper()} {symbol} — using software SL@{pos.stop_loss:.4f} TP@{pos.take_profit:.4f}")
                     available -= pos.margin
                     self._last_entry_time = time.time()
-                    if strat_name == "htf_confluence_pullback":
+                    if strat_name in ("htf_confluence_pullback", "htf_l2_anticipation"):
                         self._last_htf_entry_time = time.time()
                     logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${pos.margin:.2f} | Conf: {confidence}/7 | {signal.reason} | Strength: {signal.strength:.2f}")
                     _htf_adx_val = float(htf_df.iloc[-1].get("adx", 0)) if htf_df is not None and len(htf_df) > 0 else None
@@ -1291,7 +1291,7 @@ class Phmex2Bot:
                                 pos.sl_order_id = "software"
                             available -= pos.margin
                             self._last_entry_time = time.time()
-                            if strat_name == "htf_confluence_pullback":
+                            if strat_name in ("htf_confluence_pullback", "htf_l2_anticipation"):
                                 self._last_htf_entry_time = time.time()
                             try:
                                 self.risk._save_state()
@@ -1363,7 +1363,7 @@ class Phmex2Bot:
                     continue
 
                 # Trend-flip exit for htf_confluence_pullback paper positions
-                if slot.strategy_name == "htf_confluence_pullback":
+                if slot.strategy_name in ("htf_confluence_pullback", "htf_l2_anticipation"):
                     htf_df_tuple = self._htf_cache.get(symbol)
                     htf_df = htf_df_tuple[0] if htf_df_tuple else None
                     should_flip, flip_reason = _check_htf_trend_flip_exit(pos.side, htf_df)
