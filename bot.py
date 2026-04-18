@@ -159,6 +159,21 @@ def _check_htf_trend_flip_exit(side: str, htf_df) -> tuple[bool, str]:
     return False, ""
 
 
+def _write_l2_snapshot(snapshot_dict: dict, path: str = "l2_snapshot.json") -> None:
+    """Atomic write of L2 snapshot for dashboard. Silent on failure."""
+    try:
+        payload = {
+            "updated_at": time.time(),
+            "symbols": snapshot_dict,
+        }
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(payload, f, separators=(",", ":"))
+        os.replace(tmp, path)
+    except Exception as e:
+        logger.debug(f"[L2_SNAPSHOT] write failed: {e}")
+
+
 class Phmex2Bot:
     def __init__(self):
         Config.validate()
@@ -884,6 +899,9 @@ class Phmex2Bot:
                 pass
             return
 
+        # Accumulate L2/tape signals for dashboard snapshot (written at end of cycle)
+        _l2_snapshot_accum: dict[str, dict] = {}
+
         for symbol in self.active_pairs:
             if symbol in self.risk.positions:
                 continue
@@ -938,6 +956,18 @@ class Phmex2Bot:
             ob = self.exchange.get_order_book(symbol)
             htf_df = self._fetch_htf_data(symbol)
             flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
+            # Record L2 snapshot for dashboard (overwritten each cycle)
+            _price = float(df.iloc[-1]["close"]) if len(df) > 0 else 0.0
+            _l2_snapshot_accum[symbol] = {
+                "buy_ratio":         (flow or {}).get("buy_ratio"),
+                "cvd_slope":         (flow or {}).get("cvd_slope"),
+                "bid_depth_usdt":    (ob or {}).get("bid_depth_usdt"),
+                "ask_depth_usdt":    (ob or {}).get("ask_depth_usdt"),
+                "large_trade_bias":  (flow or {}).get("large_trade_bias"),
+                "trade_count":       (flow or {}).get("trade_count", 0),
+                "last_price":        _price,
+                "updated_at":        time.time(),
+            }
             try:
                 signal = self.strategy_fn(df, ob, htf_df=htf_df, flow=flow)
             except TypeError:
@@ -1309,6 +1339,9 @@ class Phmex2Bot:
                             notifier.notify_entry(symbol, direction, gt_entry, pos.margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason + " (orphan-adopted)")
                             continue
                     logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
+
+        # Write L2 snapshot for dashboard (silent on failure)
+        _write_l2_snapshot(_l2_snapshot_accum)
 
         if self.cycle_count % 10 == 0:
             self.risk.print_stats(real_balance)
