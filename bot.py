@@ -34,6 +34,8 @@ def _extract_strategy_name(reason: str) -> str:
         return "momentum_continuation"
     if "vwap reversion" in r or "vwap_reversion" in r:
         return "vwap_reversion"
+    if "l2 anticipation" in r:
+        return "htf_l2_anticipation"
     if "confluence pullback" in r:
         return "htf_confluence_pullback"
     if "confluence vwap" in r:
@@ -932,13 +934,17 @@ class Phmex2Bot:
             else:
                 regime = "low"
 
-            # Fetch orderbook and HTF data for strategy confirmation
+            # Fetch orderbook, HTF data, and tape flow for strategy confirmation
             ob = self.exchange.get_order_book(symbol)
             htf_df = self._fetch_htf_data(symbol)
+            flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
             try:
-                signal = self.strategy_fn(df, ob, htf_df=htf_df)
+                signal = self.strategy_fn(df, ob, htf_df=htf_df, flow=flow)
             except TypeError:
-                signal = self.strategy_fn(df, ob)
+                try:
+                    signal = self.strategy_fn(df, ob, htf_df=htf_df)
+                except TypeError:
+                    signal = self.strategy_fn(df, ob)
 
             if signal.signal == Signal.HOLD:
                 logger.debug(f"[HOLD] {symbol} — {signal.reason}")
@@ -959,9 +965,6 @@ class Phmex2Bot:
 
             if signal.signal in (Signal.BUY, Signal.SELL):
                 direction = "long" if signal.signal == Signal.BUY else "short"
-
-                # Get order flow from WS (real-time, no REST call)
-                flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
 
                 # Build cvd_data from order flow (backward compatible with ensemble layer 3)
                 cvd_data = None
