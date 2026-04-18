@@ -4,6 +4,7 @@ import datetime
 import subprocess
 import os
 import json
+import threading
 from collections import deque
 from config import Config
 from exchange import Exchange
@@ -200,6 +201,7 @@ class Phmex2Bot:
         self._htf_cache: dict[str, tuple] = {}  # symbol -> (DataFrame, fetch_timestamp) for 1h candles
         self._funding_cache: dict[str, tuple] = {}  # symbol -> (data, fetch_timestamp) for funding rates
         self._divergence_cooldown: dict[str, dict] = {}  # symbol -> {"blocked_at": float, "clean_cycles": int}
+        self._ob_depth_cache: dict[str, dict] = {}  # symbol -> depth data, populated by main loop, read by live writer thread
 
         # Strategy slots framework — independent trading units (additive, main loop still uses self.risk)
         self.slots = [
@@ -417,6 +419,14 @@ class Phmex2Bot:
 
         def _cycle_timeout_handler(signum, frame):
             raise TimeoutError("Cycle exceeded 120s — likely hung API call")
+
+        # Start L2 snapshot live writer thread (updates every 5s for real-time dashboard)
+        threading.Thread(
+            target=self._l2_live_writer_loop,
+            daemon=True,
+            name="l2-live-writer",
+        ).start()
+        logger.info("[L2_LIVE] Snapshot writer thread started (5s interval)")
 
         self.running = True
         try:
@@ -899,9 +909,6 @@ class Phmex2Bot:
                 pass
             return
 
-        # Accumulate L2/tape signals for dashboard snapshot (written at end of cycle)
-        _l2_snapshot_accum: dict[str, dict] = {}
-
         for symbol in self.active_pairs:
             if symbol in self.risk.positions:
                 continue
@@ -954,20 +961,16 @@ class Phmex2Bot:
 
             # Fetch orderbook, HTF data, and tape flow for strategy confirmation
             ob = self.exchange.get_order_book(symbol)
+            # Cache depth for live L2 writer thread (no API cost — data is already fetched)
+            if ob:
+                self._ob_depth_cache[symbol] = {
+                    "bid_depth_usdt": ob.get("bid_depth_usdt"),
+                    "ask_depth_usdt": ob.get("ask_depth_usdt"),
+                    "imbalance":      ob.get("imbalance", 0),
+                    "updated_at":     time.time(),
+                }
             htf_df = self._fetch_htf_data(symbol)
             flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
-            # Record L2 snapshot for dashboard (overwritten each cycle)
-            _price = float(df.iloc[-1]["close"]) if len(df) > 0 else 0.0
-            _l2_snapshot_accum[symbol] = {
-                "buy_ratio":         (flow or {}).get("buy_ratio"),
-                "cvd_slope":         (flow or {}).get("cvd_slope"),
-                "bid_depth_usdt":    (ob or {}).get("bid_depth_usdt"),
-                "ask_depth_usdt":    (ob or {}).get("ask_depth_usdt"),
-                "large_trade_bias":  (flow or {}).get("large_trade_bias"),
-                "trade_count":       (flow or {}).get("trade_count", 0),
-                "last_price":        _price,
-                "updated_at":        time.time(),
-            }
             try:
                 signal = self.strategy_fn(df, ob, htf_df=htf_df, flow=flow)
             except TypeError:
@@ -1340,9 +1343,6 @@ class Phmex2Bot:
                             continue
                     logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
 
-        # Write L2 snapshot for dashboard (silent on failure)
-        _write_l2_snapshot(_l2_snapshot_accum)
-
         if self.cycle_count % 10 == 0:
             self.risk.print_stats(real_balance)
 
@@ -1358,6 +1358,31 @@ class Phmex2Bot:
             mode = "PAPER" if slot.paper_mode else "LIVE"
             status = "KILLED" if slot.is_killed else "ACTIVE" if slot.is_active else "DISABLED"
             logger.info(f"[SLOT] {slot.slot_id} ({mode}/{status}) | {s['trades']} trades | WR: {s['wr']}% | PnL: ${s['pnl']}")
+
+    def _l2_live_writer_loop(self, interval_sec: float = 5.0) -> None:
+        """Daemon thread: writes l2_snapshot.json every `interval_sec` from in-memory caches.
+        No API calls — reads ws_feed (live) and _ob_depth_cache (populated by main loop)."""
+        while self.running:
+            try:
+                pairs = list(self.active_pairs)
+                accum: dict[str, dict] = {}
+                for symbol in pairs:
+                    flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
+                    depth = self._ob_depth_cache.get(symbol, {})
+                    accum[symbol] = {
+                        "buy_ratio":         (flow or {}).get("buy_ratio"),
+                        "cvd_slope":         (flow or {}).get("cvd_slope"),
+                        "bid_depth_usdt":    depth.get("bid_depth_usdt"),
+                        "ask_depth_usdt":    depth.get("ask_depth_usdt"),
+                        "large_trade_bias":  (flow or {}).get("large_trade_bias"),
+                        "trade_count":       (flow or {}).get("trade_count", 0),
+                        "last_price":        None,
+                        "updated_at":        time.time(),
+                    }
+                _write_l2_snapshot(accum)
+            except Exception as e:
+                logger.debug(f"[L2_LIVE] writer tick failed: {e}")
+            time.sleep(interval_sec)
 
     def _evaluate_paper_slots(self, active_pairs: list, prices: dict):
         """Evaluate paper slots — simulate entries/exits without placing real orders."""
