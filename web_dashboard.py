@@ -604,9 +604,12 @@ def _build_reconcile_card() -> str:
 
 
 def _build_observability_panel() -> str:
-    """Build Phase 2c observability HTML panel."""
+    """Build Phase 2c observability HTML panel (Gate Rejection Breakdown only).
+
+    Note: Reconcile Status card was removed to eliminate duplication with
+    _build_reconcile_card(); reconcile data is now shown in one place only.
+    """
     from html import escape as _esc
-    # --- Gates ---
     stats = _gate_stats(LOG_FILE)
     if stats:
         total_blocks = sum(stats.values())
@@ -618,25 +621,9 @@ def _build_observability_panel() -> str:
     else:
         gates_html = '<div style="color:#888;font-size:13px">No gate rejections found in log</div>'
 
-    # --- Reconcile ---
-    rec = _reconcile_status()
-    streak_color = "#4caf50" if rec["streak"] >= 4 else "#ff9800" if rec["streak"] >= 1 else "#f44336"
-    streak_label = f'<span style="color:{streak_color};font-weight:700">{rec["streak"]} CLEAN</span>'
-    if rec["drifts"]:
-        drift_html = "".join(f'<div style="color:#ff9800;font-size:12px">{_esc(d)}</div>' for d in rec["drifts"])
-    else:
-        drift_html = '<div style="color:#4caf50;font-size:12px">No drift in last 24h</div>'
-    last_run_html = f'<div style="color:#888;font-size:12px;margin-top:4px">{_esc(rec["last"][:120])}</div>'
-
     return f'''<div class="glass-card dash-item" data-id="obs-gates">
         <h2>Gate Rejection Breakdown (24h)</h2>
         {gates_html}
-    </div>
-    <div class="glass-card dash-item" data-id="obs-reconcile" style="margin-top:12px">
-        <h2>Reconcile Status</h2>
-        <div style="margin-bottom:8px">Streak: {streak_label}</div>
-        {drift_html}
-        {last_run_html}
     </div>'''
 
 
