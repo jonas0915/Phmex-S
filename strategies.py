@@ -950,6 +950,167 @@ def htf_confluence_vwap(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.Dat
     return TradeSignal(direction, reason, min(strength, 0.90))
 
 
+def htf_l2_anticipation(
+    df: pd.DataFrame,
+    orderbook: dict = None,
+    htf_df: pd.DataFrame = None,
+    flow: dict = None,
+) -> TradeSignal:
+    """
+    Pullback strategy that confirms entries via L2/tape signals instead of closed candle.
+    Shares setup detection with htf_confluence_pullback — differs only in entry trigger.
+    Requires flow dict from ws_feed. Returns HOLD if flow is None or trade_count < 5.
+    """
+    # Pre-checks (same as htf_confluence_pullback)
+    if htf_df is None or len(htf_df) < 30:
+        return TradeSignal(Signal.HOLD, "l2_anticipation: no HTF data", 0.0)
+    if len(df) < 50:
+        return TradeSignal(Signal.HOLD, "l2_anticipation: not enough 5m data", 0.0)
+    if flow is None or flow.get("trade_count", 0) < 5:
+        return TradeSignal(Signal.HOLD, "l2_anticipation: insufficient tape (flow absent or <5 trades)", 0.0)
+
+    last = df.iloc[-1]
+    prev = df.iloc[-2]
+    htf = htf_df.iloc[-1]
+
+    close = last["close"]
+    rsi = last.get("rsi", 50)
+    volume = prev["volume"]
+    vol_avg = df["volume"].iloc[-21:-1].mean()
+    vwap = last.get("vwap", 0)
+    ema_21 = last.get("ema_21", 0)
+    ema_50 = last.get("ema_50", 0)
+
+    htf_adx = htf.get("adx", 0)
+    htf_ema21 = htf.get("ema_21", 0)
+    htf_ema50 = htf.get("ema_50", 0)
+    htf_close = htf.get("close", 0)
+
+    if htf_adx < 25:
+        return TradeSignal(Signal.HOLD, f"l2_anticipation: 1h ADX {htf_adx:.1f} < 25", 0.0)
+    if vol_avg <= 0 or volume < vol_avg * 0.6:
+        return TradeSignal(Signal.HOLD, f"l2_anticipation: vol {volume/max(vol_avg,1e-10):.2f}x < 0.6x", 0.0)
+    if vwap <= 0 or pd.isna(vwap):
+        return TradeSignal(Signal.HOLD, "l2_anticipation: no VWAP", 0.0)
+    if ema_21 == 0 or ema_50 == 0:
+        return TradeSignal(Signal.HOLD, "l2_anticipation: EMAs warming up", 0.0)
+
+    direction = None
+
+    # Setup detection (identical to htf_confluence_pullback minus bouncing/momentum)
+    htf_long = htf_ema21 > htf_ema50 and htf_close > htf_ema50 and htf_adx >= 20
+    vwap_long = close > vwap
+    pullback_to_ema = (abs(close - ema_21) / ema_21 < 0.005) or (abs(close - ema_50) / ema_50 < 0.005)
+    rsi_long = 35 <= rsi <= 60
+
+    htf_short = htf_ema21 < htf_ema50 and htf_close < htf_ema50 and htf_adx >= 20
+    vwap_short = close < vwap
+    rsi_short = 40 <= rsi <= 65
+
+    long_setup = htf_long and vwap_long and pullback_to_ema and rsi_long
+    short_setup = htf_short and vwap_short and pullback_to_ema and rsi_short
+
+    if not (long_setup or short_setup):
+        if not (htf_long or htf_short):
+            detail = "1h no trend"
+        elif not (vwap_long or vwap_short):
+            detail = f"VWAP mismatch (close={close:.4f} vwap={vwap:.4f})"
+        elif not pullback_to_ema:
+            dist21 = abs(close - ema_21) / ema_21 * 100
+            dist50 = abs(close - ema_50) / ema_50 * 100
+            detail = f"no pullback (EMA21 dist={dist21:.2f}% EMA50 dist={dist50:.2f}%)"
+        else:
+            detail = f"RSI {rsi:.1f} out of range"
+        return TradeSignal(Signal.HOLD, f"l2_anticipation: {detail}", 0.0)
+
+    # L2/tape confirmation (REPLACES bouncing + momentum confirmation)
+    buy_ratio = flow.get("buy_ratio", 0.5)
+    cvd_slope = flow.get("cvd_slope", 0.0)
+    bid_depth = orderbook.get("bid_depth_usdt", 0) if orderbook else 0
+    ask_depth = orderbook.get("ask_depth_usdt", 0) if orderbook else 0
+
+    if long_setup:
+        req1 = buy_ratio > 0.55
+        req2 = cvd_slope > 0
+        req3 = bid_depth > ask_depth
+        if not (req1 and req2 and req3):
+            reasons = []
+            if not req1: reasons.append(f"buy_ratio {buy_ratio:.2f}<0.55")
+            if not req2: reasons.append(f"cvd_slope {cvd_slope:.2f}<=0")
+            if not req3: reasons.append(f"bid_depth {bid_depth:.0f}<=ask_depth {ask_depth:.0f}")
+            return TradeSignal(Signal.HOLD, f"l2_anticipation: long L2 fail ({', '.join(reasons)})", 0.0)
+        direction = Signal.BUY
+    else:
+        req1 = buy_ratio < 0.45
+        req2 = cvd_slope < 0
+        req3 = ask_depth > bid_depth
+        if not (req1 and req2 and req3):
+            reasons = []
+            if not req1: reasons.append(f"buy_ratio {buy_ratio:.2f}>=0.45")
+            if not req2: reasons.append(f"cvd_slope {cvd_slope:.2f}>=0")
+            if not req3: reasons.append(f"ask_depth {ask_depth:.0f}<=bid_depth {bid_depth:.0f}")
+            return TradeSignal(Signal.HOLD, f"l2_anticipation: short L2 fail ({', '.join(reasons)})", 0.0)
+        direction = Signal.SELL
+
+    # Strength calculation
+    strength = 0.82
+
+    # Booster 1: whale accumulation
+    lt_bias = flow.get("large_trade_bias", 0.0)
+    if direction == Signal.BUY and lt_bias > 0.2:
+        strength += 0.03
+    elif direction == Signal.SELL and lt_bias < -0.2:
+        strength += 0.03
+
+    # Booster 2: support/resistance wall within 1%
+    price = close
+    if orderbook:
+        bid_walls = orderbook.get("bid_walls", []) or []
+        ask_walls = orderbook.get("ask_walls", []) or []
+
+        if direction == Signal.BUY and bid_walls:
+            bid_dists = [(price - w[0]) / price * 100 for w in bid_walls if w[0] < price]
+            if bid_dists:
+                nearest = min(bid_dists)
+                if 0 < nearest < 1.0:
+                    strength += 0.02
+        elif direction == Signal.SELL and ask_walls:
+            ask_dists = [(w[0] - price) / price * 100 for w in ask_walls if w[0] > price]
+            if ask_dists:
+                nearest = min(ask_dists)
+                if 0 < nearest < 1.0:
+                    strength += 0.02
+
+        # Booster 3: no adverse wall within 0.5%
+        if direction == Signal.BUY:
+            has_near_ask = any(0 < (w[0] - price) / price * 100 < 0.5 for w in ask_walls)
+            if not has_near_ask:
+                strength += 0.02
+        else:
+            has_near_bid = any(0 < (price - w[0]) / price * 100 < 0.5 for w in bid_walls)
+            if not has_near_bid:
+                strength += 0.02
+
+        # OB imbalance gate (identical to htf_confluence_pullback)
+        if orderbook.get("illiquid", False):
+            return TradeSignal(Signal.HOLD, "l2_anticipation: illiquid", 0.0)
+        imb = orderbook.get("imbalance", 0)
+        if direction == Signal.BUY and imb < -0.3:
+            return TradeSignal(Signal.HOLD, f"l2_anticipation: OB blocks long ({imb:.2f})", 0.0)
+        if direction == Signal.SELL and imb > 0.3:
+            return TradeSignal(Signal.HOLD, f"l2_anticipation: OB blocks short ({imb:.2f})", 0.0)
+        if (direction == Signal.BUY and imb > 0.15) or (direction == Signal.SELL and imb < -0.15):
+            strength += 0.02
+
+    dir_str = "LONG" if direction == Signal.BUY else "SHORT"
+    reason = (
+        f"L2 ANTICIPATION {dir_str} | 1h ADX={htf_adx:.1f} | buy_ratio={buy_ratio:.2f}"
+        f" | cvd_slope={cvd_slope:.2f} | bid/ask depth={bid_depth:.0f}/{ask_depth:.0f}"
+        f" | RSI={rsi:.1f}"
+    )
+    return TradeSignal(direction, reason, min(strength, 0.92))
+
+
 def confluence_strategy(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.DataFrame = None) -> TradeSignal:
     """
     Master router for v7.0 Confluence. Routes to HTF-confirmed strategies
