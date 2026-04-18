@@ -1080,6 +1080,142 @@ def _build_watchlist_html(wl: dict) -> str:
     return html
 
 
+def _build_l2_monitor_panel() -> str:
+    """Render the L2 Anticipation Signal Monitor panel from l2_snapshot.json."""
+    import html as _html
+    try:
+        with open("l2_snapshot.json") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return (
+            '<div class="glass-card dash-item" data-id="l2monitor">'
+            '<h2>&#128225; L2 Anticipation Monitor</h2>'
+            '<div class="muted">No L2 snapshot yet &mdash; bot is starting up.</div>'
+            '</div>'
+        )
+    except Exception as e:
+        return (
+            '<div class="glass-card dash-item" data-id="l2monitor">'
+            '<h2>&#128225; L2 Anticipation Monitor</h2>'
+            f'<div class="muted">Snapshot unreadable &mdash; {_html.escape(str(e))}</div>'
+            '</div>'
+        )
+
+    updated_at = data.get("updated_at", 0)
+    age_sec = max(0, int(time.time() - updated_at))
+    stale = age_sec > 120
+    symbols = data.get("symbols", {})
+
+    if not symbols:
+        return (
+            '<div class="glass-card dash-item" data-id="l2monitor">'
+            '<h2>&#128225; L2 Anticipation Monitor</h2>'
+            '<div class="muted">No symbols in snapshot.</div>'
+            '</div>'
+        )
+
+    rows = []
+    for sym in sorted(symbols.keys()):
+        s = symbols[sym]
+        tc = s.get("trade_count", 0) or 0
+        short_sym = sym.split("/")[0]
+
+        if tc < 5:
+            rows.append(
+                f'<tr><td>{_html.escape(short_sym)}</td>'
+                f'<td class="l2-cell muted">&#9679;</td>'
+                f'<td class="l2-cell muted">&#9679;</td>'
+                f'<td class="l2-cell muted">&#9679;</td>'
+                f'<td class="l2-cell muted">&#9679;</td>'
+                f'<td class="l2-cell muted">no feed</td></tr>'
+            )
+            continue
+
+        br = s.get("buy_ratio")
+        cvd = s.get("cvd_slope")
+        bd = s.get("bid_depth_usdt") or 0
+        ad = s.get("ask_depth_usdt") or 0
+        lt = s.get("large_trade_bias", 0) or 0
+
+        if br is None:
+            br_cell, br_pass = '<span class="muted">&mdash;</span>', False
+        elif br > 0.55 or br < 0.45:
+            br_cell = f'<span class="l2-ok">{br:.2f}</span>'
+            br_pass = True
+        else:
+            br_cell = f'<span class="l2-fail">{br:.2f}</span>'
+            br_pass = False
+
+        if cvd is None:
+            cvd_cell, cvd_pass = '<span class="muted">&mdash;</span>', False
+        elif abs(cvd) > 0.1:
+            cvd_cell = f'<span class="l2-ok">{cvd:+.2f}</span>'
+            cvd_pass = True
+        else:
+            cvd_cell = f'<span class="l2-fail">{cvd:+.2f}</span>'
+            cvd_pass = False
+
+        if bd > 0 and ad > 0:
+            ratio = bd / ad
+            if abs(ratio - 1.0) > 0.2:
+                depth_cell = f'<span class="l2-ok">{ratio:.2f}&times;</span>'
+                depth_pass = True
+            else:
+                depth_cell = f'<span class="l2-fail">{ratio:.2f}&times;</span>'
+                depth_pass = False
+        else:
+            depth_cell, depth_pass = '<span class="muted">&mdash;</span>', False
+
+        whale = '&#128011;' if abs(lt) > 0.2 else '&nbsp;'
+        whale_cell = f'<span class="l2-whale">{whale} {lt:+.2f}</span>' if lt else f'<span>{whale}</span>'
+
+        passing = sum([br_pass, cvd_pass, depth_pass])
+        if passing == 3:
+            ready_cell = '<span class="l2-ready">&#9989; 3/3</span>'
+        elif passing >= 1:
+            ready_cell = f'<span class="l2-partial">&#128992; {passing}/3</span>'
+        else:
+            ready_cell = '<span class="l2-fail">&#128308; 0/3</span>'
+
+        rows.append(
+            f'<tr><td>{_html.escape(short_sym)}</td>'
+            f'<td class="l2-cell">{br_cell}</td>'
+            f'<td class="l2-cell">{cvd_cell}</td>'
+            f'<td class="l2-cell">{depth_cell}</td>'
+            f'<td class="l2-cell">{whale_cell}</td>'
+            f'<td class="l2-cell">{ready_cell}</td></tr>'
+        )
+
+    stale_banner = ''
+    if stale:
+        stale_banner = (
+            f'<div class="l2-stale">Snapshot stale &mdash; last update {age_sec}s ago</div>'
+        )
+
+    table_html = (
+        '<table class="l2-table">'
+        '<thead><tr>'
+        '<th>Symbol</th>'
+        '<th>buy_ratio</th>'
+        '<th>cvd_slope</th>'
+        '<th>depth b/a</th>'
+        '<th>whale</th>'
+        '<th>READY</th>'
+        '</tr></thead>'
+        f'<tbody>{"".join(rows)}</tbody>'
+        '</table>'
+    )
+
+    return (
+        '<div class="glass-card dash-item" data-id="l2monitor">'
+        '<h2>&#128225; L2 Anticipation Monitor</h2>'
+        f'<div class="muted">Live snapshot &mdash; updated {age_sec}s ago</div>'
+        f'{stale_banner}'
+        f'{table_html}'
+        '</div>'
+    )
+
+
 # ── HTML rendering ───────────────────────────────────────────────────────
 def build_content() -> str:
     """Build just the inner content HTML (no head/style/script shell)."""
@@ -1274,6 +1410,7 @@ def build_content() -> str:
             <h2>Watchlist</h2>
             {_build_watchlist_html(watchlist)}
         </div>
+        {_build_l2_monitor_panel()}
         {_build_reconcile_card()}
         {_build_observability_panel()}
         {paper_html}
@@ -1565,6 +1702,18 @@ tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
     width: 100%;
     border-radius: 2px;
 }}
+
+/* ── L2 Anticipation Monitor ── */
+.l2-table {{ width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 0.4rem; }}
+.l2-table th {{ text-align: left; padding: 0.3rem 0.4rem; font-weight: 600; color: var(--muted); border-bottom: 1px solid rgba(255,255,255,0.1); }}
+.l2-table td {{ padding: 0.3rem 0.4rem; border-bottom: 1px solid rgba(255,255,255,0.05); }}
+.l2-cell {{ text-align: center; font-variant-numeric: tabular-nums; }}
+.l2-ok {{ color: var(--positive); font-weight: 600; }}
+.l2-fail {{ color: var(--negative); font-weight: 600; }}
+.l2-ready {{ color: var(--positive); font-weight: 700; }}
+.l2-partial {{ color: var(--warning); font-weight: 600; }}
+.l2-whale {{ color: var(--accent); }}
+.l2-stale {{ background: rgba(251,146,60,0.15); color: var(--warning); padding: 0.3rem 0.6rem; border-radius: 4px; margin: 0.4rem 0; font-size: 0.8rem; }}
 
 /* ── Watchlist ── */
 .watchlist-grid {{
