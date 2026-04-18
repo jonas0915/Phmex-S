@@ -1124,43 +1124,53 @@ def _build_l2_monitor_panel() -> str:
         ad = s.get("ask_depth_usdt") or 0
         lt = s.get("large_trade_bias", 0) or 0
 
+        # Direction per signal: +1 long, -1 short, 0 neutral
         if br is None:
-            br_cell, br_pass = '<span class="muted">&mdash;</span>', False
-        elif br > 0.55 or br < 0.45:
-            br_cell = f'<span class="l2-ok">{br:.2f}</span>'
-            br_pass = True
+            br_cell, br_dir = '<span class="muted">&mdash;</span>', 0
+        elif br > 0.55:
+            br_cell, br_dir = f'<span class="l2-ok">{br:.2f}&#8593;</span>', 1
+        elif br < 0.45:
+            br_cell, br_dir = f'<span class="l2-ok">{br:.2f}&#8595;</span>', -1
         else:
-            br_cell = f'<span class="l2-fail">{br:.2f}</span>'
-            br_pass = False
+            br_cell, br_dir = f'<span class="l2-fail">{br:.2f}</span>', 0
 
         if cvd is None:
-            cvd_cell, cvd_pass = '<span class="muted">&mdash;</span>', False
-        elif abs(cvd) > 0.1:
-            cvd_cell = f'<span class="l2-ok">{cvd:+.2f}</span>'
-            cvd_pass = True
+            cvd_cell, cvd_dir = '<span class="muted">&mdash;</span>', 0
+        elif cvd > 0.1:
+            cvd_cell, cvd_dir = f'<span class="l2-ok">{cvd:+.2f}&#8593;</span>', 1
+        elif cvd < -0.1:
+            cvd_cell, cvd_dir = f'<span class="l2-ok">{cvd:+.2f}&#8595;</span>', -1
         else:
-            cvd_cell = f'<span class="l2-fail">{cvd:+.2f}</span>'
-            cvd_pass = False
+            cvd_cell, cvd_dir = f'<span class="l2-fail">{cvd:+.2f}</span>', 0
 
         if bd > 0 and ad > 0:
             ratio = bd / ad
-            if abs(ratio - 1.0) > 0.2:
-                depth_cell = f'<span class="l2-ok">{ratio:.2f}&times;</span>'
-                depth_pass = True
+            if ratio > 1.2:
+                depth_cell, depth_dir = f'<span class="l2-ok">{ratio:.2f}&times;&#8593;</span>', 1
+            elif ratio < 0.83:
+                depth_cell, depth_dir = f'<span class="l2-ok">{ratio:.2f}&times;&#8595;</span>', -1
             else:
-                depth_cell = f'<span class="l2-fail">{ratio:.2f}&times;</span>'
-                depth_pass = False
+                depth_cell, depth_dir = f'<span class="l2-fail">{ratio:.2f}&times;</span>', 0
         else:
-            depth_cell, depth_pass = '<span class="muted">&mdash;</span>', False
+            depth_cell, depth_dir = '<span class="muted">&mdash;</span>', 0
 
         whale = '&#128011;' if abs(lt) > 0.2 else '&nbsp;'
         whale_cell = f'<span class="l2-whale">{whale} {lt:+.2f}</span>' if lt else f'<span>{whale}</span>'
 
-        passing = sum([br_pass, cvd_pass, depth_pass])
-        if passing == 3:
-            ready_cell = '<span class="l2-ready">&#9989; 3/3</span>'
-        elif passing >= 1:
-            ready_cell = f'<span class="l2-partial">&#128992; {passing}/3</span>'
+        # Aligned direction: all 3 leaning same way (no opposites, at least 1 directional)
+        dirs = [d for d in (br_dir, cvd_dir, depth_dir) if d != 0]
+        long_count = sum(1 for d in dirs if d == 1)
+        short_count = sum(1 for d in dirs if d == -1)
+        if long_count == 3:
+            ready_cell = '<span class="l2-ready">&#9989; LONG 3/3</span>'
+        elif short_count == 3:
+            ready_cell = '<span class="l2-ready">&#9989; SHORT 3/3</span>'
+        elif long_count > 0 and short_count > 0:
+            ready_cell = f'<span class="l2-partial">&#9888;&#65039; MIXED {long_count}L/{short_count}S</span>'
+        elif long_count > 0:
+            ready_cell = f'<span class="l2-partial">&#128992; LONG {long_count}/3</span>'
+        elif short_count > 0:
+            ready_cell = f'<span class="l2-partial">&#128992; SHORT {short_count}/3</span>'
         else:
             ready_cell = '<span class="l2-fail">&#128308; 0/3</span>'
 
