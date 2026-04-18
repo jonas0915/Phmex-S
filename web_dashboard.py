@@ -1415,7 +1415,7 @@ def build_content() -> str:
 </div>
 
 <div class="footer">
-    Auto-refresh 20s &middot; Charts {CHART_INTERVAL}s &middot; Read-only &middot; Zero API calls
+    Auto-refresh 3s &middot; Charts {CHART_INTERVAL}s &middot; Read-only &middot; Zero API calls
 </div>"""
 
 
@@ -2036,7 +2036,7 @@ tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
       }});
     }} catch(e) {{}}
   }}
-  setInterval(refresh, 20000);
+  setInterval(refresh, 3000);
 }})();
 </script>
 </body>
