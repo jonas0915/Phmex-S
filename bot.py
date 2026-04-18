@@ -283,7 +283,7 @@ class Phmex2Bot:
 
         # 4. Hurst regime match — must align with strategy type
         reversion_strats = {"vwap_reversion", "htf_confluence_vwap", "bb_mean_reversion"}
-        trend_strats = {"momentum_continuation", "trend_pullback", "keltner_squeeze", "htf_confluence_pullback"}
+        trend_strats = {"momentum_continuation", "trend_pullback", "keltner_squeeze", "htf_confluence_pullback", "htf_l2_anticipation"}
         if hurst_val and not (hurst_val != hurst_val):  # not NaN
             if hurst_val > 0.55 and (not strategy or strategy in trend_strats):
                 confirmed.append("hurst_trend")
@@ -1134,7 +1134,7 @@ class Phmex2Bot:
 
                 # Cluster throttle: max 1 htf_confluence_pullback entry per 30 min
                 # Data: 27/57 htf cluster entries = -$14.10. Solo entries = -$0.37 (breakeven).
-                if strat_name == "htf_confluence_pullback" and time.time() - self._last_htf_entry_time < 1800:
+                if strat_name in ("htf_confluence_pullback", "htf_l2_anticipation") and time.time() - self._last_htf_entry_time < 1800:
                     logger.info(f"[HTF THROTTLE] {symbol} {direction} skipped — htf entry {(time.time() - self._last_htf_entry_time)/60:.0f}min ago, need 30min gap")
                     continue
 
