@@ -264,6 +264,53 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
 | PnL | ${today_pnl:.2f} | ${paper_today_pnl:.2f} |
 """
 
+    # NARROW paper slot section (new)
+    narrow_state_file = os.path.join(BOT_DIR, "trading_state_5m_narrow.json")
+    narrow_today = []
+    narrow_bc = {"blocked_symbol": 0, "blocked_hour": 0, "blocked_ensemble": 0}
+    narrow_today_pnl = 0.0
+    narrow_today_wr = 0.0
+    narrow_delta = 0.0
+    narrow_exists = os.path.exists(narrow_state_file)
+    if narrow_exists:
+        try:
+            with open(narrow_state_file) as f:
+                n_state = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            n_state = {}
+        for t in n_state.get("closed_trades", []) or []:
+            closed_at = t.get("closed_at", 0)
+            if closed_at and datetime.fromtimestamp(closed_at, tz=CA_TZ).strftime("%Y-%m-%d") == date_str:
+                narrow_today.append(t)
+        try:
+            with open(os.path.join(BOT_DIR, "trading_state_5m_narrow_blocked.json")) as bf:
+                bc = json.load(bf) or {}
+        except (FileNotFoundError, json.JSONDecodeError):
+            bc = {}
+        for k in narrow_bc:
+            narrow_bc[k] = bc.get(k, 0)
+        narrow_today_wins = sum(1 for t in narrow_today if _net(t) > 0)
+        narrow_today_pnl = sum(_net(t) for t in narrow_today)
+        narrow_today_wr = (narrow_today_wins / len(narrow_today) * 100) if narrow_today else 0
+        narrow_delta = narrow_today_pnl - today_pnl
+
+    report += "\n## NARROW Paper Slot\n"
+    if not narrow_exists:
+        report += "_No state file yet — slot has not run._\n"
+        report += f"- Blocked: symbol={narrow_bc['blocked_symbol']} "
+        report += f"hour={narrow_bc['blocked_hour']} ensemble={narrow_bc['blocked_ensemble']}\n"
+    else:
+        narrow_today_wins = sum(1 for t in narrow_today if _net(t) > 0)
+        report += f"- Trades today: {len(narrow_today)} "
+        report += f"({narrow_today_wins}W / {len(narrow_today)-narrow_today_wins}L)\n"
+        report += f"- Win Rate: {narrow_today_wr:.1f}%\n"
+        report += f"- PnL today: ${narrow_today_pnl:.2f}\n"
+        report += (
+            f"- Blocked: symbol={narrow_bc['blocked_symbol']} "
+            f"hour={narrow_bc['blocked_hour']} ensemble={narrow_bc['blocked_ensemble']}\n"
+        )
+        report += f"- Delta vs Live: ${narrow_delta:+.2f} (NARROW minus Live)\n"
+
     # Save
     report_path = os.path.join(REPORT_DIR, f"{date_str}.md")
     with open(report_path, "w") as f:
@@ -359,6 +406,42 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
         msg += (
             f"\n🔵 <b>Paper Slot (ADX+SMA+VWAP)</b>\n"
             f"{len(pt)} trades | {pt_wr:.0f}% WR | {pt_sign}${pt_pnl:.2f}\n"
+        )
+
+    # NARROW paper slot block (new)
+    narrow_state_file = os.path.join(BOT_DIR, "trading_state_5m_narrow.json")
+    if os.path.exists(narrow_state_file):
+        try:
+            with open(narrow_state_file) as f:
+                ns = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            ns = {}
+        nc = ns.get("closed_trades", []) or []
+        nt = [t for t in nc if t.get("closed_at") and datetime.fromtimestamp(t["closed_at"], tz=CA_TZ).strftime("%Y-%m-%d") == date_str]
+        nt_wins = sum(1 for t in nt if _net(t) > 0)
+        nt_pnl = sum(_net(t) for t in nt)
+        nt_wr = (nt_wins / len(nt) * 100) if nt else 0
+        try:
+            with open(os.path.join(BOT_DIR, "trading_state_5m_narrow_blocked.json")) as bf:
+                bc = json.load(bf) or {}
+        except (FileNotFoundError, json.JSONDecodeError):
+            bc = {}
+        b_sym = bc.get("blocked_symbol", 0)
+        b_hr = bc.get("blocked_hour", 0)
+        b_ens = bc.get("blocked_ensemble", 0)
+        nt_sign = "+" if nt_pnl >= 0 else ""
+        delta = nt_pnl - today_pnl
+        d_sign = "+" if delta >= 0 else ""
+        msg += (
+            f"\n🧪 <b>NARROW (paper)</b>\n"
+            f"{len(nt)} trades | {nt_wr:.0f}% WR | {nt_sign}${nt_pnl:.2f}\n"
+            f"Blocked: sym={b_sym} hr={b_hr} ens={b_ens}\n"
+            f"Δ vs Live: {d_sign}${delta:.2f}\n"
+        )
+    else:
+        msg += (
+            "\n🧪 <b>NARROW (paper)</b>\n"
+            "No state file yet — slot has not run.\n"
         )
 
     try:

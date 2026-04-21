@@ -52,17 +52,17 @@ Four parallel audits found v1 was directionally correct but had four blocking is
 
 ### Q1 — Bot fixes C1/C2/C3/I9/I18
 
-Only C1 landed. C2, C3, I9 NOT landed. I18 defanged (1h_momentum slot removed in 67a8aa3 but code path still bugged).
+C1 and C2 landed. C3 and I9 NOT landed. I18 defanged (1h_momentum slot removed in 67a8aa3 but code path still bugged).
 
 | ID | Status | Location |
 |---|---|---|
-| C1 | ✅ LANDED (commit 2c89ad8) | bot.py:1037 strategy-name fix |
-| C2 | ❌ NOT LANDED | bot.py:1419-1424 paper slot missing cvd_slope carve-out |
+| C1 | ✅ LANDED (commit 2c89ad8) | bot.py:1113 strategy-name fix |
+| C2 | ✅ LANDED (verified 2026-04-20) | bot.py:1623-1625 paper-path carve-out exempts same tuple as live |
 | C3 | ❌ NOT LANDED | bot.py:1678 `_sync_exchange_closes` fee-match race |
 | I9 | ❌ NOT LANDED | exchange.py:225 REST-fallback CVD not normalized (9-OOM bug) |
 | I18 | ⚠️ OBVIATED | bot.py:1355-1358 code still bugged; slot removed in 67a8aa3 |
 
-**Implication:** Phase 2a (fee reduction) is formally blocked per `reference_recursive_improvement.md:52` until C2/C3/I9 land.
+**Implication:** Phase 2a (fee reduction) formally blocked per `reference_recursive_improvement.md:52` until C3/I9 land (was C2/C3/I9 — C2 now closed).
 
 ### Q2 — Reconcile CLEAN streak
 

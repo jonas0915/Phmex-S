@@ -106,8 +106,10 @@ async def cmd_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         import glob
         msg = "📋 <b>Slots</b>\n"
+        narrow_path = os.path.join(BOT_DIR, "trading_state_5m_narrow.json")
         for path in sorted(glob.glob(os.path.join(BOT_DIR, "trading_state_*.json"))):
             slot_name = os.path.basename(path).replace("trading_state_", "").replace(".json", "")
+            is_narrow = (path == narrow_path)
             try:
                 with open(path) as f:
                     state = json.load(f)
@@ -115,6 +117,30 @@ async def cmd_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 msg += f"\n{slot_name}: ERROR ({e})"
                 continue
             trades = state.get("closed_trades", [])
+            if is_narrow:
+                try:
+                    with open(os.path.join(BOT_DIR, "trading_state_5m_narrow_blocked.json")) as bf:
+                        bc = json.load(bf) or {}
+                except (FileNotFoundError, json.JSONDecodeError):
+                    bc = {"blocked_symbol": 0, "blocked_hour": 0, "blocked_ensemble": 0}
+                b_sym = bc.get("blocked_symbol", 0)
+                b_hr = bc.get("blocked_hour", 0)
+                b_ens = bc.get("blocked_ensemble", 0)
+                if not trades:
+                    msg += (
+                        f"\n🧪 NARROW (paper) | 0 trades | "
+                        f"blocked: sym={b_sym} hr={b_hr} ens={b_ens}"
+                    )
+                    continue
+                wins = sum(1 for t in trades if t.get("pnl_usdt", 0) > 0)
+                pnl = sum(t.get("pnl_usdt", 0) for t in trades)
+                wr = wins / len(trades) * 100
+                msg += (
+                    f"\n🧪 NARROW (paper) | {len(trades)} trades | "
+                    f"WR: {wr:.0f}% | PnL: ${pnl:+.2f} | "
+                    f"blocked: sym={b_sym} hr={b_hr} ens={b_ens}"
+                )
+                continue
             if not trades:
                 msg += f"\n{slot_name}: 0 trades"
                 continue
@@ -122,9 +148,84 @@ async def cmd_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pnl = sum(t.get("pnl_usdt", 0) for t in trades)
             wr = wins / len(trades) * 100
             msg += f"\n{slot_name}: {len(trades)} trades | {wr:.0f}% WR | ${pnl:+.2f}"
+        # If narrow file doesn't exist yet, still surface a zeroed line.
+        if not os.path.exists(narrow_path):
+            msg += "\n🧪 NARROW (paper) | 0 trades | blocked: sym=0 hr=0 ens=0 (no state file yet)"
         await update.message.reply_text(msg, parse_mode="HTML")
     except Exception as e:
         await update.message.reply_text(f"Error: {e}")
+
+
+async def cmd_narrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Detailed NARROW paper slot view — 7/14/30d stats, blocked counts, today's trades."""
+    if not check_auth(update):
+        return
+    from datetime import datetime, timezone, timedelta
+    path = os.path.join(BOT_DIR, "trading_state_5m_narrow.json")
+    if not os.path.exists(path):
+        await update.message.reply_text(
+            "🧪 <b>NARROW (paper)</b>\nNo state file yet — slot has not run.\n"
+            "blocked: sym=0 hr=0 ens=0",
+            parse_mode="HTML",
+        )
+        return
+    try:
+        with open(path) as f:
+            state = json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        await update.message.reply_text(f"Error reading NARROW state: {e}")
+        return
+
+    trades = state.get("closed_trades", []) or []
+    try:
+        with open(os.path.join(BOT_DIR, "trading_state_5m_narrow_blocked.json")) as bf:
+            bc = json.load(bf) or {}
+    except (FileNotFoundError, json.JSONDecodeError):
+        bc = {"blocked_symbol": 0, "blocked_hour": 0, "blocked_ensemble": 0}
+    b_sym = bc.get("blocked_symbol", 0)
+    b_hr = bc.get("blocked_hour", 0)
+    b_ens = bc.get("blocked_ensemble", 0)
+
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+
+    def _window(days):
+        cutoff = (now - timedelta(days=days)).timestamp()
+        sel = [t for t in trades if t.get("closed_at", 0) >= cutoff]
+        n = len(sel)
+        if n == 0:
+            return (0, 0.0, 0.0)
+        wins = sum(1 for t in sel if t.get("pnl_usdt", 0) > 0)
+        pnl = sum(t.get("pnl_usdt", 0) for t in sel)
+        wr = wins / n * 100
+        return (n, wr, pnl)
+
+    n7, wr7, pnl7 = _window(7)
+    n14, wr14, pnl14 = _window(14)
+    n30, wr30, pnl30 = _window(30)
+
+    today_trades = [t for t in trades if t.get("closed_at", 0) >= today_start]
+    today_pnl = sum(t.get("pnl_usdt", 0) for t in today_trades)
+    today_wins = sum(1 for t in today_trades if t.get("pnl_usdt", 0) > 0)
+
+    lines = [
+        "🧪 <b>NARROW (paper) — Detailed</b>",
+        f"7d:  {n7} trades | WR {wr7:.0f}% | ${pnl7:+.2f}",
+        f"14d: {n14} trades | WR {wr14:.0f}% | ${pnl14:+.2f}",
+        f"30d: {n30} trades | WR {wr30:.0f}% | ${pnl30:+.2f}",
+        "",
+        f"<b>Blocked counts</b>: symbol={b_sym} hour={b_hr} ensemble={b_ens}",
+        "",
+        f"<b>Today</b>: {len(today_trades)} trades "
+        f"({today_wins}W/{len(today_trades)-today_wins}L) | ${today_pnl:+.2f}",
+    ]
+    for t in today_trades[-5:]:
+        sym = t.get("symbol", "?")
+        side = (t.get("side", "?") or "?").upper()
+        pnl = t.get("pnl_usdt", 0)
+        reason = t.get("exit_reason") or t.get("reason") or "?"
+        lines.append(f"  {side} {sym} | ${pnl:+.2f} | {reason}")
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
 
 async def cmd_kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -336,6 +437,7 @@ def main():
         app.add_handler(CommandHandler("status", cmd_status))
         app.add_handler(CommandHandler("balance", cmd_balance))
         app.add_handler(CommandHandler("slots", cmd_slots))
+        app.add_handler(CommandHandler("narrow", cmd_narrow))
         app.add_handler(CommandHandler("kill", cmd_kill))
         app.add_handler(CommandHandler("pause", cmd_pause))
         app.add_handler(CommandHandler("resume", cmd_resume))

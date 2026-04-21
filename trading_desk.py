@@ -568,6 +568,7 @@ let facilityWalking = false;
 let facilityWalkFrom = null;
 let facilityWalkTo = null;
 let facilityWalkStart = null;
+let facilityWalkPath = null;
 let facilityReturning = false;
 let facilityLocation = null;
 
@@ -1181,7 +1182,7 @@ function createSFPanorama(facing, hour) {
 
     // Golden Gate Bridge (visible far left, behind headlands — international orange)
     {
-      const ggO = isDaytime ? '#c04030' : '#8a2a1e';
+      const ggO = isDaytime ? '#c0362c' : '#9a3a25';
       // Distant towers (small due to distance)
       ctx.fillStyle = ggO;
       ctx.fillRect(55*S, landY-38*S, 4*S, 28*S);
@@ -1451,6 +1452,100 @@ function createSFPanorama(facing, hour) {
       drawBuilding(x, landY, (8+Math.random()*12)*S, (15+Math.random()*25)*S, {depth:1});
     }
 
+    // Painted Ladies — Alamo Square Victorian rowhouses (inland, on hill slope)
+    {
+      const ladyColors = ['#d4b896','#c4866b','#8a9ab4','#b4a4c8','#d4c488','#a48878'];
+      const ladyW = 22*S, ladyH = 28*S;
+      const ladyBaseX = 200*S;
+      for(let i=0; i<6; i++) {
+        const lx = ladyBaseX + i*ladyW;
+        const ly = landY - ladyH;
+        const col = ladyColors[i];
+        // Main body
+        ctx.fillStyle = col;
+        ctx.fillRect(lx, ly, ladyW, ladyH);
+        // Pitched triangular roof
+        ctx.fillStyle = isDaytime ? '#5a4030' : '#1a1210';
+        ctx.beginPath();
+        ctx.moveTo(lx, ly);
+        ctx.lineTo(lx+ladyW/2, ly-8*S);
+        ctx.lineTo(lx+ladyW, ly);
+        ctx.closePath();
+        ctx.fill();
+        // Bay window (darker fill, protruding center)
+        const bayW = 10*S, bayH = 16*S;
+        const bayX = lx + (ladyW-bayW)/2;
+        const bayY = ly + 8*S;
+        const [cr,cg,cbb] = parseHex(col);
+        ctx.fillStyle = `rgb(${Math.max(0,cr-40)},${Math.max(0,cg-40)},${Math.max(0,cbb-40)})`;
+        ctx.fillRect(bayX, bayY, bayW, bayH);
+        // Trim line between stories
+        ctx.fillStyle = isDaytime ? 'rgba(255,255,255,0.6)' : 'rgba(180,170,150,0.3)';
+        ctx.fillRect(lx, ly+ladyH/2, ladyW, S*0.5);
+        // Windows — 2 stories, 2 per story on sides of bay
+        for(let story=0; story<2; story++) {
+          for(let w=0; w<2; w++) {
+            const winX = lx + (w===0 ? 2*S : ladyW-5*S);
+            const winY = ly + 4*S + story*(ladyH/2);
+            ctx.fillStyle = isDaytime ? 'rgba(80,90,110,0.5)' : `rgba(255,220,140,${wb*0.75})`;
+            ctx.fillRect(winX, winY, 3*S, 5*S);
+          }
+          // Bay window panes (2 side panes)
+          ctx.fillStyle = isDaytime ? 'rgba(80,90,110,0.5)' : `rgba(255,225,150,${wb*0.8})`;
+          ctx.fillRect(bayX+S, bayY + story*(bayH/2) + S, 3*S, 5*S);
+          ctx.fillRect(bayX+bayW-4*S, bayY + story*(bayH/2) + S, 3*S, 5*S);
+        }
+      }
+    }
+
+    // Oracle Park — waterfront stadium (foreground, along the bay)
+    {
+      const stadW = 220*S, stadH = 18*S;
+      const stadX = 80*S;
+      const stadY = landY - stadH;
+      // Low curved stadium silhouette
+      ctx.fillStyle = isDaytime ? '#4a5560' : '#14181f';
+      ctx.beginPath();
+      ctx.moveTo(stadX, landY);
+      ctx.lineTo(stadX, stadY + 6*S);
+      ctx.quadraticCurveTo(stadX + stadW/2, stadY - 4*S, stadX + stadW, stadY + 6*S);
+      ctx.lineTo(stadX + stadW, landY);
+      ctx.closePath();
+      ctx.fill();
+      // Dark brick-red right field wall
+      ctx.fillStyle = isDaytime ? '#7a3a28' : '#2a1410';
+      ctx.fillRect(stadX + stadW - 55*S, stadY + 8*S, 55*S, stadH - 8*S);
+      // Top rim highlight
+      ctx.fillStyle = isDaytime ? 'rgba(220,220,230,0.3)' : 'rgba(60,70,85,0.8)';
+      ctx.beginPath();
+      ctx.moveTo(stadX+2*S, stadY + 7*S);
+      ctx.quadraticCurveTo(stadX + stadW/2, stadY - 3*S, stadX + stadW - 2*S, stadY + 7*S);
+      ctx.lineTo(stadX + stadW - 2*S, stadY + 9*S);
+      ctx.quadraticCurveTo(stadX + stadW/2, stadY - 1*S, stadX+2*S, stadY + 9*S);
+      ctx.closePath();
+      ctx.fill();
+      // 6 tall thin light pylons with bright white glow on top
+      const pylonH = 35*S;
+      for(let p=0; p<6; p++) {
+        const px = stadX + 15*S + p*((stadW - 30*S)/5);
+        const py = stadY - pylonH + 6*S;
+        ctx.fillStyle = isDaytime ? '#5a6068' : '#1a1e24';
+        ctx.fillRect(px, py, S, pylonH);
+        // Glow circle on top
+        ctx.fillStyle = isDaytime ? 'rgba(255,255,240,0.9)' : `rgba(255,255,230,${0.6+wb*0.4})`;
+        ctx.beginPath();
+        ctx.arc(px + S/2, py, 2*S, 0, Math.PI*2);
+        ctx.fill();
+        // Soft outer glow (night)
+        if(!isDaytime) {
+          ctx.fillStyle = `rgba(255,255,220,${wb*0.25})`;
+          ctx.beginPath();
+          ctx.arc(px + S/2, py, 5*S, 0, Math.PI*2);
+          ctx.fill();
+        }
+      }
+    }
+
     // 280 freeway overpass (concrete highway in foreground-right)
     ctx.fillStyle = isDaytime ? '#8a8880' : '#2a2a28';
     ctx.fillRect(750*S, landY-8*S, 200*S, 4*S);
@@ -1502,7 +1597,58 @@ function createSFPanorama(facing, hour) {
     }
   }
   else if(facing === 'east') {
-    // ── EAST — Bay Bridge (main feature), Oakland skyline, port cranes ──
+    // ── EAST — Bay Bridge (main feature), Ferry Building, Oakland skyline, port cranes ──
+
+    // Ferry Building — iconic Embarcadero landmark with clock tower (foreground right, waterfront)
+    {
+      const fbX = 140*S;
+      const fbY = landY - 14*S;
+      const fbW = 90*S;
+      const fbH = 14*S;
+      // Long arcaded base (cream/limestone)
+      ctx.fillStyle = isDaytime ? '#d8cdb0' : '#3a3428';
+      ctx.fillRect(fbX, fbY, fbW, fbH);
+      // Arcade arches along the base
+      ctx.fillStyle = isDaytime ? '#b8a888' : '#1e1a12';
+      for(let ax=fbX+3*S; ax<fbX+fbW-3*S; ax+=6*S) {
+        ctx.beginPath(); ctx.arc(ax, fbY+fbH-3*S, 1.8*S, Math.PI, 0); ctx.fill();
+      }
+      // Roof line
+      ctx.fillStyle = isDaytime ? '#8a7a5a' : '#2a2418';
+      ctx.fillRect(fbX, fbY-2*S, fbW, 2*S);
+      // Clock tower — centered, tall square shaft
+      const ctX = fbX + fbW*0.5;
+      const ctW = 10*S;
+      const ctH = 38*S;
+      const ctTop = fbY - ctH;
+      ctx.fillStyle = isDaytime ? '#d8cdb0' : '#3a3428';
+      ctx.fillRect(ctX-ctW/2, ctTop, ctW, ctH);
+      // Clock face — white circle
+      ctx.fillStyle = isDaytime ? '#f4f0e4' : '#c8c0a8';
+      ctx.beginPath(); ctx.arc(ctX, ctTop+10*S, 3.2*S, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = isDaytime ? '#3a2e20' : '#1a1408';
+      ctx.lineWidth = 0.6*S;
+      ctx.beginPath(); ctx.arc(ctX, ctTop+10*S, 3.2*S, 0, Math.PI*2); ctx.stroke();
+      // Clock hands
+      ctx.beginPath(); ctx.moveTo(ctX, ctTop+10*S); ctx.lineTo(ctX+1.5*S, ctTop+9*S); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ctX, ctTop+10*S); ctx.lineTo(ctX, ctTop+7.5*S); ctx.stroke();
+      // Pyramidal roof
+      ctx.fillStyle = isDaytime ? '#6a5a42' : '#1a1408';
+      ctx.beginPath();
+      ctx.moveTo(ctX-ctW/2-1*S, ctTop);
+      ctx.lineTo(ctX, ctTop-8*S);
+      ctx.lineTo(ctX+ctW/2+1*S, ctTop);
+      ctx.closePath(); ctx.fill();
+      // Flagpole
+      ctx.fillStyle = isDaytime ? '#888' : '#444';
+      ctx.fillRect(ctX-0.3*S, ctTop-14*S, 0.6*S, 6*S);
+      // Window rows on tower
+      ctx.fillStyle = isDaytime ? 'rgba(60,50,40,0.5)' : `rgba(255,220,140,${wb*0.6})`;
+      for(let wy=ctTop+16*S; wy<fbY-2*S; wy+=5*S) {
+        ctx.fillRect(ctX-2*S, wy, 1.2*S, 2.5*S);
+        ctx.fillRect(ctX+0.8*S, wy, 1.2*S, 2.5*S);
+      }
+    }
 
     // Oakland Hills (ridgeline — far background with atmospheric perspective)
     ctx.fillStyle = isDaytime ? '#5a7a58' : '#1a2a25';
@@ -1820,9 +1966,62 @@ function createSFPanorama(facing, hour) {
       ctx.fillRect(pyrX+pyrBase, landY-40*S, 3*S, 40*S);
     }
 
-    // Golden Gate Bridge (northwest, international orange #c04030)
-    const ggOrange = isDaytime ? '#c04030' : '#8a2a1e';
-    const ggDark = isDaytime ? '#a03525' : '#6a2015';
+    // Salesforce Tower (tallest in SF, 1070ft, tapered obelisk with LED crown) — THE iconic SF landmark
+    {
+      const sfX = 615*S;
+      const sfTop = landY - 220*S;
+      const sfBaseW = 22*S;
+      const sfTopW = 16*S;  // tapered ~25% narrower at top
+      // Main tapered body
+      const sfGrad = ctx.createLinearGradient(sfX, landY, sfX, sfTop);
+      if(isDaytime) { sfGrad.addColorStop(0,'#5a7090'); sfGrad.addColorStop(0.5,'#728aa8'); sfGrad.addColorStop(1,'#8aa0bb'); }
+      else { sfGrad.addColorStop(0,'#1a2838'); sfGrad.addColorStop(0.5,'#223248'); sfGrad.addColorStop(1,'#2a3850'); }
+      ctx.fillStyle = sfGrad;
+      ctx.beginPath();
+      ctx.moveTo(sfX-sfBaseW, landY);
+      ctx.lineTo(sfX-sfTopW, sfTop+8*S);
+      ctx.lineTo(sfX, sfTop);
+      ctx.lineTo(sfX+sfTopW, sfTop+8*S);
+      ctx.lineTo(sfX+sfBaseW, landY);
+      ctx.closePath(); ctx.fill();
+      // Glass reflection streak
+      ctx.fillStyle = isDaytime ? 'rgba(200,220,245,0.18)' : 'rgba(120,160,210,0.10)';
+      ctx.beginPath();
+      ctx.moveTo(sfX-3*S, landY); ctx.lineTo(sfX-2*S, sfTop+8*S); ctx.lineTo(sfX+2*S, sfTop+8*S); ctx.lineTo(sfX+3*S, landY); ctx.closePath(); ctx.fill();
+      // Grid windows (taper matches body)
+      for(let wy=landY-8*S; wy>sfTop+10*S; wy-=3.5*S) {
+        const prog = (landY - wy) / (220*S);
+        const ww = sfBaseW - (sfBaseW - sfTopW) * prog;
+        for(let wx=-ww+2*S; wx<ww-2*S; wx+=3*S) {
+          if(Math.random()>0.3) {
+            ctx.fillStyle = isDaytime ? `rgba(190,210,235,0.15)` : `rgba(255,${220+Math.random()*30},${140+Math.random()*70},${wb*(0.5+Math.random()*0.5)})`;
+            ctx.fillRect(sfX+wx, wy, 2*S, 2.2*S);
+          }
+        }
+      }
+      // LED crown art (Jim Campbell) — pulsing vertical column in top 20%
+      if(!isDaytime) {
+        const pulse = 0.6 + 0.4 * Math.sin(hour * 0.7);
+        const crownG = ctx.createLinearGradient(sfX, sfTop, sfX, sfTop+40*S);
+        crownG.addColorStop(0, `rgba(200,220,255,${pulse*0.85})`);
+        crownG.addColorStop(1, `rgba(180,200,240,0.0)`);
+        ctx.fillStyle = crownG;
+        ctx.fillRect(sfX-3*S, sfTop, 6*S, 40*S);
+        // Bright tip glow
+        ctx.fillStyle = `rgba(220,230,255,${pulse})`;
+        ctx.beginPath(); ctx.arc(sfX, sfTop+4*S, 5*S, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = `rgba(180,210,255,${pulse*0.3})`;
+        ctx.beginPath(); ctx.arc(sfX, sfTop+4*S, 14*S, 0, Math.PI*2); ctx.fill();
+      } else {
+        // Daytime rounded dome crown
+        ctx.fillStyle = '#9aafc8';
+        ctx.beginPath(); ctx.arc(sfX, sfTop+4*S, 4*S, Math.PI, 0); ctx.fill();
+      }
+    }
+
+    // Golden Gate Bridge (northwest, international orange — brighter, accurate)
+    const ggOrange = isDaytime ? '#c0362c' : '#9a3a25';
+    const ggDark = isDaytime ? '#982a20' : '#7a2a18';
     // Tower 1 (south tower, closer = larger)
     const ggT1x = 700*S, ggT1top = landY-72*S;
     ctx.fillStyle = ggOrange;
@@ -2169,7 +2368,15 @@ const PENTHOUSE_RAD = ROOM_W * 0.65; // match towerRadTop
     if(i === 0) floorShape.moveTo(px, py);
     else floorShape.lineTo(px, py);
   }
-  // Note: stairwell hole removed — stairs are outside cylinder radius
+  // Stairwell hole at main→B1 stair position (world X [-5.5,-3.5], world Z [2.5,4.5])
+  // Shape Y maps to world -Z under rotation.x=-π/2, so use shape Y [-4.5,-2.5]
+  const phHole = new THREE.Path();
+  phHole.moveTo(-5.5, -4.5);
+  phHole.lineTo(-3.5, -4.5);
+  phHole.lineTo(-3.5, -2.5);
+  phHole.lineTo(-5.5, -2.5);
+  phHole.lineTo(-5.5, -4.5);
+  floorShape.holes.push(phHole);
   const floorGeo = new THREE.ShapeGeometry(floorShape);
   const floor = new THREE.Mesh(floorGeo, floorMat);
   floor.rotation.x = -Math.PI/2;
@@ -3451,7 +3658,7 @@ scene.add(beamRing);
   }
 
   // ── EARLY MATERIAL DECLARATIONS (needed by landmarks below) ──
-  const winMat = new THREE.MeshBasicMaterial({color:0xfff0cc, transparent:true, opacity:0.9, side:THREE.DoubleSide});
+  const winMat = new THREE.MeshBasicMaterial({color:0xffd88a, transparent:true, opacity:0.98, side:THREE.DoubleSide});
   const avLightMat = new THREE.MeshBasicMaterial({color:0xff2200, emissive:0xff2200});
 
   // ── SF HILLS (the city's famous 7 hills + more) ──
@@ -3881,7 +4088,7 @@ scene.add(beamRing);
       const rows = Math.max(2, Math.floor(h / 2.5));
       for(let c = 0; c < cols; c++) {
         for(let r = 0; r < rows; r++) {
-          if(Math.random() < 0.6) continue;
+          if(Math.random() < 0.3) continue;
           const wn = new THREE.Mesh(winGeo, winMat);
           const along = -w/2*0.7 + c * (w*0.7*2/Math.max(cols-1,1));
           const wy = h*0.1 + r * (h*0.8/Math.max(rows-1,1));
@@ -3923,6 +4130,29 @@ scene.add(beamRing);
       g.add(light);
     }
 
+    // Aviation red beacon for tall buildings (h > 30)
+    if(h > 30) {
+      const beacon = new THREE.Mesh(
+        new THREE.SphereGeometry(0.22, 6, 6),
+        new THREE.MeshBasicMaterial({color: 0xff3030})
+      );
+      beacon.position.set(0, h + 0.5, 0);
+      g.add(beacon);
+      const pl = new THREE.PointLight(0xff3030, 0.3, 8);
+      pl.position.set(0, h + 0.6, 0);
+      g.add(pl);
+    }
+    // Occasional green/white rooftop glow for mid-rise h > 20
+    if(h > 20 && h <= 30 && Math.random() < 0.25) {
+      const glowCol = Math.random() < 0.5 ? 0x66ff88 : 0xffffff;
+      const glow = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 6, 6),
+        new THREE.MeshBasicMaterial({color: glowCol})
+      );
+      glow.position.set(0, h + 0.35, 0);
+      g.add(glow);
+    }
+
     g.position.set(x, GROUND_Y, z);
     scene.add(g);
   }
@@ -3935,6 +4165,834 @@ scene.add(beamRing);
 
   // One Rincon Hill (south, near Bay Bridge approach)
   cityBuilding(12, 22, 3, 3, 36, true);
+
+  // ═══════════════════════════════════════════════════════
+  // NAMED SF LANDMARKS (iconic 3D geometry, not procedural)
+  // ═══════════════════════════════════════════════════════
+
+  // Transamerica Pyramid — distinctive white pyramid, NW of Salesforce
+  (function transamerica() {
+    const px = -14, pz = -14, ph = 48;
+    const g = new THREE.Group();
+    const pyrMat = new THREE.MeshStandardMaterial({color:0xe8e4d8, roughness:0.35, metalness:0.2});
+    const body = new THREE.Mesh(new THREE.ConeGeometry(3.6, ph, 4), pyrMat);
+    body.position.set(0, ph/2, 0); body.rotation.y = Math.PI/4; g.add(body);
+    // Twin wing protrusions (elevator shafts)
+    const wingMat = new THREE.MeshStandardMaterial({color:0xd8d0c0, roughness:0.4});
+    const wingW = 0.8, wingH = ph*0.55, wingD = 1.6;
+    const wL = new THREE.Mesh(new THREE.BoxGeometry(wingW, wingH, wingD), wingMat);
+    wL.position.set(-2.6, wingH/2, 0); g.add(wL);
+    const wR = new THREE.Mesh(new THREE.BoxGeometry(wingW, wingH, wingD), wingMat);
+    wR.position.set(2.6, wingH/2, 0); g.add(wR);
+    // Spire
+    const spireMat = new THREE.MeshStandardMaterial({color:0xcccccc, metalness:0.7, roughness:0.2});
+    const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.18, 7, 6), spireMat);
+    spire.position.set(0, ph + 3.5, 0); g.add(spire);
+    // Beacon
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6),
+      new THREE.MeshBasicMaterial({color:0xff4422}));
+    beacon.position.set(0, ph + 7.2, 0); g.add(beacon);
+    const beaconLight = new THREE.PointLight(0xff3322, 0.8, 8);
+    beaconLight.position.set(0, ph + 7.2, 0); g.add(beaconLight);
+    g.position.set(px, GROUND_Y, pz);
+    scene.add(g);
+  })();
+
+  // 555 California (aka Bank of America Center) — iconic dark monolith
+  (function fiveFiveFive() {
+    const cx = -16, cz = -2, ch = 44;
+    const g = new THREE.Group();
+    const darkMat = new THREE.MeshStandardMaterial({color:0x3a3028, roughness:0.35, metalness:0.3});
+    // Chiseled facade — slightly irregular prism
+    const body = new THREE.Mesh(new THREE.BoxGeometry(4.5, ch, 4.5), darkMat);
+    body.position.set(0, ch/2, 0); g.add(body);
+    // Crown band
+    const crown = new THREE.Mesh(new THREE.BoxGeometry(4.7, 1.5, 4.7),
+      new THREE.MeshStandardMaterial({color:0x4a4038, roughness:0.4}));
+    crown.position.set(0, ch + 0.75, 0); g.add(crown);
+    // Warm window glow
+    for(let wy = 4; wy < ch - 2; wy += 2.5) {
+      for(let side = 0; side < 4; side++) {
+        const winMat2 = new THREE.MeshBasicMaterial({
+          color: Math.random() > 0.4 ? 0xffd080 : 0x2a2018, transparent:true, opacity:0.9
+        });
+        const wr = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 0.3), winMat2);
+        if(side === 0) { wr.position.set(0, wy, 2.27); }
+        else if(side === 1) { wr.position.set(0, wy, -2.27); wr.rotation.y = Math.PI; }
+        else if(side === 2) { wr.position.set(2.27, wy, 0); wr.rotation.y = Math.PI/2; }
+        else { wr.position.set(-2.27, wy, 0); wr.rotation.y = -Math.PI/2; }
+        g.add(wr);
+      }
+    }
+    g.position.set(cx, GROUND_Y, cz);
+    scene.add(g);
+  })();
+
+  // Coit Tower — fluted cylindrical landmark on Telegraph Hill (to the north)
+  (function coitTower() {
+    const tx = -6, tz = -32;
+    const g = new THREE.Group();
+    // Telegraph Hill — small green hill base
+    const hillMat = new THREE.MeshStandardMaterial({color:0x4a6a42, roughness:0.95});
+    const hill = new THREE.Mesh(new THREE.ConeGeometry(7, 5, 16), hillMat);
+    hill.position.set(0, 2.5, 0); g.add(hill);
+    // Tower shaft — cream/limestone cylinder
+    const towerMat = new THREE.MeshStandardMaterial({color:0xd8cfb8, roughness:0.6});
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.15, 11, 16), towerMat);
+    shaft.position.set(0, 5 + 5.5, 0); g.add(shaft);
+    // Fluted details (vertical stripes)
+    for(let a = 0; a < 8; a++) {
+      const flute = new THREE.Mesh(new THREE.BoxGeometry(0.08, 10.5, 0.25),
+        new THREE.MeshStandardMaterial({color:0xc8bfa8, roughness:0.7}));
+      const ang = (a / 8) * Math.PI * 2;
+      flute.position.set(Math.cos(ang) * 1.12, 5 + 5.25, Math.sin(ang) * 1.12);
+      flute.rotation.y = -ang;
+      g.add(flute);
+    }
+    // Crenellated top
+    for(let a = 0; a < 8; a++) {
+      const cren = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.6, 0.35), towerMat);
+      const ang = (a / 8) * Math.PI * 2;
+      cren.position.set(Math.cos(ang) * 1.05, 5 + 11.3, Math.sin(ang) * 1.05);
+      g.add(cren);
+    }
+    // Top observation ring
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 16),
+      new THREE.MeshStandardMaterial({color:0xb8ad96, roughness:0.5}));
+    ring.position.set(0, 5 + 11.15, 0); g.add(ring);
+    g.position.set(tx, GROUND_Y, tz);
+    scene.add(g);
+  })();
+
+  // Ferry Building — low arcaded building with clock tower on east waterfront
+  (function ferryBuilding() {
+    const fx = 24, fz = -6;
+    const g = new THREE.Group();
+    const bldgMat = new THREE.MeshStandardMaterial({color:0xd8cdb0, roughness:0.6});
+    const roofMat = new THREE.MeshStandardMaterial({color:0x5a4a38, roughness:0.7});
+    // Long base (east-west axis)
+    const base = new THREE.Mesh(new THREE.BoxGeometry(3.5, 4, 18), bldgMat);
+    base.position.set(0, 2, 0); g.add(base);
+    // Pitched roof
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.5, 18.2), roofMat);
+    roof.position.set(0, 4.25, 0); g.add(roof);
+    // Clock tower in center
+    const towerMat = new THREE.MeshStandardMaterial({color:0xd8cdb0, roughness:0.55});
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(2.2, 10, 2.2), towerMat);
+    tower.position.set(0, 5, 0); g.add(tower);
+    // Pyramidal roof on tower
+    const tRoof = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.5, 4),
+      new THREE.MeshStandardMaterial({color:0x4a3e2a, roughness:0.6}));
+    tRoof.position.set(0, 10 + 1.25, 0); tRoof.rotation.y = Math.PI/4; g.add(tRoof);
+    // Clock face — white circle on 4 sides
+    for(let i = 0; i < 4; i++) {
+      const face = new THREE.Mesh(new THREE.CircleGeometry(0.7, 20),
+        new THREE.MeshBasicMaterial({color:0xf4f0e4}));
+      const ang = (i / 4) * Math.PI * 2;
+      face.position.set(Math.cos(ang) * 1.12, 8.5, Math.sin(ang) * 1.12);
+      face.rotation.y = ang + Math.PI/2;
+      g.add(face);
+    }
+    // Window rows on the long base
+    for(let wz = -8; wz < 8; wz += 1.6) {
+      const w = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.2),
+        new THREE.MeshBasicMaterial({color:0xffd080, transparent:true, opacity:0.7}));
+      w.position.set(1.77, 2, wz); w.rotation.y = Math.PI/2; g.add(w);
+      const w2 = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1.2),
+        new THREE.MeshBasicMaterial({color:0xffd080, transparent:true, opacity:0.7}));
+      w2.position.set(-1.77, 2, wz); w2.rotation.y = -Math.PI/2; g.add(w2);
+    }
+    g.position.set(fx, GROUND_Y, fz);
+    scene.add(g);
+  })();
+
+  // ═══════════════════════════════════════════════════════
+  // ═══ BAY FEATURES ═══ — bridges, islands, headlands, port
+  // ═══════════════════════════════════════════════════════
+
+  // Golden Gate Bridge — international orange suspension bridge, NW of SF
+  (function goldenGate() {
+    const g = new THREE.Group();
+    const orangeMat = new THREE.MeshStandardMaterial({color:0xc0362c, roughness:0.55, metalness:0.25});
+    const cableMat = new THREE.MeshStandardMaterial({color:0x8a2a20, roughness:0.5, metalness:0.3});
+    const deckMat = new THREE.MeshStandardMaterial({color:0x6a2018, roughness:0.7, metalness:0.15});
+    const ax = -60, az = -20;
+    const bx = -120, bz = -90;
+    const dx = bx - ax, dz = bz - az;
+    const length = Math.sqrt(dx*dx + dz*dz);
+    const angle = Math.atan2(dz, dx);
+    const deckY = 6;
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(length, 0.6, 3.5), deckMat);
+    deck.position.set((ax+bx)/2, deckY, (az+bz)/2);
+    deck.rotation.y = -angle;
+    g.add(deck);
+    const towerH = 35;
+    const towerPositions = [0.3, 0.7];
+    const towerWorldPos = [];
+    towerPositions.forEach(t => {
+      const tx = ax + dx * t;
+      const tz = az + dz * t;
+      towerWorldPos.push({x:tx, z:tz});
+      for(let s = -1; s <= 1; s += 2) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(1.4, towerH, 1.4), orangeMat);
+        const perpX = -Math.sin(angle) * s * 1.6;
+        const perpZ =  Math.cos(angle) * s * 1.6;
+        leg.position.set(tx + perpX, towerH/2, tz + perpZ);
+        g.add(leg);
+      }
+      const cross = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.0, 1.0), orangeMat);
+      cross.position.set(tx, towerH - 3, tz);
+      cross.rotation.y = -angle;
+      g.add(cross);
+      const cross2 = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.8, 1.0), orangeMat);
+      cross2.position.set(tx, deckY + 0.4, tz);
+      cross2.rotation.y = -angle;
+      g.add(cross2);
+    });
+    const cablePts = [
+      {x:ax, y:deckY + 1, z:az},
+      {x:towerWorldPos[0].x, y:towerH - 1, z:towerWorldPos[0].z},
+      {x:towerWorldPos[1].x, y:towerH - 1, z:towerWorldPos[1].z},
+      {x:bx, y:deckY + 1, z:bz}
+    ];
+    function drawCable(p1, p2, sag, sideOffset) {
+      const segs = 10;
+      for(let i = 0; i < segs; i++) {
+        const t1 = i/segs, t2 = (i+1)/segs;
+        function pt(t) {
+          const x = p1.x + (p2.x-p1.x)*t;
+          const z = p1.z + (p2.z-p1.z)*t;
+          const y = p1.y + (p2.y-p1.y)*t - sag * 4 * t * (1-t);
+          const px = -Math.sin(angle) * sideOffset;
+          const pz =  Math.cos(angle) * sideOffset;
+          return {x:x+px, y:y, z:z+pz};
+        }
+        const a = pt(t1), b = pt(t2);
+        const sx = b.x-a.x, sy = b.y-a.y, sz = b.z-a.z;
+        const len = Math.sqrt(sx*sx+sy*sy+sz*sz);
+        const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, len, 6), cableMat);
+        seg.position.set((a.x+b.x)/2, (a.y+b.y)/2, (a.z+b.z)/2);
+        const up = new THREE.Vector3(0,1,0);
+        const dir = new THREE.Vector3(sx, sy, sz).normalize();
+        const q = new THREE.Quaternion().setFromUnitVectors(up, dir);
+        seg.quaternion.copy(q);
+        g.add(seg);
+      }
+    }
+    for(const side of [-1.4, 1.4]) {
+      drawCable(cablePts[0], cablePts[1], 2, side);
+      drawCable(cablePts[1], cablePts[2], 5, side);
+      drawCable(cablePts[2], cablePts[3], 2, side);
+    }
+    const lampMat = new THREE.MeshBasicMaterial({color:0xffeab0});
+    for(let t = 0.05; t < 1.0; t += 0.08) {
+      const lx = ax + dx * t;
+      const lz = az + dz * t;
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 4), lampMat);
+      lamp.position.set(lx, deckY + 1.2, lz);
+      g.add(lamp);
+    }
+    const ggLight = new THREE.PointLight(0xffaa66, 0.6, 40);
+    ggLight.position.set((ax+bx)/2, towerH, (az+bz)/2);
+    g.add(ggLight);
+    scene.add(g);
+  })();
+
+  // Bay Bridge — western suspension span (SF → Yerba Buena) + eastern cantilever to Oakland
+  (function bayBridge() {
+    const g = new THREE.Group();
+    const silverMat = new THREE.MeshStandardMaterial({color:0xcdd2d8, roughness:0.45, metalness:0.5});
+    const cableMat = new THREE.MeshStandardMaterial({color:0x8a909a, roughness:0.5, metalness:0.4});
+    const deckMat = new THREE.MeshStandardMaterial({color:0x555a60, roughness:0.7, metalness:0.2});
+    const ax = 35, az = -5;
+    const bx = 60, bz = -50;
+    const dx = bx - ax, dz = bz - az;
+    const len = Math.sqrt(dx*dx + dz*dz);
+    const angle = Math.atan2(dz, dx);
+    const deckY = 5.5;
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(len, 0.5, 3.0), deckMat);
+    deck.position.set((ax+bx)/2, deckY, (az+bz)/2);
+    deck.rotation.y = -angle;
+    g.add(deck);
+    const towerH = 30;
+    const towers = [0.33, 0.66];
+    const twPos = [];
+    towers.forEach(t => {
+      const tx = ax + dx*t, tz = az + dz*t;
+      twPos.push({x:tx, z:tz});
+      for(let s = -1; s <= 1; s += 2) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(1.1, towerH, 1.1), silverMat);
+        const perpX = -Math.sin(angle) * s * 1.3;
+        const perpZ =  Math.cos(angle) * s * 1.3;
+        leg.position.set(tx + perpX, towerH/2, tz + perpZ);
+        g.add(leg);
+      }
+      const cr = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.8, 0.8), silverMat);
+      cr.position.set(tx, towerH - 2.5, tz);
+      cr.rotation.y = -angle;
+      g.add(cr);
+    });
+    function drawBB(p1, p2, sag, sideOffset) {
+      const segs = 8;
+      for(let i = 0; i < segs; i++) {
+        const t1 = i/segs, t2 = (i+1)/segs;
+        function pt(t) {
+          const x = p1.x + (p2.x-p1.x)*t;
+          const z = p1.z + (p2.z-p1.z)*t;
+          const y = p1.y + (p2.y-p1.y)*t - sag * 4 * t * (1-t);
+          const px = -Math.sin(angle) * sideOffset;
+          const pz =  Math.cos(angle) * sideOffset;
+          return {x:x+px, y:y, z:z+pz};
+        }
+        const a = pt(t1), b = pt(t2);
+        const sx = b.x-a.x, sy = b.y-a.y, sz = b.z-a.z;
+        const ln = Math.sqrt(sx*sx+sy*sy+sz*sz);
+        const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, ln, 6), cableMat);
+        seg.position.set((a.x+b.x)/2, (a.y+b.y)/2, (a.z+b.z)/2);
+        const up = new THREE.Vector3(0,1,0);
+        const dir = new THREE.Vector3(sx, sy, sz).normalize();
+        seg.quaternion.setFromUnitVectors(up, dir);
+        g.add(seg);
+      }
+    }
+    const cPts = [
+      {x:ax, y:deckY+1, z:az},
+      {x:twPos[0].x, y:towerH-1, z:twPos[0].z},
+      {x:twPos[1].x, y:towerH-1, z:twPos[1].z},
+      {x:bx, y:deckY+1, z:bz}
+    ];
+    for(const side of [-1.2, 1.2]) {
+      drawBB(cPts[0], cPts[1], 1.5, side);
+      drawBB(cPts[1], cPts[2], 4, side);
+      drawBB(cPts[2], cPts[3], 1.5, side);
+    }
+    const lmat = new THREE.MeshBasicMaterial({color:0xffeab0});
+    for(let t = 0.05; t < 1.0; t += 0.1) {
+      const lx = ax + dx*t, lz = az + dz*t;
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 4), lmat);
+      lamp.position.set(lx, deckY + 1, lz);
+      g.add(lamp);
+    }
+    // Eastern cantilever: (60, -50) → (100, -25)
+    const ex = 60, ez = -50;
+    const fx2 = 100, fz2 = -25;
+    const edx = fx2 - ex, edz = fz2 - ez;
+    const eangle = Math.atan2(edz, edx);
+    const elen = Math.sqrt(edx*edx + edz*edz);
+    const edeck = new THREE.Mesh(new THREE.BoxGeometry(elen, 0.5, 2.6), deckMat);
+    edeck.position.set((ex+fx2)/2, deckY, (ez+fz2)/2);
+    edeck.rotation.y = -eangle;
+    g.add(edeck);
+    const pylons = 4;
+    for(let i = 1; i <= pylons; i++) {
+      const t = i/(pylons+1);
+      const px = ex + edx*t, pz = ez + edz*t;
+      const pyl = new THREE.Mesh(new THREE.BoxGeometry(0.8, deckY, 0.8), silverMat);
+      pyl.position.set(px, deckY/2, pz); g.add(pyl);
+      const truss = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.5), silverMat);
+      truss.position.set(px, deckY + 2, pz); g.add(truss);
+    }
+    scene.add(g);
+  })();
+
+  // Alcatraz Island
+  (function alcatraz() {
+    const g = new THREE.Group();
+    const rockMat = new THREE.MeshStandardMaterial({color:0x8a8070, roughness:0.95, metalness:0.05});
+    const prisonMat = new THREE.MeshStandardMaterial({color:0xe8e0d0, roughness:0.7});
+    const roofMat = new THREE.MeshStandardMaterial({color:0x5a4a38, roughness:0.8});
+    const base = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 3), rockMat);
+    base.position.set(0, 0.3, 0); g.add(base);
+    const tier2 = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.8, 2.2), rockMat);
+    tier2.position.set(0, 1.2, 0); g.add(tier2);
+    const pMain = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.4, 1.2), prisonMat);
+    pMain.position.set(0, 2.3, 0); g.add(pMain);
+    const pRoof = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.2, 1.3), roofMat);
+    pRoof.position.set(0, 3.1, 0); g.add(pRoof);
+    const pSec = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 0.9), prisonMat);
+    pSec.position.set(-1.8, 2.1, 0.3); g.add(pSec);
+    const pW = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 0.7), prisonMat);
+    pW.position.set(1.8, 2.0, -0.3); g.add(pW);
+    const lhMat = new THREE.MeshStandardMaterial({color:0xf0f0f0, roughness:0.6});
+    const lh = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 2.5, 10), lhMat);
+    lh.position.set(1.3, 3.85, 0); g.add(lh);
+    const lhCap = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.5, 10),
+      new THREE.MeshStandardMaterial({color:0x8a1a12, roughness:0.5}));
+    lhCap.position.set(1.3, 5.35, 0); g.add(lhCap);
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6),
+      new THREE.MeshBasicMaterial({color:0xff2020}));
+    beacon.position.set(1.3, 5.0, 0); g.add(beacon);
+    const bLight = new THREE.PointLight(0xff3030, 0.9, 12);
+    bLight.position.set(1.3, 5.0, 0); g.add(bLight);
+    g.position.set(-15, GROUND_Y - 0.2, -55);
+    scene.add(g);
+  })();
+
+  // Angel Island
+  (function angelIsland() {
+    const g = new THREE.Group();
+    const greenMat = new THREE.MeshStandardMaterial({color:0x3e6a38, roughness:0.95});
+    const darkGreen = new THREE.MeshStandardMaterial({color:0x2e5028, roughness:0.95});
+    const rockMat = new THREE.MeshStandardMaterial({color:0x7a7060, roughness:0.95});
+    const base = new THREE.Mesh(new THREE.BoxGeometry(12, 0.8, 8), rockMat);
+    base.position.set(0, 0.2, 0); g.add(base);
+    const hill = new THREE.Mesh(new THREE.ConeGeometry(5.5, 5, 12), greenMat);
+    hill.position.set(0, 3.1, 0); g.add(hill);
+    const h2 = new THREE.Mesh(new THREE.SphereGeometry(2.5, 10, 8), darkGreen);
+    h2.position.set(-3, 0.9, 1.5); h2.scale.set(1, 0.6, 1); g.add(h2);
+    const h3 = new THREE.Mesh(new THREE.SphereGeometry(2.2, 10, 8), greenMat);
+    h3.position.set(3, 0.8, -1.8); h3.scale.set(1, 0.55, 1); g.add(h3);
+    g.position.set(-25, GROUND_Y - 0.2, -75);
+    scene.add(g);
+  })();
+
+  // Yerba Buena + Treasure Island
+  (function ybiTi() {
+    const g = new THREE.Group();
+    const greenMat = new THREE.MeshStandardMaterial({color:0x4a6a42, roughness:0.95});
+    const rockMat = new THREE.MeshStandardMaterial({color:0x7a7060, roughness:0.95});
+    const flatMat = new THREE.MeshStandardMaterial({color:0x5c7a4e, roughness:0.9});
+    const ybiBase = new THREE.Mesh(new THREE.BoxGeometry(10, 0.6, 8), rockMat);
+    ybiBase.position.set(0, 0.15, 4); g.add(ybiBase);
+    const ybiHill = new THREE.Mesh(new THREE.ConeGeometry(4.5, 4.5, 12), greenMat);
+    ybiHill.position.set(0, 2.7, 4); g.add(ybiHill);
+    const ti = new THREE.Mesh(new THREE.BoxGeometry(11, 0.5, 10), flatMat);
+    ti.position.set(0, 0.15, -6); g.add(ti);
+    const bMat = new THREE.MeshStandardMaterial({color:0xc8c0b0, roughness:0.7});
+    for(let i = 0; i < 4; i++) {
+      const bb = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.5, 1.2), bMat);
+      bb.position.set(-3 + i*2, 1.15, -6 + (i%2)*1.5);
+      g.add(bb);
+    }
+    g.position.set(50, GROUND_Y - 0.2, -55);
+    scene.add(g);
+  })();
+
+  // Marin Headlands — far NW rolling hills
+  (function marinHeadlands() {
+    const g = new THREE.Group();
+    const hillMat = new THREE.MeshStandardMaterial({color:0x6a6838, roughness:0.95});
+    const hillMat2 = new THREE.MeshStandardMaterial({color:0x585a2e, roughness:0.95});
+    const hillMat3 = new THREE.MeshStandardMaterial({color:0x7a7848, roughness:0.95});
+    const base = new THREE.Mesh(new THREE.BoxGeometry(70, 0.8, 55), hillMat);
+    base.position.set(0, 0.2, 0); g.add(base);
+    const hillSpecs = [
+      {x:-20, z:-10, r:14, h:14, m:hillMat},
+      {x:  5, z:  5, r:16, h:17, m:hillMat2},
+      {x: 22, z: -8, r:12, h:11, m:hillMat3},
+      {x:-10, z: 15, r:10, h: 9, m:hillMat2},
+      {x: 15, z: 18, r:11, h:12, m:hillMat},
+      {x:-25, z: 18, r: 9, h: 8, m:hillMat3},
+    ];
+    hillSpecs.forEach(s => {
+      const h = new THREE.Mesh(new THREE.ConeGeometry(s.r, s.h, 14), s.m);
+      h.position.set(s.x, s.h/2, s.z); g.add(h);
+    });
+    g.position.set(-100, GROUND_Y - 0.2, -160);
+    scene.add(g);
+  })();
+
+  // Oakland port — cranes along east shoreline
+  (function oaklandPort() {
+    const g = new THREE.Group();
+    const craneMat = new THREE.MeshStandardMaterial({color:0xd43a20, roughness:0.55, metalness:0.4});
+    const craneMat2 = new THREE.MeshStandardMaterial({color:0xe8e4d4, roughness:0.6});
+    const deckMat = new THREE.MeshStandardMaterial({color:0x4a4640, roughness:0.8});
+    const dock = new THREE.Mesh(new THREE.BoxGeometry(60, 0.4, 18), deckMat);
+    dock.position.set(130, 0.2, -25); g.add(dock);
+    const craneX = [104, 118, 132, 146, 158];
+    craneX.forEach((cx, i) => {
+      const col = (i % 2 === 0) ? craneMat : craneMat2;
+      const craneZ = -28 + (i % 2) * 4;
+      const ch = 22;
+      for(const lx of [-2.2, 2.2]) {
+        for(const lz of [-1.8, 1.8]) {
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.5, ch, 0.5), col);
+          leg.position.set(cx + lx, ch/2, craneZ + lz);
+          g.add(leg);
+        }
+      }
+      const plat = new THREE.Mesh(new THREE.BoxGeometry(5.5, 1.2, 4.5), col);
+      plat.position.set(cx, ch + 0.6, craneZ); g.add(plat);
+      const boom = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 16), col);
+      boom.position.set(cx, ch + 1.4, craneZ - 4); g.add(boom);
+      const cw = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 6), col);
+      cw.position.set(cx, ch + 1.4, craneZ + 4.5); g.add(cw);
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 1.2),
+        new THREE.MeshStandardMaterial({color:0x333333, roughness:0.4}));
+      cab.position.set(cx, ch + 0.8, craneZ - 2.5); g.add(cab);
+      const wl = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 4),
+        new THREE.MeshBasicMaterial({color:0xff4040}));
+      wl.position.set(cx, ch + 2.2, craneZ); g.add(wl);
+    });
+    scene.add(g);
+  })();
+
+  // ═══════════════════════════════════════════════════════
+  // ═══ SF DISTRICTS ═══
+  // Named neighborhoods and landmarks surrounding downtown
+  // ═══════════════════════════════════════════════════════
+
+  // Golden Gate Park — west green strip
+  (function goldenGatePark() {
+    const lawnMat = new THREE.MeshStandardMaterial({color:0x2e6b2a, roughness:0.95});
+    const lawn = new THREE.Mesh(new THREE.PlaneGeometry(35, 30), lawnMat);
+    lawn.rotation.x = -Math.PI/2;
+    lawn.position.set(-77.5, GROUND_Y + 0.12, 0);
+    scene.add(lawn);
+    const treeMat = new THREE.MeshStandardMaterial({color:0x1b4a1c, roughness:0.9});
+    const trunkMat = new THREE.MeshStandardMaterial({color:0x3a2a18, roughness:0.9});
+    for(let i = 0; i < 10; i++) {
+      const tx = -62 - Math.random() * 32;
+      const tz = -14 + Math.random() * 28;
+      const th = 2.5 + Math.random() * 1.8;
+      const tree = new THREE.Mesh(new THREE.ConeGeometry(1.2, th, 8), treeMat);
+      tree.position.set(tx, GROUND_Y + th/2 + 0.5, tz);
+      scene.add(tree);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.6, 6), trunkMat);
+      trunk.position.set(tx, GROUND_Y + 0.3, tz);
+      scene.add(trunk);
+    }
+  })();
+
+  // Presidio — northwest forested cluster + Palace of Fine Arts
+  (function presidioForest() {
+    const floorMat = new THREE.MeshStandardMaterial({color:0x2d5a2a, roughness:0.95});
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 50), floorMat);
+    floor.rotation.x = -Math.PI/2;
+    floor.position.set(-75, GROUND_Y + 0.13, -55);
+    scene.add(floor);
+    const conifMat = new THREE.MeshStandardMaterial({color:0x163a1a, roughness:0.9});
+    const trunkMat = new THREE.MeshStandardMaterial({color:0x2e1e10, roughness:0.9});
+    for(let i = 0; i < 26; i++) {
+      const tx = -61 - Math.random() * 29;
+      const tz = -30 - Math.random() * 50;
+      const th = 3 + Math.random() * 2.5;
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(1.0 + Math.random()*0.4, th, 7), conifMat);
+      cone.position.set(tx, GROUND_Y + th/2 + 0.4, tz);
+      scene.add(cone);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 0.6, 6), trunkMat);
+      trunk.position.set(tx, GROUND_Y + 0.3, tz);
+      scene.add(trunk);
+    }
+    // Palace of Fine Arts at (-65, -50)
+    const pofa = new THREE.Group();
+    const domeMat = new THREE.MeshStandardMaterial({color:0xd9a06b, roughness:0.6});
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(3.2, 24, 16, 0, Math.PI*2, 0, Math.PI/2),
+      domeMat
+    );
+    dome.position.set(0, 2, 0);
+    pofa.add(dome);
+    // Drum under dome
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.4, 2, 20), domeMat);
+    drum.position.set(0, 1, 0);
+    pofa.add(drum);
+    // Column row
+    const colMat = new THREE.MeshStandardMaterial({color:0xe8d8b8, roughness:0.6});
+    for(let i = -3; i <= 3; i++) {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 3.2, 10), colMat);
+      col.position.set(i * 0.9, 1.6, 3);
+      pofa.add(col);
+    }
+    // Reflecting pool
+    const poolMat = new THREE.MeshStandardMaterial({color:0x3a6a9a, roughness:0.35, metalness:0.3});
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(9, 4), poolMat);
+    pool.rotation.x = -Math.PI/2;
+    pool.position.set(0, 0.2, 6);
+    pofa.add(pool);
+    pofa.position.set(-65, GROUND_Y + 0.2, -50);
+    scene.add(pofa);
+  })();
+
+  // Chinatown / North Beach — mid-height ornate buildings north of FiDi
+  (function chinatownNorthBeach() {
+    const spots = [
+      [-8, -18, 3, 3, 10],
+      [-2, -20, 3, 3, 13],
+      [4, -18, 3, 3, 11],
+      [8, -22, 3, 3, 9],
+      [-4, -26, 3, 3, 12],
+      [2, -28, 3, 3, 14],
+      [8, -28, 3, 3, 10],
+      [-10, -24, 3, 3, 8],
+    ];
+    spots.forEach(function(s) {
+      cityBuilding(s[0], s[1], s[2], s[3], s[4], s[4] > 11);
+    });
+    // Pagoda roofs — stacked cones on 2-3 buildings
+    const pagodaMat = new THREE.MeshStandardMaterial({color:0xa83030, roughness:0.6});
+    const pagodaSpots = [[-2, -20, 13], [2, -28, 14], [-4, -26, 12]];
+    pagodaSpots.forEach(function(p) {
+      const g = new THREE.Group();
+      for(let t = 0; t < 3; t++) {
+        const r = 2.2 - t * 0.6;
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(r, 0.8, 4), pagodaMat);
+        cone.rotation.y = Math.PI/4;
+        cone.position.y = t * 0.9;
+        g.add(cone);
+      }
+      g.position.set(p[0], GROUND_Y + p[2] + 0.4, p[1]);
+      scene.add(g);
+    });
+  })();
+
+  // Fisherman's Wharf / Piers — wooden piers extending from north shore into bay
+  (function fishermansWharf() {
+    const pierMat = new THREE.MeshStandardMaterial({color:0x9a7a4e, roughness:0.85});
+    const whMat = new THREE.MeshStandardMaterial({color:0xc0b090, roughness:0.75});
+    const pierXs = [-18, -9, 0, 9, 18];
+    pierXs.forEach(function(px) {
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(4, 0.4, 8), pierMat);
+      pier.position.set(px, GROUND_Y + 0.2, -24);
+      scene.add(pier);
+      // Warehouse on pier
+      const wh = new THREE.Mesh(new THREE.BoxGeometry(3, 2.2, 5), whMat);
+      wh.position.set(px, GROUND_Y + 0.4 + 1.1, -24);
+      scene.add(wh);
+      // Roof
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.3, 5.2),
+        new THREE.MeshStandardMaterial({color:0x552e1e, roughness:0.8}));
+      roof.position.set(px, GROUND_Y + 0.4 + 2.35, -24);
+      scene.add(roof);
+    });
+  })();
+
+  // Lombard Street zig-zag — winding red road with pale edges
+  (function lombardStreet() {
+    const roadMat = new THREE.MeshStandardMaterial({color:0x552822, roughness:0.85});
+    const edgeMat = new THREE.MeshStandardMaterial({color:0xb8a078, roughness:0.9});
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(3, 10), roadMat);
+    road.rotation.x = -Math.PI/2;
+    road.position.set(-15, GROUND_Y + 0.18, -20);
+    scene.add(road);
+    // Alternating segment hatches
+    for(let i = 0; i < 6; i++) {
+      const seg = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.5), edgeMat);
+      seg.rotation.x = -Math.PI/2;
+      seg.position.set(-15 + (i%2===0 ? -0.2 : 0.2), GROUND_Y + 0.2, -24 + i * 1.5);
+      scene.add(seg);
+    }
+  })();
+
+  // Oracle Park — south waterfront stadium
+  (function oraclePark() {
+    const g = new THREE.Group();
+    const standMat = new THREE.MeshStandardMaterial({color:0x8b3a2a, roughness:0.75});
+    // Partial-arc stands (open to NE toward the bay)
+    const stands = new THREE.Mesh(
+      new THREE.CylinderGeometry(9, 10, 6, 40, 1, true, Math.PI * 0.25, Math.PI * 1.5),
+      standMat
+    );
+    stands.position.set(0, 3, 0);
+    g.add(stands);
+    // Playing field
+    const fieldMat = new THREE.MeshStandardMaterial({color:0x3a7a35, roughness:0.9});
+    const field = new THREE.Mesh(new THREE.CircleGeometry(8, 32), fieldMat);
+    field.rotation.x = -Math.PI/2;
+    field.position.set(0, 0.2, 0);
+    g.add(field);
+    // Light pylons
+    const pylonMat = new THREE.MeshStandardMaterial({color:0x444444, roughness:0.6});
+    const bulbMat = new THREE.MeshBasicMaterial({color:0xfff2c0});
+    for(let i = 0; i < 6; i++) {
+      const ang = Math.PI * 0.3 + (i / 5) * Math.PI * 1.4;
+      const px = Math.cos(ang) * 9.5;
+      const pz = Math.sin(ang) * 9.5;
+      const pyl = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 9, 8), pylonMat);
+      pyl.position.set(px, 4.5, pz);
+      g.add(pyl);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.4, 10, 8), bulbMat);
+      bulb.position.set(px, 9.2, pz);
+      g.add(bulb);
+    }
+    g.position.set(15, GROUND_Y, 25);
+    scene.add(g);
+  })();
+
+  // Mission District — colorful pastel Victorian row homes south of SoMa
+  (function missionDistrict() {
+    const pastels = [0xe8a6b8, 0xf0d48a, 0xb8d8e8, 0xd8b8e0, 0xe8c8a0, 0xbfe0b5, 0xf0b4a0];
+    for(let gx = -28; gx <= 28; gx += 3) {
+      for(let gz = 46; gz <= 74; gz += 3.5) {
+        if(Math.random() < 0.22) continue;
+        const h = 4 + Math.random() * 4;
+        const w = 2 + Math.random();
+        const d = 2 + Math.random();
+        fillBuilding(gx + (Math.random()-0.5)*0.4, gz + (Math.random()-0.5)*0.4, w, d, h, true);
+        // Occasional colored roof marker (pastel bay-window hint)
+        if(Math.random() < 0.35) {
+          const color = pastels[Math.floor(Math.random()*pastels.length)];
+          const accent = new THREE.Mesh(
+            new THREE.BoxGeometry(w*0.8, 0.3, d*0.8),
+            new THREE.MeshStandardMaterial({color:color, roughness:0.7})
+          );
+          accent.position.set(gx, GROUND_Y + h + 0.15, gz);
+          scene.add(accent);
+        }
+      }
+    }
+  })();
+
+  // ═══════════════════════════════════════════════════════
+  // STREET GRID — asphalt plane with lane markings
+  // ═══════════════════════════════════════════════════════
+  (function streetGrid() {
+    const SIZE = 160;                 // world units covered (cityRange=80 each side)
+    const TEX = 2048;                 // canvas resolution
+    const BLK = 6;                    // matches BLOCK spacing
+    const pxPerUnit = TEX / SIZE;     // pixels per world unit
+    const cnv = document.createElement('canvas');
+    cnv.width = TEX; cnv.height = TEX;
+    const c = cnv.getContext('2d');
+    // Asphalt base
+    c.fillStyle = '#1a1a1c';
+    c.fillRect(0, 0, TEX, TEX);
+    // Helper: convert world (x,z) to canvas (px,py). World x:-80..80, z:-80..80
+    function wx(x) { return (x + SIZE/2) * pxPerUnit; }
+    function wz(z) { return (z + SIZE/2) * pxPerUnit; }
+    // Park exclusion check (skip drawing lines inside)
+    function inPark(x, z) {
+      if(x >= -96 && x <= -59 && z >= -16 && z <= 16) return true;     // Golden Gate Park
+      if(x >= -91 && x <= -59 && z >= -82 && z <= -28) return true;    // Presidio
+      return false;
+    }
+    // Paint parks green
+    c.fillStyle = '#2e5d2a';
+    c.fillRect(wx(-80), wz(-16), (-59-(-80))*pxPerUnit, 32*pxPerUnit);
+    c.fillRect(wx(-80), wz(-82), (-59-(-80))*pxPerUnit, 54*pxPerUnit);
+    // Minor street lane markings (dashed white) every BLOCK
+    c.strokeStyle = '#ededed';
+    c.lineWidth = 1.5;
+    c.setLineDash([10, 14]);
+    for(let x = -80; x <= 80; x += BLK) {
+      // N-S street
+      for(let z = -80; z < 80; z += 4) {
+        if(inPark(x, z)) continue;
+        c.beginPath();
+        c.moveTo(wx(x), wz(z));
+        c.lineTo(wx(x), wz(z + 3));
+        c.stroke();
+      }
+    }
+    for(let z = -80; z <= 80; z += BLK) {
+      for(let x = -80; x < 80; x += 4) {
+        if(inPark(x, z)) continue;
+        c.beginPath();
+        c.moveTo(wx(x), wz(z));
+        c.lineTo(wx(x + 3), wz(z));
+        c.stroke();
+      }
+    }
+    c.setLineDash([]);
+    // Major avenues: yellow double lines
+    function majorLine(x1, z1, x2, z2) {
+      c.strokeStyle = '#f5c542';
+      c.lineWidth = 3;
+      const dx = x2 - x1, dz = z2 - z1;
+      const len = Math.sqrt(dx*dx + dz*dz);
+      const nx = -dz / len * 0.4, nz = dx / len * 0.4; // offset normal
+      c.beginPath();
+      c.moveTo(wx(x1 + nx), wz(z1 + nz));
+      c.lineTo(wx(x2 + nx), wz(z2 + nz));
+      c.stroke();
+      c.beginPath();
+      c.moveTo(wx(x1 - nx), wz(z1 - nz));
+      c.lineTo(wx(x2 - nx), wz(z2 - nz));
+      c.stroke();
+    }
+    // Market St — diagonal from SW to NE (downtown)
+    majorLine(-40, 40, 28, -14);
+    // Van Ness — N-S around x=-30
+    majorLine(-30, -80, -30, 80);
+    // Mission St — parallel to Market, slight offset
+    majorLine(-20, 40, -2, -20);
+    // Embarcadero — curves along waterfront (approximated as 2 segments)
+    majorLine(-20, -18, 20, -16);
+    majorLine(20, -16, 32, 0);
+
+    const tex = new THREE.CanvasTexture(cnv);
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.repeat.set(1, 1);
+    const mat = new THREE.MeshBasicMaterial({map: tex, transparent: true, opacity: 0.95, depthWrite: false});
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), mat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.set(0, GROUND_Y + 0.01, 0);
+    plane.renderOrder = 0.6;
+    scene.add(plane);
+  })();
+
+  // ═══════════════════════════════════════════════════════
+  // BAY WATER OVERLAY — richer material with ripple texture
+  // ═══════════════════════════════════════════════════════
+  (function bayWaterOverlay() {
+    const TEX = 1024;
+    const cnv = document.createElement('canvas');
+    cnv.width = TEX; cnv.height = TEX;
+    const c = cnv.getContext('2d');
+    // Base water color
+    c.fillStyle = '#2a5a78';
+    c.fillRect(0, 0, TEX, TEX);
+    // Wavy bright streaks (moire pattern of sine curves)
+    c.strokeStyle = 'rgba(180,220,240,0.18)';
+    c.lineWidth = 1.2;
+    for(let y = 0; y < TEX; y += 6) {
+      c.beginPath();
+      for(let x = 0; x < TEX; x += 4) {
+        const yy = y + Math.sin(x * 0.02 + y * 0.015) * 3 + Math.sin(x * 0.007) * 5;
+        if(x === 0) c.moveTo(x, yy); else c.lineTo(x, yy);
+      }
+      c.stroke();
+    }
+    // Sparse brighter highlights
+    c.strokeStyle = 'rgba(255,250,220,0.22)';
+    c.lineWidth = 1;
+    for(let i = 0; i < 120; i++) {
+      const x = Math.random() * TEX, y = Math.random() * TEX, w = 20 + Math.random() * 60;
+      c.beginPath();
+      c.moveTo(x, y); c.lineTo(x + w, y + Math.sin(i) * 3);
+      c.stroke();
+    }
+    const tex = new THREE.CanvasTexture(cnv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(4, 4);
+    tex.minFilter = THREE.LinearFilter;
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x2a5a78, roughness: 0.25, metalness: 0.7,
+      transparent: true, opacity: 0.92, map: tex,
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(360, 210), mat);
+    plane.rotation.x = -Math.PI / 2;
+    // Center roughly over water area: x:-140..200 => cx=30; z:-210..-18 => cz=-114
+    plane.position.set(30, GROUND_Y - 0.15, -114);
+    plane.renderOrder = 0.8;
+    scene.add(plane);
+  })();
+
+  // ═══════════════════════════════════════════════════════
+  // STREET LAMPS — sparse yellow points along major avenues
+  // ═══════════════════════════════════════════════════════
+  (function streetLamps() {
+    const lampMat = new THREE.MeshBasicMaterial({color: 0xffe8a0});
+    const lampGeo = new THREE.SphereGeometry(0.18, 6, 6);
+    function addLamp(x, z) {
+      const m = new THREE.Mesh(lampGeo, lampMat);
+      m.position.set(x, GROUND_Y + 2.2, z);
+      scene.add(m);
+      const pl = new THREE.PointLight(0xffd07a, 0.35, 7);
+      pl.position.set(x, GROUND_Y + 2.2, z);
+      scene.add(pl);
+    }
+    // Market St (diagonal from (-40,40) to (28,-14))
+    for(let t = 0; t <= 1.0001; t += 0.12) {
+      addLamp(-40 + t * 68, 40 + t * -54);
+    }
+    // Van Ness (N-S at x=-30)
+    for(let z = -70; z <= 70; z += 14) addLamp(-30, z);
+    // Embarcadero waterfront
+    for(let x = -20; x <= 32; x += 8) addLamp(x, -17);
+  })();
 
   // ═══════════════════════════════════════════════════════
   // PROCEDURAL CITY FILL — every city block gets buildings
@@ -4000,7 +5058,19 @@ scene.add(beamRing);
 
   // Is this position too close to Salesforce Tower base?
   function isTowerZone(x, z) {
-    return Math.abs(x) < 8 && Math.abs(z) < 7;
+    if(Math.abs(x) < 8 && Math.abs(z) < 7) return true;
+    // Named landmark exclusion zones (Transamerica, 555 Cal, Coit, Ferry Building)
+    if(Math.abs(x - (-14)) < 5 && Math.abs(z - (-14)) < 5) return true; // Transamerica
+    if(Math.abs(x - (-16)) < 4 && Math.abs(z - (-2)) < 4) return true;  // 555 California
+    if(Math.abs(x - (-6)) < 8 && Math.abs(z - (-32)) < 8) return true;  // Coit Tower + hill
+    if(Math.abs(x - 24) < 4 && Math.abs(z - (-6)) < 11) return true;    // Ferry Building
+    // New SF districts
+    if(x >= -96 && x <= -59 && z >= -16 && z <= 16) return true;        // Golden Gate Park
+    if(x >= -91 && x <= -59 && z >= -82 && z <= -28) return true;       // Presidio (incl. Palace of Fine Arts)
+    if(Math.sqrt((x-15)*(x-15) + (z-25)*(z-25)) < 12) return true;      // Oracle Park
+    if(x >= -22 && x <= 22 && z >= -27 && z <= -21) return true;        // Fisherman's Wharf piers
+    if(Math.abs(x - (-15)) < 2.5 && z >= -26 && z <= -15) return true;  // Lombard Street
+    return false;
   }
 
   // ── FILL THE ENTIRE CITY GRID ──
@@ -6990,7 +8060,7 @@ function updateClaudeWalk(t) {
     switchToIdleAnim('ensemble');
     if(claudeTarget === 'meeting') {
       cGroup.lookAt(CONF_X, cGroup.position.y, CONF_Z);
-      generateDialogue('meeting');
+      try { generateDialogue('meeting'); } catch(e) { console.warn('meeting dialogue error', e); }
       setTimeout(()=>{
         inMeeting = false;
         const homePos = deskPositions['ensemble'];
@@ -7010,8 +8080,10 @@ function updateClaudeWalk(t) {
       }, MEETING_DURATION);
     } else if(claudeTarget === 'teammeeting') {
       cGroup.lookAt(CONF_X, cGroup.position.y, CONF_Z);
-      generateDialogue('teammeeting');
+      try { generateDialogue('teammeeting'); } catch(e) { console.warn('teammeeting dialogue error', e); }
+      console.log('[teammeeting] arrived, scheduling return in', TEAM_MEETING_DURATION, 'ms');
       setTimeout(()=>{
+        console.log('[teammeeting] firing return walks');
         inTeamMeeting = false;
         // Everyone walks back
         const homePos = deskPositions['ensemble'];
@@ -7211,10 +8283,11 @@ function updateHUD() {
   // Feed
   const feed = document.getElementById('feed');
   const evts = (apiData.events||[]).slice(-8).reverse();
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   feed.innerHTML = evts.map(e => {
-    const t = e.type||'info';
-    const time = (e.time||'').split(' ')[1]||'';
-    const msg = (e.msg||'').substring(0,60);
+    const t = (e.type||'info').replace(/[^a-zA-Z0-9_-]/g,'');
+    const time = esc((e.time||'').split(' ')[1]||'');
+    const msg = esc((e.msg||'').substring(0,60));
     return `<div class="feed-line ${t}">${time} ${msg}</div>`;
   }).join('');
 
@@ -7369,6 +8442,8 @@ async function fetchData() {
       }
     });
     // ── LED STATUS UPDATES ──
+    // Reset all LEDs to idle each poll so stale events don't stick
+    ['scanner','executor','risk','ensemble','ws_feed','tape'].forEach(function(a){ updateAgentLED(a,'idle'); });
     if (apiData.events) {
       apiData.events.slice(-10).forEach(function(ev) {
         if (ev.type === 'scanner') updateAgentLED('scanner', 'scanning');
@@ -7394,6 +8469,12 @@ function animate() {
   frameCount++;
   if(frameCount % 2 !== 0) return; // ~30fps instead of 60fps
   const t = clock.getElapsedTime();
+  const dt = (t - (window._lastAnimT || t));
+  window._lastAnimT = t;
+  // Tick GLTF animation mixers so idle/walk clips actually play
+  Object.values(charGroups).forEach(function(g){
+    if (g && g.userData && g.userData.mixer) g.userData.mixer.update(dt);
+  });
 
   // Character idle animations
   Object.entries(charGroups).forEach(([name, g]) => {
@@ -7604,8 +8685,14 @@ function animate() {
       const loc = facilityLocations[facilityLocation];
       const ag = charGroups[agent];
       facilityWalkFrom = ag.position.clone();
-      // First walk to stair top, then descend
+      // Multi-phase path: desk → stair top → stair bottom → facility
       facilityWalkTo = new THREE.Vector3(loc.x, loc.y + 0.02, loc.z);
+      facilityWalkPath = [
+        ag.position.clone(),
+        new THREE.Vector3(-4.5, 0.02, 3.8),           // stair top (main floor)
+        new THREE.Vector3(-4.5, loc.y + 0.02, 0.3),   // stair bottom
+        new THREE.Vector3(loc.x, loc.y + 0.02, loc.z) // facility
+      ];
       facilityWalkStart = clock.getElapsedTime();
 
       // Show what they're doing
@@ -7631,6 +8718,13 @@ function animate() {
         const homePos = deskPositions[agent];
         facilityWalkFrom = ag2.position.clone();
         facilityWalkTo = new THREE.Vector3(homePos.x, 0, homePos.z + 0.5);
+        // Reverse path: facility → stair bottom → stair top → desk
+        facilityWalkPath = [
+          ag2.position.clone(),
+          new THREE.Vector3(-4.5, ag2.position.y + 0.02, 0.3),
+          new THREE.Vector3(-4.5, 0.02, 3.8),
+          new THREE.Vector3(homePos.x, 0, homePos.z + 0.5)
+        ];
         facilityWalking = true;
         facilityReturning = true;
         facilityWalkStart = clock.getElapsedTime();
@@ -7639,24 +8733,32 @@ function animate() {
     }
   }
 
-  // Update facility walk
+  // Update facility walk (multi-segment path: desk → stair top → stair bottom → facility)
   if(facilityWalking && facilityAgent) {
     const ag = charGroups[facilityAgent];
     if(ag) {
       const elapsed = t - facilityWalkStart;
-      const dur = WALK_DURATION * 1.5; // slower walk (going down stairs)
+      const dur = WALK_DURATION * 2.2; // slower for 3-leg journey
       const progress = Math.min(elapsed / dur, 1.0);
-      const ease = progress < 0.5 ? 2*progress*progress : 1-Math.pow(-2*progress+2,2)/2;
-      ag.position.lerpVectors(facilityWalkFrom, facilityWalkTo, ease);
-      restoreGroundY(facilityAgent);
+      const path = facilityWalkPath || [facilityWalkFrom, facilityWalkTo];
+      const segCount = path.length - 1;
+      const segProg = progress * segCount;
+      const segIdx = Math.min(Math.floor(segProg), segCount - 1);
+      const segT = segProg - segIdx;
+      const ease = segT < 0.5 ? 2*segT*segT : 1-Math.pow(-2*segT+2,2)/2;
+      ag.position.lerpVectors(path[segIdx], path[segIdx+1], ease);
+
+      // Only restore ground Y on main floor segments; stair/B1 segments keep computed Y
+      if(ag.position.y > -0.5) restoreGroundY(facilityAgent);
 
       if(progress < 0.95) {
-        const dir = facilityWalkTo.clone().sub(facilityWalkFrom);
-        ag.rotation.y = Math.atan2(dir.x, dir.z);
+        const dir = path[segIdx+1].clone().sub(path[segIdx]);
+        if(dir.lengthSq() > 0.001) ag.rotation.y = Math.atan2(dir.x, dir.z);
       }
 
       if(progress >= 1.0) {
         facilityWalking = false;
+        facilityWalkPath = null;
         switchToIdleAnim(facilityAgent);
         if(facilityReturning) {
           ag.rotation.y = Math.PI;
@@ -7764,6 +8866,32 @@ function animate() {
   }
 
   // Team meeting every 1 hour — all 5 walk to conference room
+  // WATCHDOG: force-reset stuck team meeting (chars never returned home)
+  if(inTeamMeeting && Date.now() - lastTeamMeeting > TEAM_MEETING_DURATION + 30000) {
+    console.warn('[teammeeting] WATCHDOG fired — resetting stuck team meeting');
+    inTeamMeeting = false;
+    claudeWalking = false;
+    claudeTarget = null;
+    const cg = charGroups['ensemble'];
+    if(cg) {
+      const ehome = deskPositions['ensemble'];
+      claudeWalkFrom = cg.position.clone();
+      claudeWalkTo = new THREE.Vector3(ehome.x, 0, ehome.z + 0.6);
+      claudeWalking = true;
+      claudeWalkStart = clock.getElapsedTime();
+      switchToWalkAnim('ensemble');
+    }
+    teamMembers.forEach(nm => {
+      const ag = charGroups[nm];
+      if(!ag) return;
+      const hp = deskPositions[nm];
+      ag.userData.meetingFrom = ag.position.clone();
+      ag.userData.meetingTarget = new THREE.Vector3(hp.x, 0, hp.z + 0.5);
+      ag.userData.walkingToMeeting = true;
+      ag.userData.meetingWalkStart = clock.getElapsedTime();
+      switchToWalkAnim(nm);
+    });
+  }
   if(Date.now() - lastTeamMeeting > TEAM_MEETING_INTERVAL && !claudeWalking && !reportingWalking && !coffeeWalking && !facilityWalking && !inMeeting && !inTeamMeeting) {
     lastTeamMeeting = Date.now();
     inTeamMeeting = true;
@@ -8042,6 +9170,8 @@ class Handler(BaseHTTPRequestHandler):
             body = HTML_PAGE.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
             self.end_headers()
             self.wfile.write(body)
         elif self.path == "/jonas_avatar.jpg":

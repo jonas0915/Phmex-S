@@ -35,6 +35,32 @@ class StrategySlot:
         self.regime_pause_until: float = 0.0
         self.total_signals: int = 0
         self.total_entries: int = 0
+        # Shadow-only: extra rejection counters (used by narrow-filter slots like 5m_narrow).
+        # Persisted to a sidecar file so it survives restarts without touching RiskManager schema.
+        self._blocked_sidecar = os.path.join(
+            os.path.dirname(__file__), f"trading_state_{self.slot_id}_blocked.json"
+        )
+        self.blocked_counts: dict = self._load_blocked_counts()
+
+    def _load_blocked_counts(self) -> dict:
+        try:
+            if os.path.exists(self._blocked_sidecar):
+                with open(self._blocked_sidecar) as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        return data
+        except Exception as e:
+            logger.debug(f"[SLOT] {self.slot_id} could not load blocked_counts: {e}")
+        return {}
+
+    def bump_blocked(self, tag: str) -> None:
+        """Increment a rejection counter and persist. Never raises."""
+        try:
+            self.blocked_counts[tag] = int(self.blocked_counts.get(tag, 0)) + 1
+            with open(self._blocked_sidecar, "w") as f:
+                json.dump(self.blocked_counts, f)
+        except Exception as e:
+            logger.debug(f"[SLOT] {self.slot_id} bump_blocked({tag}) failed: {e}")
 
     @property
     def is_active(self) -> bool:

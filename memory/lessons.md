@@ -241,8 +241,8 @@
 - Sequence: data bugs → 24h clean data → then strategy retune. Never skip the data step.
 
 ### Phmex-S Bot: Known issues logged but NOT fixed 2026-04-07 session 2 (user restricted bot code edits)
-- C1: pullback carve-out uses "bb_reversion" but _extract_strategy_name returns "bb_mean_reversion" — carve-out broken for BB reversion
-- C2: paper slot has no cvd_slope carve-out at all
+- C1: pullback carve-out uses "bb_reversion" but _extract_strategy_name returns "bb_mean_reversion" — carve-out broken for BB reversion [LANDED 2c89ad8, verified 2026-04-20 bot.py:1113]
+- C2: paper slot has no cvd_slope carve-out at all [LANDED, verified 2026-04-20 bot.py:1623-1625 — paper path exempts same tuple as live]
 - C3: _sync_exchange_closes fee matching uses `recent[-1]` (race window)
 - I9: REST fallback CVD not normalized in exchange.get_cvd
 - I18: 1h_momentum paper slot reads 5m WS data (invalidates results)

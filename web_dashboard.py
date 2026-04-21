@@ -37,6 +37,8 @@ import matplotlib.dates as mdates
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
 PAPER_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_liq_cascade.json")
+NARROW_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_narrow.json")
+NARROW_BLOCKED_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_narrow_blocked.json")
 FACTORY_STATE_FILE = os.path.join(PROJECT_DIR, "strategy_factory_state.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
 HOST = "127.0.0.1"
@@ -159,6 +161,72 @@ def read_paper_state() -> dict:
             return json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         return {"peak_balance": 0, "closed_trades": []}
+
+
+def read_narrow_state() -> dict:
+    """Read 5m_narrow paper slot state file. Returns empty structure if missing."""
+    try:
+        with open(NARROW_STATE_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {"peak_balance": 0, "closed_trades": [], "blocked_counts": {}}
+
+
+def _build_narrow_panel(state: dict) -> str:
+    """Build the NARROW (paper) panel — trade stats plus blocked-signal counts."""
+    trades = state.get("closed_trades", []) or []
+    try:
+        with open(NARROW_BLOCKED_FILE) as f:
+            blocked = json.load(f) or {}
+    except (FileNotFoundError, json.JSONDecodeError):
+        blocked = {"blocked_symbol": 0, "blocked_hour": 0, "blocked_ensemble": 0}
+    b_sym = int(blocked.get("blocked_symbol", 0) or 0)
+    b_hr = int(blocked.get("blocked_hour", 0) or 0)
+    b_ens = int(blocked.get("blocked_ensemble", 0) or 0)
+
+    if not trades and b_sym == 0 and b_hr == 0 and b_ens == 0:
+        body = '<div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.85em">Awaiting first trade.</div>'
+        return f'''<div class="glass-card dash-item paper-card" data-id="narrow-panel">
+            <h2><span class="paper-badge">PAPER</span> NARROW (paper)</h2>
+            {body}
+        </div>'''
+
+    stats = compute_stats(trades)
+    total = stats["total"]
+    wr = stats["win_rate"]
+    pnl = stats["total_pnl"]
+    wr_cls = "positive" if wr >= 50 else "negative" if wr < 30 else ""
+    pnl_cls = "positive" if pnl >= 0 else "negative"
+
+    def _row(label, val, cls=""):
+        return (
+            f'<div class="compare-row">'
+            f'<span class="compare-label">{escape(label)}</span>'
+            f'<span class="compare-paper {cls}" style="grid-column:2 / span 2;text-align:right">{val}</span>'
+            f'</div>'
+        )
+
+    def _blocked_row(label, val):
+        # Highlighted block-count row
+        color = "var(--warning)" if val > 0 else "var(--text-dim)"
+        return (
+            f'<div class="compare-row" style="background:rgba(210,153,34,0.05);border-radius:3px">'
+            f'<span class="compare-label">{escape(label)}</span>'
+            f'<span class="compare-paper" style="grid-column:2 / span 2;text-align:right;color:{color};font-weight:600">{val}</span>'
+            f'</div>'
+        )
+
+    return f'''<div class="glass-card dash-item paper-card" data-id="narrow-panel">
+        <h2><span class="paper-badge">PAPER</span> NARROW (paper)</h2>
+        <div class="compare-section-title">Performance</div>
+        {_row("Trades", total)}
+        {_row("Win Rate", f"{wr:.1f}%", wr_cls)}
+        {_row("Net PnL", f"${pnl:+.2f}", pnl_cls)}
+        <div class="compare-section-title" style="margin-top:10px">Blocked Signals</div>
+        {_blocked_row("blocked_symbol", b_sym)}
+        {_blocked_row("blocked_hour", b_hr)}
+        {_blocked_row("blocked_ensemble", b_ens)}
+    </div>'''
 
 
 def read_factory_state() -> dict:
@@ -1260,6 +1328,7 @@ def build_content() -> str:
 
     audit_html = build_audit_table(trades)
     paper_html = _build_paper_comparison(trades, paper_trades)
+    narrow_html = _build_narrow_panel(read_narrow_state())
     slots_html = _build_slots_overview(all_slot_states, factory_state, sentinels)
 
     session_html = _build_session_card(trades, paper_trades, balance=balance, balance_start=balance_start_of_day)
@@ -1411,6 +1480,7 @@ def build_content() -> str:
         {_build_reconcile_card()}
         {_build_observability_panel()}
         {paper_html}
+        {narrow_html}
     </div>
 </div>
 

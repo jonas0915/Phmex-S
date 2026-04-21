@@ -228,6 +228,17 @@ class Phmex2Bot:
                 capital_pct=0.0,  # 0% for now — paper only
                 paper_mode=True,
             ),
+            # 5m_narrow — shadow slot that mirrors the live primary strategy but applies
+            # three extra rejection filters (symbol blacklist, hour block, ensemble tightening).
+            # Pure paper — never executes live orders. See strategy_slot.py:bump_blocked.
+            StrategySlot(
+                slot_id="5m_narrow",
+                strategy_name="confluence",  # same primary strategy the live bot uses
+                timeframe="5m",
+                max_positions=2,
+                capital_pct=0.0,
+                paper_mode=True,
+            ),
         ]
 
     def _fetch_htf_data(self, symbol: str):
@@ -1472,141 +1483,228 @@ class Phmex2Bot:
                     df = add_all_indicators(df)
                     ob = self.exchange.get_order_book(symbol)
                     htf_df = self._fetch_htf_data(symbol)
-                    try:
-                        signal = strategy_fn(df, ob, htf_df=htf_df)
-                    except TypeError:
-                        signal = strategy_fn(df, ob)
+                    _flow_for_strat = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
+
+                    # Build candidate signal list.
+                    # For 5m_narrow ONLY: mirror every sub-strategy the live `confluence`
+                    # router considers, so narrow filters can accept/reject each independently
+                    # (instead of only seeing the single strongest signal confluence returns).
+                    # Other slots keep their single-strategy behavior unchanged.
+                    candidate_signals = []
+                    if slot.slot_id == "5m_narrow":
+                        try:
+                            from strategies import (
+                                htf_confluence_pullback,
+                                htf_l2_anticipation,
+                                htf_confluence_vwap,
+                                bb_mean_reversion_strategy,
+                                momentum_continuation_strategy,
+                                liquidation_cascade_strategy,
+                                htf_momentum_strategy,
+                            )
+                            _htf_adx = htf_df.iloc[-1].get("adx", 25) if htf_df is not None and len(htf_df) > 0 else 25
+                            _hurst_v = df.iloc[-1].get("hurst", 0.5) if "hurst" in df.columns else 0.5
+                            # Same gating confluence_strategy applies before routing
+                            _chop_v = df.iloc[-1].get("chop", 50)
+                            _confluence_ok = (htf_df is not None and len(htf_df) >= 30 and _chop_v <= 65 and len(df) >= 30)
+                            if _confluence_ok:
+                                if _htf_adx >= 20:
+                                    candidate_signals.append(htf_confluence_pullback(df, ob, htf_df))
+                                    candidate_signals.append(htf_l2_anticipation(df, ob, htf_df, _flow_for_strat))
+                                if _htf_adx >= 25:
+                                    candidate_signals.append(momentum_continuation_strategy(df, ob))
+                                if _htf_adx < 25:
+                                    candidate_signals.append(htf_confluence_vwap(df, ob, htf_df))
+                                    if _hurst_v < 0.50:
+                                        candidate_signals.append(bb_mean_reversion_strategy(df, ob))
+                            # Top-level strategies the bot has registered but confluence doesn't call
+                            try:
+                                candidate_signals.append(htf_momentum_strategy(df, ob, htf_df=htf_df))
+                            except TypeError:
+                                candidate_signals.append(htf_momentum_strategy(df, ob))
+                            candidate_signals.append(liquidation_cascade_strategy(df, ob))
+                        except Exception as _narrow_build_err:
+                            logger.debug(f"[PAPER] [NARROW] {symbol} candidate build failed: {_narrow_build_err}")
+                            continue
+                    else:
+                        try:
+                            _s = strategy_fn(df, ob, htf_df=htf_df)
+                        except TypeError:
+                            _s = strategy_fn(df, ob)
+                        candidate_signals.append(_s)
                 except Exception as e:
                     logger.debug(f"[PAPER] {slot.slot_id} error on {symbol}: {e}")
                     continue
 
-                if signal.signal == Signal.HOLD:
-                    if "SMA+VWAP gate" in signal.reason:
-                        logger.debug(f"[PAPER] {slot.slot_id} {symbol}: {signal.reason}")
-                    continue
-                if signal.strength < 0.80:
-                    logger.debug(f"[PAPER] {slot.slot_id} {symbol}: strength {signal.strength:.2f} < 0.80")
-                    continue
+                # Iterate each candidate signal (1 for standard slots, N for 5m_narrow)
+                _entered_this_symbol = False
+                for signal in candidate_signals:
+                    if _entered_this_symbol:
+                        break  # slot capacity respected — one entry per symbol per cycle
+                    if signal is None or signal.signal == Signal.HOLD:
+                        if signal is not None and "SMA+VWAP gate" in signal.reason:
+                            logger.debug(f"[PAPER] {slot.slot_id} {symbol}: {signal.reason}")
+                        continue
+                    if signal.strength < 0.80:
+                        logger.debug(f"[PAPER] {slot.slot_id} {symbol}: strength {signal.strength:.2f} < 0.80")
+                        continue
 
-                direction = "long" if signal.signal == Signal.BUY else "short"
-                margin = Config.TRADE_AMOUNT_USDT
-                atr_val = df.iloc[-2].get("atr", 0) if len(df) > 1 else 0
+                    direction = "long" if signal.signal == Signal.BUY else "short"
 
-                # Apply OB + Tape gates to paper slots
-                # L2 Orderbook gate
-                if ob is not None:
-                    ob_imb = ob.get("imbalance", 0.0)
-                    ob_bwalls = ob.get("bid_walls", [])
-                    ob_awalls = ob.get("ask_walls", [])
-                    ob_spread = ob.get("spread_pct", 0.0)
-                    if direction == "long" and ob_imb < -0.25:
-                        logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} LONG blocked — ask imbalance {ob_imb:.2f}")
-                        continue
-                    if direction == "short" and ob_imb > 0.25:
-                        logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} SHORT blocked — bid imbalance {ob_imb:.2f}")
-                        continue
-                    if direction == "long" and ob_awalls and not ob_bwalls:
-                        logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} LONG blocked — unmatched ask wall")
-                        continue
-                    if direction == "short" and ob_bwalls and not ob_awalls:
-                        logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} SHORT blocked — unmatched bid wall")
-                        continue
-                    if ob_spread > 0.15:
-                        logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} blocked — wide spread {ob_spread:.3f}%")
-                        continue
-                # Tape gate
-                flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
-                if flow and flow.get("trade_count", 0) > 20:
-                    buy_ratio = flow.get("buy_ratio", 0.5)
-                    cvd_slope = flow.get("cvd_slope", 0.0)
-                    divergence = flow.get("divergence")
-                    lt_bias = flow.get("large_trade_bias", 0.0)
-                    if direction == "long" and buy_ratio < 0.45:
-                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — buy_ratio {buy_ratio:.0%}")
-                        continue
-                    if direction == "short" and buy_ratio > 0.55:
-                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%}")
-                        continue
-                    # CVD slope gate — carve-out for pullback/reversion (matches live bot line 1037)
-                    _paper_strat = _extract_strategy_name(signal.reason)
-                    if _paper_strat not in ("htf_confluence_pullback", "bb_mean_reversion"):
-                        if direction == "long" and cvd_slope < -0.3:
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — CVD slope {cvd_slope:.2f}")
+                    # --- 5m_narrow extra filters (shadow-only, never affects live) ---
+                    if slot.slot_id == "5m_narrow":
+                        try:
+                            # Filter 1: symbol blacklist extension
+                            if "SUI" in symbol or "LINK" in symbol:
+                                slot.bump_blocked("blocked_symbol")
+                                logger.debug(f"[PAPER] [NARROW FILTER] {symbol} blocked_symbol")
+                                continue
+                            # Filter 2: hour block extension (UTC hour 0 = PT 5 PM PDT, UTC hour 17 = PT 10 AM PDT)
+                            _narrow_hr = datetime.datetime.now(datetime.timezone.utc).hour
+                            if _narrow_hr in (0, 17):
+                                slot.bump_blocked("blocked_hour")
+                                logger.debug(f"[PAPER] [NARROW FILTER] {symbol} blocked_hour UTC{_narrow_hr}")
+                                continue
+                            # Filter 3: ensemble tightening for htf_confluence_pullback (>=5/7 vs live 4/7)
+                            _narrow_strat = _extract_strategy_name(signal.reason)
+                            if _narrow_strat == "htf_confluence_pullback":
+                                _narrow_conf, _ = self._compute_confidence(
+                                    direction, df, ob, htf_df=htf_df,
+                                    cvd_data=self._ws_feed.get_order_flow(symbol) if self._ws_feed else None,
+                                    hurst_val=None, funding_data=None,
+                                    strategy=_narrow_strat,
+                                    flow=self._ws_feed.get_order_flow(symbol) if self._ws_feed else None,
+                                )
+                                if _narrow_conf < 5:
+                                    slot.bump_blocked("blocked_ensemble")
+                                    logger.debug(f"[PAPER] [NARROW FILTER] {symbol} blocked_ensemble {_narrow_conf}/7<5")
+                                    continue
+                        except Exception as _ne:
+                            logger.debug(f"[PAPER] [NARROW FILTER] {symbol} filter error (skipping signal): {_ne}")
                             continue
-                        if direction == "short" and cvd_slope > 0.3:
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — CVD slope {cvd_slope:.2f}")
+                    margin = Config.TRADE_AMOUNT_USDT
+                    atr_val = df.iloc[-2].get("atr", 0) if len(df) > 1 else 0
+
+                    # Apply OB + Tape gates to paper slots
+                    # L2 Orderbook gate
+                    if ob is not None:
+                        ob_imb = ob.get("imbalance", 0.0)
+                        ob_bwalls = ob.get("bid_walls", [])
+                        ob_awalls = ob.get("ask_walls", [])
+                        ob_spread = ob.get("spread_pct", 0.0)
+                        if direction == "long" and ob_imb < -0.25:
+                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} LONG blocked — ask imbalance {ob_imb:.2f}")
                             continue
-                    if direction == "long" and divergence == "bearish":
-                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — bearish divergence")
-                        continue
-                    if direction == "short" and divergence == "bullish":
-                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — bullish divergence")
-                        continue
-                    if direction == "long" and lt_bias < -0.3:
-                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — large trade bias {lt_bias:.2f}")
-                        continue
-                    if direction == "short" and lt_bias > 0.3:
-                        logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — large trade bias {lt_bias:.2f}")
-                        continue
+                        if direction == "short" and ob_imb > 0.25:
+                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} SHORT blocked — bid imbalance {ob_imb:.2f}")
+                            continue
+                        if direction == "long" and ob_awalls and not ob_bwalls:
+                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} LONG blocked — unmatched ask wall")
+                            continue
+                        if direction == "short" and ob_bwalls and not ob_awalls:
+                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} SHORT blocked — unmatched bid wall")
+                            continue
+                        if ob_spread > 0.15:
+                            logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} blocked — wide spread {ob_spread:.3f}%")
+                            continue
+                    # Tape gate
+                    flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
+                    if flow and flow.get("trade_count", 0) > 20:
+                        buy_ratio = flow.get("buy_ratio", 0.5)
+                        cvd_slope = flow.get("cvd_slope", 0.0)
+                        divergence = flow.get("divergence")
+                        lt_bias = flow.get("large_trade_bias", 0.0)
+                        if direction == "long" and buy_ratio < 0.45:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — buy_ratio {buy_ratio:.0%}")
+                            continue
+                        if direction == "short" and buy_ratio > 0.55:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%}")
+                            continue
+                        # CVD slope gate — carve-out for pullback/reversion (matches live bot line 1037)
+                        _paper_strat = _extract_strategy_name(signal.reason)
+                        if _paper_strat not in ("htf_confluence_pullback", "bb_mean_reversion"):
+                            if direction == "long" and cvd_slope < -0.3:
+                                logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — CVD slope {cvd_slope:.2f}")
+                                continue
+                            if direction == "short" and cvd_slope > 0.3:
+                                logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — CVD slope {cvd_slope:.2f}")
+                                continue
+                        if direction == "long" and divergence == "bearish":
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — bearish divergence")
+                            continue
+                        if direction == "short" and divergence == "bullish":
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — bullish divergence")
+                            continue
+                        if direction == "long" and lt_bias < -0.3:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — large trade bias {lt_bias:.2f}")
+                            continue
+                        if direction == "short" and lt_bias > 0.3:
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — large trade bias {lt_bias:.2f}")
+                            continue
 
-                # Shadow-tag: which LIVE gates would have blocked this trade?
-                _gate_tags = []
-                _strat_name = _extract_strategy_name(signal.reason)
-                _conf, _layers = self._compute_confidence(
-                    direction, df, ob, htf_df=htf_df,
-                    cvd_data=self._ws_feed.get_order_flow(symbol) if self._ws_feed else None,
-                    hurst_val=None, funding_data=None,
-                    strategy=_strat_name, flow=flow
-                )
-                if _conf < 4:
-                    _gate_tags.append(f"confidence:{_conf}/7<4")
-                _utc_hr = datetime.datetime.now(datetime.timezone.utc).hour
-                if _utc_hr in {0, 1, 2, 17, 18, 19, 20}:
-                    _gate_tags.append(f"time_block:UTC{_utc_hr}")
-                if time.time() - self._last_entry_time < 120:
-                    _gate_tags.append("global_cooldown")
-                _regime_snap = self._classify_regime(df.iloc[-1], df)
-                if _regime_snap.get("label") == "QUIET":
-                    _fc = False
-                    if flow and flow.get("trade_count", 0) > 5:
-                        if direction == "long" and flow.get("cvd_slope", 0) > 0.2:
-                            _fc = True
-                        if direction == "short" and flow.get("cvd_slope", 0) < -0.2:
-                            _fc = True
-                    if not _fc:
-                        _gate_tags.append("quiet_regime")
-                if flow and flow.get("divergence"):
-                    if direction == "long" and flow["divergence"] == "bearish":
-                        _gate_tags.append("divergence_bearish")
-                    if direction == "short" and flow["divergence"] == "bullish":
-                        _gate_tags.append("divergence_bullish")
-                _would_block = len(_gate_tags) > 0
-                _tag_str = ",".join(_gate_tags) if _gate_tags else "none"
+                    # Shadow-tag: which LIVE gates would have blocked this trade?
+                    _gate_tags = []
+                    _strat_name = _extract_strategy_name(signal.reason)
+                    _conf, _layers = self._compute_confidence(
+                        direction, df, ob, htf_df=htf_df,
+                        cvd_data=self._ws_feed.get_order_flow(symbol) if self._ws_feed else None,
+                        hurst_val=None, funding_data=None,
+                        strategy=_strat_name, flow=flow
+                    )
+                    if _conf < 4:
+                        _gate_tags.append(f"confidence:{_conf}/7<4")
+                    _utc_hr = datetime.datetime.now(datetime.timezone.utc).hour
+                    if _utc_hr in {0, 1, 2, 17, 18, 19, 20}:
+                        _gate_tags.append(f"time_block:UTC{_utc_hr}")
+                    if time.time() - self._last_entry_time < 120:
+                        _gate_tags.append("global_cooldown")
+                    _regime_snap = self._classify_regime(df.iloc[-1], df)
+                    if _regime_snap.get("label") == "QUIET":
+                        _fc = False
+                        if flow and flow.get("trade_count", 0) > 5:
+                            if direction == "long" and flow.get("cvd_slope", 0) > 0.2:
+                                _fc = True
+                            if direction == "short" and flow.get("cvd_slope", 0) < -0.2:
+                                _fc = True
+                        if not _fc:
+                            _gate_tags.append("quiet_regime")
+                    if flow and flow.get("divergence"):
+                        if direction == "long" and flow["divergence"] == "bearish":
+                            _gate_tags.append("divergence_bearish")
+                        if direction == "short" and flow["divergence"] == "bullish":
+                            _gate_tags.append("divergence_bullish")
+                    _would_block = len(_gate_tags) > 0
+                    _tag_str = ",".join(_gate_tags) if _gate_tags else "none"
 
-                slot.risk.open_position(
-                    symbol, price, margin, side=direction,
-                    atr=atr_val, regime="medium",
-                    cycle=self.cycle_count,
-                    strategy=slot.strategy_name
-                )
-                notifier.notify_paper_entry(
-                    symbol, direction, price, margin,
-                    signal.strength, signal.reason
-                )
-                slot.total_entries += 1
-                _block_label = f" [WOULD BLOCK: {_tag_str}]" if _would_block else ""
-                logger.info(
-                    f"[PAPER] {slot.slot_id} ENTRY {direction.upper()} {symbol} | "
-                    f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}{_block_label}"
-                )
-                snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, slot.strategy_name, signal.strength, price, 0, None, flow, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None)
-                if symbol in slot.risk.positions:
-                    slot.risk.positions[symbol].entry_snapshot = snap
-                    slot.risk.positions[symbol].gate_tags = _tag_str
-                    try:
-                        slot.risk._save_state()
-                    except Exception as _e:
-                        logger.debug(f"[SNAPSHOT] paper save_state after entry failed: {_e}")
+                    # For 5m_narrow, record the actual routed sub-strategy, not the slot's
+                    # generic "confluence" label — preserves per-strategy attribution in logs.
+                    _entry_strategy_name = _strat_name if (slot.slot_id == "5m_narrow" and _strat_name) else slot.strategy_name
+
+                    slot.risk.open_position(
+                        symbol, price, margin, side=direction,
+                        atr=atr_val, regime="medium",
+                        cycle=self.cycle_count,
+                        strategy=_entry_strategy_name
+                    )
+                    notifier.notify_paper_entry(
+                        symbol, direction, price, margin,
+                        signal.strength, signal.reason
+                    )
+                    slot.total_entries += 1
+                    _entered_this_symbol = True
+                    _block_label = f" [WOULD BLOCK: {_tag_str}]" if _would_block else ""
+                    logger.info(
+                        f"[PAPER] {slot.slot_id} ENTRY {direction.upper()} {symbol} | "
+                        f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}{_block_label}"
+                    )
+                    snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, _entry_strategy_name, signal.strength, price, 0, None, flow, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None)
+                    if symbol in slot.risk.positions:
+                        slot.risk.positions[symbol].entry_snapshot = snap
+                        slot.risk.positions[symbol].gate_tags = _tag_str
+                        try:
+                            slot.risk._save_state()
+                        except Exception as _e:
+                            logger.debug(f"[SNAPSHOT] paper save_state after entry failed: {_e}")
 
     @staticmethod
     def _classify_regime(last, df=None) -> dict:
