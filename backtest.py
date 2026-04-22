@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 from indicators import add_all_indicators
-from strategies import Signal, TradeSignal, adaptive_strategy
+from strategies import Signal, TradeSignal, confluence_strategy
 
 # ---------------------------------------------------------------------------
 # Constants (match .env)
@@ -674,12 +674,12 @@ def run_backtest(
             else:
                 regime = "low"
 
-            # Call adaptive_strategy (single pass — no OB re-run)
+            # Call confluence_strategy (single pass — no OB re-run)
             win_start = max(0, idx - 200)
             df_window = df.iloc[win_start:idx + 1]
 
             try:
-                signal = adaptive_strategy(df_window, None)
+                signal = confluence_strategy(df_window, None)
             except Exception:
                 continue
 
@@ -860,7 +860,7 @@ def format_report(
     lines.append(SEPARATOR)
     lines.append("  PHMEX-S BACKTEST RESULTS")
     lines.append(SEPARATOR)
-    lines.append(f"  Strategy   : adaptive{' (no gates)' if no_gates else ''}")
+    lines.append(f"  Strategy   : confluence{' (no gates)' if no_gates else ''}")
     lines.append(f"  Pairs      : {len(pairs)} pairs")
     lines.append(f"  Timeframe  : {timeframe}")
     lines.append(f"  Period     : last {days} days")

@@ -180,7 +180,7 @@ class Phmex2Bot:
         Config.validate()
         self.exchange = Exchange()
         self.risk = RiskManager()
-        self.strategy_fn = STRATEGIES.get(Config.STRATEGY, STRATEGIES["adaptive"])
+        self.strategy_fn = STRATEGIES.get(Config.STRATEGY, STRATEGIES["confluence"])
         self.running = False
         self.cycle_count = 0
         self.active_pairs = Config.TRADING_PAIRS[:]
