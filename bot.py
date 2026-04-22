@@ -1477,7 +1477,7 @@ class Phmex2Bot:
                     if self._ws_feed and not self._ws_feed.is_stale(symbol):
                         df = self._ws_feed.get_ohlcv(symbol, limit=Config.CANDLE_LOOKBACK)
                     else:
-                        df = self.exchange.get_ohlcv(symbol, slot.timeframe, limit=200)
+                        df = self.exchange.get_ohlcv(symbol, slot.timeframe, limit=Config.CANDLE_LOOKBACK)
                     if df is None or len(df) < 50:
                         continue
                     df = add_all_indicators(df)

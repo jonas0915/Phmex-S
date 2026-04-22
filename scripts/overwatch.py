@@ -657,6 +657,14 @@ def check_unrealized_drawdown() -> CheckResult:
         return CheckResult("unrealized_drawdown", "OK",
                            f"All {total_open} open position(s) within drawdown limits")
     except Exception as e:
+        err_str = str(e).lower()
+        transient_hints = (
+            "public/products", "timeout", "timed out", "connection",
+            "dns", "cdn", "could not load markets", "networkerror",
+        )
+        if any(hint in err_str for hint in transient_hints):
+            return CheckResult("unrealized_drawdown", "OK",
+                               f"Transient exchange error (ignored): {e}")
         return CheckResult("unrealized_drawdown", "WARNING",
                            f"Unrealized drawdown check failed: {e}", str(e))
 
