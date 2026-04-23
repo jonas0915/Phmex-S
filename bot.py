@@ -1183,6 +1183,24 @@ class Phmex2Bot:
                     logger.info(f"[HTF THROTTLE] {symbol} {direction} skipped — htf entry {(time.time() - self._last_htf_entry_time)/60:.0f}min ago, need 30min gap")
                     continue
 
+                # Phase 2b Gate A: pullback per-hour bleed filter (30d data-driven)
+                # UTC {5,8,13,14,16} = 10PM/1AM/6AM/7AM/9AM PT — 5 unblocked hours where pullback runs 22% WR vs 47% breakeven
+                # Shadow-log when PULLBACK_SESSION_GATE=false; hard-block when true
+                if strat_name == "htf_confluence_pullback":
+                    _pb_utc_hour = datetime.datetime.now(datetime.timezone.utc).hour
+                    _PULLBACK_BLEED_HOURS_UTC = {5, 8, 13, 14, 16}
+                    if _pb_utc_hour in _PULLBACK_BLEED_HOURS_UTC:
+                        _pb_pt = (_pb_utc_hour - 7) % 24
+                        _pb_label = f"{_pb_pt % 12 or 12}:00 {'AM' if _pb_pt < 12 else 'PM'}"
+                        self._log_gotaway("pullback_hour_bleed", symbol, direction, strat_name,
+                                          signal.strength, confidence, price, ob, flow, df)
+                        logger.info(
+                            f"[PHASE2B] {symbol} {direction.upper()} pullback hour bleed — "
+                            f"{_pb_label} PT ({'BLOCKED' if Config.PULLBACK_SESSION_GATE else 'shadow-tagged'})"
+                        )
+                        if Config.PULLBACK_SESSION_GATE:
+                            continue
+
                 # Kelly-aware position sizing (uses $2 min margin during bootstrap)
                 margin = self.risk.calculate_kelly_margin(available, confidence=confidence)
 
@@ -1249,6 +1267,17 @@ class Phmex2Bot:
                         logger.info(f"[REGIME GATE] {symbol} {direction.upper()} blocked — QUIET regime "
                                     f"(5m ADX={_regime_snap.get('adx', '?')}) with no flow confirmation")
                         continue
+
+                # Phase 2b Gate B: VOLATILE 5m regime shadow-tag (pullback-specific, shadow only — no hard-gate path)
+                # Reuses _regime_snap from QUIET block above; VOLATILE label = atr_pct > 1.5% or vol_ratio > 2.5x
+                if strat_name == "htf_confluence_pullback" and _regime_snap.get("label") == "VOLATILE":
+                    self._log_gotaway("pullback_volatile_5m", symbol, direction, strat_name,
+                                      signal.strength, confidence, price, ob, flow, df)
+                    logger.debug(
+                        f"[PHASE2B] {symbol} {direction.upper()} pullback volatile 5m — "
+                        f"ATR={_regime_snap.get('atr_pct', 0):.3%} vol={_regime_snap.get('vol_ratio', 0):.1f}x "
+                        f"(shadow-tagged only)"
+                    )
 
                 order = self.exchange.open_long(symbol, margin, price) if direction == "long" else self.exchange.open_short(symbol, margin, price)
                 if order:

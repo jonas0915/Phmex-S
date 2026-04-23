@@ -34,6 +34,10 @@ class Config:
     TRAILING_STOP = os.getenv("TRAILING_STOP", "true").lower() == "true"
     TRAILING_STOP_OFFSET = float(os.getenv("TRAILING_STOP_OFFSET", "1.0"))
 
+    # Phase 2b — Pullback regime filter flags (shadow-log by default; hard-block only when explicitly true)
+    PULLBACK_SESSION_GATE = os.getenv("PULLBACK_SESSION_GATE", "false").lower() == "true"
+    PULLBACK_VOLATILE_GATE = os.getenv("PULLBACK_VOLATILE_GATE", "false").lower() == "true"
+
     # Mode
     MODE = os.getenv("MODE", "paper")  # "live" or "paper" — default paper for safety
 

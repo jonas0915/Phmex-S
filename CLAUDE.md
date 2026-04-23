@@ -34,6 +34,8 @@ Current version: **Sentinel (v11)** — deployed 2026-04-01.
 | Ensemble confidence | 4/7 minimum | bot.py |
 | OB imbalance gate | ±0.25 | strategies.py:139 |
 | Tape buy_ratio gate | 0.45/0.55 | bot.py:~789 |
+| Pullback session gate | `false` (shadow-only, Phase 2b Gate A) — blocks UTC {5,8,13,14,16} when `true` | .env: PULLBACK_SESSION_GATE |
+| Pullback volatile gate | `false` (reserved, Gate B shadow-only) | .env: PULLBACK_VOLATILE_GATE |
 
 ## Architecture
 ```
