@@ -61,6 +61,22 @@ CORE_PY_FILES = [
 CORE_BOT_FILES = {"bot.py", "risk_manager.py", "strategies.py", "exchange.py",
                   "config.py", "main.py", "ws_feed.py"}
 
+# Exchange/network error substrings treated as transient upstream blips — not bot bugs.
+# Any check that touches the exchange REST endpoint should use _is_transient_exchange_error
+# so a 5-minute DNS outage doesn't generate 3 LLM fix-specs (real incident 2026-04-23).
+TRANSIENT_EXCHANGE_HINTS = (
+    "public/products", "timeout", "timed out", "connection",
+    "dns", "cdn", "could not load markets", "networkerror",
+    "failed to resolve", "could not contact dns",
+    "name or service not known", "temporary failure in name resolution",
+    "econnreset", "econnrefused", "eai_again", "eai_noname",
+)
+
+
+def _is_transient_exchange_error(err) -> bool:
+    """True if exception looks like a network/DNS/CDN blip, not a real bot bug."""
+    return any(hint in str(err).lower() for hint in TRANSIENT_EXCHANGE_HINTS)
+
 # ── Telegram ───────────────────────────────────────────────────────────
 TG_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TG_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -300,6 +316,9 @@ def check_position_desync() -> CheckResult:
         return CheckResult("position_desync", "OK",
                            f"Positions in sync ({len(exchange_syms)} open)")
     except Exception as e:
+        if _is_transient_exchange_error(e):
+            return CheckResult("position_desync", "OK",
+                               f"Transient exchange error (ignored): {e}")
         return CheckResult("position_desync", "WARNING",
                            f"Could not check positions: {e}", str(e))
 
@@ -347,6 +366,9 @@ def check_balance_anomaly() -> CheckResult:
         return CheckResult("balance_anomaly", "OK",
                            f"Balance ${current_balance:.2f} — within expected range")
     except Exception as e:
+        if _is_transient_exchange_error(e):
+            return CheckResult("balance_anomaly", "OK",
+                               f"Transient exchange error (ignored): {e}")
         return CheckResult("balance_anomaly", "WARNING",
                            f"Could not check balance: {e}", str(e))
 
@@ -486,6 +508,9 @@ def check_trade_reconciliation() -> CheckResult:
         return CheckResult("trade_reconciliation", "OK",
                            f"Last {len(recent_local)} trades reconciled OK")
     except Exception as e:
+        if _is_transient_exchange_error(e):
+            return CheckResult("trade_reconciliation", "OK",
+                               f"Transient exchange error (ignored): {e}")
         return CheckResult("trade_reconciliation", "WARNING",
                            f"Reconciliation check failed: {e}", str(e))
 
@@ -657,12 +682,7 @@ def check_unrealized_drawdown() -> CheckResult:
         return CheckResult("unrealized_drawdown", "OK",
                            f"All {total_open} open position(s) within drawdown limits")
     except Exception as e:
-        err_str = str(e).lower()
-        transient_hints = (
-            "public/products", "timeout", "timed out", "connection",
-            "dns", "cdn", "could not load markets", "networkerror",
-        )
-        if any(hint in err_str for hint in transient_hints):
+        if _is_transient_exchange_error(e):
             return CheckResult("unrealized_drawdown", "OK",
                                f"Transient exchange error (ignored): {e}")
         return CheckResult("unrealized_drawdown", "WARNING",
@@ -753,6 +773,56 @@ FIX_SPEC_SKIP_WHEN_WARNING = {"dirty_tree", "pycache_stale"}
 # unrealized_drawdown at -50%) still generate specs because they describe real bugs.
 
 
+def _get_recent_log_errors(minutes: int = 10, max_lines: int = 80) -> str:
+    """Return the last `max_lines` ERROR/WARNING lines from bot.log within the last `minutes`
+    minutes. Passed to the LLM as outage context so it can distinguish a local code bug from
+    a simultaneous DNS/CDN/upstream outage affecting every outbound host."""
+    try:
+        if not os.path.exists(LOG_FILE):
+            return ""
+        cutoff = datetime.now() - timedelta(minutes=minutes)
+        # Tail the log file, keep only ERROR/WARNING lines with a timestamp in window.
+        result = subprocess.run(
+            ["tail", "-n", "2000", LOG_FILE],
+            capture_output=True, text=True, timeout=5,
+        )
+        keep = []
+        for line in result.stdout.splitlines():
+            if "ERROR" not in line and "WARNING" not in line:
+                continue
+            # Lines look like: "2026-04-23 20:00:16 [bot] ERROR ..."
+            if len(line) < 19:
+                continue
+            try:
+                ts = datetime.strptime(line[:19], "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                continue
+            if ts >= cutoff:
+                keep.append(line)
+        return "\n".join(keep[-max_lines:])
+    except Exception as e:
+        logger.warning(f"_get_recent_log_errors failed: {e}")
+        return ""
+
+
+def _detect_outage_mode(failures: list[CheckResult]) -> tuple[bool, str]:
+    """Return (is_outage, reason) if multiple checks fail with transient network symptoms.
+    When this triggers, fix-spec generation is skipped — no point asking an LLM to diagnose
+    a 5-minute DNS burst as a code bug (happens 3x/day when the VPN resolver blips)."""
+    transient = [f for f in failures if _is_transient_exchange_error(f.message) or _is_transient_exchange_error(f.diagnostics)]
+    if len(transient) >= 2:
+        names = ", ".join(f.name for f in transient)
+        return True, f"{len(transient)} checks failed with transient-network symptoms ({names}) — treating as upstream outage, skipping fix-spec generation"
+    # Also probe bot.log: if recent window is saturated with DNS/timeout errors, it's an outage.
+    log_tail = _get_recent_log_errors(minutes=10, max_lines=200)
+    if log_tail:
+        dns_hits = sum(1 for ln in log_tail.splitlines()
+                       if any(h in ln.lower() for h in ("could not contact dns", "failed to resolve", "dns servers")))
+        if dns_hits >= 10:
+            return True, f"bot.log has {dns_hits} DNS-failure lines in the last 10 min — upstream resolver outage, skipping fix-spec generation"
+    return False, ""
+
+
 def generate_fix_specs(failures: list[CheckResult]):
     """Call Claude Sonnet to generate fix specs for each failure with diagnostics.
 
@@ -773,6 +843,14 @@ def generate_fix_specs(failures: list[CheckResult]):
         logger.info("No actionable diagnostics after filter — skipping fix specs")
         return
 
+    # Outage gate: if multiple checks tripped with transient-network symptoms or bot.log
+    # shows a DNS storm, skip fix-spec generation entirely. LLM would generate fake "ccxt
+    # threading" or "eager load_markets" specs for what is actually an upstream outage.
+    is_outage, outage_reason = _detect_outage_mode(failures)
+    if is_outage:
+        logger.warning(f"OUTAGE MODE: {outage_reason}")
+        return
+
     try:
         import anthropic
     except ImportError:
@@ -780,6 +858,10 @@ def generate_fix_specs(failures: list[CheckResult]):
         return
 
     client = anthropic.Anthropic(api_key=api_key)
+
+    # Shared log context passed to every fix-spec — the LLM needs to see the broader error
+    # landscape, not just the one error string from one check, to distinguish bug vs outage.
+    log_context = _get_recent_log_errors(minutes=10, max_lines=60)
 
     for failure in actionable:
         slug = failure.name.replace("_", "-")
@@ -796,7 +878,7 @@ def generate_fix_specs(failures: list[CheckResult]):
             _append_to_existing_spec(recent_existing, failure)
             continue
 
-        _generate_new_spec(client, failure, slug)
+        _generate_new_spec(client, failure, slug, log_context)
 
 
 def _append_to_existing_spec(filepath: str, failure: CheckResult):
@@ -812,87 +894,101 @@ def _append_to_existing_spec(filepath: str, failure: CheckResult):
     logger.info(f"Appended new evidence to {os.path.basename(filepath)}")
 
 
-CODEBASE_MAP = """\
-## Phmex-S Codebase Map
-
-### Architecture
-Phemex-S is a 10x leveraged crypto scalping bot on Phemex perpetual futures via ccxt. \
-60-second main loop, 5m candles, WebSocket OHLCV feed with REST fallback. \
-Persists state to trading_state.json. Manages risk through Position objects with \
-trailing stops, time exits, adverse exits, and 4-signal early exit.
-
-### bot.py (Main Loop & Entry Logic)
-- Class: TradingBot [line 161]
-- Key methods: start:311 | _run_cycle:527 (main loop body) | _evaluate_paper_slots:1180 \
-| _process_sentinels:441 (file-based halt/kill/pause) | _sync_exchange_closes:1478 \
-| _persist_trade_results:1473 | _fetch_htf_data:221
-- Entry flow: strategy signal → global cooldown → per-pair cooldown → daily cap \
-→ ensemble confidence (4/7) → tape gate → OB gate → order placement
-- Watchdog: signal.alarm(180) covers cycle + sleep
-
-### risk_manager.py (Position Management & Exits)
-- Class: Position [line 17]: symbol, side, entry_price, amount, margin, stop_loss, \
-take_profit, trailing_stop_price, peak_price, strategy, confidence
-- Exit methods: should_exit_early:112 (4 signals: RSI, MACD crossover, EMA-9, peak drawdown) \
-| update_trailing_stop:37 (tiered 3-5% trail) | should_stop_loss:93 | should_take_profit:104 \
-| should_time_exit:211 | should_adverse_exit:200 | check_breakeven:241
-- pnl_percent:194 returns ROI on margin (10x amplified — 1% price = 10% ROI)
-- Class: RiskManager [line 260]: open_position:479 | close_position:590 \
-| sync_positions:542 | check_positions:658 | calculate_kelly_margin:392
-
-### strategies.py (Signal Generation)
-- Returns TradeSignal(signal=BUY/SELL/HOLD, reason, strength 0.0-1.0)
-- Active: confluence:953 (primary), htf_confluence_pullback (HTF confirmation)
-- Available: trend_scalp:22 | bb_reversion:158 | trend_pullback:257 | keltner_squeeze:357 \
-| momentum_continuation:410 | vwap_reversion:551 | htf_momentum:1013 | liq_cascade:1109
-
-### exchange.py (Phemex API via ccxt)
-- Class: Exchange [line 13]
-- _call_with_timeout:47 wraps ALL REST calls in 15s thread timeout (returns None on hang)
-- Read: get_ohlcv:79 | get_balance:57 | get_ticker:264 | get_order_book:92 \
-| get_recent_trades:138 | get_funding_rate:248 | get_open_positions:742
-- Write: open_long:403 | close_long:421 | open_short:446 | close_short:464 \
-| place_sl_tp:640 | cancel_open_orders:717
-- Helpers: _coin_amount:274 | _round_price:626 | _round_amount:633
-
-### ws_feed.py (WebSocket Data Stream)
-- Class: WSDataFeed [line 17] — ccxt.pro WebSocket in background thread
-- start:50 (blocks 30s) | seed:60 (REST backfill) | get_ohlcv (cached DataFrame)
-- is_connected checks if any symbol updated in last 120s (not just cache existence)
-
-### notifier.py (Telegram Alerts)
-- send:6 | notify_entry:30 | notify_exit:43 | notify_ban_mode:82 | notify_shutdown:103
-
-### State File (trading_state.json)
-- peak_balance: float
-- positions: {"BTC/USDT:USDT": {side, entry_price, amount, margin, stop_loss, \
-take_profit, strategy, opened_at, peak_price, sl_order_id, tp_order_id}}
-- closed_trades: [{symbol, side, entry, exit, amount, margin, pnl_usdt, pnl_pct, \
-fees_usdt, net_pnl, reason, exit_reason, strategy, opened_at, closed_at, duration_s}]
+CODEBASE_MAP_STATIC_FOOTER = """\
 
 ### Key Patterns & Constraints
-- ccxt clients are NOT thread-safe — background threads must create their own instance
+- Scanner thread creates its own ccxt client (scanner.py:63) — main thread uses the shared one
 - Fill prices from fetch_positions(), NOT order response (Phemex returns stale price)
-- SL=1.2%, TP=2.1% — confirmed good, do not change
-- Must rm -rf __pycache__ before restart (stale bytecode bug)
-- flat_exit=240 cycles (4hrs) is INTENTIONAL — short flat_exit lost $22
+- Risk parameters come from .env / config.py — do NOT propose changes to stop-loss, take-profit,
+  adverse-exit thresholds, or flat_exit cycles. These are governed by the R&D process, not bug-fixes.
+- Must `rm -rf __pycache__` before restart (stale bytecode bug)
 - 12-hour PT time format always (PDT = UTC-7)
+- exchange.py already calls client.load_markets() eagerly in Exchange.__init__ (3-attempt retry).
+  Do NOT propose "add eager load_markets()" — it already exists.
 """
 
 
-def _generate_new_spec(client, failure: CheckResult, slug: str):
-    """Generate a new fix spec via Claude Sonnet."""
+def _build_codebase_map() -> str:
+    """Build a fresh codebase map from ast.parse() of the real files. Replaces a hand-written
+    map that drifted hundreds of lines out of date and caused LLM fix-specs to cite wrong
+    line numbers (real incident 2026-04-23). Regenerated on every overwatch run."""
+    import ast
+
+    files = [
+        ("bot.py", "Main Loop & Entry Logic"),
+        ("risk_manager.py", "Position Management & Exits"),
+        ("strategies.py", "Signal Generation"),
+        ("exchange.py", "Phemex API via ccxt"),
+        ("ws_feed.py", "WebSocket Data Stream"),
+        ("notifier.py", "Telegram Alerts"),
+        ("config.py", "Environment-driven Config"),
+    ]
+    sections = ["## Phmex-S Codebase Map (auto-generated from AST — line numbers are authoritative)\n"]
+    for filename, label in files:
+        path = os.path.join(BOT_DIR, filename)
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                tree = ast.parse(f.read(), filename=filename)
+        except Exception as e:
+            logger.warning(f"AST parse failed for {filename}: {e}")
+            continue
+
+        sections.append(f"### {filename} ({label})")
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef):
+                methods = []
+                for sub in node.body:
+                    if isinstance(sub, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        methods.append(f"{sub.name}:{sub.lineno}")
+                methods_str = " | ".join(methods) if methods else "(no methods)"
+                sections.append(f"- Class `{node.name}` [line {node.lineno}]: {methods_str}")
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                sections.append(f"- `{node.name}` [line {node.lineno}]")
+        sections.append("")  # blank line between files
+
+    sections.append(CODEBASE_MAP_STATIC_FOOTER)
+    return "\n".join(sections)
+
+
+def _generate_new_spec(client, failure: CheckResult, slug: str, log_context: str = ""):
+    """Generate a new fix spec via Claude Sonnet.
+
+    Passes a freshly AST-built codebase map (accurate line numbers) plus a window of recent
+    ERROR/WARNING log lines from bot.log so the model can distinguish a local code bug from
+    an upstream DNS/CDN outage affecting every outbound host at the same minute.
+    """
+    codebase_map = _build_codebase_map()
+    log_section = ""
+    if log_context:
+        log_section = (
+            f"\n### Recent bot.log ERROR/WARNING lines (last 10 min)\n"
+            f"```\n{log_context}\n```\n"
+            f"If these lines show DNS/timeout/connection failures affecting multiple unrelated "
+            f"hosts (Phemex + Telegram + Anthropic), classify this as an upstream outage in your "
+            f"root cause analysis — NOT a bot code bug.\n"
+        )
+
     prompt = (
         f"Issue: {failure.name} — {failure.severity}\n"
         f"Description: {failure.message}\n\n"
-        f"Evidence:\n{failure.diagnostics}\n\n"
-        f"{CODEBASE_MAP}\n\n"
+        f"Evidence:\n{failure.diagnostics}\n"
+        f"{log_section}\n"
+        f"{codebase_map}\n\n"
         f"Write a fix spec with these sections:\n"
         f"1. Problem — what is wrong (1-2 sentences)\n"
-        f"2. Root Cause Analysis — why it happened, referencing specific methods/lines\n"
-        f"3. Proposed Fix — specific code changes with exact file paths and line numbers\n"
-        f"4. Files to Change — file:line references from the codebase map above\n"
-        f"5. Risk Assessment — what could go wrong with the fix\n"
+        f"2. Root Cause Analysis — why it happened, referencing specific methods/lines from "
+        f"   the AUTO-GENERATED codebase map above (line numbers are authoritative — do not "
+        f"   invent or remember line numbers from training data).\n"
+        f"3. Proposed Fix — specific code changes with exact file paths and line numbers. "
+        f"   Before proposing any fix, check whether it is ALREADY implemented (e.g. "
+        f"   `load_markets()` in `Exchange.__init__`). If already implemented, say so and "
+        f"   mark the spec as 'no action needed — already in place'.\n"
+        f"4. Files to Change — file:line references from the AST map only.\n"
+        f"5. Risk Assessment — what could go wrong with the fix.\n"
+        f"\nIf the evidence suggests a transient network/DNS/CDN outage rather than a code "
+        f"bug, say so in Section 2 and recommend monitoring over code change in Section 3.\n"
     )
 
     try:
@@ -900,11 +996,14 @@ def _generate_new_spec(client, failure: CheckResult, slug: str):
             model="claude-sonnet-4-6",
             max_tokens=2000,
             system=(
-                "You are a senior Python developer who knows the Phmex-S trading bot codebase "
-                "intimately. Write concise, actionable fix specs with EXACT file paths and line "
-                "numbers from the codebase map provided. Reference specific methods, classes, and "
-                "patterns. This bot trades real money — safety is paramount. Never propose changes "
-                "to SL/TP values, flat_exit cycles, or other parameters marked as intentional."
+                "You are a senior Python developer reviewing a live trading bot (real money). "
+                "Use ONLY the AST-generated codebase map provided in the user message for line "
+                "numbers. Never invent or recall line numbers from training data. Before "
+                "proposing any 'add X' fix, check whether X is already implemented in the map. "
+                "If the evidence suggests an upstream outage (DNS, CDN, exchange API), classify "
+                "it as such and recommend monitoring — do NOT fabricate code-bug hypotheses. "
+                "Never propose changes to risk parameters (stop-loss, take-profit, adverse-exit, "
+                "flat_exit) — those are governed by the R&D process, not bug-fix specs."
             ),
             messages=[{"role": "user", "content": prompt}],
         )
