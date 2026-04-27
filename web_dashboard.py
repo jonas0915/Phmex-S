@@ -49,6 +49,7 @@ ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
 # ── Chart cache ──────────────────────────────────────────────────────────
 _chart_cache = {}  # name -> PNG bytes
 _chart_lock = threading.Lock()
+_chart_version = 0  # bumped each time refresh_charts() actually writes new bytes
 
 
 def strip_ansi(text: str) -> str:
@@ -402,8 +403,14 @@ def get_recent_activity(lines: list[str], n: int = 12) -> list[str]:
     return list(reversed(activity))
 
 
-def build_audit_table(trades: list[dict]) -> str:
-    """Build performance audit with breakdowns and collapsible trade log."""
+def build_audit_table(trades: list[dict], index_offset: int = 0) -> str:
+    """Build performance audit with breakdowns and collapsible trade log.
+
+    index_offset: when called with a slice (e.g., Sentinel-era trades), pass the
+    number of trades that come BEFORE this slice in the full closed_trades list.
+    Used so the version-segmenting (Genesis/Patch/.../Sentinel) labels each
+    trade by its absolute trade number, not its position within the slice.
+    """
     if not trades:
         return '<div style="color:#7e8aa0;text-align:center;padding:20px">No trades to audit</div>'
 
@@ -497,13 +504,13 @@ def build_audit_table(trades: list[dict]) -> str:
 
     recent_rows = ""
     for i, t in enumerate(reversed(trades[-30:])):
-        trade_num = len(trades) - i
+        trade_num = index_offset + len(trades) - i
         recent_rows += _build_trade_row(t, trade_num, len(trades))
 
     older_rows = ""
     if len(trades) > 30:
         for i, t in enumerate(reversed(trades[:-30])):
-            trade_num = len(trades) - 30 - i
+            trade_num = index_offset + len(trades) - 30 - i
             older_rows += _build_trade_row(t, trade_num, len(trades))
 
     log_header = '<thead><tr><th>#</th><th>Ver</th><th>Side</th><th>Pair</th><th>PnL</th><th>ROI</th><th>Exit</th><th>Dur</th><th>Closed</th></tr></thead>'
@@ -1080,6 +1087,7 @@ def _make_pnl_by_reason(trades: list[dict]) -> bytes:
 
 def refresh_charts():
     """Regenerate all charts and cache as PNG bytes."""
+    global _chart_version
     state = read_state()
     trades = state.get("closed_trades", [])
     charts = {}
@@ -1088,6 +1096,7 @@ def refresh_charts():
         charts["pnl_by_reason"] = _make_pnl_by_reason(trades)
     with _chart_lock:
         _chart_cache.update(charts)
+        _chart_version += 1
 
 
 def chart_thread_loop():
@@ -1360,7 +1369,11 @@ def build_content() -> str:
         if (t.get("opened_at") or t.get("closed_at") or 0) >= SENTINEL_DEPLOY_TS
     ]
     sentinel_stats = compute_stats(sentinel_trades)
-    sentinel_audit_html = build_audit_table(sentinel_trades)
+    # offset = number of pre-Sentinel trades, so trade numbering matches global index
+    sentinel_audit_html = build_audit_table(
+        sentinel_trades,
+        index_offset=len(trades) - len(sentinel_trades),
+    )
 
     paper_html = _build_paper_comparison(trades, paper_trades)
     narrow_html = _build_narrow_panel(read_narrow_state())
@@ -1382,10 +1395,12 @@ def build_content() -> str:
 
     chart_section = ""
     if has_charts:
-        chart_section = """
+        with _chart_lock:
+            _v = _chart_version
+        chart_section = f"""
         <div class="charts-grid">
-            <div class="chart-box"><img src="/chart/cumulative_pnl" alt="Cumulative PnL"></div>
-            <div class="chart-box"><img src="/chart/pnl_by_reason" alt="PnL by Reason"></div>
+            <div class="chart-box"><img src="/chart/cumulative_pnl?v={_v}" alt="Cumulative PnL"></div>
+            <div class="chart-box"><img src="/chart/pnl_by_reason?v={_v}" alt="PnL by Reason"></div>
         </div>"""
     else:
         chart_section = '<div class="glass-card" style="text-align:center;padding:40px"><p style="color:#7e8aa0">No trades yet — charts appear after first closed trade</p></div>'
@@ -1482,17 +1497,6 @@ def build_content() -> str:
     <!-- Center column: Charts, Audit + Trade Log -->
     <div class="dash-col">
         {chart_section}
-        <div class="glass-card dash-item" data-id="audit">
-            <h2>Performance Audit</h2>
-            <div class="perf-summary">
-                <div class="perf-summary-item"><span class="stat-label">Win Rate</span><span class="stat-value {'positive' if stats['win_rate'] >= 50 else 'negative'}">{stats['win_rate']:.1f}%</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Avg Win</span><span class="stat-value positive">${stats['avg_win']:.2f}</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Avg Loss</span><span class="stat-value negative">${stats['avg_loss']:.2f}</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Best Trade</span><span class="stat-value positive">${stats['best']:+.2f}</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Worst Trade</span><span class="stat-value negative">${stats['worst']:+.2f}</span></div>
-            </div>
-            {audit_html}
-        </div>
         <div class="glass-card dash-item" data-id="audit-sentinel">
             <h2>Performance Audit <span style="color:var(--accent);font-size:0.65em;font-weight:500;letter-spacing:0.08em">SENTINEL</span></h2>
             <div style="font-size:0.65em;color:var(--text-dim);margin:-4px 0 8px;font-family:'JetBrains Mono',monospace">since 2026-04-01 11:01 PM PT &middot; {len(sentinel_trades)} trades</div>
@@ -1504,6 +1508,18 @@ def build_content() -> str:
                 <div class="perf-summary-item"><span class="stat-label">Worst Trade</span><span class="stat-value negative">${sentinel_stats['worst']:+.2f}</span></div>
             </div>
             {sentinel_audit_html}
+        </div>
+        <div class="glass-card dash-item" data-id="audit">
+            <h2>Performance Audit <span style="color:var(--text-dim);font-size:0.65em;font-weight:500;letter-spacing:0.08em">ALL-TIME</span></h2>
+            <div style="font-size:0.65em;color:var(--text-dim);margin:-4px 0 8px;font-family:'JetBrains Mono',monospace">{len(trades)} trades total</div>
+            <div class="perf-summary">
+                <div class="perf-summary-item"><span class="stat-label">Win Rate</span><span class="stat-value {'positive' if stats['win_rate'] >= 50 else 'negative'}">{stats['win_rate']:.1f}%</span></div>
+                <div class="perf-summary-item"><span class="stat-label">Avg Win</span><span class="stat-value positive">${stats['avg_win']:.2f}</span></div>
+                <div class="perf-summary-item"><span class="stat-label">Avg Loss</span><span class="stat-value negative">${stats['avg_loss']:.2f}</span></div>
+                <div class="perf-summary-item"><span class="stat-label">Best Trade</span><span class="stat-value positive">${stats['best']:+.2f}</span></div>
+                <div class="perf-summary-item"><span class="stat-label">Worst Trade</span><span class="stat-value negative">${stats['worst']:+.2f}</span></div>
+            </div>
+            {audit_html}
         </div>
     </div>
 
@@ -2148,10 +2164,9 @@ tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
         if (scrollPositions[i] !== undefined) col.scrollTop = scrollPositions[i];
       }});
       window.scrollTo(0, mainScroll);
-      document.querySelectorAll('.chart-box img').forEach(img => {{
-        const src = img.getAttribute('src').split('?')[0];
-        img.src = src + '?t=' + Date.now();
-      }});
+      // Chart imgs are versioned via ?v=<chart_version> in their src.
+      // Only re-fetch when the URL actually changes (= server pushed a new chart).
+      // This stops the 3s flicker from the prior Date.now() cache-buster.
     }} catch(e) {{}}
   }}
   setInterval(refresh, 3000);
