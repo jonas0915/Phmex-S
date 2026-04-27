@@ -670,37 +670,40 @@ def confluence_strategy(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.Dat
     if htf_adx >= 20:
         signals.append(htf_confluence_pullback(df, orderbook, htf_df))
         signals.append(htf_l2_anticipation(df, orderbook, htf_df, flow))
-    if htf_adx >= 25:
-        mom_signal = momentum_continuation_strategy(df, orderbook)
-        if mom_signal.signal != Signal.HOLD:
-            htf_ema21 = htf_df.iloc[-1].get("ema_21", 0)
-            htf_ema50 = htf_df.iloc[-1].get("ema_50", 0)
-            htf_close = htf_df.iloc[-1].get("close", 0)
-            htf_agrees = (
-                (mom_signal.signal == Signal.BUY and htf_close > htf_ema50) or
-                (mom_signal.signal == Signal.SELL and htf_close < htf_ema50)
-            )
-            if htf_agrees and htf_ema21 != 0 and htf_ema50 != 0:
-                signals.append(mom_signal)
-                _log.debug(f"[CONFLUENCE] momentum_cont passed HTF guard (1h ADX={htf_adx:.1f})")
-            else:
-                _log.debug(f"[CONFLUENCE] momentum_cont blocked by HTF guard (1h EMA21={'>' if htf_ema21>htf_ema50 else '<'}EMA50)")
-    if htf_adx < 25:
-        signals.append(htf_confluence_vwap(df, orderbook, htf_df))
+    # CULLED 2026-04-26 (Option A): momentum_continuation -$0.40/trade net, n=11/30d
+    # if htf_adx >= 25:
+    #     mom_signal = momentum_continuation_strategy(df, orderbook)
+    #     if mom_signal.signal != Signal.HOLD:
+    #         htf_ema21 = htf_df.iloc[-1].get("ema_21", 0)
+    #         htf_ema50 = htf_df.iloc[-1].get("ema_50", 0)
+    #         htf_close = htf_df.iloc[-1].get("close", 0)
+    #         htf_agrees = (
+    #             (mom_signal.signal == Signal.BUY and htf_close > htf_ema50) or
+    #             (mom_signal.signal == Signal.SELL and htf_close < htf_ema50)
+    #         )
+    #         if htf_agrees and htf_ema21 != 0 and htf_ema50 != 0:
+    #             signals.append(mom_signal)
+    #             _log.debug(f"[CONFLUENCE] momentum_cont passed HTF guard (1h ADX={htf_adx:.1f})")
+    #         else:
+    #             _log.debug(f"[CONFLUENCE] momentum_cont blocked by HTF guard (1h EMA21={'>' if htf_ema21>htf_ema50 else '<'}EMA50)")
+    # CULLED 2026-04-26 (Option A): htf_confluence_vwap -$0.10/trade net, n=5/30d
+    # if htf_adx < 25:
+    #     signals.append(htf_confluence_vwap(df, orderbook, htf_df))
 
     # Log rejection reasons
     for s in signals:
         if s.signal == Signal.HOLD:
             _log.debug(f"[STRAT] {s.reason}")
 
-    # Mean reversion in confirmed ranging conditions
-    # Research: works at 2-30 min horizons when ADX < 25 AND Hurst < 0.50
-    if htf_adx < 25:
-        hurst_val = df.iloc[-1].get("hurst", 0.5) if "hurst" in df.columns else 0.5
-        if hurst_val < 0.50:
-            bb_signal = bb_mean_reversion_strategy(df, orderbook)
-            if bb_signal.signal != Signal.HOLD:
-                signals.append(bb_signal)
+    # CULLED 2026-04-26 (Option A): bb_mean_reversion 0 trades 30d (effectively dead)
+    # Lessons.md note: "entered longs during downtrends (falling knives), 6 consecutive
+    # losing longs -$3.73" — disabling here reinforces that lesson
+    # if htf_adx < 25:
+    #     hurst_val = df.iloc[-1].get("hurst", 0.5) if "hurst" in df.columns else 0.5
+    #     if hurst_val < 0.50:
+    #         bb_signal = bb_mean_reversion_strategy(df, orderbook)
+    #         if bb_signal.signal != Signal.HOLD:
+    #             signals.append(bb_signal)
 
     # Pick strongest non-HOLD
     active = [s for s in signals if s.signal != Signal.HOLD]
