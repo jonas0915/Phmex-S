@@ -1385,7 +1385,17 @@ class Phmex2Bot:
                     logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
 
         if self.cycle_count % 10 == 0:
-            self.risk.print_stats(real_balance)
+            # Skip STATS when get_balance returned 0 with open positions —
+            # almost certainly an API failure (401 / network). Logging
+            # real_balance = 0 + margin_in_use causes false drawdown alerts
+            # downstream (monitor_daemon parses STATS Balance — 2026-04-26 incident).
+            if available > 0 or margin_in_use == 0:
+                self.risk.print_stats(real_balance)
+            else:
+                logger.warning(
+                    f"[STATS] Skipping log — get_balance returned 0 with "
+                    f"${margin_in_use:.2f} margin in use (likely API failure)"
+                )
 
         # Evaluate paper slots (completely isolated — no real orders)
         try:
