@@ -14,7 +14,7 @@ import re
 import subprocess
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -50,6 +50,26 @@ ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
 _chart_cache = {}  # name -> PNG bytes
 _chart_lock = threading.Lock()
 _chart_version = 0  # bumped each time refresh_charts() actually writes new bytes
+
+# ── Sentinel-era anchors ─────────────────────────────────────────────────
+# Sentinel deployed 2026-04-01 23:01 PT (= 2026-04-02 06:01 UTC), trade #342+
+SENTINEL_DEPLOY_TS = datetime(2026, 4, 2, 6, 1, 0, tzinfo=timezone.utc).timestamp()
+# Strategy cull (Option A) commit 479f879 landed 2026-04-26 19:22:55 PT
+SENTINEL_CULL_TS = datetime(2026, 4, 27, 2, 22, 55, tzinfo=timezone.utc).timestamp()
+
+
+def _cull_marker_index(sentinel_trades: list[dict]) -> int | None:
+    """Return 1-based index of the first post-cull trade, or None if none exist.
+
+    Index is 1-based to match the chart's x-axis convention (trade #1, #2, ...).
+    Falls back to ``closed_at`` if ``opened_at`` is missing — mirrors the
+    existing filter logic in ``render()``.
+    """
+    for i, t in enumerate(sentinel_trades, start=1):
+        ts = t.get("opened_at") or t.get("closed_at") or 0
+        if ts >= SENTINEL_CULL_TS:
+            return i
+    return None
 
 
 def strip_ansi(text: str) -> str:
@@ -1362,8 +1382,7 @@ def build_content() -> str:
     audit_html = build_audit_table(trades)
 
     # Sentinel-era audit (deployed 2026-04-01 23:01 PT = 2026-04-02 06:01 UTC, trade #342+)
-    from datetime import datetime as _dt, timezone as _tz
-    SENTINEL_DEPLOY_TS = _dt(2026, 4, 2, 6, 1, 0, tzinfo=_tz.utc).timestamp()
+    # SENTINEL_DEPLOY_TS is module-level (see top of file)
     sentinel_trades = [
         t for t in trades
         if (t.get("opened_at") or t.get("closed_at") or 0) >= SENTINEL_DEPLOY_TS
