@@ -1,105 +1,54 @@
-# Session Handoff — Resume Here
-
-**Last session ended:** 2026-04-17 ~8:00 PM PT
-**Session grade:** A — major feature session, 15 commits, all verified live
-**Bot PID:** 26384 (restarted 2026-04-17 7:45 PM PT)
-**Dashboard PID:** ~active (port 8050)
-**Balance at session end:** ~$73.57 USDT (peak $76.24, drawdown 3.5%)
-
+---
+name: SESSION_HANDOFF — last touched 2026-04-26 9:54 PM PT
+description: Read this FIRST in next session. Full handoff after the strategy cull + key rotation marathon.
+type: project
 ---
 
-## What was deployed this session (3 features, 15 commits)
+# Session Handoff — 2026-04-26 (Sat night, late)
 
-### Feature 1: `htf_l2_anticipation` strategy — parallel to `htf_confluence_pullback`
-Runs alongside the existing confluence pullback strategy. Replaces the `bouncing = close > prev_close` candle confirmation with L2/tape confirmation:
-- **3 required signals:** `buy_ratio > 0.55` (longs) / `< 0.45` (shorts), `cvd_slope` directional (>0 long, <0 short), `bid_depth > ask_depth` (longs) / opposite (shorts)
-- **3 boosters:** `large_trade_bias > 0.2` (+0.03), bid/ask wall within 1% (+0.02), no adverse wall within 0.5% (+0.02)
-- Shares HTF trend, VWAP, pullback-to-EMA, RSI, volume gates with original — only confirmation layer differs
-- HTF cluster throttle (30 min) and trend-flip exit extended to cover both strategies
+## Bot state right now
+- **PID** changed multiple times tonight; check `ps aux | grep "Python.*main\.py"` for current
+- **2 strategies live** (real money): `htf_confluence_pullback` + `htf_l2_anticipation` only. All others culled in commit `479f879` (originally `af0c942` pre-rewrite).
+- **2 open positions:** ETH long entry $2392.11 ($9.62 margin) + TAO long entry $255.39 ($9.96 margin). Total equity $74.73 (peak $74.80).
+- **All 3 API keys rotated tonight:** Phemex new key `44597c26...` with **"Don't Bind"** (no IP whitelist — required because ExpressVPN rotates IPs every few seconds), Anthropic + Telegram also fresh.
 
-### Feature 2: L2 Anticipation Signal Monitor dashboard panel
-New panel on right column of dashboard. Reads `l2_snapshot.json` and renders a live table:
-- Columns: Symbol, buy_ratio, cvd_slope, depth bid/ask ratio, whale bias, READY status
-- READY column shows **direction**: ✅ LONG 3/3, ✅ SHORT 3/3, ⚠️ MIXED NL/NS, 🟠 N/3, 🔴 0/3
-- Dropped duplicate Reconcile Status card in same session
+## What was shipped tonight (commits on `github.com/jonas0915/Phmex-S`)
+1. **Strategy cull (Option A)** — disabled `momentum_continuation`, `htf_confluence_vwap`, `bb_mean_reversion` in `confluence_strategy` router (`strategies.py:670-703`)
+2. **Dashboard:** Today Total bar in Sessions card; **Sentinel-era audit card** (above all-time, filtered to 146 trades since 2026-04-02 06:01 UTC); Win Rate added; chart flicker fixed (server cache headers + JS img stashing)
+3. **Monitor false-drawdown bug fix** — `bot.py` skips STATS log when `get_balance()=0` with open positions; `scripts/monitor_daemon.py` skips alert when `parsed_balance ≤ locked_margin` (the stale-STATS pattern from API failures). Telegram alerts now use 12-hour PT timestamps.
+4. **Git history rewrite** — scrubbed `.env` from all 131 commits via `git-filter-repo`. Force-pushed clean to `Phmex-S` (canonical, was `Phmex2`). Backup at `~/Desktop/Phmex-S.backup-2026-04-26` — **DELETE on/after 2026-05-03** if no rollback needed.
 
-### Feature 3: Real-time L2 snapshot writer thread
-Daemon thread writes `l2_snapshot.json` every 5 seconds (was 60s main-loop). Dashboard polls every 3s (was 20s). End-to-end latency: ~4s average, 8s worst case. No API calls — reads from ws_feed in-memory cache and `_ob_depth_cache` populated by main loop.
+## Verified per-strategy edge (30 days, 184 trades, n=verified-from-trading_state.json)
+| Strategy | n | WR | Edge/trade | Verdict |
+|---|---|---|---|---|
+| htf_l2_anticipation | 13 | 80% | **+$0.20** | KEEP — only proven winner |
+| synced (orphan-adopted) | 32 | 56% | +$0.02 | safety mech, not cullable |
+| htf_confluence_pullback | 126 | 39.7% | **-$0.13** | KEPT — biggest data source, recent 7d shows 46.7% / +$0.19 (recovering or noise) |
+| htf_confluence_vwap | 5 | — | -$0.10 | CULLED |
+| momentum_continuation | 11 | — | -$0.40 | CULLED |
+| bb_mean_reversion (live) | 0 | — | n/a | CULLED — was dead anyway |
 
-### Commits (chronological)
-```
-042bdd8 feat: wire htf_l2_anticipation into confluence router + STRATEGIES dict
-ffbcdc0 feat: pass flow dict to strategy_fn + extract htf_l2_anticipation name
-f47ec7e feat: include htf_l2_anticipation in trend_strats + HTF cluster throttle
-420c029 fix: extend HTF throttle update + trend-flip exit to htf_l2_anticipation
-b649d41 docs: L2 signal dashboard panel spec
-78874e6 feat: bot writes l2_snapshot.json each cycle for dashboard
-75bced6 feat: add L2 Anticipation Signal Monitor dashboard panel
-ca554f3 refactor: remove duplicate Reconcile Status card from observability panel
-3f619c4 fix(dashboard): L2 panel READY column shows direction (LONG/SHORT/MIXED)
-2990f0f docs: L2 realtime snapshot thread spec
-6c7dad1 feat: L2 snapshot writer moved to 5s daemon thread (real-time)
-3653b52 fix: set self.running=True before L2 writer thread start (race fix)
-40bdbdd feat(dashboard): poll every 3s for real-time L2 panel updates
-```
+**Net per-trade expectancy: -$0.10 with 95% CI entirely below zero. Strategy mix problem, not parameter problem.**
 
----
+## Paper slots
+| Slot | Strategy | n | WR | PnL | Note |
+|---|---|---|---|---|---|
+| 5m_mean_revert | bb_mean_reversion | 9 | 55.6% | +$2.47 | **Misleading** — 3 of 5 wins are TP lottery hits; without them = -$1.97. Same falling-knife pattern lessons.md flagged. |
+| 5m_liq_cascade | liq_cascade | 28 | 32.1% | +$0.45 | No edge. Should likely kill. |
+| 5m_narrow | confluence (filtered) | 50 | 20.0% | -$12.99 | Auto-killed by Kelly switch. |
 
-## What to monitor next 24-48h
+## Top-priority next-session work
+1. **Write research spec for `bb_mean_reversion` tweak.** Jonas wants culled strategies fixed not abandoned. Concrete hypothesis: directional filter (shorts-only OR require lower-highs/higher-lows confirmation). Path: `docs/superpowers/specs/2026-04-27-bb-mean-reversion-fix.md`. Spec only, no code.
+2. **Decide on paper slots** — `5m_liq_cascade` (no edge) and `5m_mean_revert` (lottery winners hide bleeder). Jonas hasn't approved kills yet.
+3. **Watch the cull effect.** `htf_confluence_pullback` 7d WR jumped from 30d-avg 39.7% to 46.7% (+$0.19). Either real recovery from cull's collateral effect or pure variance. Reassess after 14 more days.
 
-1. **htf_l2_anticipation trade count** — should start accumulating. Compare against `htf_confluence_pullback` on same setups.
-2. **L2 signal alignment** — does any symbol hit ✅ LONG 3/3 or SHORT 3/3 reliably? If not, thresholds may need tuning.
-3. **Thread stability** — `[L2_LIVE]` write failures in bot.log. Should be none.
-4. **Dashboard responsiveness** — L2 panel values should visibly change every 5s during active markets.
-5. **Snapshot file mtime** — should update every 5s (check with `stat -f %Sm l2_snapshot.json`).
+## Critical rules from this session (added to lessons.md)
+- **Never trust agent impact estimates without OHLCV simulation.** Yesterday's "trail-to-breakeven +$5" was actually -$0.20 in OHLCV replay. Earlier today I quoted 45.2% WR for pullback when verified is 39.7%. Always re-derive from `trading_state.json` directly before quoting per-strategy numbers.
+- **Repo HAS unit tests** (4 files / 12 functions in `tests/`). Earlier "zero tests" claim was wrong; corrected.
+- **Phemex new keys default to IP-bound.** Use the **"Don't Bind"** radio button explicitly. ExpressVPN rotates IPs every few seconds → instant 401 on any whitelisted key.
+- **Jonas is in California PT.** Don't assume "tired" before 11 PM PT.
+- **STATS log line lies during API failures** — `get_balance()=0` + open position → `real_balance = 0 + margin` → bot logs the locked margin as "Balance" → monitor alerts false drawdown. Both fixes deployed (skip log + sanity check downstream).
 
-## Success criteria (after 50 htf_l2_anticipation trades)
-- WR ≥ 43.9% (htf_confluence_pullback baseline)
-- Net PnL per trade > -$0.08
-- Fires earlier than pullback strategy on same setups
-- Adverse exit rate ≤ existing rate (~5.5%)
-
----
-
-## Architecture snapshot
-
-### Entry gate flow (unchanged from prior session)
-Signal → Global cooldown → Per-pair cooldown → Divergence cooldown → Ensemble conf → Tape gate + soft tape gate → Divergence gate → Funding → Time blocks → HTF cluster throttle → Kelly → OB → QUIET regime → Entry
-
-### New in this session
-- **2 confluence strategies** now fire in parallel: `htf_confluence_pullback` (baseline) + `htf_l2_anticipation` (new)
-- **`_ob_depth_cache`** in Phmex2Bot: depth data populated by main loop (60s), read by live writer thread (5s)
-- **`_l2_live_writer_loop`** daemon thread: writes `l2_snapshot.json` every 5s
-
-### Files touched
-- `bot.py` — +200 lines (strategy router, flow passing, threading, L2 cache)
-- `strategies.py` — +160 lines (htf_l2_anticipation function, STRATEGIES dict entry)
-- `web_dashboard.py` — +130 lines (L2 panel + -18 lines for duplicate Reconcile removal)
-- `l2_snapshot.json` — new runtime file, 8 symbols, ~2 KB
-- `docs/superpowers/specs/` — 3 new spec docs
-- `docs/superpowers/plans/` — 3 new plan docs
-
----
-
-## Outstanding follow-ups (carried forward)
-
-- **`.env` tracked in git** — `git rm --cached .env` needed (Jonas's call, keys rotated 04-13)
-- **backfill_fees.py** — hardcoded paths, not committed
-- **Phase 2a (fee reduction)** — still unblocked, not started
-- **Scanner vol_rank tuning** — BTC dominates, may need log normalization after more data
-- **Fee data in trading_state.json** — `fee_usdt` field is 0 for all trades (pre-existing issue)
-- **L2 anticipation tuning** — hardcoded thresholds (0.55/0.45, ±0.1, 1.2x/0.83x). Promote to config after 50 trades.
-- **Dashboard Sessions + Charts panels** — flagged as low-value in audit, left for now. Revisit after 2 weeks.
-
----
-
-## Active monitoring (carried forward)
-- `[L2_LIVE]` log lines — new, thread health
-- `[RATE WATCH]` log lines — since Apr 16, cap removed
-- `[TAPE GATE SOFT]` log lines — since Apr 16
-- `[DIVERGENCE COOLDOWN]` log lines — since Apr 16
-- `[TIMEOUT]` log entries (DNS wrap from 04-10)
-- Maker fill rate (postOnly fix from 04-09)
-- Orphan-position 3-layer defense (live since 04-13)
-- Overwatch hourly health checks
-- Reconcile every 15min
+## Open questions
+- Paper slots (`5m_mean_revert`, `5m_liq_cascade`) — kill or watch? Awaiting Jonas decision.
+- Should `bb_mean_reversion` shorts-only experiment go straight to a paper slot, or backtest first? Jonas hasn't decided.
