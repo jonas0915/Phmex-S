@@ -198,17 +198,20 @@ def run_monitor():
     if peak > 0 and balance > 0:
         dd = (peak - balance) / peak * 100
         if dd > 15:
-            # Sanity check: if parsed balance ≈ sum of locked position margins,
-            # the bot's get_balance() likely returned 0 (API failure) and the
-            # STATS line is reporting margin only — NOT a real drawdown.
+            # Sanity check: bot logs `print_stats(real_balance)` where
+            # `real_balance = free + locked_margin`. By construction,
+            # parsed_balance must be >= sum of position margins. If the
+            # parsed value is LESS THAN the locked margin, it means
+            # get_balance() returned 0 (API failure) and the STATS line is
+            # reporting margin-only — STALE. Skip the false alert.
             # 2026-04-26 incident: 87% false alarm during 401 IP-mismatch window.
             positions = state.get("positions", {})
             locked_margin = sum(
                 (p.get("margin", 0) or 0) for p in positions.values()
                 if isinstance(p, dict)
             )
-            if locked_margin > 0 and abs(balance - locked_margin) < 0.5:
-                # Stale/bad STATS — skip alert, log it locally for debugging
+            if locked_margin > 0 and balance <= locked_margin + 0.5:
+                # Stale/bad STATS — skip alert
                 pass
             else:
                 alerts.append(f"DRAWDOWN: {dd:.1f}% (balance ${balance:.2f}, peak ${peak:.2f})")
