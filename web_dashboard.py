@@ -1069,6 +1069,53 @@ def _make_cumulative_pnl(trades: list[dict]) -> bytes:
     return _fig_to_png(fig)
 
 
+def _make_cumulative_pnl_sentinel(trades: list[dict]) -> bytes:
+    """Cumulative net PnL chart, filtered to Sentinel-era trades only.
+
+    Mirrors _make_cumulative_pnl style. Adds a vertical dashed marker at the
+    2026-04-26 strategy cull commit (479f879). Returns b"" if no Sentinel
+    trades exist, so render() can omit the cache key.
+    """
+    sentinel_trades = [
+        t for t in trades
+        if (t.get("opened_at") or t.get("closed_at") or 0) >= SENTINEL_DEPLOY_TS
+    ]
+    if not sentinel_trades:
+        return b""
+
+    pnls = [_net_pnl(t) for t in sentinel_trades]
+    cum = []
+    r = 0.0
+    for p in pnls:
+        r += p
+        cum.append(r)
+    x = list(range(1, len(cum) + 1))
+
+    fig, ax = plt.subplots(figsize=(9, 4), facecolor="#1e1e2e")
+    ax.set_facecolor("#1e1e2e")
+    ax.plot(x, cum, color="#89b4fa", linewidth=2, marker="o", markersize=3)
+    ax.fill_between(x, cum, 0, where=[c >= 0 for c in cum], color="#a6e3a1", alpha=0.15)
+    ax.fill_between(x, cum, 0, where=[c < 0 for c in cum], color="#f38ba8", alpha=0.15)
+    ax.axhline(y=0, color="#585b70", linestyle="--", alpha=0.5)
+
+    cull_x = _cull_marker_index(sentinel_trades)
+    if cull_x is not None:
+        ax.axvline(x=cull_x, color="#f9e2af", linestyle="--", linewidth=1, alpha=0.6)
+        # Place "cull" label near the top of the axes
+        y_top = max(cum) if cum else 0
+        ax.text(cull_x, y_top, " cull", color="#a6adc8", fontsize=8,
+                va="top", ha="left")
+
+    ax.set_xlabel("Trade # (Sentinel-era)", color="#cdd6f4")
+    ax.set_ylabel("Cumulative PnL (USDT)", color="#cdd6f4")
+    ax.set_title("Cumulative PnL — Sentinel Era", color="#cdd6f4", fontsize=13)
+    ax.tick_params(colors="#a6adc8")
+    ax.grid(True, alpha=0.15, color="#585b70")
+    for spine in ax.spines.values():
+        spine.set_color("#585b70")
+    return _fig_to_png(fig)
+
+
 
 def _make_pnl_by_reason(trades: list[dict]) -> bytes:
     if not trades:
