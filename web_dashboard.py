@@ -2159,14 +2159,34 @@ tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
         scrollPositions[i] = col.scrollTop;
       }});
       const mainScroll = window.scrollY;
+
+      // Stash existing chart <img> elements before content wipe — keyed by alt
+      // text (chart name). Preserves the in-DOM img with its already-loaded
+      // pixel buffer so we can re-attach it after, avoiding the 3s flicker
+      // from chart recreate + refetch.
+      const stashedCharts = {{}};
+      document.querySelectorAll('.chart-box img').forEach(img => {{
+        stashedCharts[img.alt] = img;
+      }});
+
       document.getElementById('content').innerHTML = html;
       document.querySelectorAll('.dash-col').forEach((col, i) => {{
         if (scrollPositions[i] !== undefined) col.scrollTop = scrollPositions[i];
       }});
       window.scrollTo(0, mainScroll);
-      // Chart imgs are versioned via ?v=<chart_version> in their src.
-      // Only re-fetch when the URL actually changes (= server pushed a new chart).
-      // This stops the 3s flicker from the prior Date.now() cache-buster.
+
+      // Re-attach stashed chart imgs in place of the freshly-rendered placeholders.
+      // If src is unchanged (chart_version unchanged), the existing img stays
+      // bit-for-bit identical — zero flicker. If src changed, update on the
+      // SAME element (browser holds old pixels while new ones load — no blank).
+      document.querySelectorAll('.chart-box img').forEach(newImg => {{
+        const stashed = stashedCharts[newImg.alt];
+        if (!stashed) return;
+        if (stashed.src !== newImg.src) {{
+          stashed.src = newImg.src;
+        }}
+        newImg.parentNode.replaceChild(stashed, newImg);
+      }});
     }} catch(e) {{}}
   }}
   setInterval(refresh, 3000);
@@ -2197,14 +2217,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
         elif self.path.startswith("/chart/"):
-            name = self.path[7:]  # strip "/chart/"
+            # Strip "/chart/" prefix and any ?v= query param (versioning is in URL)
+            name = self.path[7:].split("?")[0]
             with _chart_lock:
                 data = _chart_cache.get(name, b"")
             if data:
                 self.send_response(200)
                 self.send_header("Content-Type", "image/png")
                 self.send_header("Content-Length", str(len(data)))
-                self.send_header("Cache-Control", "no-cache")
+                # URL is versioned (?v=<chart_version>) — when bytes change, URL changes.
+                # Browser can safely cache for 1 year. This prevents the 3s flicker
+                # where each innerHTML replace was triggering a fresh chart fetch.
+                self.send_header("Cache-Control", "public, max-age=31536000, immutable")
                 self.end_headers()
                 self.wfile.write(data)
             else:
