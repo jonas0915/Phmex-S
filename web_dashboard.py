@@ -1161,6 +1161,9 @@ def refresh_charts():
     if trades:
         charts["cumulative_pnl"] = _make_cumulative_pnl(trades)
         charts["pnl_by_reason"] = _make_pnl_by_reason(trades)
+        sentinel_png = _make_cumulative_pnl_sentinel(trades)
+        if sentinel_png:
+            charts["cumulative_pnl_sentinel"] = sentinel_png
     with _chart_lock:
         _chart_cache.update(charts)
         _chart_version += 1
@@ -1471,6 +1474,15 @@ def build_content() -> str:
     else:
         chart_section = '<div class="glass-card" style="text-align:center;padding:40px"><p style="color:#7e8aa0">No trades yet — charts appear after first closed trade</p></div>'
 
+    # Sentinel-era chart fragment (None if cache key absent — chart returned empty bytes)
+    with _chart_lock:
+        has_sentinel_chart = "cumulative_pnl_sentinel" in _chart_cache
+        _v_sentinel = _chart_version
+    sentinel_chart_img = (
+        f'<div class="chart-box" style="margin-bottom:12px"><img src="/chart/cumulative_pnl_sentinel?v={_v_sentinel}" alt="Cumulative PnL — Sentinel Era"></div>'
+        if has_sentinel_chart else ""
+    )
+
     # Daily stats
     today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     # Use closed_at for TODAY so trade count and balance delta reconcile
@@ -1566,6 +1578,7 @@ def build_content() -> str:
         <div class="glass-card dash-item" data-id="audit-sentinel">
             <h2>Performance Audit <span style="color:var(--accent);font-size:0.65em;font-weight:500;letter-spacing:0.08em">SENTINEL</span></h2>
             <div style="font-size:0.65em;color:var(--text-dim);margin:-4px 0 8px;font-family:'JetBrains Mono',monospace">since 2026-04-01 11:01 PM PT &middot; {len(sentinel_trades)} trades</div>
+            {sentinel_chart_img}
             <div class="perf-summary">
                 <div class="perf-summary-item"><span class="stat-label">Win Rate</span><span class="stat-value {'positive' if sentinel_stats['win_rate'] >= 50 else 'negative'}">{sentinel_stats['win_rate']:.1f}%</span></div>
                 <div class="perf-summary-item"><span class="stat-label">Avg Win</span><span class="stat-value positive">${sentinel_stats['avg_win']:.2f}</span></div>
