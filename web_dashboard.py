@@ -1351,6 +1351,17 @@ def build_content() -> str:
             balance_start_of_day = balance
 
     audit_html = build_audit_table(trades)
+
+    # Sentinel-era audit (deployed 2026-04-01 23:01 PT = 2026-04-02 06:01 UTC, trade #342+)
+    from datetime import datetime as _dt, timezone as _tz
+    SENTINEL_DEPLOY_TS = _dt(2026, 4, 2, 6, 1, 0, tzinfo=_tz.utc).timestamp()
+    sentinel_trades = [
+        t for t in trades
+        if (t.get("opened_at") or t.get("closed_at") or 0) >= SENTINEL_DEPLOY_TS
+    ]
+    sentinel_stats = compute_stats(sentinel_trades)
+    sentinel_audit_html = build_audit_table(sentinel_trades)
+
     paper_html = _build_paper_comparison(trades, paper_trades)
     narrow_html = _build_narrow_panel(read_narrow_state())
     slots_html = _build_slots_overview(all_slot_states, factory_state, sentinels)
@@ -1480,6 +1491,17 @@ def build_content() -> str:
                 <div class="perf-summary-item"><span class="stat-label">Worst Trade</span><span class="stat-value negative">${stats['worst']:+.2f}</span></div>
             </div>
             {audit_html}
+        </div>
+        <div class="glass-card dash-item" data-id="audit-sentinel">
+            <h2>Performance Audit <span style="color:var(--accent);font-size:0.65em;font-weight:500;letter-spacing:0.08em">SENTINEL</span></h2>
+            <div style="font-size:0.65em;color:var(--text-dim);margin:-4px 0 8px;font-family:'JetBrains Mono',monospace">since 2026-04-01 11:01 PM PT &middot; {len(sentinel_trades)} trades</div>
+            <div class="perf-summary">
+                <div class="perf-summary-item"><span class="stat-label">Avg Win</span><span class="stat-value positive">${sentinel_stats['avg_win']:.2f}</span></div>
+                <div class="perf-summary-item"><span class="stat-label">Avg Loss</span><span class="stat-value negative">${sentinel_stats['avg_loss']:.2f}</span></div>
+                <div class="perf-summary-item"><span class="stat-label">Best Trade</span><span class="stat-value positive">${sentinel_stats['best']:+.2f}</span></div>
+                <div class="perf-summary-item"><span class="stat-label">Worst Trade</span><span class="stat-value negative">${sentinel_stats['worst']:+.2f}</span></div>
+            </div>
+            {sentinel_audit_html}
         </div>
     </div>
 

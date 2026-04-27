@@ -10,8 +10,21 @@ import json
 import os
 import re
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+
+
+def _now_pt_12hr() -> str:
+    """Return current PT time in 12-hour format with AM/PM (e.g., '8:42 PM PT').
+    Per CLAUDE.md: all human-readable timestamps use 12-hour Pacific Time."""
+    pt = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-7)))
+    return pt.strftime("%-I:%M %p PT")
+
+
+def _now_pt_date_12hr() -> str:
+    """PT date + 12-hour time (e.g., '2026-04-26 8:42 PM PT')."""
+    pt = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-7)))
+    return pt.strftime("%Y-%m-%d %-I:%M %p PT")
 
 BOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE_FILE = os.path.join(BOT_DIR, "trading_state.json")
@@ -238,16 +251,16 @@ def run_monitor():
 
     summary = " | ".join(summary_parts)
 
-    # Log to alerts file
+    # Log to alerts file (12-hour PT per CLAUDE.md)
     with open(ALERT_LOG, "a") as f:
-        f.write(f"[{now.strftime('%Y-%m-%d %H:%M')}] {summary}\n")
+        f.write(f"[{_now_pt_date_12hr()}] {summary}\n")
         for a in alerts:
             f.write(f"  ALERT: {a}\n")
 
-    # Send Telegram if there are alerts
+    # Send Telegram if there are alerts (12-hour PT per CLAUDE.md)
     if alerts:
         msg = f"⚠️ <b>Phmex-S Monitor</b>\n"
-        msg += f"Time: {now.strftime('%H:%M')}\n\n"
+        msg += f"Time: {_now_pt_12hr()}\n\n"
         for a in alerts:
             msg += f"• {a}\n"
         tg_send(msg)
@@ -261,7 +274,7 @@ def run_monitor():
         except Exception:
             pass
 
-    print(f"[{now.strftime('%H:%M')}] Monitor complete. {len(alerts)} alerts. {summary}")
+    print(f"[{_now_pt_12hr()}] Monitor complete. {len(alerts)} alerts. {summary}")
 
 
 if __name__ == "__main__":
