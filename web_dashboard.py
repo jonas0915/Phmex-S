@@ -1166,6 +1166,10 @@ def refresh_charts():
             charts["cumulative_pnl_sentinel"] = sentinel_png
     with _chart_lock:
         _chart_cache.update(charts)
+        # Drop sentinel key when chart is empty so a state-file restore
+        # (e.g. *.bak rollback) can't leave stale Sentinel-era PNG bytes cached.
+        if not charts.get("cumulative_pnl_sentinel"):
+            _chart_cache.pop("cumulative_pnl_sentinel", None)
         _chart_version += 1
 
 
