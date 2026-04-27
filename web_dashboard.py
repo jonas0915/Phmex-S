@@ -1485,6 +1485,7 @@ def build_content() -> str:
         <div class="glass-card dash-item" data-id="audit">
             <h2>Performance Audit</h2>
             <div class="perf-summary">
+                <div class="perf-summary-item"><span class="stat-label">Win Rate</span><span class="stat-value {'positive' if stats['win_rate'] >= 50 else 'negative'}">{stats['win_rate']:.1f}%</span></div>
                 <div class="perf-summary-item"><span class="stat-label">Avg Win</span><span class="stat-value positive">${stats['avg_win']:.2f}</span></div>
                 <div class="perf-summary-item"><span class="stat-label">Avg Loss</span><span class="stat-value negative">${stats['avg_loss']:.2f}</span></div>
                 <div class="perf-summary-item"><span class="stat-label">Best Trade</span><span class="stat-value positive">${stats['best']:+.2f}</span></div>
@@ -1496,6 +1497,7 @@ def build_content() -> str:
             <h2>Performance Audit <span style="color:var(--accent);font-size:0.65em;font-weight:500;letter-spacing:0.08em">SENTINEL</span></h2>
             <div style="font-size:0.65em;color:var(--text-dim);margin:-4px 0 8px;font-family:'JetBrains Mono',monospace">since 2026-04-01 11:01 PM PT &middot; {len(sentinel_trades)} trades</div>
             <div class="perf-summary">
+                <div class="perf-summary-item"><span class="stat-label">Win Rate</span><span class="stat-value {'positive' if sentinel_stats['win_rate'] >= 50 else 'negative'}">{sentinel_stats['win_rate']:.1f}%</span></div>
                 <div class="perf-summary-item"><span class="stat-label">Avg Win</span><span class="stat-value positive">${sentinel_stats['avg_win']:.2f}</span></div>
                 <div class="perf-summary-item"><span class="stat-label">Avg Loss</span><span class="stat-value negative">${sentinel_stats['avg_loss']:.2f}</span></div>
                 <div class="perf-summary-item"><span class="stat-label">Best Trade</span><span class="stat-value positive">${sentinel_stats['best']:+.2f}</span></div>
