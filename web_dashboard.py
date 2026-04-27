@@ -762,8 +762,32 @@ def _build_session_card(trades: list[dict], paper_trades: list[dict], **_kwargs)
             <div style="font-family:'JetBrains Mono',monospace;font-size:0.75em;display:flex;flex-direction:column;align-items:center;gap:1px">{all_html}</div>
         </div>'''
 
+    # Today total across all 4 sessions
+    today_total_trades = sum(s["trades"] for s in td)
+    today_total_wins = sum(s["wins"] for s in td)
+    today_total_pnl = sum(s["pnl"] for s in td)
+    if today_total_trades > 0:
+        today_total_wr = today_total_wins / today_total_trades * 100
+        tt_pnl_cls = "positive" if today_total_pnl >= 0 else "negative"
+        tt_wr_cls = "positive" if today_total_wr >= 50 else "negative"
+        total_html = (
+            f'<span class="{tt_pnl_cls}" style="font-weight:700;font-size:1.05em">${today_total_pnl:+.2f}</span>'
+            f'<span style="color:var(--text-dim);font-size:0.85em;margin-left:10px">{today_total_trades}t</span>'
+            f'<span class="{tt_wr_cls}" style="font-size:0.85em;margin-left:8px">{today_total_wr:.0f}%</span>'
+        )
+    else:
+        total_html = '<span style="color:var(--text-dim)">no trades today</span>'
+    today_total_bar = (
+        f'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;'
+        f'background:var(--bg-deep);border-radius:3px;margin-bottom:8px;font-family:\'JetBrains Mono\',monospace">'
+        f'<span style="font-size:0.72em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em">Today Total</span>'
+        f'<span style="font-size:0.85em">{total_html}</span>'
+        f'</div>'
+    )
+
     return f'''<div class="glass-card dash-item" data-id="sessions">
         <h2>Sessions</h2>
+        {today_total_bar}
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">{tiles}</div>
     </div>'''
 
