@@ -53,6 +53,9 @@ def notify_exit(symbol: str, side: str, entry: float, exit_price: float, pnl: fl
     elif reason == "trailing_stop":
         emoji = "🎯"
         label = "TRAILING STOP"
+    elif reason == "durable_sl":
+        emoji = "🛡"
+        label = "DURABLE SL"
     else:
         emoji = "⏹"
         label = reason.upper()
@@ -71,6 +74,14 @@ def notify_partial_tp(symbol: str, side: str, exit_price: float, pnl: float, pnl
         f"Closed 50% @ ${exit_price:.4f}\n"
         f"PnL on half: <b>{sign}${pnl:.2f} USDT ({sign}{pnl_pct:.1f}%)</b>\n"
         f"Remaining 50% running with SL at breakeven"
+    )
+
+def notify_sl_move_fail(symbol: str, target_sl: float, resting_sl: float, error: str):
+    send(
+        f"🚨 <b>SL MOVE FAILED — {symbol}</b>  [{BOT_NAME}]\n"
+        f"Could not ratchet exchange SL to ${target_sl:.4f}\n"
+        f"Old SL still resting at ${resting_sl:.4f} — position is NOT naked\n"
+        f"Error: {error[:200]}"
     )
 
 def notify_drawdown(drawdown: float, balance: float, peak: float):

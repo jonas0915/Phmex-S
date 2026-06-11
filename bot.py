@@ -415,6 +415,7 @@ class Phmex2Bot:
                             pos.sl_order_id = sl_tp.get("sl_order_id")
                             pos.tp_order_id = sl_tp.get("tp_order_id")
                             if pos.sl_order_id:
+                                pos.exchange_sl_price = pos.stop_loss
                                 logger.info(f"[SYNC] Placed exchange SL/TP for {sym} — SL@{pos.stop_loss:.4f} TP@{pos.take_profit:.4f}")
                             else:
                                 pos.sl_order_id = "software"
@@ -782,9 +783,13 @@ class Phmex2Bot:
             if pos.sl_order_id and not self.exchange.verify_sl_order(symbol, pos.sl_order_id):
                 logger.warning(f"[SL CHECK] SL order missing for {symbol} — re-placing")
                 self.exchange.cancel_open_orders(symbol)
-                sl_tp = self.exchange.place_sl_tp(symbol, pos.side, pos.amount, pos.stop_loss, pos.take_profit or pos.entry_price)
+                # Restore the ratcheted durable level if one was set, not the looser base stop
+                replace_sl = pos.exchange_sl_price if pos.exchange_sl_price is not None else pos.stop_loss
+                sl_tp = self.exchange.place_sl_tp(symbol, pos.side, pos.amount, replace_sl, pos.take_profit or pos.entry_price)
                 pos.sl_order_id = sl_tp.get("sl_order_id")
                 pos.tp_order_id = sl_tp.get("tp_order_id")
+                if pos.sl_order_id:
+                    pos.exchange_sl_price = replace_sl
                 if not pos.sl_order_id:
                     # Fall back to software SL/TP — preserve existing SL/TP values
                     # (may be ATR-based or breakeven-adjusted, don't overwrite with Config %)
@@ -820,7 +825,12 @@ class Phmex2Bot:
                     self.exchange.cancel_open_orders(symbol)
                     notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), exit_type)
 
-        # Break-even and trailing stop updates
+        # Break-even and trailing stop updates → durable exchange SL ratchet.
+        # Replaces the old cancel-then-place sequence (naked-window bug): the resting
+        # SL is moved via atomic amend (move_stop_loss) and is NEVER cancelled before
+        # a replacement is confirmed. TP is never touched on this path.
+        # Spec: docs/superpowers/specs/2026-06-08-breakeven-sl-solidify-design.md (Part A)
+        #     + 2026-06-08-part-b-trailing-protection-plan.md (fast-track addendum).
         for symbol, pos in list(self.risk.positions.items()):
             if symbol not in self.risk.positions:
                 continue  # already closed earlier this cycle
@@ -830,25 +840,42 @@ class Phmex2Bot:
             old_sl = pos.stop_loss
             pos.check_breakeven(price)
             pos.update_trailing_stop(price)
-            # If SL ratcheted, update the exchange order
-            if pos.stop_loss != old_sl and pos.sl_order_id and pos.sl_order_id != "software":
-                self.exchange.cancel_open_orders(symbol)
-                tp_price = pos.take_profit if pos.take_profit is not None else None
-                if tp_price is not None:
-                    sl_tp = self.exchange.place_sl_tp(symbol, pos.side, pos.amount, pos.stop_loss, tp_price)
-                else:
-                    # Partial-close mode: no TP, place SL only
-                    sl_tp = self.exchange.place_sl_tp(symbol, pos.side, pos.amount, pos.stop_loss, pos.entry_price)
-                    # We don't actually want a TP at entry, so cancel the TP if placed
-                    if sl_tp.get("tp_order_id"):
-                        try:
-                            self.exchange.client.cancel_order(sl_tp["tp_order_id"], symbol)
-                        except Exception:
-                            pass
-                        sl_tp["tp_order_id"] = None
-                pos.sl_order_id = sl_tp.get("sl_order_id") or "software"
-                pos.tp_order_id = sl_tp.get("tp_order_id")
-                logger.info(f"[BREAKEVEN] {symbol} exchange SL updated to {pos.stop_loss:.4f}")
+            if not pos.sl_order_id or pos.sl_order_id == "software":
+                continue  # software-managed SL — check_positions handles exits
+            # Durable backstop: wide band from peak once the trail is armed. Software
+            # tiers (0.3-0.5% price from peak) still exit first via the 60s loop; the
+            # resting order caps inter-cycle reversals that used to ride to -12%.
+            band = Config.DURABLE_TRAIL_BAND_PCT / 100.0
+            durable_floor = None
+            if pos.trailing_stop_price is not None and pos.peak_price > 0:
+                durable_floor = pos.peak_price * (1 - band) if pos.side == "long" else pos.peak_price * (1 + band)
+            # Q2 coordination: resting order is never looser than the breakeven lock.
+            candidates = [v for v in (pos.stop_loss, durable_floor) if v is not None]
+            target = max(candidates) if pos.side == "long" else min(candidates)
+            # Exchange order currently rests at exchange_sl_price (or this cycle's
+            # pre-ratchet stop_loss for positions opened before this field existed).
+            current_resting = pos.exchange_sl_price if pos.exchange_sl_price is not None else old_sl
+            # Ratchet-only + >=0.1% throttle (spec guardrail — avoid amend spam)
+            improvement = (target - current_resting) if pos.side == "long" else (current_resting - target)
+            if improvement <= 0 or improvement / price < 0.001:
+                continue
+            try:
+                new_id = self.exchange.move_stop_loss(symbol, pos.side, pos.amount, target, pos.sl_order_id)
+                pos.sl_order_id = new_id
+                pos.exchange_sl_price = target
+                pos.sl_ratcheted = True
+                logger.info(
+                    f"[DURABLE SL] {symbol} exchange SL ratcheted to {target:.4f} "
+                    f"(breakeven={pos.stop_loss:.4f}, durable_floor={round(durable_floor, 4) if durable_floor is not None else None})"
+                )
+            except Exception as e:
+                # Old SL is still resting (move_stop_loss guarantees it) — alert loudly,
+                # do NOT downgrade to "software": that would lie about protection state.
+                logger.error(f"[SL-MOVE-FAIL] {symbol} could not move exchange SL to {target:.4f}: {e} — old SL still resting at {current_resting:.4f}")
+                try:
+                    notifier.notify_sl_move_fail(symbol, target, current_resting, str(e))
+                except Exception as ne:
+                    logger.warning(f"[SL-MOVE-FAIL] Telegram alert failed for {symbol}: {ne}")
 
         # Check exit conditions for open positions
         to_close = self.risk.check_positions(prices)
@@ -869,6 +896,12 @@ class Phmex2Bot:
                     notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), reason)
                     self.risk.close_position(symbol, fill_price, reason, fees_usdt=self.exchange.extract_order_fee(order, symbol))
                     self.exchange.cancel_open_orders(symbol)
+
+        # Part B shadow-logger — read-only trail instrumentation, must never break the cycle
+        try:
+            self._log_shadow_trail(prices, ohlcv_cache)
+        except Exception as e:
+            logger.debug(f"[SHADOW TRAIL] logging failed: {e}")
 
         # Check for new entry signals
         available = self.exchange.get_balance(Config.BASE_CURRENCY)     # free balance for trade sizing
@@ -983,6 +1016,8 @@ class Phmex2Bot:
                 }
             htf_df = self._fetch_htf_data(symbol)
             flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
+            # Capture flow+OB snapshot per scan for offline backtester replay (capture-forward decision 2026-05-10)
+            self._log_flow_snapshot(symbol, ob, flow, price=float(df.iloc[-1]["close"]) if df is not None and len(df) > 0 else None)
             try:
                 signal = self.strategy_fn(df, ob, htf_df=htf_df, flow=flow)
             except TypeError:
@@ -1309,6 +1344,8 @@ class Phmex2Bot:
                     sl_tp = self.exchange.place_sl_tp(symbol, direction, fill_amount, pos.stop_loss, pos.take_profit)
                     pos.sl_order_id = sl_tp.get("sl_order_id")
                     pos.tp_order_id = sl_tp.get("tp_order_id")
+                    if pos.sl_order_id:
+                        pos.exchange_sl_price = pos.stop_loss
                     if not pos.sl_order_id:
                         pos.sl_order_id = "software"
                         logger.warning(f"[SL FALLBACK] Exchange SL failed for {direction.upper()} {symbol} — using software SL@{pos.stop_loss:.4f} TP@{pos.take_profit:.4f}")
@@ -1361,6 +1398,8 @@ class Phmex2Bot:
                             sl_tp = self.exchange.place_sl_tp(symbol, direction, pos.amount, pos.stop_loss, pos.take_profit)
                             pos.sl_order_id = sl_tp.get("sl_order_id")
                             pos.tp_order_id = sl_tp.get("tp_order_id")
+                            if pos.sl_order_id:
+                                pos.exchange_sl_price = pos.stop_loss
                             if not pos.sl_order_id:
                                 pos.sl_order_id = "software"
                             available -= pos.margin
@@ -1821,6 +1860,124 @@ class Phmex2Bot:
         except Exception:
             pass
 
+    def _log_flow_snapshot(self, symbol: str, ob: dict | None, flow: dict | None,
+                           price: float | None = None) -> None:
+        """Append per-cycle flow + orderbook snapshot to JSONL for backtester replay.
+        Captures EVERY pair scan (not just entries) so the offline backtester can
+        reconstruct what the bot saw at any moment. See docs/superpowers/specs/
+        2026-05-07-calibrated-backtester-design.md (capture-forward decision)."""
+        if flow is None or flow.get("trade_count", 0) == 0:
+            return  # skip empty flow (WS still seeding)
+
+        def _safe(v, default=None):
+            """Coerce NaN/inf to default — stdlib json.dumps raises on NaN by default."""
+            if v is None:
+                return default
+            try:
+                f = float(v)
+                if f != f or f in (float("inf"), float("-inf")):
+                    return default
+                return f
+            except (TypeError, ValueError):
+                return v
+
+        snap = {
+            "ts": int(time.time()),
+            "symbol": symbol,
+            "price": round(_safe(price, 0.0), 6) if price is not None else None,
+            "ob": {
+                "imbalance": round(_safe(ob.get("imbalance"), 0.0), 3),
+                "bid_walls": len(ob.get("bid_walls", [])),
+                "ask_walls": len(ob.get("ask_walls", [])),
+                "spread_pct": round(_safe(ob.get("spread_pct"), 0.0), 4),
+                "bid_depth_usdt": _safe(ob.get("bid_depth_usdt")),
+                "ask_depth_usdt": _safe(ob.get("ask_depth_usdt")),
+                "illiquid": bool(ob.get("illiquid", False)),
+            } if ob else None,
+            "flow": {
+                "buy_ratio": round(_safe(flow.get("buy_ratio"), 0.5), 3),
+                "cvd_slope": round(_safe(flow.get("cvd_slope"), 0.0), 4),
+                "divergence": flow.get("divergence"),
+                "large_trade_bias": round(_safe(flow.get("large_trade_bias"), 0.0), 3),
+                "trade_count": int(flow.get("trade_count", 0)),
+            },
+        }
+        try:
+            with open("logs/flow_capture.jsonl", "a") as f:
+                f.write(json.dumps(snap) + "\n")
+        except Exception as e:
+            logger.debug(f"[FLOW CAPTURE] write failed: {e}")
+
+    def _log_shadow_trail(self, prices: dict, ohlcv_cache: dict) -> None:
+        """Part B shadow-logger: forward-log armed trailing stops so we can later
+        measure how an exchange-resting trail would have behaved on intra-candle
+        wicks vs the 60s software loop. READ-ONLY — touches no orders, no SL/TP,
+        no exit logic. See docs/superpowers/specs/
+        2026-06-08-part-b-trailing-protection-plan.md (GO/NO-GO gate)."""
+        if not hasattr(self, "_shadow_trail_armed"):
+            self._shadow_trail_armed = {}  # symbol -> last tick record this run
+
+        def _safe(v):
+            """Coerce NaN/inf/non-numeric to None — json.dumps raises on NaN."""
+            try:
+                f = float(v)
+                return f if f == f and f not in (float("inf"), float("-inf")) else None
+            except (TypeError, ValueError):
+                return None
+
+        records = []
+
+        # Exit events — armed symbols that left the book this cycle (all exit
+        # paths run before this call, so the closed trade record already exists).
+        for sym in [s for s in self._shadow_trail_armed if s not in self.risk.positions]:
+            last_tick = self._shadow_trail_armed.pop(sym)
+            trade = next((t for t in reversed(self.risk.closed_trades)
+                          if t.get("symbol") == sym), None)
+            records.append({
+                "event": "exit", "ts": int(time.time()), "symbol": sym,
+                "side": last_tick.get("side"),
+                "entry": last_tick.get("entry"),
+                "last_trail": last_tick.get("trail"),
+                "last_peak": last_tick.get("peak"),
+                "exit_reason": trade.get("exit_reason") if trade else None,
+                "exit_price": _safe(trade.get("exit_price")) if trade else None,
+                "net_pnl": _safe(trade.get("net_pnl")) if trade else None,
+            })
+
+        # Tick events — every open position with the trail armed (arms at +5%
+        # peak ROI: trailing_stop_price is set by update_trailing_stop).
+        for sym, pos in self.risk.positions.items():
+            if pos.trailing_stop_price is None:
+                continue
+            price = prices.get(sym)
+            df = ohlcv_cache.get(sym)
+            # No REST ticker here: prices[] is the WS forming-candle close (= latest
+            # trade), and a hung fetch_ticker can block ~30s/call via executor
+            # teardown (exchange.py:47-55) — audit finding 2026-06-11.
+            tick = {
+                "event": "tick", "ts": int(time.time()), "symbol": sym,
+                "side": pos.side,
+                "entry": pos.entry_price,
+                "trail": pos.trailing_stop_price,
+                "peak": pos.peak_price,
+                "sl": pos.stop_loss,
+                "candle_close": _safe(price),
+                "candle_high": _safe(df.iloc[-1]["high"]) if df is not None and len(df) > 0 else None,
+                "candle_low": _safe(df.iloc[-1]["low"]) if df is not None and len(df) > 0 else None,
+                "roi": round(pos.pnl_percent(price), 3) if price else None,
+            }
+            records.append(tick)
+            self._shadow_trail_armed[sym] = tick
+
+        if not records:
+            return
+        try:
+            with open("logs/shadow_trail.jsonl", "a") as f:
+                for r in records:
+                    f.write(json.dumps(r) + "\n")
+        except Exception as e:
+            logger.debug(f"[SHADOW TRAIL] write failed: {e}")
+
     def _log_entry_snapshot(self, symbol: str, direction: str, slot_id: str,
                             strategy: str, strength: float, price: float,
                             confidence: int, ob: dict | None, flow: dict | None,
@@ -1950,11 +2107,17 @@ class Phmex2Bot:
                                 logger.debug(f"[SYNC] {symbol} no post-entry close trade found yet — using mark price")
                     except Exception:
                         pass
-                    logger.info(f"[SYNC] {symbol} closed on exchange (SL/TP triggered) — removing from tracker")
+                    # Tag fills at a ratcheted durable-SL level as durable_sl so they
+                    # don't pollute the exchange_close (rode-to-disaster) bucket.
+                    close_reason = "exchange_close"
+                    if getattr(pos, "sl_ratcheted", False) and pos.exchange_sl_price:
+                        if abs(exit_price - pos.exchange_sl_price) / pos.exchange_sl_price <= 0.005:
+                            close_reason = "durable_sl"
+                    logger.info(f"[SYNC] {symbol} closed on exchange (SL/TP triggered) — removing from tracker (reason={close_reason})")
                     self.exchange.cancel_open_orders(symbol)
                     self._set_cooldown_if_loss(symbol, pos.pnl_percent(exit_price))
-                    notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), "exchange_close")
-                    self.risk.close_position(symbol, exit_price, "exchange_close", fees_usdt=sync_fee)
+                    notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), close_reason)
+                    self.risk.close_position(symbol, exit_price, close_reason, fees_usdt=sync_fee)
         except Exception as e:
             logger.warning(f"[SYNC] (A) close-detection path failed: {e} — continuing to orphan scan")
 
@@ -2008,6 +2171,8 @@ class Phmex2Bot:
             sl_tp = self.exchange.place_sl_tp(symbol, side, amount, pos.stop_loss, pos.take_profit)
             pos.sl_order_id = sl_tp.get("sl_order_id")
             pos.tp_order_id = sl_tp.get("tp_order_id")
+            if pos.sl_order_id:
+                pos.exchange_sl_price = pos.stop_loss
             if not pos.sl_order_id:
                 pos.sl_order_id = "software"
                 logger.warning(f"[ORPHAN] Exchange SL placement failed for {symbol} — software SL@{pos.stop_loss:.4f}")

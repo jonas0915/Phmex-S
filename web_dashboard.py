@@ -260,7 +260,8 @@ def read_factory_state() -> dict:
 
 
 def read_all_slot_states() -> dict[str, dict]:
-    """Discover and read all trading_state_*.json files. Returns {slot_id: state_dict}."""
+    """Discover and read all trading_state_*.json files. Returns {slot_id: state_dict}.
+    Also maps 5m_scalp → main trading_state.json (the live slot has no sidecar file)."""
     slots = {}
     for path in _glob.glob(os.path.join(PROJECT_DIR, "trading_state_*.json")):
         fname = os.path.basename(path)
@@ -271,6 +272,14 @@ def read_all_slot_states() -> dict[str, dict]:
                 slots[slot_id] = json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
             slots[slot_id] = {"peak_balance": 0, "closed_trades": []}
+    # 5m_scalp uses the bot's main trading_state.json (no sidecar file).
+    main_state_path = os.path.join(PROJECT_DIR, "trading_state.json")
+    if os.path.exists(main_state_path):
+        try:
+            with open(main_state_path, "r") as f:
+                slots["5m_scalp"] = json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            slots["5m_scalp"] = {"peak_balance": 0, "closed_trades": []}
     return slots
 
 
@@ -372,17 +381,22 @@ def parse_watchlist(lines: list[str]) -> dict:
         if m:
             hold_pairs.add(m.group(1))
 
-        # Scanner results with scores
-        m = re.search(r'(\S+/USDT:USDT)\s+score=([\d.]+) \| 10c=([\-\+\d.]+)% \| vol=([\d.]+)x \| atr=([\d.]+)% \| 24h=\s*([\-\+\d.]+)% (↑|↓)', line)
+        # Scanner results with scores — current SCALPSCAN format (post-2026-04-16 composite scanner):
+        # "  INJ/USDT:USDT             score=0.628 (hist=0.90 x mkt=0.00) | vol=$3,284,863 | 24h= -3.9%"
+        m = re.search(r'(\S+/USDT:USDT)\s+score=([\d.]+) \(hist=([\d.]+) x mkt=([\d.]+)\) \| vol=\$[\d,]+ \| 24h=\s*([\-\+]?[\d.]+)%', line)
         if m:
+            change_24h = float(m.group(5))
             scanner_pairs.append({
                 "symbol": m.group(1),
                 "score": float(m.group(2)),
-                "momentum": float(m.group(3)),
-                "vol_spike": float(m.group(4)),
-                "atr": float(m.group(5)),
-                "change_24h": float(m.group(6)),
-                "trend": m.group(7),
+                "hist_score": float(m.group(3)),
+                "mkt_score": float(m.group(4)),
+                "change_24h": change_24h,
+                "trend": "↑" if change_24h >= 0 else "↓",
+                # Legacy fields kept for any consumer expecting the old shape
+                "momentum": 0.0,
+                "vol_spike": 0.0,
+                "atr": 0.0,
             })
 
         # Scanner updated — reset scanner list to only keep latest batch
@@ -440,12 +454,29 @@ def build_audit_table(trades: list[dict], index_offset: int = 0) -> str:
     exit_stats = defaultdict(lambda: {"wins": 0, "losses": 0, "pnl": 0.0, "trades": 0})
     side_stats = defaultdict(lambda: {"wins": 0, "losses": 0, "pnl": 0.0, "trades": 0})
 
+    # Strategies removed from the live ensemble — kept in history but flagged so users
+    # know these numbers are archive data, not current live performance.
+    RETIRED_STRATEGIES = {
+        "htf_confluence_pullback",  # culled 2026-05-02 (post-cull n=18, 22% WR)
+        "momentum_continuation",    # culled 2026-04-26 (Option A, n=11/30d)
+        "htf_confluence_vwap",      # historical, not in current ensemble
+        "bb_reversion",             # alias renamed to bb_mean_reversion (paper slot)
+        "trend_scalp",
+        "trend_pullback",
+        "keltner_squeeze",
+        "vwap_reversion",
+        "confluence_sma_vwap",
+        "funding_contrarian",
+        "adaptive",
+    }
     for t in trades:
         pnl = _net_pnl(t)
         sym = t.get("symbol", "?").replace("/USDT:USDT", "")
         strat = t.get("strategy", "") or ""
         if not strat or strat in ("unknown", "synced"):
             strat = "pre-tracking"
+        elif strat in RETIRED_STRATEGIES:
+            strat = f"{strat} (retired)"
         reason = t.get("exit_reason") or t.get("reason") or "unknown"
         side = t.get("side", "?").upper()
         is_win = pnl > 0
@@ -522,15 +553,18 @@ def build_audit_table(trades: list[dict], index_offset: int = 0) -> str:
             <td class="time-cell">{time_str}</td>
         </tr>'''
 
+    # Show last 100 inline (was 30), older still behind collapsible. Full searchable
+    # table with filters is at /trades — link added in the section heading below.
+    INLINE_LIMIT = 100
     recent_rows = ""
-    for i, t in enumerate(reversed(trades[-30:])):
+    for i, t in enumerate(reversed(trades[-INLINE_LIMIT:])):
         trade_num = index_offset + len(trades) - i
         recent_rows += _build_trade_row(t, trade_num, len(trades))
 
     older_rows = ""
-    if len(trades) > 30:
-        for i, t in enumerate(reversed(trades[:-30])):
-            trade_num = index_offset + len(trades) - 30 - i
+    if len(trades) > INLINE_LIMIT:
+        for i, t in enumerate(reversed(trades[:-INLINE_LIMIT])):
+            trade_num = index_offset + len(trades) - INLINE_LIMIT - i
             older_rows += _build_trade_row(t, trade_num, len(trades))
 
     log_header = '<thead><tr><th>#</th><th>Ver</th><th>Side</th><th>Pair</th><th>PnL</th><th>ROI</th><th>Exit</th><th>Dur</th><th>Closed</th></tr></thead>'
@@ -539,8 +573,8 @@ def build_audit_table(trades: list[dict], index_offset: int = 0) -> str:
     if older_rows:
         older_section = f'''
         <details style="margin-top:8px">
-            <summary style="cursor:pointer;color:var(--accent);font-size:0.8em;font-weight:500;padding:6px 0">Show {len(trades)-30} older trades</summary>
-            <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+            <summary style="cursor:pointer;color:var(--accent);font-size:0.8em;font-weight:500;padding:6px 0">Show {len(trades)-INLINE_LIMIT} older trades</summary>
+            <div class="table-wrap" style="max-height:600px;overflow-y:auto">
             <table>{log_header}<tbody>{older_rows}</tbody></table>
             </div>
         </details>'''
@@ -553,8 +587,11 @@ def build_audit_table(trades: list[dict], index_offset: int = 0) -> str:
         {_compact_table("By Strategy", strat_stats)}
     </div>
     <div style="margin-top:10px">
-        <div style="font-size:0.72em;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Recent Trades ({min(30,len(trades))} of {len(trades)})</div>
-        <div class="table-wrap" style="max-height:350px;overflow-y:auto">
+        <div style="font-size:0.72em;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+            <span>Recent Trades ({min(INLINE_LIMIT,len(trades))} of {len(trades)})</span>
+            <a href="/trades" target="_blank" style="font-size:0.85em;color:var(--accent);text-decoration:none">Full table + filters →</a>
+        </div>
+        <div class="table-wrap" style="max-height:500px;overflow-y:auto">
         <table>{log_header}<tbody>{recent_rows}</tbody></table>
         </div>
         {older_section}
@@ -935,7 +972,57 @@ _SLOT_STRATEGY_MAP = {
     "5m_scalp": "confluence",
     "5m_mean_revert": "bb_mean_reversion",
     "5m_liq_cascade": "liq_cascade",
+    "5m_narrow": "narrow_filter",
+    "5m_narrow_blocked": "narrow_filter",
 }
+
+# Slots that run LIVE (not paper). All others default to paper.
+_LIVE_SLOTS = {"5m_scalp"}
+
+
+def _compute_kelly_raw(trades: list[dict]) -> float:
+    """Mirror RiskManager.calculate_kelly_raw — needs ≥20 trades, returns negative if no edge."""
+    if len(trades) < 20:
+        return 0.0
+    wins = [t for t in trades if _net_pnl(t) > 0]
+    losses = [t for t in trades if _net_pnl(t) <= 0]
+    if not wins or not losses:
+        return 0.0
+    wr = len(wins) / len(trades)
+    avg_win = sum(_net_pnl(t) for t in wins) / len(wins)
+    avg_loss = abs(sum(_net_pnl(t) for t in losses) / len(losses))
+    if avg_win == 0:
+        return 0.0
+    return (wr * avg_win - (1 - wr) * avg_loss) / avg_win
+
+
+def _compute_slot_stage(slot_id: str, trades: list[dict], factory_stage: str,
+                        sentinels: dict) -> str:
+    """Single source of truth for slot status. Mirrors StrategySlot.is_killed
+    so the dashboard matches what the bot logs as `[SLOT] X (MODE/STATUS)`."""
+    # Sentinel kills take highest priority
+    if slot_id in sentinels.get("kills", []):
+        return "killed"
+    if slot_id in sentinels.get("pauses", []):
+        return "paused"
+    if slot_id in sentinels.get("promotes", []):
+        return "promoting"
+    if slot_id in sentinels.get("demotes", []):
+        return "demoting"
+    # Live slot is whatever the bot is configured to run live (5m_scalp). Don't
+    # apply Kelly auto-kill to it: its trade history is the main trading_state.json
+    # (lifetime live trades, includes pre-Sentinel iterations), not the slot's
+    # sidecar — the bot itself uses an empty sidecar so its is_killed never trips.
+    if slot_id in _LIVE_SLOTS:
+        return "live"
+    # Paper slots: auto-kill at 50+ trades AND negative Kelly (strategy_slot.py:70-78)
+    if len(trades) >= 50 and _compute_kelly_raw(trades) < 0:
+        return "killed"
+    # Factory stage overrides only if it's a known label (avoid "unknown" fallback).
+    if factory_stage in ("paper", "killed", "hypothesis"):
+        return factory_stage
+    return "paper"
+
 
 def _build_slots_overview(all_slots: dict[str, dict], factory: dict, sentinels: dict) -> str:
     """Build a card showing all slots with lifecycle stage, trade count, and status."""
@@ -964,17 +1051,8 @@ def _build_slots_overview(all_slots: dict[str, dict], factory: dict, sentinels: 
         # Determine strategy name and stage from factory
         strat_name = _SLOT_STRATEGY_MAP.get(slot_id, slot_id)
         strat_info = strategies.get(strat_name, {})
-        stage = strat_info.get("stage", "unknown")
-
-        # Override stage if sentinel files active
-        if slot_id in sentinels.get("kills", []):
-            stage = "killed"
-        elif slot_id in sentinels.get("pauses", []):
-            stage = "paused"
-        elif slot_id in sentinels.get("promotes", []):
-            stage = "promoting"
-        elif slot_id in sentinels.get("demotes", []):
-            stage = "demoting"
+        factory_stage = strat_info.get("stage", "")
+        stage = _compute_slot_stage(slot_id, trades, factory_stage, sentinels)
 
         # Stage badge styling
         stage_styles = {
@@ -1010,13 +1088,27 @@ def _build_slots_overview(all_slots: dict[str, dict], factory: dict, sentinels: 
         </div>'''
 
     # Pipeline log (last 5 events)
+    # Pipeline log — only render entries from the last 30 days. Older entries are
+    # historical noise (March hypothesis registrations, etc.) that mislead more than inform.
     pipeline = factory.get("pipeline_log", [])
     log_html = ""
     if pipeline:
-        for entry in pipeline[-5:]:
-            ts = entry.get("time", "")[:16].replace("T", " ")
-            log_html += f'<div style="font-size:0.68em;color:var(--text-dim);padding:2px 0;font-family:\'JetBrains Mono\',monospace">{ts} — {escape(entry.get("strategy", ""))} — {escape(entry.get("event", ""))}</div>'
-        log_html = f'<div class="compare-section-title" style="margin-top:10px">Pipeline Log</div>{log_html}'
+        from datetime import datetime as _dt, timedelta as _td
+        cutoff = _dt.now() - _td(days=30)
+        recent = []
+        for entry in pipeline:
+            ts_raw = entry.get("time", "")
+            try:
+                ts_dt = _dt.fromisoformat(ts_raw.replace("Z", "+00:00").split(".")[0])
+                if ts_dt.replace(tzinfo=None) >= cutoff:
+                    recent.append(entry)
+            except (ValueError, AttributeError):
+                continue
+        if recent:
+            for entry in recent[-5:]:
+                ts = entry.get("time", "")[:16].replace("T", " ")
+                log_html += f'<div style="font-size:0.68em;color:var(--text-dim);padding:2px 0;font-family:\'JetBrains Mono\',monospace">{ts} — {escape(entry.get("strategy", ""))} — {escape(entry.get("event", ""))}</div>'
+            log_html = f'<div class="compare-section-title" style="margin-top:10px">Pipeline Log (30d)</div>{log_html}'
 
     return f'''<div class="glass-card dash-item" data-id="slots-overview">
         <h2>Slot Lifecycle</h2>
@@ -1183,8 +1275,13 @@ def chart_thread_loop():
         time.sleep(CHART_INTERVAL)
 
 
-def _build_watchlist_html(wl: dict) -> str:
-    """Render watchlist as a grid of coin tiles with status dots."""
+def _build_watchlist_html(wl: dict, positions: dict | None = None) -> str:
+    """Render watchlist as a grid of coin tiles with status dots.
+
+    positions: live state positions dict (trading_state.json), used to show the
+    exchange-resting SL on open-position tiles.
+    """
+    positions = positions or {}
     base = wl["base_pairs"]
     scanner = {s["symbol"]: s for s in wl["scanner_pairs"]}
     open_syms = wl["open_symbols"]
@@ -1229,6 +1326,18 @@ def _build_watchlist_html(wl: dict) -> str:
 
         score_html = ""
         meta_parts = [status]
+        if is_open:
+            pos = positions.get(sym) or {}
+            # Prefer the exchange-resting SL (durable trailing stop) so the tile
+            # never shows internal stop_loss while the resting order sits elsewhere.
+            # Old state files lack exchange_sl_price — fall back to stop_loss.
+            sl_val = pos.get("exchange_sl_price")
+            sl_label = "Exch SL"
+            if sl_val is None:
+                sl_val = pos.get("stop_loss")
+                sl_label = "SL"
+            if sl_val:
+                meta_parts.append(f"{sl_label} {sl_val:.6g}")
         if is_scanner and sym in scanner:
             s = scanner[sym]
             score_html = f'<span class="wl-score">{s["score"]:.1f}</span>'
@@ -1399,7 +1508,9 @@ def build_content() -> str:
     factory_state = read_factory_state()
     all_slot_states = read_all_slot_states()
     sentinels = detect_sentinel_files()
-    lines = tail_log(500)
+    # 3000 lines covers ~6-12 hours of recent activity — wide enough to catch
+    # ENTRY/Position-closed events that get buried under DEBUG noise on quiet days.
+    lines = tail_log(3000)
     cycle = parse_latest_cycle(lines)
     regime = parse_regime_status(lines)
     activity = get_recent_activity(lines, n=15)
@@ -1449,7 +1560,13 @@ def build_content() -> str:
     )
 
     paper_html = _build_paper_comparison(trades, paper_trades)
-    narrow_html = _build_narrow_panel(read_narrow_state())
+    # Auto-hide NARROW panel if the underlying state file hasn't been updated in 7+ days
+    # (slot has been killed since 2026-04-24 — leaving the panel up shows zombie counts).
+    _narrow_path = os.path.join(PROJECT_DIR, "trading_state_5m_narrow.json")
+    if os.path.exists(_narrow_path) and (time.time() - os.path.getmtime(_narrow_path)) < 7 * 86400:
+        narrow_html = _build_narrow_panel(read_narrow_state())
+    else:
+        narrow_html = ""
     slots_html = _build_slots_overview(all_slot_states, factory_state, sentinels)
 
     session_html = _build_session_card(trades, paper_trades, balance=balance, balance_start=balance_start_of_day)
@@ -1470,9 +1587,10 @@ def build_content() -> str:
     if has_charts:
         with _chart_lock:
             _v = _chart_version
+        # Removed all-time cumulative_pnl — duplicates the Sentinel chart below.
+        # PnL by exit reason is unique info, kept.
         chart_section = f"""
         <div class="charts-grid">
-            <div class="chart-box"><img src="/chart/cumulative_pnl?v={_v}" alt="Cumulative PnL"></div>
             <div class="chart-box"><img src="/chart/pnl_by_reason?v={_v}" alt="PnL by Reason"></div>
         </div>"""
     else:
@@ -1553,7 +1671,7 @@ def build_content() -> str:
     </div>
     <div class="status-item">
         <span class="status-label">TODAY</span>
-        <span class="status-value {bal_change_cls}">${balance_change:+.2f}</span>
+        <span class="status-value {daily_pnl_cls}">${daily_pnl:+.2f}</span>
         <span class="status-sub">{daily_count}t {daily_wr:.0f}%</span>
     </div>
     <div class="status-item">
@@ -1621,7 +1739,7 @@ def build_content() -> str:
         </div>
         <div class="glass-card dash-item" data-id="watchlist">
             <h2>Watchlist</h2>
-            {_build_watchlist_html(watchlist)}
+            {_build_watchlist_html(watchlist, state.get("positions") or {})}
         </div>
         {_build_l2_monitor_panel()}
         {_build_reconcile_card()}
@@ -2280,6 +2398,230 @@ tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
 
 
 
+# ── Full Trades page ─────────────────────────────────────────────────────
+def build_trades_page() -> str:
+    """Standalone full-table view of every closed trade across live + paper slots.
+    Includes client-side filters (slot, side, strategy, symbol search, win/loss).
+    Self-contained CSS so it doesn't depend on the main dashboard template."""
+    # Load every closed_trades source, tag each row with the slot it came from.
+    sources = [("live", "trading_state.json")]
+    for path in sorted(_glob.glob(os.path.join(PROJECT_DIR, "trading_state_5m_*.json"))):
+        fname = os.path.basename(path)
+        if fname.endswith(".bak"):
+            continue
+        slot = fname.replace("trading_state_", "").replace(".json", "")
+        sources.append((slot, fname))
+
+    all_rows = []
+    for slot, fname in sources:
+        path = os.path.join(PROJECT_DIR, fname)
+        try:
+            with open(path) as f:
+                s = json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            continue
+        for t in s.get("closed_trades", []):
+            all_rows.append((slot, t))
+
+    # Sort newest first by closed_at (fall back to opened_at)
+    all_rows.sort(key=lambda r: r[1].get("closed_at") or r[1].get("opened_at") or 0, reverse=True)
+
+    # Build row HTML
+    body_rows = []
+    for slot, t in all_rows:
+        pnl = _net_pnl(t)
+        fee = _real_fee(t)
+        sym = (t.get("symbol") or "?").replace("/USDT:USDT", "")
+        side = (t.get("side") or "?").upper()
+        strat = t.get("strategy") or "—"
+        reason = t.get("exit_reason") or t.get("reason") or "—"
+        entry_px = t.get("entry_price") or 0
+        exit_px = t.get("exit_price") or 0
+        confidence = t.get("confidence") or ""
+        opened = t.get("opened_at") or 0
+        closed = t.get("closed_at") or 0
+        opened_str = _from_ts(opened).strftime("%Y-%m-%d %I:%M %p") if opened else "—"
+        closed_str = _from_ts(closed).strftime("%Y-%m-%d %I:%M %p") if closed else "—"
+        dur = ""
+        if opened and closed:
+            mins = (closed - opened) / 60
+            dur = f"{mins/60:.1f}h" if mins >= 60 else f"{mins:.0f}m"
+        win = "W" if pnl > 0 else "L"
+        pnl_cls = "pos" if pnl > 0 else "neg"
+        side_cls = "long" if side == "LONG" else "short"
+        body_rows.append(
+            f'<tr data-slot="{escape(slot)}" data-side="{escape(side)}" '
+            f'data-strat="{escape(strat)}" data-symbol="{escape(sym)}" '
+            f'data-result="{win}" data-closed="{closed}" data-pnl="{pnl}">'
+            f'<td>{escape(slot)}</td>'
+            f'<td>{closed_str}</td>'
+            f'<td class="num">{dur}</td>'
+            f'<td class="{side_cls}">{side}</td>'
+            f'<td class="sym">{escape(sym)}</td>'
+            f'<td>{escape(strat)}</td>'
+            f'<td class="num">{entry_px:.6g}</td>'
+            f'<td class="num">{exit_px:.6g}</td>'
+            f'<td class="num {pnl_cls}">${pnl:+.4f}</td>'
+            f'<td class="num">${fee:.4f}</td>'
+            f'<td>{escape(reason)}</td>'
+            f'<td class="num">{confidence}</td>'
+            f'</tr>'
+        )
+
+    # Unique values for filter dropdowns
+    slots_set = sorted({slot for slot, _ in all_rows})
+    strats_set = sorted({(t.get("strategy") or "—") for _, t in all_rows})
+    sides_set = sorted({(t.get("side") or "?").upper() for _, t in all_rows})
+
+    def _opts(values):
+        return "".join(f'<option value="{escape(v)}">{escape(v)}</option>' for v in values)
+
+    total = len(all_rows)
+    rows_html = "\n".join(body_rows)
+
+    return f"""<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>Phmex-S — All Trades ({total})</title>
+<style>
+  body {{ background:#0d1117; color:#cdd6f4; font-family:'JetBrains Mono',monospace; font-size:12px; margin:0; padding:16px; }}
+  h1 {{ font-size:14px; color:#39d2c0; margin:0 0 12px; text-transform:uppercase; letter-spacing:0.08em; }}
+  .meta {{ color:#7e8aa0; font-size:11px; margin-bottom:12px; }}
+  .meta a {{ color:#39d2c0; text-decoration:none; }}
+  .filters {{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; background:#161b22; padding:10px; border-radius:4px; }}
+  .filters label {{ display:flex; flex-direction:column; font-size:10px; color:#7e8aa0; text-transform:uppercase; }}
+  .filters input, .filters select {{ background:#0d1117; color:#cdd6f4; border:1px solid #30363d; padding:5px 8px; font-family:inherit; font-size:11px; border-radius:3px; min-width:120px; }}
+  .filters button {{ background:#30363d; color:#cdd6f4; border:none; padding:5px 12px; border-radius:3px; cursor:pointer; align-self:flex-end; }}
+  .filters button:hover {{ background:#3fb950; color:#0d1117; }}
+  .count {{ color:#7e8aa0; font-size:11px; margin-bottom:8px; }}
+  table {{ width:100%; border-collapse:collapse; background:#161b22; border-radius:3px; overflow:hidden; }}
+  thead th {{ background:#21262d; color:#7e8aa0; text-transform:uppercase; font-size:10px; font-weight:600; padding:8px 6px; text-align:left; cursor:pointer; user-select:none; position:sticky; top:0; }}
+  thead th:hover {{ color:#39d2c0; }}
+  tbody td {{ padding:5px 6px; border-top:1px solid #21262d; font-size:11px; }}
+  tbody tr:hover {{ background:#1c2128; }}
+  td.num {{ text-align:right; font-variant-numeric:tabular-nums; }}
+  td.sym {{ font-weight:600; color:#fde68a; }}
+  td.long {{ color:#3fb950; font-weight:600; }}
+  td.short {{ color:#f85149; font-weight:600; }}
+  td.pos {{ color:#3fb950; }}
+  td.neg {{ color:#f85149; }}
+</style>
+</head><body>
+<h1>All Trades — {total} closed</h1>
+<div class="meta">
+  Sources: {", ".join(s for s, _ in sources)} · sorted newest first ·
+  <a href="/">← back to dashboard</a>
+</div>
+<div class="filters">
+  <label>Slot<select id="f-slot"><option value="">all</option>{_opts(slots_set)}</select></label>
+  <label>Side<select id="f-side"><option value="">all</option>{_opts(sides_set)}</select></label>
+  <label>Strategy<select id="f-strat"><option value="">all</option>{_opts(strats_set)}</select></label>
+  <label>Result<select id="f-result"><option value="">all</option><option value="W">Wins</option><option value="L">Losses</option></select></label>
+  <label>Symbol contains<input id="f-symbol" type="text" placeholder="e.g. INJ"></label>
+  <label>Closed after<input id="f-after" type="date"></label>
+  <label>Closed before<input id="f-before" type="date"></label>
+  <button id="f-reset">Reset</button>
+</div>
+<div class="count" id="count">Showing {total} of {total} trades</div>
+<table id="trades-table">
+  <thead><tr>
+    <th data-col="slot">Slot</th>
+    <th data-col="closed">Closed (PT)</th>
+    <th data-col="dur">Dur</th>
+    <th data-col="side">Side</th>
+    <th data-col="symbol">Symbol</th>
+    <th data-col="strat">Strategy</th>
+    <th data-col="entry">Entry</th>
+    <th data-col="exit">Exit</th>
+    <th data-col="pnl">Net PnL</th>
+    <th data-col="fee">Fee</th>
+    <th data-col="reason">Exit Reason</th>
+    <th data-col="conf">Conf</th>
+  </tr></thead>
+  <tbody>
+{rows_html}
+  </tbody>
+</table>
+<script>
+(function() {{
+  const tbody = document.querySelector('#trades-table tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const countEl = document.getElementById('count');
+  const filters = ['f-slot', 'f-side', 'f-strat', 'f-result', 'f-symbol', 'f-after', 'f-before'];
+
+  function applyFilters() {{
+    const slot = document.getElementById('f-slot').value;
+    const side = document.getElementById('f-side').value;
+    const strat = document.getElementById('f-strat').value;
+    const result = document.getElementById('f-result').value;
+    const symbol = document.getElementById('f-symbol').value.trim().toUpperCase();
+    const after = document.getElementById('f-after').value;
+    const before = document.getElementById('f-before').value;
+    const afterTs = after ? new Date(after + 'T00:00:00').getTime() / 1000 : null;
+    const beforeTs = before ? new Date(before + 'T23:59:59').getTime() / 1000 : null;
+
+    let shown = 0;
+    rows.forEach(r => {{
+      const ts = parseInt(r.dataset.closed, 10) || 0;
+      const ok =
+        (!slot || r.dataset.slot === slot) &&
+        (!side || r.dataset.side === side) &&
+        (!strat || r.dataset.strat === strat) &&
+        (!result || r.dataset.result === result) &&
+        (!symbol || r.dataset.symbol.toUpperCase().includes(symbol)) &&
+        (!afterTs || ts >= afterTs) &&
+        (!beforeTs || ts <= beforeTs);
+      r.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    }});
+    countEl.textContent = `Showing ${{shown}} of {total} trades`;
+  }}
+
+  filters.forEach(id => {{
+    const el = document.getElementById(id);
+    el.addEventListener('input', applyFilters);
+    el.addEventListener('change', applyFilters);
+  }});
+  document.getElementById('f-reset').addEventListener('click', () => {{
+    filters.forEach(id => document.getElementById(id).value = '');
+    applyFilters();
+  }});
+
+  // Click-to-sort columns
+  const headers = document.querySelectorAll('#trades-table thead th');
+  let sortState = {{ col: 'closed', dir: -1 }};
+  const numericCols = new Set(['dur', 'entry', 'exit', 'pnl', 'fee', 'conf', 'closed']);
+  headers.forEach((th, idx) => {{
+    th.addEventListener('click', () => {{
+      const col = th.dataset.col;
+      sortState.dir = sortState.col === col ? -sortState.dir : 1;
+      sortState.col = col;
+      const sorted = rows.slice().sort((a, b) => {{
+        let av, bv;
+        if (col === 'pnl') {{
+          av = parseFloat(a.dataset.pnl); bv = parseFloat(b.dataset.pnl);
+        }} else if (col === 'closed') {{
+          av = parseInt(a.dataset.closed, 10); bv = parseInt(b.dataset.closed, 10);
+        }} else {{
+          av = a.children[idx].textContent.trim();
+          bv = b.children[idx].textContent.trim();
+          if (numericCols.has(col)) {{
+            av = parseFloat(av.replace(/[$,h]/g, '')) || 0;
+            bv = parseFloat(bv.replace(/[$,h]/g, '')) || 0;
+          }}
+        }}
+        if (av < bv) return -sortState.dir;
+        if (av > bv) return sortState.dir;
+        return 0;
+      }});
+      sorted.forEach(r => tbody.appendChild(r));
+    }});
+  }});
+}})();
+</script>
+</body></html>"""
+
+
 # ── HTTP handler ─────────────────────────────────────────────────────────
 class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -2292,6 +2634,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.wfile.write(html.encode())
         elif self.path == "/api/content":
             html = build_content()
+            data = html.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(data)
+        elif self.path == "/trades":
+            html = build_trades_page()
             data = html.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")

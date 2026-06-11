@@ -769,6 +769,75 @@ class Exchange:
 
         return results
 
+    def move_stop_loss(self, symbol: str, side: str, amount: float, new_sl: float,
+                       sl_order_id: str) -> str:
+        """Move the resting exchange SL to new_sl with NO naked-position window.
+
+        Primary: atomic edit_order amend — the stop never disappears (non-destructive
+        on failure). Fallback: place new SL → verify → cancel old by id; the old SL
+        is NEVER cancelled before the new one is confirmed live.
+
+        Complete-or-raise (lessons.md:290 — deliberately not _call_with_timeout-
+        wrapped): raises RuntimeError if the move cannot be guaranteed, in which
+        case the OLD SL is still resting. Returns the resting SL order id.
+        See docs/superpowers/specs/2026-06-08-part-b-trailing-protection-plan.md.
+        """
+        if not Config.is_live():
+            return sl_order_id
+        if not sl_order_id or sl_order_id == "software":
+            raise ValueError(f"move_stop_loss requires a live exchange SL id (got {sl_order_id!r})")
+
+        order_side = "sell" if side == "long" else "buy"
+        sl_trigger_dir = "descending" if side == "long" else "ascending"
+        new_sl = self._round_price(symbol, new_sl)
+        amount = self._round_amount(symbol, amount)
+        params = {"reduceOnly": True, "triggerPrice": new_sl, "triggerDirection": sl_trigger_dir}
+
+        # Primary — atomic amend. First live amend doubles as the one-time
+        # edit_order param validation (endpoint unused before 2026-06-11), so log
+        # the full request shape.
+        last_err = None
+        for attempt in range(3):
+            try:
+                logger.info(f"[SL-MOVE] amend {symbol} id={sl_order_id} -> trigger@{new_sl} params={params}")
+                result = self.client.edit_order(sl_order_id, symbol, "market", order_side,
+                                                amount, None, params=params)
+                new_id = (result or {}).get("id") or sl_order_id
+                if self.verify_sl_order(symbol, new_id):
+                    logger.info(f"[SL-MOVE] amended {symbol} SL -> {new_sl} (id={new_id})")
+                    return new_id
+                last_err = RuntimeError("amend verify failed — order not in open orders")
+            except Exception as e:
+                last_err = e
+                logger.warning(f"[SL-MOVE] amend attempt {attempt+1}/3 failed for {symbol}: {e}")
+            if attempt < 2:
+                time.sleep(1 + attempt)
+
+        # Fallback — place-then-cancel. If the duplicate reduce-only SL is rejected
+        # (Merged-mode acceptance unknown, Appendix A), we raise with the old SL intact.
+        logger.warning(f"[SL-MOVE] amend exhausted for {symbol} ({last_err}) — fallback place-then-cancel")
+        new_id = None
+        for attempt in range(3):
+            try:
+                order = self.client.create_order(symbol, "market", order_side, amount, None, params=params)
+                new_id = order.get("id")
+                if new_id and self.verify_sl_order(symbol, new_id):
+                    break
+                new_id = None
+            except Exception as e:
+                last_err = e
+                logger.warning(f"[SL-MOVE] fallback place attempt {attempt+1}/3 failed for {symbol}: {e}")
+            if attempt < 2:
+                time.sleep(1 + attempt)
+        if not new_id:
+            raise RuntimeError(f"move_stop_loss failed for {symbol}: old SL {sl_order_id} left in place ({last_err})")
+        try:
+            self.client.cancel_order(sl_order_id, symbol)
+        except Exception as e:
+            logger.warning(f"[SL-MOVE] could not cancel old SL {sl_order_id} for {symbol}: {e} — orphan reduce-only, cleaned at close")
+        logger.info(f"[SL-MOVE] fallback placed {symbol} SL -> {new_sl} (id={new_id}, old cancelled)")
+        return new_id
+
     def verify_sl_order(self, symbol: str, sl_order_id: str) -> bool:
         """Check if a stop-loss order is still active on the exchange."""
         if not Config.is_live() or not sl_order_id:

@@ -26,6 +26,13 @@ class Position:
     peak_price: float = 0.0
     sl_order_id: str = None
     tp_order_id: str = None
+    # Price the resting exchange SL actually sits at (durable trail backstop).
+    # None = exchange SL still at original stop_loss / not yet ratcheted.
+    exchange_sl_price: Optional[float] = None
+    # True once move_stop_loss has ratcheted the resting SL away from its
+    # entry-time placement — lets exchange-side fills at the ratcheted level be
+    # tagged durable_sl instead of polluting the exchange_close disaster bucket.
+    sl_ratcheted: bool = False
     entry_cycle: int = 0  # cycle count when position was opened
     opened_at: float = 0.0  # epoch timestamp when position was opened
     strategy: str = ""  # strategy name for strategy-specific time exits
@@ -293,6 +300,8 @@ class RiskManager:
                     )
                     pos.shadow_skip = pd.get("shadow_skip", False)
                     pos.shadow_hour_pt = pd.get("shadow_hour_pt", None)
+                    pos.exchange_sl_price = pd.get("exchange_sl_price")  # absent in old state files
+                    pos.sl_ratcheted = pd.get("sl_ratcheted", False)
                     self.positions[sym] = pos
                 if pos_data:
                     logger.info(f"Restored {len(pos_data)} open positions from state")
@@ -315,6 +324,8 @@ class RiskManager:
                     "strategy": pos.strategy, "entry_strength": pos.entry_strength,
                     "confidence": pos.confidence, "ensemble_layers": pos.ensemble_layers,
                     "entry_snapshot": getattr(pos, "entry_snapshot", {}),
+                    "exchange_sl_price": pos.exchange_sl_price,
+                    "sl_ratcheted": pos.sl_ratcheted,
                 }
             with open(self.state_file, "w") as f:
                 json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades, "trade_results": self.trade_results, "positions": pos_data}, f)

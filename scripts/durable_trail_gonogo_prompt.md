@@ -1,0 +1,14 @@
+Run the Phmex-S durable-trail GO/NO-GO shadow-data analysis (scheduled 2026-06-11 after the fast-track deploy; gate window June 23-29 per docs/superpowers/specs/2026-06-08-part-b-trailing-protection-plan.md). You are running headless via launchd on Jonas's Mac, cwd ~/Desktop/Phmex-S.
+
+Context: On 2026-06-11 two things went live in ~/Desktop/Phmex-S — (1) a read-only shadow-logger writing armed-trail ticks and exit records to logs/shadow_trail.jsonl (tick = symbol, side, entry, trail, peak, sl, candle_close/high/low, roi; exit = exit_reason, exit_price, net_pnl, last_trail, last_peak), and (2) the fast-track durable exchange trail (DURABLE_TRAIL_BAND_PCT=1.2% price from peak, new exit tag durable_sl). Bot takes ~2 trades/day; armed-trail events (peak ROI >= +5%) are a subset — the plan estimated ~15-20 episodes for a read.
+
+Do (preflight first per project rules — read memory/lessons.md META-RULES):
+1. Count events in logs/shadow_trail.jsonl — distinct armed-trail episodes (group ticks by symbol + entry) and exit records. If fewer than ~15 episodes, report the count and recommend extending the gate (window runs to June 29); do not force a conclusion on thin data.
+2. If enough data: per episode, using candle high/low ticks, measure (a) would a hypothetical TIGHT exchange-resting trail (0.3-0.5% price — the software band) have been wicked out before the software exit fired? (b) did the actual exit beat or lose to where the 1.2% durable backstop sat? (c) for any durable_sl fills in trading_state.json closed_trades: net PnL vs what riding to the -12% exchange stop would have cost.
+3. Pull closed_trades since 2026-06-11 from trading_state.json: counts and net PnL by exit_reason (durable_sl / trailing_stop / early_exit / exchange_close / others), and grep logs/bot.log* for "[SL-MOVE]" — report whether the first live edit_order amend succeeded or fell back (the endpoint was never validated before this deploy).
+4. Verdict: net $ effect — is the 1.2% band saving more than it gives back? Recommend KEEP / WIDEN / TIGHTEN, and whether a tight-band durable trail (the original Part B question) looks viable or dead.
+5. Verify every number against the raw files (no-fabrication rule — never invent a count or PnL), cite file/line or record keys, and write the full report to docs/2026-06-23-durable-trail-go-nogo.md (12-hour PT times). Lead the report with the verdict and key numbers.
+
+TOOLING: you have Read/Glob/Grep/Write and read-only Bash (jq, grep, tail, head, wc, ls). Use jq for all JSON counting/grouping/summing — you do NOT have python or unrestricted shell, by design (live bot host, unsupervised run). If a computation is impossible with these tools, state what's missing in the report instead of working around it.
+
+HARD RULES: read-only analysis — do NOT modify bot code, do NOT restart the bot, do NOT touch .env or any order. Only file you create is the report doc.

@@ -33,6 +33,10 @@ class Config:
     TAKE_PROFIT_PERCENT = float(os.getenv("TAKE_PROFIT_PERCENT", "1.8"))
     TRAILING_STOP = os.getenv("TRAILING_STOP", "true").lower() == "true"
     TRAILING_STOP_OFFSET = float(os.getenv("TRAILING_STOP_OFFSET", "1.0"))
+    # Durable exchange-resting trail backstop: price % below/above peak once the
+    # software trail is armed. Wide on purpose (fast-track 2026-06-11, spec range
+    # 1.0-1.5) — software tiers still exit first; this caps inter-cycle reversals.
+    DURABLE_TRAIL_BAND_PCT = float(os.getenv("DURABLE_TRAIL_BAND_PCT", "1.2"))
 
     # Phase 2b — Pullback regime filter flags (shadow-log by default; hard-block only when explicitly true)
     PULLBACK_SESSION_GATE = os.getenv("PULLBACK_SESSION_GATE", "false").lower() == "true"
