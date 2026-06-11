@@ -1,0 +1,80 @@
+RECORDS total=108313 bad/skipped=930 symbols=35
+TIME span 481.0h  split_ts=1779424838.0  (265.0h into data)
+  1000PEPE/USDT:USDT   n=  1138
+  AAVE/USDT:USDT       n=   824
+  ADA/USDT:USDT        n=  8403
+  ALLO/USDT:USDT       n=   119
+  APT/USDT:USDT        n=   168
+  ARB/USDT:USDT        n=  6231
+  ATOM/USDT:USDT       n=   561
+  AVAX/USDT:USDT       n=  4205
+  BCH/USDT:USDT        n=  4395
+  BTC/USDT:USDT        n=  4342
+  CFX/USDT:USDT        n=   213
+  DOGE/USDT:USDT       n= 11368
+  ENA/USDT:USDT        n=  5538
+  ETH/USDT:USDT        n=  5388
+  GMT/USDT:USDT        n=    37
+  GRASS/USDT:USDT      n=   295
+  HYPE/USDT:USDT       n=  1479
+  INJ/USDT:USDT        n= 10043
+  JTO/USDT:USDT        n=   716
+  JUP/USDT:USDT        n=    60
+  LTC/USDT:USDT        n=  1567
+  ME/USDT:USDT         n=    54
+  ONDO/USDT:USDT       n=  5912
+  PENDLE/USDT:USDT     n=   765
+  PENGU/USDT:USDT      n=    60
+  PROVE/USDT:USDT      n=   533
+  RENDER/USDT:USDT     n=  3856
+  RON/USDT:USDT        n=   560
+  SEI/USDT:USDT        n=   178
+  TAO/USDT:USDT        n=  1094
+  TON/USDT:USDT        n=  6626
+  WLD/USDT:USDT        n=  1127
+  XLM/USDT:USDT        n=  4715
+  XRP/USDT:USDT        n=  3790
+  ZEC/USDT:USDT        n= 11023
+
+GRID size = 324 configs
+Configs with n>=50 on TRAIN: 324 / 324
+Configs net-positive on TRAIN (n>=50): 0
+
+BEST TRAIN CONFIG (by net exp/trade, n>=50):
+  W=300s pct=95 thr=0.0 TP=1.00% SL=0.50% M=1800s
+  TRAIN: n=1474 wr=40.7% gross/trade=0.0511% net/trade=-0.0689%
+
+=== HELD-OUT TEST (exact best config) ===
+  n=1538 wr=39.9% gross/trade=0.0401% net/trade=-0.0799% total_net=-122.96%
+  per-symbol (n, net_total%, wr%):
+    1000PEPE/USDT:USDT   n=  57 net_total=   -2.68%  wr= 45.6%
+    AAVE/USDT:USDT       n=   7 net_total=    0.53%  wr= 71.4%
+    ADA/USDT:USDT        n= 303 net_total=  -28.36%  wr= 40.3%
+    ARB/USDT:USDT        n= 155 net_total=  -16.35%  wr= 36.1%
+    AVAX/USDT:USDT       n=  58 net_total=   -5.76%  wr= 39.7%
+    BCH/USDT:USDT        n=  69 net_total=   -7.88%  wr= 34.8%
+    DOGE/USDT:USDT       n= 121 net_total=   -8.94%  wr= 42.1%
+    ENA/USDT:USDT        n= 122 net_total=   -6.75%  wr= 41.0%
+    ETH/USDT:USDT        n=  20 net_total=   -2.88%  wr= 20.0%
+    HYPE/USDT:USDT       n=  21 net_total=   -1.39%  wr= 42.9%
+    INJ/USDT:USDT        n= 202 net_total=  -10.00%  wr= 41.6%
+    JTO/USDT:USDT        n=   4 net_total=   -1.40%  wr= 25.0%
+    LTC/USDT:USDT        n=  28 net_total=   -1.48%  wr= 42.9%
+    ONDO/USDT:USDT       n=  22 net_total=   -2.41%  wr= 31.8%
+    PROVE/USDT:USDT      n=   3 net_total=   -0.36%  wr= 33.3%
+    TON/USDT:USDT        n= 102 net_total=   -6.05%  wr= 40.2%
+    XLM/USDT:USDT        n=  48 net_total=   -5.65%  wr= 37.5%
+    ZEC/USDT:USDT        n= 196 net_total=  -15.15%  wr= 40.3%
+
+=== OVERFIT DIAGNOSTICS ===
+  Train-positive configs (n>=50): 0
+  ...of those, net-positive on TEST: 0  (0.0%)
+  Overfit rate (train-pos but test<=0): 0.0%
+
+=== GATE MARGINAL VALUE (TEST set, all eligible configs) ===
+  thr=0.0: configs=108 avg_test_net/trade= -0.1167% total_test_trades=225396 pct_pos=0%
+  thr=0.1: configs=108 avg_test_net/trade= -0.1173% total_test_trades=143064 pct_pos=0%
+  thr=0.2: configs=108 avg_test_net/trade= -0.1192% total_test_trades= 77076 pct_pos=0%
+
+  Matched pairs (same W,pct,TP,SL,M): thr=0 vs thr=0.2 on TEST net/trade:
+    pairs=108 mean(gate0.2 - gate0)=-0.0024%  median=-0.0073%  pct_gate_better=25%

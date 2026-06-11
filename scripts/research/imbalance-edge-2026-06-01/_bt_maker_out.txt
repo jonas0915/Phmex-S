@@ -1,0 +1,36 @@
+RECORDS total=108313 bad/skipped=930 symbols=35
+TIME span 481.0h split_ts=1779424838.0 (265.0h into data)
+
+GRID size = 324 configs
+
+======================================================================
+SCENARIO A — optimistic maker, perfect fills (round-trip 0.02%)
+======================================================================
+TRAIN eligible (n>=50): 324/324  net-positive on TRAIN: 35
+BEST TRAIN cfg: W=300s pct=95 thr=0.0 TP=1.00% SL=0.50% M=1800s
+  TRAIN: n=1474 wr=47.4% gross/trade=0.0511% net/trade=0.0311%
+
+  HELD-OUT TEST (best cfg):
+    n=1538 wr=45.4% gross/trade=0.0401% net/trade=0.0201% total_net=30.84%
+    BREAKEVEN round-trip fee (TEST gross exp): 0.0401%  (maker=0.02% taker=0.12%)
+
+  GATE VALUE (Scenario A, TEST, eligible configs):
+    thr=0.0: configs=108 avg_test_net/trade= -0.0167% test_trades=225396 pct_pos=13%
+    thr=0.1: configs=108 avg_test_net/trade= -0.0173% test_trades=143064 pct_pos=17%
+    thr=0.2: configs=108 avg_test_net/trade= -0.0192% test_trades=77076 pct_pos=19%
+
+======================================================================
+SCENARIO B — realistic maker fill model, fill-wait = 30s
+  entry 0.01% maker (post-only, must fill); exit TP=0.01% maker else 0.06% taker
+======================================================================
+TRAIN eligible (filled n>=50): 0/324  net-positive on TRAIN: 0
+  No eligible config (too few fills on train). Skipping.
+
+======================================================================
+SCENARIO B — realistic maker fill model, fill-wait = 60s
+  entry 0.01% maker (post-only, must fill); exit TP=0.01% maker else 0.06% taker
+======================================================================
+TRAIN eligible (filled n>=50): 0/324  net-positive on TRAIN: 0
+  No eligible config (too few fills on train). Skipping.
+
+DONE in 29.8s

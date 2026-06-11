@@ -176,13 +176,10 @@ def volatility_scan(client, top_n: int = None, min_volume: float = None) -> list
         mkt   = change_norm * vol_rank
         c["history_score"] = hist
         c["market_score"]  = mkt
-        c["composite"]     = hist * mkt
-
-    # Fallback: if all market scores are 0, use history x vol_rank
-    if all(c["composite"] == 0 for c in candidates):
-        logger.warning("[SCALPSCAN] All market scores zero — falling back to history x vol_rank")
-        for c in candidates:
-            c["composite"] = c["history_score"] * (c["volume"] / max_vol)
+        # Additive weighting: edge dominates, market activity is tiebreaker.
+        # Old formula `hist * mkt` let mkt (typically 0.00-0.05) crush hist contribution,
+        # ranking proven winners (e.g. INJ hist=0.90) at #5 because of low daily volume.
+        c["composite"]     = 0.7 * hist + 0.3 * mkt
 
     # Step 6: Sort by composite score descending
     candidates.sort(key=lambda x: x["composite"], reverse=True)

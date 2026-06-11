@@ -1,95 +1,67 @@
 ---
-name: SESSION_HANDOFF — last touched 2026-05-01
-description: Read this FIRST in next session. Cull failed at day 5 of 14, bot stopped, research path opened.
+name: SESSION_HANDOFF — last touched 2026-05-02 7:05 PM PT
+description: Read this FIRST in next session. Pullback culled tactically; bot running on htf_l2_anticipation only; may go quiet. Research path remains strategic plan but paused.
 type: project
 ---
 
-# Session Handoff — 2026-05-01
+# Session Handoff — 2026-05-02 (Sat evening)
 
 ## Bot state right now
-- **NOT RUNNING.** Bot stopped sometime after 8:41 PM PT 2026-04-30 (last log line is a routine WS seeding, no error). PID 41730 gone. `.bot.pid` stale at 1648 (also gone). No restart attempted.
-- **Balance: $68.51** USDT. Down from ~$74.45 at session start, ~$74.78 at peak.
-- **Open positions: 0.**
-- 2 live strategies remained from the 2026-04-26 cull (`htf_confluence_pullback` + `htf_l2_anticipation`).
+- **PID 26589** running. Started 7:01 PM PT 2026-05-02 after pullback cull deployed.
+- **Balance $67.65** at deploy time.
+- **1 strategy live** (real money): `htf_l2_anticipation` only. `htf_confluence_pullback` commented out at `strategies.py:671`.
+- **Open positions:** 0 live (1 paper-slot position restored on startup).
+- **Today's 3 trades** (all BEFORE the cull deploy): TAO long pullback +$0.12, TAO long pullback -$0.58, ETH long pullback -$0.37 → **net -$0.83. All 3 were `htf_confluence_pullback`. Zero `htf_l2_anticipation` fires today.**
 
-## Headline finding: cull observation FAILED
+## ⚠️ Critical caveat
+- **Bot may go quiet.** Pullback drove 100% of today's trades. l2_anticipation didn't fire today. Now pullback is gone.
+- **No idle alarm.** Code review I-4: PnL halts (daily loss / consecutive loss / DD tier) are the only kill switches. Zero entries for hours triggers nothing. Watch the bot log if no Telegram entries within 24h.
 
-5 days into the 14-day post-cull observation window (n=26 trades since 2026-04-27 02:22 UTC):
+## What changed this session
+1. **Bot restarted 11:25 PM PT 04-30** — overrode the 05-01 research-path pause when Jonas said "start bot." (See lessons.md: should have flagged the conflict at session-start preflight.)
+2. **Investigation pass** — 3 parallel agents (forensic + verifier + reference_*.md research read).
+3. **D1: profitable-hours filter audit** — wired correctly via `_BLOCKED_HOURS_UTC = {0,1,2,9,17,18,19,20}` at bot.py:1166-1178. Updated from Apr 10-16 417-trade analysis (more current than the older `_PROFITABLE_HOURS_UTC` whitelist). Working as designed.
+4. **D2: gate_tags=null root cause** — never wired into live entry path. Populate site exists ONLY for paper slots at bot.py:1742. Live path at bot.py:1282-1326 has no equivalent. Persist (risk_manager.py:303-322) and restore (272-301) also miss the field. 517-trade history confirms always null.
+5. **OHLCV AE-threshold replay** — sweep across {-2%, -2.5%, -3%, -3.5%, -4%, -5%, -6%} on n=32 post-cull + n=182 pre-cull. **Caps > rescues at every threshold.** AE feature is dollar-negative regardless of parameter. Threshold tuning rejected. Artifacts at `/tmp/ae_replay/`.
+6. **Pullback cull (single line, fully reversible)** — `strategies.py:671` commented out.
+   - **Originally proposed culling l2_anticipation** on agent's stale numbers (n=10/-$0.254). Verification re-counted: actual was n=13/-$0.194, AND pullback was WORSE (n=18/-$0.236). Cull target inverted.
+   - Jonas chose B (cull pullback). Edit applied, audit GREEN, bot restarted clean.
+   - Reverse: uncomment `strategies.py:671` + restart.
 
-| Metric | Pre-cull (30d) | Post-cull (5d, n=26) | Direction |
-|---|---|---|---|
-| Win rate | 39.7% | **23.1%** | ▼ |
-| Per-trade net | -$0.10 | **-$0.24** | ▼ |
-| AE rate | 29.3% | **50%** | ▼ |
-| `htf_confluence_pullback` per-trade | -$0.13 | **-$0.24** | ▼ |
-| `htf_l2_anticipation` per-trade | +$0.20 (n=13) | **-$0.25** (n=10 post) | ▼ flipped negative |
+## Verified per-strategy edge (post-cull window, 2026-05-02 7 PM PT)
+| Strategy | n | WR | Edge/trade | Verdict |
+|---|---|---|---|---|
+| htf_l2_anticipation (LIVE) | 13 | 30.8% | -$0.194 | CI [-$0.44, +$0.05] brackets zero |
+| htf_confluence_pullback (CULLED 05-02) | 18 | 22.2% | -$0.236 | worse; culled tonight |
+| synced (orphan-adopted, not a strategy) | 3 | 66.7% | +$0.407 | safety mech |
 
-Both strategies are now negative-edge over their cumulative samples. The +$0.20/trade reading on `htf_l2_anticipation` that justified keeping it was statistical noise; at n=23 cumulative it's now negative.
+Combined l2_anticipation pre+post (n=26): **-$0.022/trade**, CI [-$0.19, +$0.15] brackets zero. **No statistical signal of edge.** The cull is tactical risk-reduction, not an edge play.
 
-**Decision (2026-05-01):** no more parameter sweeps. The bot has not produced verified positive edge across 5 rounds of changes (Sentinel deploy, conf 3→4, hours trim, TP/AE tighten, cull). Research path opened.
+## Strategic plan (paused, still strategic)
+The 2026-05-01 research-path remains the strategic plan: build a calibrated backtest harness, simulate 90 days OHLCV with realistic fees+slippage, deploy only with positive simulated edge. Decomposes into 3 sub-projects: (1) calibrate one backtester within ±15% of live, (2) strategy testing harness CLI, (3) deployment gate policy. See MEMORY.md "Backtest infra survey (2026-05-01)" and the prior 05-01 handoff archived in lessons.md for full context.
 
-## What was shipped this session arc (2026-04-27 → 05-01)
+The 2026-05-02 cull is a tactical risk-reduction move while the research path proceeds — **not a substitute for it**.
 
-**Sentinel-era cumulative PnL chart on dashboard** — 4 commits, full subagent-driven workflow:
-1. `78310be` — module constants + `_cull_marker_index` helper + 6 unit tests in `tests/test_sentinel_chart.py`
-2. `ce11306` — `_make_cumulative_pnl_sentinel(trades) -> bytes` chart generator (mirrors `_make_cumulative_pnl` style + yellow cull marker)
-3. `278648c` — wire into `refresh_charts()` + embed `<img>` inside Sentinel audit card
-4. `0846ce8` — cache-eviction fix from code review (handles `*.bak` rollback edge case)
+## Top-priority next-session work
+1. **Watch trade frequency.** If l2_anticipation fires <1 trade/day for 3+ days, decide: revert pullback cull, or pause and accelerate research path.
+2. **AE feature investigation (separate from threshold tuning).** Today's replay showed AE is dollar-negative at every threshold. Next: replay with AE disabled entirely on n=182. If confirmed, "kill AE" is higher-leverage than threshold tuning.
+3. **gate_tags wiring** — non-trivial code work; needed before any future gate-level forensic. Defer until research path is unblocked or until a specific gate question demands it.
+4. **5m_narrow paper slot decision** — still calls `htf_confluence_pullback` directly (bot.py:1536, 1551), unaffected by cull. Useful as counterfactual ("what would we have earned with pullback?"). Revisit after 14d.
+5. **Resume backtest-harness brainstorm** — A/B/C decision on OB/tape simulation, then calibration target selection.
 
-Live verified: chart serves at `localhost:8050/chart/cumulative_pnl_sentinel`, embeds correctly inside the audit card.
+## Open questions
+- Will l2_anticipation fire enough to keep the bot meaningfully live?
+- Should 5m_narrow paper slot mirror the live cull or remain a counterfactual?
+- When does the research path resume — after 14d cull observation, or sooner if bot goes quiet?
 
-Spec: `docs/superpowers/specs/2026-04-27-sentinel-pnl-chart-design.md`
-Plan: `docs/superpowers/plans/2026-04-27-sentinel-pnl-chart.md`
+## Critical rules added to lessons.md this session
+- **Re-derive headline numbers between agent run and proposal acceptance.** Bot trades while agents work; numbers go stale within minutes for active windows.
+- **Surface active "stop work" directives at session-start preflight.** Scan MEMORY.md for stop-words ("stopped", "paused", "no more", "research path", "halt") and flag conflicts with the user's first ask.
+- **AE feature is dollar-negative at every threshold tested.** Threshold tuning is dead — future AE work must use different methodology or jump to "kill AE" entirely.
+- **gate_tags is null on 517 live trades — never wired** (paper slot only).
+- **Pullback hour-bleed gate is stale; do not flip.** Hour set inverted vs current data.
 
-## Forensics performed (clean, no bugs)
-
-**AVAX/ARB shorts (2026-04-27 losses):**
-- AVAX: real 1h downtrend (ADX 29.2, EMAs aligned), pullback gate fired exactly at the EMA pivot, 5m EMAs crossed back to bullish at +22 min → AE fired correctly. Not a gate failure, market refused the bet.
-- ARB: bot saw RSI **63** at entry (verified from bot.log), inside the 40-65 short band. My earlier "RSI=71" claim was a **partial-bar timing artifact** — same bar, measured 3.5 min later after it finalized at a higher close.
-- Entry snapshot persistence verified working. Schema is nested (`entry_snapshot.flow.buy_ratio`, `entry_snapshot.ob.imbalance`, `entry_snapshot.regime.adx`), not the flat top-level fields I had been grepping for. 83% population rate across recent trades.
-
-## Open: brainstorming the backtest harness
-
-Jonas's stated R&D plan:
-1. Build a backtest harness that produces results matching live trading within ±15%
-2. Test new strategy ideas against 90 days OHLCV with realistic fees + slippage
-3. Only deploy what shows positive simulated edge
-
-**Existing infra surveyed:**
-- `backtester.py` (478L) — CSV-based, no live gates → 2.7x overtrade calibration gap
-- `backtest.py` (1143L) — production, has cooldowns + regime + DD halt + strength gate, missing OB/tape
-- 90-day OHLCV in `backtest_data/`: 5 pairs (BTC, ETH, SOL, BNB, XRP) × 5m+1h, Jan 10 → Apr 10 2026
-- Both backtesters import `confluence_strategy()` directly from live `strategies.py` — no copy
-- AE rule lives in `backtester.py` only (`--ae-rule {roi,trend_flip}` flag)
-
-**Decomposed into 3 sub-projects:**
-1. **Backtest calibration** — pick one backtester, get it within ±15% of live on PnL+WR
-2. **Strategy testing harness** — CLI / workflow for proposing+testing new ideas
-3. **Deployment gate** — process policy, "no live deploy without simulated +ve edge"
-
-**Open question** (where brainstorming was paused): how to handle OB/tape gates that aren't in OHLCV?
-- **A.** Skip them in backtester, accept ~20-30% trade-count gap, calibrate other gates carefully. Available now, ~3-5 days.
-- **B.** Proxy from OHLCV structure (buy_ratio ~ candle close-vs-mid, imbalance ~ wick asymmetry). Lossy. ~1-2 weeks.
-- **C.** Capture L2/tape live going forward, build replay corpus. Highest fidelity. 30-60 days lag.
-
-## Next session — pick up at the brainstorm
-
-1. Resume the A/B/C decision on OB/tape simulation
-2. Then continue brainstorming sub-project 1 (calibration target — PnL? WR? trade count? all three?)
-3. Then writing-plans → implementation
-4. Bot stays OFF until simulation says yes (or Jonas overrides for a deliberate paper-only restart)
-
-## Lower-priority pending items
-
-- **Backup folder cleanup**: `~/Desktop/Phmex-S.backup-2026-04-26` is past the 2026-05-03 deadline. Safe to delete (no rollback needed).
-- **`bb_mean_reversion` shorts-only spec** — deferred from the 2026-04-26 handoff. Likely irrelevant now if we go research-first.
-- **Paper slot decisions** (`5m_liq_cascade`, `5m_mean_revert`) — also deferred. Same reasoning.
-- **Order-path timeout wrap** (`docs/superpowers/specs/2026-04-24-order-path-timeout-wrap.md`) — needs no-position window for restart. We have one now if/when we redeploy.
-
-## META-RULE corrections caught this session
-
-1. **ADX threshold** — quoted 20 from memory; actual code is 25 (strategies.py:291,527). See lessons.md "Verify thresholds against strategies.py source."
-2. **Partial-bar RSI** — computed RSI on finalized bar instead of partial bar bot evaluated. See lessons.md "Partial-bar RSI replication."
-3. **Snapshot schema** — claimed flat fields when schema is nested. See lessons.md "entry_snapshot schema is nested."
-
-Pattern: under time pressure I trust memory + quick pandas-recompute over reading current source. Each time, parallel verification (or Jonas) caught it. Rule now formalized in lessons.md.
+## Lower-priority pending
+- `~/Desktop/Phmex-S.backup-2026-04-26` past 05-03 deletion deadline. Safe to delete.
+- `bb_mean_reversion` shorts-only spec — deferred indefinitely (research path supersedes).
+- Order-path timeout wrap spec at `docs/superpowers/specs/2026-04-24-order-path-timeout-wrap.md` — needs no-position window if/when redeployed.

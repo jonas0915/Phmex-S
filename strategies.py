@@ -668,7 +668,10 @@ def confluence_strategy(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.Dat
 
     signals = []
     if htf_adx >= 20:
-        signals.append(htf_confluence_pullback(df, orderbook, htf_df))
+        # CULLED 2026-05-02: htf_confluence_pullback post-cull n=18, WR 22.2%, -$0.236/trade.
+        # Verified worse than htf_l2_anticipation (n=13, WR 30.8%, -$0.194/trade).
+        # Reverse: uncomment the line below.
+        # signals.append(htf_confluence_pullback(df, orderbook, htf_df))
         signals.append(htf_l2_anticipation(df, orderbook, htf_df, flow))
     # CULLED 2026-04-26 (Option A): momentum_continuation -$0.40/trade net, n=11/30d
     # if htf_adx >= 25:

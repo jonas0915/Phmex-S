@@ -23,8 +23,18 @@ import ccxt
 import numpy as np
 import pandas as pd
 
+import os
+import sys
+
 from indicators import add_all_indicators
-from strategies import Signal, TradeSignal, confluence_strategy
+from strategies import Signal, TradeSignal, confluence_strategy, htf_confluence_pullback
+
+# Flow replay (offline calibration) — scripts/flow_replay.py
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
+try:
+    from flow_replay import passes_flow_gates as _passes_flow_gates
+except Exception:
+    _passes_flow_gates = None
 
 # ---------------------------------------------------------------------------
 # Constants (match .env)
@@ -35,7 +45,7 @@ SLIPPAGE_PCT = 0.05         # 0.05% simulated slippage
 LEVERAGE = 10
 TRADE_SIZE_USD = 10.0       # margin per trade (matches .env TRADE_AMOUNT_USDT)
 STARTING_BALANCE = 74.38    # approximate current balance (updated 2026-04-15)
-SCALP_MIN_STRENGTH = 0.75   # matches live bot min_strength (raised Mar 20)
+SCALP_MIN_STRENGTH = 0.80   # matches live .env SCALP_MIN_STRENGTH (synced 2026-05-30; was stale 0.75)
 MAX_OPEN_TRADES = 3
 
 DEFAULT_PAIRS = [
@@ -87,6 +97,23 @@ PAIR_COOLDOWN_CANDLES = 40
 # Regime filter: 60 candles pause after 4 of last 6 trades were losses
 REGIME_PAUSE_CANDLES = 60  # ~15 min equivalent
 
+# Adverse exit (matches live .env: ADVERSE_EXIT_THRESHOLD / ADVERSE_EXIT_CYCLES).
+# Default mirrors current live state (disabled at -999.0 since 2026-05-07).
+# Override via --ae-threshold / --ae-cycles to test variants in calibration.
+DEFAULT_AE_THRESHOLD_ROI = -999.0   # ROI percent; trade exits when roi <= this AND cycles >= AE_MIN_CYCLES
+DEFAULT_AE_MIN_CYCLES = 10           # 10 live cycles (~10 min) before AE can fire
+
+# Per-pair cooldown after ANY loss (matches live bot.py:1032 — 600s = 10 candles on 1m).
+PAIR_LOSS_COOLDOWN_CANDLES = 10
+
+# Time-of-day filter (matches live bot.py:1172, 417-trade analysis).
+# Blocked UTC hours: 0,1,2,9,17,18,19,20. PT-equivalent listed in live code.
+BLOCKED_HOURS_UTC = {0, 1, 2, 9, 17, 18, 19, 20}
+
+# HTF cluster throttle (matches live bot.py:1182). 30 min between any htf entry.
+HTF_CLUSTER_THROTTLE_CANDLES = 30
+HTF_STRATEGIES = {"htf_confluence_pullback", "htf_l2_anticipation"}
+
 
 def _cycles_to_candles(cycles: int) -> int:
     """Convert 15-second cycle counts to 1-minute candle counts."""
@@ -108,6 +135,15 @@ def _get_time_exits(strategy: str) -> dict:
 
 def _extract_strategy_name(reason: str) -> str:
     r = reason.lower()
+    # Order matters: check more-specific HTF strategies before generic substrings
+    if "confluence pullback" in r:
+        return "htf_confluence_pullback"
+    if "l2 anticipation" in r:
+        return "htf_l2_anticipation"
+    if "confluence vwap" in r:
+        return "htf_confluence_vwap"
+    if "momentum continuation" in r:
+        return "momentum_continuation"
     if "kc squeeze" in r or "keltner" in r:
         return "keltner_squeeze"
     if "bb" in r or "mean reversion" in r:
@@ -309,11 +345,16 @@ def check_exits(
     candle: pd.Series,
     candle_idx: int,
     df_window: pd.DataFrame,
+    ae_threshold: float = DEFAULT_AE_THRESHOLD_ROI,
+    ae_cycles: int = DEFAULT_AE_MIN_CYCLES,
 ) -> Optional[tuple[float, str]]:
     """
     Check all exit conditions for an open position.
     Returns (exit_price, reason) or None.
     Checks in priority order matching the live bot.
+
+    ae_threshold/ae_cycles: adverse-exit. Default disabled (-999.0) to mirror
+    current live config. Pass e.g. -3.0 / 10 to test live's pre-2026-05-07 behavior.
     """
     high = candle["high"]
     low = candle["low"]
@@ -348,9 +389,18 @@ def check_exits(
         return exit_px, "take_profit"
 
     # ---------------------------------------------------------------
-    # 3. Early exit: ROI >= 10% AND 2+ reversal signals
+    # 2.5. Adverse exit (matches live risk_manager.py):
+    #      roi <= ae_threshold AND cycles_held >= ae_cycles.
+    #      Disabled by default (-999.0) to mirror live's 2026-05-07 setting.
     # ---------------------------------------------------------------
     roi = pos.roi(close)
+    if candles_held >= ae_cycles and roi <= ae_threshold:
+        exit_px = apply_slippage(close, pos.direction, entering=False)
+        return exit_px, "adverse_exit"
+
+    # ---------------------------------------------------------------
+    # 3. Early exit: ROI >= 10% AND 2+ reversal signals
+    # ---------------------------------------------------------------
     if roi >= 10.0 and len(df_window) >= 3:
         signals_count = 0
         last = df_window.iloc[-1]
@@ -468,20 +518,40 @@ def check_exits(
 
 def run_backtest(
     pair_data: dict[str, pd.DataFrame],
+    htf_data: dict[str, pd.DataFrame] | None = None,
     no_gates: bool = False,
+    calibration_mode: bool = False,
+    ae_threshold: float = DEFAULT_AE_THRESHOLD_ROI,
+    ae_cycles: int = DEFAULT_AE_MIN_CYCLES,
+    flow_index=None,
+    flow_replay: bool = False,
 ) -> list[ClosedTrade]:
     """
     Run the full backtest across all pairs simultaneously.
     Processes candles sequentially, checking all pairs each candle.
+
+    htf_data: optional 1h dataframes per pair. Required for htf_confluence_pullback /
+              htf_l2_anticipation strategies — without it, confluence_strategy returns HOLD.
+    calibration_mode: if True, bypass confluence_strategy router and call
+                     htf_confluence_pullback directly. Used for backtester calibration
+                     against live PnL when l2_anticipation can't be replayed (no flow).
     """
-    # Compute indicators on full datasets upfront
+    htf_data = htf_data or {}
+
+    # Compute indicators on full datasets upfront (5m and 1h)
     pair_dfs: dict[str, pd.DataFrame] = {}
+    htf_dfs: dict[str, pd.DataFrame] = {}
     for pair, df_raw in pair_data.items():
         df = add_all_indicators(df_raw)
         if df.empty or len(df) < WARMUP:
             print(f"  [{pair}] Not enough data after indicator warmup ({len(df)} rows). Skipping.")
             continue
         pair_dfs[pair] = df
+        htf_raw = htf_data.get(pair)
+        if htf_raw is not None and not htf_raw.empty:
+            htf_with_ind = add_all_indicators(htf_raw)
+            if not htf_with_ind.empty and len(htf_with_ind) >= 30:
+                htf_dfs[pair] = htf_with_ind
 
     if not pair_dfs:
         return []
@@ -498,6 +568,7 @@ def run_backtest(
     open_positions: dict[str, BTPosition] = {}  # pair -> position
     closed_trades: list[ClosedTrade] = []
     last_entry_candle = -GLOBAL_COOLDOWN_CANDLES  # global cooldown
+    last_htf_entry_candle = -HTF_CLUSTER_THROTTLE_CANDLES  # htf cluster throttle
     pair_loss_streak: dict[str, int] = {}
     pair_cooldown_until: dict[str, int] = {}  # pair -> candle index when cooldown expires
     trade_results: deque = deque(maxlen=6)
@@ -561,7 +632,7 @@ def run_backtest(
             win_start = max(0, idx - 5)
             df_window = df.iloc[win_start:idx + 1]
 
-            result = check_exits(pos, candle, idx, df_window)
+            result = check_exits(pos, candle, idx, df_window, ae_threshold=ae_threshold, ae_cycles=ae_cycles)
             if result is not None:
                 exit_price, reason = result
                 gross_pnl = pos.pnl_usd(exit_price)
@@ -590,9 +661,13 @@ def run_backtest(
                     peak_balance = balance
                 pairs_to_close.append(pair)
 
-                # Track cooldowns
+                # Track cooldowns (matches live bot.py:1032 — 10 min after ANY loss + 4hr blacklist on 3-streak)
                 is_loss = net_pnl < 0
                 if is_loss:
+                    pair_cooldown_until[pair] = max(
+                        pair_cooldown_until.get(pair, 0),
+                        virtual_candle + PAIR_LOSS_COOLDOWN_CANDLES,
+                    )
                     pair_loss_streak[pair] = pair_loss_streak.get(pair, 0) + 1
                     streak = pair_loss_streak[pair]
                     if streak >= 3:
@@ -674,12 +749,39 @@ def run_backtest(
             else:
                 regime = "low"
 
-            # Call confluence_strategy (single pass — no OB re-run)
+            # Call strategy with HTF context (single pass — no OB re-run)
             win_start = max(0, idx - 200)
             df_window = df.iloc[win_start:idx + 1]
 
+            # Slice 1h HTF window up to current candle_time
+            htf_df_full = htf_dfs.get(pair)
+            htf_window = None
+            if htf_df_full is not None:
+                htf_idx = htf_df_full.index.searchsorted(candle_time, side="right") - 1
+                if htf_idx >= 30:
+                    htf_window = htf_df_full.iloc[max(0, htf_idx - 200):htf_idx + 1]
+
+            # Flow replay: look up captured ob+flow for this candle so the live
+            # flow-dependent strategy + gates can fire. No snapshot -> skip (can't
+            # faithfully replay flow we never captured).
+            ob_rp, flow_rp = (None, None)
+            if flow_replay:
+                if flow_index is None:
+                    continue
+                ob_rp, flow_rp = flow_index.get(pair, int(candle_time.timestamp()))
+                if flow_rp is None:
+                    continue
+
             try:
-                signal = confluence_strategy(df_window, None)
+                if flow_replay:
+                    signal = confluence_strategy(df_window, ob_rp, htf_df=htf_window, flow=flow_rp)
+                elif calibration_mode:
+                    # Calibration: call htf_confluence_pullback directly (OHLCV-only,
+                    # no flow needed). Bypass confluence_strategy router which would
+                    # otherwise route to htf_l2_anticipation (requires flow → HOLD).
+                    signal = htf_confluence_pullback(df_window, None, htf_window)
+                else:
+                    signal = confluence_strategy(df_window, None, htf_df=htf_window)
             except Exception:
                 continue
 
@@ -689,6 +791,18 @@ def run_backtest(
             # Min strength check (v4.0: 0.70)
             if signal.strength < SCALP_MIN_STRENGTH:
                 continue
+
+            strategy_name = _extract_strategy_name(signal.reason)
+
+            # --- Flow gate port (live bot.py:1082-1143), replayed from capture ---
+            if flow_replay and not no_gates and _passes_flow_gates is not None:
+                _dir = "long" if signal.signal == Signal.BUY else "short"
+                # Live uses one-bar-back EMA for slope (bot.py:289) -> iloc[-2].
+                _htf_last = htf_window.iloc[-1] if htf_window is not None and len(htf_window) else None
+                _htf_prev = htf_window.iloc[-2] if htf_window is not None and len(htf_window) >= 2 else _htf_last
+                _ok, _ = _passes_flow_gates(strategy_name, _dir, ob_rp, flow_rp, candle, _htf_last, _htf_prev)
+                if not _ok:
+                    continue
 
             # --- Cooldowns (skip in no-gates mode) ---
             if not no_gates:
@@ -700,12 +814,21 @@ def run_backtest(
                 if pair in pair_cooldown_until and virtual_candle < pair_cooldown_until[pair]:
                     continue
 
+                # Time-of-day filter (matches live bot.py:1172, 417-trade analysis)
+                _utc_hour = candle_time.hour if hasattr(candle_time, "hour") else 0
+                if _utc_hour in BLOCKED_HOURS_UTC:
+                    continue
+
+                # HTF cluster throttle (matches live bot.py:1182, 30 min between any htf entry)
+                if strategy_name in HTF_STRATEGIES:
+                    if virtual_candle - last_htf_entry_candle < HTF_CLUSTER_THROTTLE_CANDLES:
+                        continue
+
             # --- Open position ---
             entry_price = float(candle["close"])
             direction = "long" if signal.signal == Signal.BUY else "short"
             fill_price = apply_slippage(entry_price, direction, entering=True)
 
-            strategy_name = _extract_strategy_name(signal.reason)
             sl_price, tp_price = calculate_sl_tp(fill_price, direction, atr_val, regime)
 
             margin = TRADE_SIZE_USD
@@ -735,6 +858,8 @@ def run_backtest(
             )
             open_positions[pair] = pos
             last_entry_candle = virtual_candle
+            if strategy_name in HTF_STRATEGIES:
+                last_htf_entry_candle = virtual_candle
 
     # ===================================================================
     # Force-close remaining positions at end of data
@@ -1025,10 +1150,15 @@ def format_report(
     lines.append("  LIMITATIONS")
     lines.append(SEPARATOR)
     lines.append("  - No order book data (no imbalance/depth gate)")
-    lines.append("  - No tape data (no aggressor/large trade gate)")
+    lines.append("  - No tape data (no aggressor/large trade gate, no ensemble confidence)")
     lines.append("  - No dynamic scanner (static pair list)")
+    lines.append("  - No daily-symbol-cap, per-pair-loss-cooldown, or profitable-hours filter")
     lines.append("  - Slippage estimated at 0.05%")
-    lines.append("  - Live performance may differ +/-5-10% due to missing OB/tape confirmations")
+    lines.append("  - CALIBRATION (2026-05-11, ETH 45d htf_confluence_pullback):")
+    lines.append("      Fire rate ~10x live (sim 342 trades vs live 34, +906%)")
+    lines.append("      PnL ~64x live loss (sim -$63.84 vs live -$0.99)")
+    lines.append("      Correction factor: divide sim trade count by ~10 to approximate live rate")
+    lines.append("      Engine is structurally correct but missing live entry gates (tape/ensemble/daily-cap)")
     lines.append("")
     lines.append(SEPARATOR)
     lines.append("  END OF REPORT")
@@ -1070,11 +1200,48 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Disable entry gates (cooldowns, regime filter, drawdown halt). Strength gate remains.",
     )
+    parser.add_argument(
+        "--calibration",
+        action="store_true",
+        default=False,
+        help="Calibration mode: bypass confluence_strategy router, call htf_confluence_pullback directly. "
+             "Used for backtester calibration vs live PnL — htf_l2_anticipation cannot be replayed without live flow.",
+    )
+    parser.add_argument(
+        "--ae-threshold",
+        type=float,
+        default=DEFAULT_AE_THRESHOLD_ROI,
+        help="Adverse-exit ROI threshold (percent). Trade exits when roi <= this AND cycles_held >= --ae-cycles. "
+             "Default mirrors current live (-999.0 = disabled). Set -3.0 to test live's pre-2026-05-07 behavior.",
+    )
+    parser.add_argument(
+        "--ae-cycles",
+        type=int,
+        default=DEFAULT_AE_MIN_CYCLES,
+        help="Minimum candles held before adverse-exit can fire (matches live ADVERSE_EXIT_CYCLES).",
+    )
+    parser.add_argument(
+        "--starting-balance",
+        type=float,
+        default=STARTING_BALANCE,
+        help="Override starting balance. Used to match live balance at the start of a calibration window.",
+    )
+    parser.add_argument(
+        "--output-json",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Dump summary JSON to PATH after run (trades, total_pnl, win_rate, by_strategy). "
+             "Consumed by scripts/calibrate_compare.py.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+
+    if args.starting_balance != STARTING_BALANCE:
+        globals()["STARTING_BALANCE"] = args.starting_balance
 
     print()
     print(SEPARATOR)
@@ -1084,6 +1251,7 @@ def main() -> None:
     print(f"  Timeframe : {args.timeframe}")
     print(f"  Period    : {args.days} days")
     print(f"  Gates     : {'OFF (raw signals)' if args.no_gates else 'ON (full pipeline)'}")
+    print(f"  Start bal : ${STARTING_BALANCE:.2f}")
     print()
 
     # Init exchange (public endpoints only)
@@ -1093,15 +1261,22 @@ def main() -> None:
     except Exception as e:
         print(f"[WARN] Could not load markets: {e}")
 
-    # Fetch data for all pairs
+    # Fetch data for all pairs (5m for entry, 1h for HTF context)
     pair_data: dict[str, pd.DataFrame] = {}
+    htf_data: dict[str, pd.DataFrame] = {}
     for pair in args.pairs:
         print(f"\n[{pair}] Fetching data...")
         df_raw = fetch_ohlcv_full(exchange, pair, args.timeframe, args.days)
         if df_raw.empty:
-            print(f"  [{pair}] No data returned. Skipping.")
+            print(f"  [{pair}] No 5m data returned. Skipping.")
+            continue
+        time.sleep(0.3)
+        df_htf = fetch_ohlcv_full(exchange, pair, "1h", args.days)
+        if df_htf.empty:
+            print(f"  [{pair}] No 1h HTF data returned. Skipping.")
             continue
         pair_data[pair] = df_raw
+        htf_data[pair] = df_htf
         time.sleep(0.3)
 
     if not pair_data:
@@ -1113,7 +1288,17 @@ def main() -> None:
     print("  RUNNING BACKTEST")
     print(f"{'=' * 40}")
 
-    trades = run_backtest(pair_data, no_gates=args.no_gates)
+    trades = run_backtest(
+        pair_data,
+        htf_data=htf_data,
+        no_gates=args.no_gates,
+        calibration_mode=args.calibration,
+        ae_threshold=args.ae_threshold,
+        ae_cycles=args.ae_cycles,
+    )
+
+    if args.output_json:
+        _dump_summary_json(trades, args)
 
     if not trades:
         print("\nNo trades were generated. Try a longer period or different settings.")
@@ -1138,6 +1323,53 @@ def main() -> None:
         print(f"\n  Results saved to: {OUTPUT_FILE}")
     except OSError as e:
         print(f"\n  [WARN] Could not write results file: {e}")
+
+
+def _dump_summary_json(trades: list, args: argparse.Namespace) -> None:
+    import json
+
+    by_strategy: dict[str, dict] = {}
+    by_pair: dict[str, dict] = {}
+    for t in trades:
+        strat = getattr(t, "strategy", "unknown") or "unknown"
+        by_strategy.setdefault(strat, {"trades": 0, "total_pnl": 0.0, "wins": 0})
+        by_strategy[strat]["trades"] += 1
+        by_strategy[strat]["total_pnl"] += t.pnl_usd
+        if t.pnl_usd > 0:
+            by_strategy[strat]["wins"] += 1
+        pair = getattr(t, "pair", "unknown") or "unknown"
+        by_pair.setdefault(pair, {"trades": 0, "total_pnl": 0.0})
+        by_pair[pair]["trades"] += 1
+        by_pair[pair]["total_pnl"] += t.pnl_usd
+
+    total = len(trades)
+    total_pnl = sum(t.pnl_usd for t in trades)
+    wins = sum(1 for t in trades if t.pnl_usd > 0)
+    summary = {
+        "trades": total,
+        "total_pnl": round(total_pnl, 4),
+        "win_rate": round(wins / total * 100, 2) if total else 0.0,
+        "wins": wins,
+        "losses": total - wins,
+        "by_strategy": {k: {**v, "total_pnl": round(v["total_pnl"], 4)} for k, v in by_strategy.items()},
+        "by_pair": {k: {**v, "total_pnl": round(v["total_pnl"], 4)} for k, v in by_pair.items()},
+        "args": {
+            "pairs": args.pairs,
+            "days": args.days,
+            "timeframe": args.timeframe,
+            "calibration": args.calibration,
+            "no_gates": args.no_gates,
+            "ae_threshold": args.ae_threshold,
+            "ae_cycles": args.ae_cycles,
+            "starting_balance": STARTING_BALANCE,
+        },
+    }
+    try:
+        with open(args.output_json, "w", encoding="utf-8") as fh:
+            json.dump(summary, fh, indent=2)
+        print(f"\n  Summary JSON: {args.output_json}")
+    except OSError as e:
+        print(f"\n  [WARN] Could not write summary JSON: {e}")
 
 
 if __name__ == "__main__":

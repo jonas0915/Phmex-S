@@ -8,3 +8,9 @@ logs/
 venv/
 docs/fix-proposals/*.md
 l2_snapshot.json
+
+# Editor/OS junk + session temp
+.DS_Store
+.vscode/
+.superpowers/
+*.pid
