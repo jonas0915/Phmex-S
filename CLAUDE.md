@@ -29,7 +29,7 @@ Current version: **Sentinel (v11)** — deployed 2026-04-01.
 | Candle lookback | 500 (Phemex requires value in {5,10,50,100,500,1000}) | .env: CANDLE_LOOKBACK |
 | Per-pair cooldown | 10 min after loss | bot.py:1032 |
 | Global cooldown | 120s between entries | bot.py |
-| Daily symbol cap | 3 trades/symbol | bot.py:~671 |
+| Daily symbol cap | 3 trades/symbol (enforced 2026-06-11 — was log-only) | bot.py:~966 |
 | ADX threshold | 25 | strategies.py |
 | Ensemble confidence | 4/7 minimum | bot.py |
 | OB imbalance gate | ±0.25 | strategies.py:139 |

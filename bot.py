@@ -206,6 +206,10 @@ class Phmex2Bot:
         # Strategy slots framework — independent trading units (additive, main loop still uses self.risk)
         self.slots = [
             StrategySlot(
+                # NOT an independent trader: live trading runs on self.risk (the main
+                # loop), and "5m_scalp" is the LABEL the dashboard + entry snapshots
+                # use for it (web_dashboard.py maps 5m_scalp -> trading_state.json).
+                # max_positions/capital_pct here are dead config (audit 2026-06-11).
                 slot_id="5m_scalp",
                 strategy_name="confluence",
                 timeframe="5m",
@@ -625,7 +629,12 @@ class Phmex2Bot:
         # for symbols not yet in the WS cache (e.g. freshly scanned pairs).
         ohlcv_cache = {}
         prices = {}
-        all_symbols = list(set(self.active_pairs) | set(self.risk.positions.keys()))
+        # Include paper-slot open-position symbols so their exits always get a price —
+        # without this, a paper position on a no-longer-scanned pair never exits
+        # (the 5m_narrow DOGE freeze, audit 2026-06-11).
+        paper_pos_symbols = {s for slot in self.slots if slot.paper_mode
+                             for s in slot.risk.positions.keys()}
+        all_symbols = list(set(self.active_pairs) | set(self.risk.positions.keys()) | paper_pos_symbols)
         for symbol in all_symbols:
             df_raw = None
             if self._ws_feed and not self._ws_feed.is_stale(symbol):
@@ -963,13 +972,16 @@ class Phmex2Bot:
             # Per-pair cooldown: skip pair after losses
             if symbol in self._pair_cooldown and time.time() < self._pair_cooldown[symbol]:
                 continue
-            # Daily trade counter — no hard cap, but log when a symbol trades frequently
+            # Daily symbol cap — ENFORCED as of 2026-06-11 audit. CLAUDE.md and .env
+            # claimed DAILY_SYMBOL_CAP=3 for weeks while this was log-only.
             day_start = time.time() - (time.time() % 86400)  # midnight UTC
             daily_trades = sum(1 for t in self.risk.closed_trades
-                               if t.get("symbol") == symbol and t.get("opened_at", 0) > day_start)
+                               if t.get("symbol") == symbol and t.get("opened_at", 0) > day_start
+                               and t.get("exit_reason") != "min_margin_skip")  # partial-fill ghosts don't consume cap slots (review 2026-06-11)
             daily_trades += 1 if symbol in self.risk.positions else 0  # count open positions too
-            if daily_trades >= 4:
-                logger.info(f"[RATE WATCH] {symbol} — {daily_trades + 1}th entry today (no cap, monitoring)")
+            if daily_trades >= Config.DAILY_SYMBOL_CAP:
+                logger.info(f"[DAILY CAP] {symbol} — {daily_trades} trades today (cap {Config.DAILY_SYMBOL_CAP}) — entry skipped")
+                continue
 
             if not self.risk.can_open_trade(real_balance):
                 break
@@ -1289,6 +1301,7 @@ class Phmex2Bot:
                 # QUIET = 5m ADX 20-25, no EMA stack alignment (0% WR in 48hr audit)
                 # Allow through if flow CVD strongly confirms the trade direction
                 _regime_snap = self._classify_regime(df.iloc[-1], df)
+                _quiet_exempt = False
                 if _regime_snap.get("label") == "QUIET":
                     _flow_confirms = False
                     if flow and flow.get("trade_count", 0) > 5:
@@ -1302,6 +1315,10 @@ class Phmex2Bot:
                         logger.info(f"[REGIME GATE] {symbol} {direction.upper()} blocked — QUIET regime "
                                     f"(5m ADX={_regime_snap.get('adx', '?')}) with no flow confirmation")
                         continue
+                    # Shadow-tag the exemption: this cohort ran 44.4% WR / -$5.45 over
+                    # 60d (audit 2026-06-11). Tagged for the Phase 3 sim decision —
+                    # NOT hard-blocked yet (lessons.md:407: sim before live changes).
+                    _quiet_exempt = True
 
                 # Phase 2b Gate B: VOLATILE 5m regime shadow-tag (pullback-specific, shadow only — no hard-gate path)
                 # Reuses _regime_snap from QUIET block above; VOLATILE label = atr_pct > 1.5% or vol_ratio > 2.5x
@@ -1355,7 +1372,7 @@ class Phmex2Bot:
                         self._last_htf_entry_time = time.time()
                     logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${pos.margin:.2f} | Conf: {confidence}/7 | {signal.reason} | Strength: {signal.strength:.2f}")
                     _htf_adx_val = float(htf_df.iloc[-1].get("adx", 0)) if htf_df is not None and len(htf_df) > 0 else None
-                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df, htf_adx=_htf_adx_val)
+                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df, htf_adx=_htf_adx_val, extra_tags={"quiet_exempt": True} if _quiet_exempt else None)
                     try:
                         self.risk._save_state()
                     except Exception as _e:
@@ -1477,8 +1494,11 @@ class Phmex2Bot:
     def _evaluate_paper_slots(self, active_pairs: list, prices: dict):
         """Evaluate paper slots — simulate entries/exits without placing real orders."""
         for slot in self.slots:
-            if not slot.paper_mode or not slot.is_active:
+            if not slot.paper_mode:
                 continue
+            # NOTE: killed slots (is_active False) still run the EXIT block below —
+            # skipping them entirely froze a DOGE position in 5m_narrow from 4/24 to
+            # 6/11 (audit finding). The is_active guard now sits before entries only.
 
             strategy_fn = STRATEGIES.get(slot.strategy_name)
             if not strategy_fn:
@@ -1542,6 +1562,8 @@ class Phmex2Bot:
                     continue
 
             # --- Paper entries ---
+            if not slot.is_active:
+                continue  # killed slots close out open positions above but never re-enter
             for symbol in active_pairs:
                 if not slot.can_enter(symbol, self.slots):
                     continue
@@ -1981,7 +2003,8 @@ class Phmex2Bot:
     def _log_entry_snapshot(self, symbol: str, direction: str, slot_id: str,
                             strategy: str, strength: float, price: float,
                             confidence: int, ob: dict | None, flow: dict | None,
-                            ohlcv_last=None, ohlcv_df=None, htf_adx: float = None) -> dict:
+                            ohlcv_last=None, ohlcv_df=None, htf_adx: float = None,
+                            extra_tags: dict | None = None) -> dict:
         """Append entry conditions snapshot to JSONL for post-hoc analysis.
         Returns the snapshot dict so it can be attached to the Position."""
         import json as _json
@@ -2010,6 +2033,8 @@ class Phmex2Bot:
             "regime": self._classify_regime(ohlcv_last, ohlcv_df) if ohlcv_last is not None else None,
             "htf_adx": round(htf_adx, 1) if htf_adx is not None else None,
         }
+        if extra_tags:
+            snapshot.update(extra_tags)
         try:
             with open("logs/entry_snapshots.jsonl", "a") as f:
                 f.write(_json.dumps(snapshot) + "\n")
