@@ -110,7 +110,7 @@ explicitly accept the blind-deploy risk.
 2. **FAST-TRACK chosen.** Durable exchange-resting trailing ships with the conservative
    wide band (1.0–1.5% from peak), accepting the blind-deploy wick risk explicitly.
    Shadow-logger runs alongside regardless, so the real wick rate still gets measured.
-3. **Restart approved + executed 2026-06-11 ~9:56 AM PT** (flat window, 0 open positions
+3. **Restart approved + executed 2026-06-11 ~6:56 AM PT** (flat window, 0 open positions
    verified two ways; /pre-restart-audit passed). Shadow-logger is LIVE.
 4. **Design-spec Q2 resolved: YES** — use `max(breakeven_lock, current_trailing_floor)`
    so the exchange SL is never looser than the software trailing intent.
@@ -121,7 +121,7 @@ explicitly accept the blind-deploy risk.
       removed per audit — executor-teardown tail latency, see method comment)
 - [x] /pre-restart-audit passed; deployed in flat window
 - [ ] First armed-trail event lands in `logs/shadow_trail.jsonl` (arms at peak ROI ≥ +5%)
-- [x] FAST-TRACK build DEPLOYED 2026-06-11 ~10:28 AM PT (PID 10869, flat window,
+- [x] FAST-TRACK build DEPLOYED 2026-06-11 ~7:28 AM PT (flat window,
       /pre-restart-audit PASS, 15/15 tests green). `move_stop_loss` atomic amend +
       1.2% wide-band durable trail + `durable_sl` exit tag + dashboard/Telegram
       propagation. One-time live `edit_order` param validation = first live amend
