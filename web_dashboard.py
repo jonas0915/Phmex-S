@@ -430,7 +430,7 @@ def parse_pair_adx(lines: list[str]) -> dict[str, float]:
 _PRICE_RES = [
     re.compile(r'\[FILL\] ([\w/:.]+) real entry price: ([\d.]+)'),
     re.compile(r'\[SYNC\] ([\w/:.]+) real exit fill: ([\d.]+)'),
-    re.compile(r'\[LIVE EXIT\] ([\w/:.]+) \w+ @ ([\d.]+)'),
+    re.compile(r'\[LIVE EXIT\] ([\w/:.]+) \S+ @ ([\d.]+)'),
     re.compile(r'Position opened: \w+ ([\w/:.]+) \| Entry: ([\d.]+)'),
     re.compile(r'Position closed: \w+ ([\w/:.]+) \| Exit: ([\d.]+)'),
 ]
@@ -955,14 +955,15 @@ def _slot_modes() -> dict[str, dict]:
 
 def _kelly_wr_rr(trades: list[dict]) -> float:
     """Kelly the way strategy_slot.should_auto_demote computes it — wr − (1−wr)/rr,
-    no wins → −1.0, no losses → 1.0 — but over ALL trades. The kill switch
-    (strategy_slot.is_killed) fires when this is negative at ≥50 trades."""
+    but over ALL trades. The kill switch (strategy_slot.is_killed) fires when
+    this is negative at ≥50 trades.
+    Boundary parity with calculate_kelly_raw — 0.0 when one side empty."""
     wins = [_net_pnl(t) for t in trades if _net_pnl(t) > 0]
     losses = [abs(_net_pnl(t)) for t in trades if _net_pnl(t) < 0]
     if not wins:
-        return -1.0
+        return 0.0
     if not losses:
-        return 1.0
+        return 0.0
     wr = len(wins) / len(trades)
     rr = (sum(wins) / len(wins)) / (sum(losses) / len(losses))
     return wr - (1 - wr) / rr
@@ -1690,9 +1691,10 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
             b_cls = "amb" if r["mode"] == "live" else "dim"
             badge = f" <span class='{b_cls}'>[{escape(r['owner'])}]</span>"
         # id is generated server-side as owner:index ([A-Za-z0-9_:] only) — safe in attr;
-        # sym rides along so /api/trade can reject a stale index ("stale id").
+        # sym passed via data-sym to avoid JS-string escaping issues with special chars.
         out += (
-            f"<tr onclick=\"drill(this,'{r['id']}','{escape(r['sym'])}')\" style='cursor:pointer'>"
+            f"<tr onclick=\"drill(this,this.dataset.id,this.dataset.sym)\" "
+            f"data-id=\"{r['id']}\" data-sym=\"{escape(r['sym'])}\" style='cursor:pointer'>"
             f"<td>{escape(r['time_pt'])}</td>"
             f"<td>{escape(r['sym'])}{badge}</td>"
             f"<td class='{side_cls}'>{side}</td>"
