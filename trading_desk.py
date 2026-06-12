@@ -9020,8 +9020,16 @@ async function fetchData() {
 // Called after the %2 frame skip, so it reports RENDERED fps (target floor ~30),
 // not the raw requestAnimationFrame rate (~60).
 let _fpsN=0,_fpsT=performance.now();
+// On-screen perf chip (diagnostic — reads renderer.info, zero scene cost)
+const _perfChip=document.createElement('div');
+_perfChip.style.cssText='position:fixed;top:6px;left:6px;z-index:999;background:rgba(0,0,0,0.7);color:#f0a500;font:11px Menlo,monospace;padding:3px 8px;border:1px solid #2d3a1e;pointer-events:none';
+_perfChip.textContent='[PERF] sampling…';
+document.body.appendChild(_perfChip);
 function _fpsTick(){ _fpsN++; const now=performance.now();
-  if(now-_fpsT>5000){ console.log(`[PERF] fps=${(_fpsN/((now-_fpsT)/1000)).toFixed(1)} calls=${renderer.info.render.calls}`);
+  if(now-_fpsT>5000){
+    const inf=renderer.info;
+    const line=`[PERF] fps=${(_fpsN/((now-_fpsT)/1000)).toFixed(1)} calls=${inf.render.calls} tris=${(inf.render.triangles/1000).toFixed(0)}k geo=${inf.memory.geometries} tex=${inf.memory.textures}`;
+    console.log(line); _perfChip.textContent=line;
     _fpsN=0; _fpsT=now; } }
 
 let frameCount = 0;
