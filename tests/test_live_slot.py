@@ -75,6 +75,46 @@ def test_close_position_records_mode(tmp_path, monkeypatch):
     rm.close_position("DOGE/USDT:USDT", 0.081, "take_profit")
     assert "mode" not in rm.closed_trades[-1]
 
+def test_sync_records_slot_close_into_slot_risk(slot, monkeypatch):
+    """Live slot position gone from exchange → recorded into slot.risk with mode=live,
+    NOT adopted into main risk (the double-management bug this code prevents)."""
+    import bot as bot_mod
+
+    slot.set_live()
+    slot.risk.open_position("DOGE/USDT:USDT", 0.08, 10.0, side="long")
+
+    class _FakeExchange:
+        def get_open_positions(self):
+            return []  # exchange is flat
+        def cancel_open_orders(self, symbol):
+            pass
+        class client:
+            @staticmethod
+            def fetch_my_trades(symbol, limit=10):
+                return []
+
+    class _MainRisk:
+        positions = {}
+        def close_position(self, *a, **k):
+            raise AssertionError("main risk must not record slot close")
+
+    b = bot_mod.Phmex2Bot.__new__(bot_mod.Phmex2Bot)
+    b.exchange = _FakeExchange()
+    b.risk = _MainRisk()
+    b.slots = [slot]
+    b._closing = set()
+
+    monkeypatch.setattr(bot_mod, "notifier", type("N", (), {
+        "notify_exit": staticmethod(lambda *a, **k: None),
+        "send": staticmethod(lambda *a, **k: None),
+    })())
+
+    b._sync_exchange_closes(prices={"DOGE/USDT:USDT": 0.081})
+
+    assert slot.risk.positions == {}
+    assert slot.risk.closed_trades[-1]["mode"] == "live"
+    assert slot.risk.closed_trades[-1]["exit_reason"] == "exchange_close"
+
 def test_owner_map_includes_live_slots(slot):
     from bot import _build_position_owners
     class _MainRisk:

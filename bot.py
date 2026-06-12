@@ -187,6 +187,8 @@ def _build_position_owners(main_risk, slots):
         for s in slot.risk.positions:
             if s not in owners:
                 owners[s] = (slot.risk, slot)
+            else:
+                logger.warning(f"[SYNC] {s} held by both main bot and slot {slot.slot_id} — slot copy excluded from sync this cycle")
     return owners
 
 
@@ -2220,6 +2222,9 @@ class Phmex2Bot:
         # it is materialized up front, so close_position calls inside the loop are safe.
         try:
             for symbol, (owner_risk, slot) in _build_position_owners(self.risk, self.slots).items():
+                # _closing is only populated by the live-exit watcher, which iterates
+                # self.risk.positions (main bot) only — slot positions can never be
+                # mid-watcher-close, so the guard applies to main-owned symbols only.
                 if slot is None and symbol in getattr(self, "_closing", set()):
                     continue  # watcher mid-close — its fill will record the trade (watcher manages main positions only)
                 if symbol not in exchange_symbols:
@@ -2268,9 +2273,9 @@ class Phmex2Bot:
                         notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), close_reason)
                         self.risk.close_position(symbol, exit_price, close_reason, fees_usdt=sync_fee)
                     else:
-                        # Live-slot position — no durable-SL ratchet tag (slots have no
-                        # ratchet) and no main-bot pair cooldown (slot cooldown semantics
-                        # are owned by the slot, not here).
+                        # Live-slot position — no durable-SL ratchet tag (slots have no ratchet).
+                        # _set_cooldown_if_loss intentionally omitted: that's the MAIN bot's
+                        # per-pair cooldown; slot cooldown semantics live in the slot.
                         logger.info(f"[SYNC] {symbol} closed on exchange (slot {slot.slot_id} SL/TP triggered) — removing from slot tracker")
                         self.exchange.cancel_open_orders(symbol)
                         notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), f"exchange_close [slot {slot.slot_id}]")
