@@ -1973,9 +1973,9 @@ async function loadEquity(){{
       const i=plot.cursor.idx;
       if(i==null || !eqMeta[i]){{ tip.style.display='none'; return; }}
       const m=eqMeta[i], sign=m.pnl>=0?'+':'';
-      tip.innerHTML=m.time_pt+' &middot; '+m.sym+' &middot; '+m.strat+
+      tip.innerHTML=escq(m.time_pt)+' &middot; '+escq(m.sym)+' &middot; '+escq(m.strat)+
         ' &middot; <span class="'+(m.win?'pos':'neg')+'">'+sign+m.pnl.toFixed(2)+'</span>'+
-        (m.reason?' &middot; '+m.reason:'');
+        (m.reason?' &middot; '+escq(m.reason):'');
       tip.style.display='block';
       tip.style.left=Math.min(plot.cursor.left+14, Math.max(0,node.clientWidth-260))+'px';
       tip.style.top=(plot.cursor.top+12)+'px';
