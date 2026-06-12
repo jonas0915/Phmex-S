@@ -1557,6 +1557,8 @@ class Phmex2Bot:
             # orders + reconcile Path A (software touch-close would double-fire), but
             # cycle exits (trend-flip / adverse / time) execute real market closes.
             for symbol in list(slot.risk.positions.keys()):
+                if symbol not in slot.risk.positions:
+                    continue  # a demote triggered earlier in this loop already closed it
                 price = prices.get(symbol)
                 if not price:
                     logger.debug(f"[PAPER] {slot.slot_id} no price for {symbol}, skipping exit check")
@@ -2351,6 +2353,8 @@ class Phmex2Bot:
 
     def _maybe_auto_demote(self, slot):
         """Auto-demote check after every live slot close (loss cap / negative Kelly)."""
+        if slot.paper_mode:
+            return  # already demoted (e.g. earlier this cycle)
         demote, reason = slot.should_auto_demote()
         if demote:
             self._demote_slot(slot, reason)
@@ -2360,6 +2364,8 @@ class Phmex2Bot:
         orders, flip mode. Never leaves a frozen position (DOGE-freeze lesson 2026-06-11)."""
         logger.warning(f"[SLOT DEMOTE] {slot.slot_id} → paper ({reason})")
         for symbol in list(slot.risk.positions.keys()):
+            if symbol not in slot.risk.positions:
+                continue  # already closed by another path this cycle
             pos = slot.risk.positions[symbol]
             try:
                 self.exchange.cancel_open_orders(symbol)

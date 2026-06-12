@@ -178,3 +178,30 @@ def test_close_slot_position_live_closes_on_exchange(slot, monkeypatch):
     assert "DOGE/USDT:USDT" not in slot.risk.positions
     t = slot.risk.closed_trades[-1]
     assert t["mode"] == "live" and t["exit_reason"] == "adverse_exit"
+
+def test_live_close_triggers_auto_demote_on_loss_cap(slot, monkeypatch):
+    """A live cycle exit that breaches the -$5 live loss cap must demote the slot."""
+    import bot as bot_mod
+    slot.set_live()
+    # Pre-existing live losses just under the cap
+    slot.risk.closed_trades = [
+        {"pnl_usdt": -2.5, "mode": "live"},
+        {"pnl_usdt": -2.4, "mode": "live"},
+    ]
+    slot.risk.open_position("DOGE/USDT:USDT", 0.08, 10.0, side="long")
+    pos = slot.risk.positions["DOGE/USDT:USDT"]
+    class _FakeExchange:
+        def close_long(self, s, a):  return {"average": 0.0799}
+        def close_short(self, s, a): return {"average": 0.0799}
+        def cancel_open_orders(self, s): pass
+        def extract_order_fee(self, o, s=None): return 0.0
+    monkeypatch.setattr(bot_mod, "notifier", type("N", (), {
+        "send": staticmethod(lambda *a, **k: None),
+        "notify_exit": staticmethod(lambda *a, **k: None),
+        "notify_paper_exit": staticmethod(lambda *a, **k: None)})())
+    b = bot_mod.Phmex2Bot.__new__(bot_mod.Phmex2Bot)
+    b.exchange = _FakeExchange()
+    ok = b._close_slot_position(slot, "DOGE/USDT:USDT", pos, 0.0799, "adverse_exit")
+    assert ok is True
+    # The close pushed live PnL past -$5 → auto-demote must have fired
+    assert slot.paper_mode is True
