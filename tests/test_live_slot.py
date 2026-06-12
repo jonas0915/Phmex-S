@@ -45,6 +45,14 @@ def test_live_pnl_excludes_paper_history(slot):
     ]
     assert slot.live_pnl() == pytest.approx(-3.5)
 
+def test_live_pnl_prefers_net_over_gross(slot):
+    slot.set_live()
+    slot.risk.closed_trades = [
+        {"pnl_usdt": -1.0, "net_pnl": -1.2, "mode": "live"},   # net preferred
+        {"pnl_usdt": -0.5, "mode": "live"},                     # gross fallback
+    ]
+    assert slot.live_pnl() == pytest.approx(-1.7)
+
 def test_auto_demote_on_loss_cap(slot):
     slot.set_live()
     slot.risk.closed_trades = [_fake_trade(-2.6, mode="live"), _fake_trade(-2.5, mode="live")]

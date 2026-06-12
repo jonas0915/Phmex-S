@@ -103,7 +103,7 @@ def live_slot_summaries(date_str):
             "losses": len(live_today) - wins,
             "wr": (wins / len(live_today) * 100) if live_today else 0,
             "pnl_today": sum(_net(t) for t in live_today),
-            "live_pnl": sum(t.get("pnl_usdt", 0) for t in live_trades),
+            "live_pnl": sum(_net(t) for t in live_trades),
         })
     return summaries
 

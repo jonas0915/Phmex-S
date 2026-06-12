@@ -13,6 +13,12 @@ LIVE_LOSS_CAP_USDT = -5.0      # auto-demote when live net PnL breaches this
 LIVE_KELLY_MIN_TRADES = 10     # negative-kelly demote needs at least this many live trades
 
 
+def _trade_net(t: dict) -> float:
+    """Net PnL of a closed trade — fees included when recorded (net_pnl), gross fallback."""
+    v = t.get("net_pnl")
+    return float(v) if v is not None else float(t.get("pnl_usdt", 0))
+
+
 @dataclass
 class StrategySlot:
     """An independent trading unit. Each slot has its own strategy, timeframe,
@@ -109,17 +115,17 @@ class StrategySlot:
         return [t for t in self.risk.closed_trades if t.get("mode") == "live"]
 
     def live_pnl(self) -> float:
-        return sum(t.get("pnl_usdt", 0) for t in self.live_trades())
+        return sum(_trade_net(t) for t in self.live_trades())
 
     def should_auto_demote(self) -> tuple:
         """(demote: bool, reason: str). Checked after every live close."""
         trades = self.live_trades()
-        pnl = sum(t.get("pnl_usdt", 0) for t in trades)
+        pnl = sum(_trade_net(t) for t in trades)
         if pnl <= LIVE_LOSS_CAP_USDT:
             return True, f"live loss cap: ${pnl:.2f} <= ${LIVE_LOSS_CAP_USDT:.2f}"
         if len(trades) >= LIVE_KELLY_MIN_TRADES:
-            wins = [t["pnl_usdt"] for t in trades if t.get("pnl_usdt", 0) > 0]
-            losses = [abs(t["pnl_usdt"]) for t in trades if t.get("pnl_usdt", 0) < 0]
+            wins = [_trade_net(t) for t in trades if _trade_net(t) > 0]
+            losses = [abs(_trade_net(t)) for t in trades if _trade_net(t) < 0]
             if losses and wins:
                 wr = len(wins) / len(trades)
                 rr = (sum(wins) / len(wins)) / (sum(losses) / len(losses))
