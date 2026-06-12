@@ -571,8 +571,7 @@ class Phmex2Bot:
                 capital_pct = 0.10
             for slot in self.slots:
                 if slot.slot_id == slot_id:
-                    slot.paper_mode = False
-                    slot.capital_pct = capital_pct
+                    slot.set_live(capital_pct=capital_pct)
                     logger.warning(f"[SENTINEL] Slot '{slot_id}' PROMOTED to live at {capital_pct*100:.0f}%")
                     notifier.send(f"🚀 Slot <b>{slot_id}</b> promoted to live ({capital_pct*100:.0f}% capital)")
                     break
@@ -586,10 +585,8 @@ class Phmex2Bot:
             slot_id = path.replace(".demote_", "")
             for slot in self.slots:
                 if slot.slot_id == slot_id:
-                    slot.paper_mode = True
-                    slot.capital_pct = 0.0
-                    logger.warning(f"[SENTINEL] Slot '{slot_id}' DEMOTED to paper")
-                    notifier.send(f"⬇️ Slot <b>{slot_id}</b> demoted to paper")
+                    # _demote_slot closes real positions, flips mode, and sends the Telegram alert
+                    self._demote_slot(slot, "manual sentinel")
                     break
             try:
                 os.remove(path)
@@ -1555,64 +1552,52 @@ class Phmex2Bot:
             if not strategy_fn:
                 continue
 
-            # --- Paper exits first (check existing paper positions) ---
-            # Live-slot exits: exchange SL/TP + reconcile Path A; cycle exits land in Task 5.
-            if slot.paper_mode:
-                for symbol in list(slot.risk.positions.keys()):
-                    price = prices.get(symbol)
-                    if not price:
-                        logger.debug(f"[PAPER] {slot.slot_id} no price for {symbol}, skipping exit check")
-                        continue
-                    pos = slot.risk.positions[symbol]
+            # --- Slot exits first (check existing slot positions, paper AND live) ---
+            # Paper: all exits simulated here. Live: SL/TP enforced by exchange resting
+            # orders + reconcile Path A (software touch-close would double-fire), but
+            # cycle exits (trend-flip / adverse / time) execute real market closes.
+            for symbol in list(slot.risk.positions.keys()):
+                price = prices.get(symbol)
+                if not price:
+                    logger.debug(f"[PAPER] {slot.slot_id} no price for {symbol}, skipping exit check")
+                    continue
+                pos = slot.risk.positions[symbol]
 
-                    # Check SL
+                if slot.paper_mode:
+                    # Check SL (paper only — live SL rests on the exchange)
                     if (pos.side == "long" and price <= pos.stop_loss) or \
                        (pos.side == "short" and price >= pos.stop_loss):
-                        pnl = pos.pnl_usdt(price)
-                        pnl_pct = pos.pnl_percent(price)
-                        slot.risk.close_position(symbol, price, "stop_loss")
-                        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "stop_loss")
+                        self._close_slot_position(slot, symbol, pos, price, "stop_loss")
                         continue
 
-                    # Check TP
+                    # Check TP (paper only — live TP rests on the exchange)
                     if (pos.side == "long" and price >= pos.take_profit) or \
                        (pos.side == "short" and price <= pos.take_profit):
-                        pnl = pos.pnl_usdt(price)
-                        pnl_pct = pos.pnl_percent(price)
-                        slot.risk.close_position(symbol, price, "take_profit")
-                        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "take_profit")
+                        self._close_slot_position(slot, symbol, pos, price, "take_profit")
                         continue
 
-                    # Trend-flip exit for htf_confluence_pullback paper positions
-                    if slot.strategy_name in ("htf_confluence_pullback", "htf_l2_anticipation"):
-                        htf_df_tuple = self._htf_cache.get(symbol)
-                        htf_df = htf_df_tuple[0] if htf_df_tuple else None
-                        should_flip, flip_reason = _check_htf_trend_flip_exit(pos.side, htf_df)
-                        if should_flip:
-                            pnl = pos.pnl_usdt(price)
-                            pnl_pct = pos.pnl_percent(price)
-                            logger.info(f"[PAPER TREND-FLIP EXIT] {slot.slot_id} {symbol} {pos.side} — 1h EMA flipped")
-                            slot.risk.close_position(symbol, price, flip_reason)
-                            notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, flip_reason)
-                            continue
-
-                    # Check adverse exit
-                    if pos.should_adverse_exit(self.cycle_count, price):
-                        pnl = pos.pnl_usdt(price)
-                        pnl_pct = pos.pnl_percent(price)
-                        slot.risk.close_position(symbol, price, "adverse_exit")
-                        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "adverse_exit")
+                # Trend-flip exit for htf_confluence_pullback positions
+                if slot.strategy_name in ("htf_confluence_pullback", "htf_l2_anticipation"):
+                    htf_df_tuple = self._htf_cache.get(symbol)
+                    htf_df = htf_df_tuple[0] if htf_df_tuple else None
+                    should_flip, flip_reason = _check_htf_trend_flip_exit(pos.side, htf_df)
+                    if should_flip:
+                        tag = "PAPER" if slot.paper_mode else "SLOT LIVE"
+                        logger.info(f"[{tag} TREND-FLIP EXIT] {slot.slot_id} {symbol} {pos.side} — 1h EMA flipped")
+                        self._close_slot_position(slot, symbol, pos, price, flip_reason)
                         continue
 
-                    # Check time exit
-                    should_exit, is_hard = pos.should_time_exit(self.cycle_count, price)
-                    if should_exit:
-                        pnl = pos.pnl_usdt(price)
-                        pnl_pct = pos.pnl_percent(price)
-                        reason = "hard_time_exit" if is_hard else "time_exit"
-                        slot.risk.close_position(symbol, price, reason)
-                        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, reason)
-                        continue
+                # Check adverse exit
+                if pos.should_adverse_exit(self.cycle_count, price):
+                    self._close_slot_position(slot, symbol, pos, price, "adverse_exit")
+                    continue
+
+                # Check time exit
+                should_exit, is_hard = pos.should_time_exit(self.cycle_count, price)
+                if should_exit:
+                    reason = "hard_time_exit" if is_hard else "time_exit"
+                    self._close_slot_position(slot, symbol, pos, price, reason)
+                    continue
 
             # --- Paper entries ---
             if not slot.is_active:
@@ -2365,11 +2350,62 @@ class Phmex2Bot:
             logger.warning(f"[SYNC] (B) orphan-scan path failed: {e}")
 
     def _maybe_auto_demote(self, slot):
-        """Auto-demote check after a live slot close. Full demote execution lands
-        with the live-exit task; trigger logic lives on the slot."""
+        """Auto-demote check after every live slot close (loss cap / negative Kelly)."""
         demote, reason = slot.should_auto_demote()
         if demote:
-            logger.warning(f"[SLOT] {slot.slot_id} auto-demote triggered ({reason}) — demote execution pending")
+            self._demote_slot(slot, reason)
+
+    def _demote_slot(self, slot, reason: str):
+        """Demote a live slot to paper: close its real positions at market, cancel
+        orders, flip mode. Never leaves a frozen position (DOGE-freeze lesson 2026-06-11)."""
+        logger.warning(f"[SLOT DEMOTE] {slot.slot_id} → paper ({reason})")
+        for symbol in list(slot.risk.positions.keys()):
+            pos = slot.risk.positions[symbol]
+            try:
+                self.exchange.cancel_open_orders(symbol)
+                order = (self.exchange.close_long(symbol, pos.amount) if pos.side == "long"
+                         else self.exchange.close_short(symbol, pos.amount))
+                if order:
+                    fill = self._extract_fill_price(order, pos.entry_price, is_exit=True)
+                    slot.risk.close_position(symbol, fill, "slot_demote", mode="live",
+                                             fees_usdt=self.exchange.extract_order_fee(order, symbol))
+                else:
+                    logger.error(f"[SLOT DEMOTE] {slot.slot_id} {symbol} close FAILED — reconcile will catch")
+            except Exception as e:
+                logger.error(f"[SLOT DEMOTE] {slot.slot_id} {symbol} error: {e}")
+        slot.set_paper()
+        try:
+            notifier.send(f"⬇️ Slot <b>{slot.slot_id}</b> demoted to paper — {reason}")
+        except Exception:
+            pass
+
+    def _close_slot_position(self, slot, symbol, pos, price, reason):
+        """Close a slot position — simulated for paper, real market order for live.
+        Returns True if closed."""
+        pnl = pos.pnl_usdt(price)
+        pnl_pct = pos.pnl_percent(price)
+        if slot.paper_mode:
+            slot.risk.close_position(symbol, price, reason)
+            notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, reason)
+            return True
+        try:
+            self.exchange.cancel_open_orders(symbol)
+            order = (self.exchange.close_long(symbol, pos.amount) if pos.side == "long"
+                     else self.exchange.close_short(symbol, pos.amount))
+            if not order:
+                logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} {reason} close FAILED — retry next cycle")
+                return False
+            fill = self._extract_fill_price(order, price, is_exit=True)
+            slot.risk.close_position(symbol, fill, reason, mode="live",
+                                     fees_usdt=self.exchange.extract_order_fee(order, symbol))
+            notifier.notify_exit(symbol, pos.side, pos.entry_price, fill,
+                                 pos.pnl_usdt(fill), pos.pnl_percent(fill),
+                                 f"{reason} [slot {slot.slot_id}]")
+            self._maybe_auto_demote(slot)
+            return True
+        except Exception as e:
+            logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} {reason} close error: {e} — retry next cycle")
+            return False
 
     def _adopt_orphan_position(self, orphan: dict):
         """Adopt an exchange-visible position that the bot isn't tracking.
