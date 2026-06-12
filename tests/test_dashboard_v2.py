@@ -42,6 +42,25 @@ def test_equity_sentinel_era_subset():
     assert len(s["t"]) <= len(a["t"])
 
 
+def test_merged_blotter_rows():
+    import web_dashboard as wd
+    rows = wd.collect_blotter_rows(limit=500)
+    assert isinstance(rows, list)
+    if rows:
+        r = rows[0]
+        assert {"id", "time_pt", "sym", "side", "strat", "net", "reason", "owner"} <= set(r.keys())
+        ts = [x["ts"] for x in rows]
+        assert ts == sorted(ts, reverse=True)  # newest first
+
+
+def test_trade_detail_endpoint():
+    import web_dashboard as wd
+    rows = wd.collect_blotter_rows(limit=5)
+    if rows:
+        d = wd.build_trade_detail(rows[0]["id"])
+        assert "snapshot" in d  # dict or the string "no snapshot recorded"
+
+
 def test_sentinel_deploy_ts_matches_2026_04_02_06_01_utc():
     """Sentinel deployed 2026-04-01 23:01 PT = 2026-04-02 06:01 UTC.
     (Moved from test_sentinel_chart.py — the PNG chart is gone, but this

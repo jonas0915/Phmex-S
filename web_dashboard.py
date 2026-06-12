@@ -14,6 +14,7 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse, parse_qs
 from zoneinfo import ZoneInfo
 
 CA_TZ = ZoneInfo("America/Los_Angeles")
@@ -244,8 +245,8 @@ def read_all_slot_states() -> dict[str, dict]:
     slots = {}
     for path in _glob.glob(os.path.join(PROJECT_DIR, "trading_state_*.json")):
         fname = os.path.basename(path)
-        if fname.endswith("_mode.json"):
-            continue  # promotion sidecar (paper/live flag), not a slot state file
+        if fname.endswith("_mode.json") or fname.endswith("_blocked.json"):
+            continue  # sidecars (promotion flag / blocked counts), not slot state files
         # Extract slot_id: trading_state_5m_liq_cascade.json → 5m_liq_cascade
         slot_id = fname.replace("trading_state_", "").replace(".json", "")
         try:
@@ -1170,6 +1171,112 @@ def build_equity_series(era: str = "sentinel") -> dict:
     return {"t": ts, "v": vals, "meta": meta}
 
 
+# ── Blotter (merged main + slots) + trade drill-down ─────────────────────
+def _blotter_sources() -> list[tuple[str, str]]:
+    """(owner, abs_path) pairs for every closed-trades source.
+    Skips _mode.json (promotion flag) and _blocked.json (blocked counts)
+    sidecars — same skip rule as read_all_slot_states."""
+    sources = [("main", STATE_FILE)]
+    for path in sorted(_glob.glob(os.path.join(PROJECT_DIR, "trading_state_*.json"))):
+        fname = os.path.basename(path)
+        if fname.endswith("_mode.json") or fname.endswith("_blocked.json"):
+            continue
+        sources.append((fname.replace("trading_state_", "").replace(".json", ""), path))
+    return sources
+
+
+def collect_blotter_rows(limit: int = 500) -> list[dict]:
+    """Merged blotter: main closed_trades (owner "main") + every slot state's
+    closed_trades (owner = slot_id). Stable id = "owner:index_in_that_file"
+    (files are append-only, so the index never moves). Newest first."""
+    rows = []
+    for owner, path in _blotter_sources():
+        try:
+            with open(path) as f:
+                trades = json.load(f).get("closed_trades", []) or []
+        except Exception:
+            continue
+        for i, t in enumerate(trades):
+            ts = t.get("closed_at") or t.get("opened_at") or 0
+            try:
+                time_pt = _from_ts(ts).strftime("%-m/%-d %-I:%M %p") if ts else "?"
+            except Exception:
+                time_pt = "?"
+            # Main trades are the live bot. A slot trade is live ONLY when the
+            # record itself carries mode=="live" (stamped at fill time, post-
+            # promotion) — same rule build_equity_series uses. Trades closed
+            # while the slot was still paper stay tagged paper.
+            mode = "live" if owner == "main" else (t.get("mode") or "paper")
+            rows.append({
+                "id": f"{owner}:{i}",
+                "ts": ts,
+                "time_pt": time_pt,
+                "sym": str(t.get("symbol") or "?").replace("/USDT:USDT", ""),
+                "side": str(t.get("side") or "?"),
+                "strat": str(t.get("strategy") or ""),
+                "net": round(_net_pnl(t), 4),
+                "reason": str(t.get("exit_reason") or t.get("reason") or ""),
+                "owner": owner,
+                "mode": mode,
+            })
+    rows.sort(key=lambda r: r["ts"], reverse=True)
+    return rows[:limit]
+
+
+def build_trade_detail(trade_id: str) -> dict:
+    """Drill-down payload for one blotter row id ("owner:index").
+    Re-reads the owning state file; unknown/malformed id → {"error": "not found"}."""
+    try:
+        owner, idx_s = str(trade_id).split(":", 1)
+        idx = int(idx_s)
+        # owner becomes part of a filename — allow only safe slot-id chars.
+        if idx < 0 or not re.fullmatch(r"[A-Za-z0-9_]+", owner):
+            return {"error": "not found"}
+        path = STATE_FILE if owner == "main" else os.path.join(
+            PROJECT_DIR, f"trading_state_{owner}.json")
+        with open(path) as f:
+            t = (json.load(f).get("closed_trades", []) or [])[idx]
+    except Exception:
+        return {"error": "not found"}
+    try:
+        opened, closed = t.get("opened_at") or 0, t.get("closed_at") or 0
+        def _fmt(ts):
+            try:
+                return _from_ts(ts).strftime("%-m/%-d %-I:%M:%S %p PT") if ts else "?"
+            except Exception:
+                return "?"
+        snap = t.get("entry_snapshot")
+        return {
+            "trade": {
+                "sym": str(t.get("symbol") or "?").replace("/USDT:USDT", ""),
+                "side": str(t.get("side") or "?"),
+                "strat": str(t.get("strategy") or ""),
+                "entry_price": t.get("entry_price") or t.get("entry"),
+                "exit_price": t.get("exit_price") or t.get("exit"),
+                "net": round(_net_pnl(t), 6),
+                "gross": t.get("pnl_usdt"),
+                "confidence": t.get("confidence"),
+                "layers": t.get("ensemble_layers"),
+                "opened_pt": _fmt(opened),
+                "closed_pt": _fmt(closed),
+                "duration_s": t.get("duration_s"),
+                "reason": str(t.get("exit_reason") or t.get("reason") or ""),
+                "owner": owner,
+                "mode": t.get("mode") or ("live" if owner == "main" else "paper"),
+            },
+            "snapshot": snap if isinstance(snap, dict) else "no snapshot recorded",
+            "gate_tags": t.get("gate_tags"),
+            "fees": {
+                "fees_usdt": round(_real_fee(t), 6),
+                "funding_usdt": t.get("funding_usdt"),
+                "fees_source": t.get("fees_source") or "estimated",
+            },
+            "basis": "net",
+        }
+    except Exception:
+        return {"error": "not found"}
+
+
 def _build_watchlist_html(wl: dict, positions: dict | None = None) -> str:
     """Render watchlist as a grid of coin tiles with status dots.
 
@@ -1571,6 +1678,37 @@ def build_feed(lines: list = None) -> str:
 
 
 # ── HTML rendering ───────────────────────────────────────────────────────
+def _build_blotter_panel(limit: int = 100) -> str:
+    """BLOTTER panel body: merged main+slot rows, newest first, click-to-drill.
+    Slot rows carry an owner badge — amber when the slot trade ran LIVE, dim
+    for paper. Row ids feed drill() → GET /api/trade?id=owner:index."""
+    rows = collect_blotter_rows(limit)
+    if not rows:
+        return "<div class='dim'>no closed trades yet</div>"
+    out = ("<table><tr class='dim'><th>TIME</th><th>SYM</th><th>SIDE</th>"
+           "<th>STRAT</th><th>PNL</th><th>REASON</th></tr>")
+    for r in rows:
+        net_cls = "pos" if r["net"] >= 0 else "neg"
+        side = r["side"][:1].upper()
+        side = {"L": "LNG", "S": "SHT"}.get(side, escape(r["side"][:3].upper()))
+        side_cls = "pos" if side == "LNG" else "neg"
+        badge = ""
+        if r["owner"] != "main":
+            b_cls = "amb" if r["mode"] == "live" else "dim"
+            badge = f" <span class='{b_cls}'>[{escape(r['owner'])}]</span>"
+        # id is generated server-side as owner:index ([A-Za-z0-9_:] only) — safe in attr
+        out += (
+            f"<tr onclick=\"drill(this,'{r['id']}')\" style='cursor:pointer'>"
+            f"<td>{escape(r['time_pt'])}</td>"
+            f"<td>{escape(r['sym'])}{badge}</td>"
+            f"<td class='{side_cls}'>{side}</td>"
+            f"<td class='dim'>{escape(r['strat'][:16])}</td>"
+            f"<td class='{net_cls}'>{r['net']:+.2f}</td>"
+            f"<td class='dim'>{escape(r['reason'][:14])}</td></tr>"
+        )
+    return out + "</table>"
+
+
 def build_content(lines: list = None) -> str:
     """Inner HTML for the swapped #content node — the six-panel command grid.
 
@@ -1641,33 +1779,8 @@ def build_content(lines: list = None) -> str:
     # Panel 2 — SLOTS + GUARDRAILS (legacy builder carried forward; Task 5 rebuilds)
     slots_html = _build_slots_overview(all_slot_states, factory_state, sentinels)
 
-    # Panel 3 — BLOTTER: last 12 main-state trades, newest first
-    # (merged main+slot blotter with click-to-drill lands in Task 3).
-    blot_rows = ""
-    for t in reversed(trades[-12:]):
-        try:
-            t_pt = _from_ts(t.get("closed_at", 0)).strftime("%-I:%M %p")
-        except Exception:
-            t_pt = "?"
-        net = _net_pnl(t)
-        net_cls = "pos" if net >= 0 else "neg"
-        side = str(t.get("side", "?"))[:3].upper()
-        side_cls = "pos" if side.startswith("L") else "neg"
-        blot_rows += (
-            f"<tr><td>{t_pt}</td>"
-            f"<td>{escape(str(t.get('symbol', '?')).replace('/USDT:USDT', ''))}</td>"
-            f"<td class='{side_cls}'>{side}</td>"
-            f"<td class='dim'>{escape(str(t.get('strategy', ''))[:14])}</td>"
-            f"<td class='{net_cls}'>{net:+.2f}</td>"
-            f"<td class='dim'>{escape(str(t.get('exit_reason') or t.get('reason') or ''))}</td></tr>"
-        )
-    if blot_rows:
-        blotter_html = (
-            "<table><tr class='dim'><th>TIME</th><th>SYM</th><th>SIDE</th>"
-            "<th>STRAT</th><th>NET</th><th>REASON</th></tr>" + blot_rows + "</table>"
-        )
-    else:
-        blotter_html = "<div class='dim'>no closed trades yet</div>"
+    # Panel 3 — BLOTTER: main + all slots merged, click a row to drill down.
+    blotter_html = _build_blotter_panel()
 
     # Panel 5 — GATES + WATCHLIST (legacy builders carried forward; Task 6 rebuilds)
     gates_html = _build_observability_panel() + _build_watchlist_html(watchlist, positions)
@@ -1682,7 +1795,7 @@ def build_content(lines: list = None) -> str:
         {slots_html}
     </div>
     <div class="panel" id="p-blotter">
-        <div class="ptitle">BLOTTER &mdash; LAST 12 (MAIN)</div>
+        <div class="ptitle">BLOTTER &mdash; CLICK ROW TO DRILL DOWN</div>
         {blotter_html}
     </div>
     <div class="panel" id="p-why">
@@ -1790,6 +1903,51 @@ async function poll(){{
 }}
 setInterval(poll, 3000); poll();
 
+// ── Blotter drill-down. NOTE: #content is replaced wholesale every 3s, so
+// an expanded row collapses on the next poll — acceptable for v1. ──
+function escq(v){{ return String(v==null?'':v).replace(/&/g,'&amp;')
+  .replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }}
+async function drill(tr, id){{
+  const next = tr.nextElementSibling;
+  if(next && next.dataset && next.dataset.drill === id){{ next.remove(); return; }}
+  let d;
+  try{{
+    const r = await fetch('/api/trade?id='+encodeURIComponent(id));
+    d = await r.json();
+  }}catch(e){{ return; }}
+  const tbl = tr.closest('table');
+  if(tbl) tbl.querySelectorAll('tr[data-drill]').forEach(x=>x.remove());
+  let body;
+  if(d.error){{
+    body = '<span class="neg">'+escq(d.error)+'</span>';
+  }}else{{
+    const t=d.trade||{{}}, f=d.fees||{{}}, s=d.snapshot, bits=[];
+    if(t.confidence!=null) bits.push('conf '+escq(t.confidence)+'/7'+
+      (t.layers?' ['+escq(t.layers)+']':''));
+    if(s && typeof s==='object'){{
+      const fl=s.flow||{{}}, ob=s.ob||{{}};
+      if(fl.buy_ratio!=null) bits.push('buy_ratio '+escq(fl.buy_ratio));
+      if(fl.cvd_slope!=null) bits.push('cvd_slope '+escq(fl.cvd_slope));
+      if(fl.large_trade_bias!=null) bits.push('lt_bias '+escq(fl.large_trade_bias));
+      if(ob.imbalance!=null) bits.push('ob_imb '+escq(ob.imbalance));
+    }}else{{
+      bits.push(escq(s));  // "no snapshot recorded"
+    }}
+    if(d.gate_tags) bits.push('tags: '+escq(d.gate_tags));
+    const fee = (typeof f.fees_usdt==='number') ? '$'+f.fees_usdt.toFixed(4) : escq(f.fees_usdt);
+    bits.push('fees '+fee+(f.fees_source?' ('+escq(f.fees_source)+')':'')+
+      ' · '+escq(d.basis)+' basis');
+    if(t.entry_price!=null) bits.push('entry '+escq(t.entry_price)+' → exit '+escq(t.exit_price));
+    body = '<span class="amb">▼ SNAPSHOT</span> <span class="dim">'+bits.join(' · ')+'</span>';
+  }}
+  const row = document.createElement('tr');
+  row.dataset.drill = id;
+  // every dynamic value above went through escq() — safe innerHTML sink
+  row.innerHTML = '<td colspan="6" style="border-left:2px solid #f0a500;'+
+    'padding:3px 6px;background:#0a0e08;">'+body+'</td>';
+  tr.after(row);
+}}
+
 // ── Equity chart (uPlot, vendored at /static/, refreshed every 30s) ──
 let plot=null, era='sentinel', eqMeta=[];
 async function loadEquity(){{
@@ -1837,230 +1995,6 @@ loadEquity(); setInterval(loadEquity, 30000);
 
 
 
-# ── Full Trades page ─────────────────────────────────────────────────────
-def build_trades_page() -> str:
-    """Standalone full-table view of every closed trade across live + paper slots.
-    Includes client-side filters (slot, side, strategy, symbol search, win/loss).
-    Self-contained CSS so it doesn't depend on the main dashboard template."""
-    # Load every closed_trades source, tag each row with the slot it came from.
-    sources = [("live", "trading_state.json")]
-    for path in sorted(_glob.glob(os.path.join(PROJECT_DIR, "trading_state_5m_*.json"))):
-        fname = os.path.basename(path)
-        if fname.endswith(".bak") or fname.endswith("_mode.json"):
-            continue
-        slot = fname.replace("trading_state_", "").replace(".json", "")
-        sources.append((slot, fname))
-
-    all_rows = []
-    for slot, fname in sources:
-        path = os.path.join(PROJECT_DIR, fname)
-        try:
-            with open(path) as f:
-                s = json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            continue
-        for t in s.get("closed_trades", []):
-            all_rows.append((slot, t))
-
-    # Sort newest first by closed_at (fall back to opened_at)
-    all_rows.sort(key=lambda r: r[1].get("closed_at") or r[1].get("opened_at") or 0, reverse=True)
-
-    # Build row HTML
-    body_rows = []
-    for slot, t in all_rows:
-        pnl = _net_pnl(t)
-        fee = _real_fee(t)
-        sym = (t.get("symbol") or "?").replace("/USDT:USDT", "")
-        side = (t.get("side") or "?").upper()
-        strat = t.get("strategy") or "—"
-        reason = t.get("exit_reason") or t.get("reason") or "—"
-        entry_px = t.get("entry_price") or 0
-        exit_px = t.get("exit_price") or 0
-        confidence = t.get("confidence") or ""
-        opened = t.get("opened_at") or 0
-        closed = t.get("closed_at") or 0
-        opened_str = _from_ts(opened).strftime("%Y-%m-%d %I:%M %p") if opened else "—"
-        closed_str = _from_ts(closed).strftime("%Y-%m-%d %I:%M %p") if closed else "—"
-        dur = ""
-        if opened and closed:
-            mins = (closed - opened) / 60
-            dur = f"{mins/60:.1f}h" if mins >= 60 else f"{mins:.0f}m"
-        win = "W" if pnl > 0 else "L"
-        pnl_cls = "pos" if pnl > 0 else "neg"
-        side_cls = "long" if side == "LONG" else "short"
-        body_rows.append(
-            f'<tr data-slot="{escape(slot)}" data-side="{escape(side)}" '
-            f'data-strat="{escape(strat)}" data-symbol="{escape(sym)}" '
-            f'data-result="{win}" data-closed="{closed}" data-pnl="{pnl}">'
-            f'<td>{escape(slot)}</td>'
-            f'<td>{closed_str}</td>'
-            f'<td class="num">{dur}</td>'
-            f'<td class="{side_cls}">{side}</td>'
-            f'<td class="sym">{escape(sym)}</td>'
-            f'<td>{escape(strat)}</td>'
-            f'<td class="num">{entry_px:.6g}</td>'
-            f'<td class="num">{exit_px:.6g}</td>'
-            f'<td class="num {pnl_cls}">${pnl:+.4f}</td>'
-            f'<td class="num">${fee:.4f}</td>'
-            f'<td>{escape(reason)}</td>'
-            f'<td class="num">{confidence}</td>'
-            f'</tr>'
-        )
-
-    # Unique values for filter dropdowns
-    slots_set = sorted({slot for slot, _ in all_rows})
-    strats_set = sorted({(t.get("strategy") or "—") for _, t in all_rows})
-    sides_set = sorted({(t.get("side") or "?").upper() for _, t in all_rows})
-
-    def _opts(values):
-        return "".join(f'<option value="{escape(v)}">{escape(v)}</option>' for v in values)
-
-    total = len(all_rows)
-    rows_html = "\n".join(body_rows)
-
-    return f"""<!DOCTYPE html>
-<html><head>
-<meta charset="utf-8">
-<title>Phmex-S — All Trades ({total})</title>
-<style>
-  body {{ background:#0d1117; color:#cdd6f4; font-family:'JetBrains Mono',monospace; font-size:12px; margin:0; padding:16px; }}
-  h1 {{ font-size:14px; color:#39d2c0; margin:0 0 12px; text-transform:uppercase; letter-spacing:0.08em; }}
-  .meta {{ color:#7e8aa0; font-size:11px; margin-bottom:12px; }}
-  .meta a {{ color:#39d2c0; text-decoration:none; }}
-  .filters {{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; background:#161b22; padding:10px; border-radius:4px; }}
-  .filters label {{ display:flex; flex-direction:column; font-size:10px; color:#7e8aa0; text-transform:uppercase; }}
-  .filters input, .filters select {{ background:#0d1117; color:#cdd6f4; border:1px solid #30363d; padding:5px 8px; font-family:inherit; font-size:11px; border-radius:3px; min-width:120px; }}
-  .filters button {{ background:#30363d; color:#cdd6f4; border:none; padding:5px 12px; border-radius:3px; cursor:pointer; align-self:flex-end; }}
-  .filters button:hover {{ background:#3fb950; color:#0d1117; }}
-  .count {{ color:#7e8aa0; font-size:11px; margin-bottom:8px; }}
-  table {{ width:100%; border-collapse:collapse; background:#161b22; border-radius:3px; overflow:hidden; }}
-  thead th {{ background:#21262d; color:#7e8aa0; text-transform:uppercase; font-size:10px; font-weight:600; padding:8px 6px; text-align:left; cursor:pointer; user-select:none; position:sticky; top:0; }}
-  thead th:hover {{ color:#39d2c0; }}
-  tbody td {{ padding:5px 6px; border-top:1px solid #21262d; font-size:11px; }}
-  tbody tr:hover {{ background:#1c2128; }}
-  td.num {{ text-align:right; font-variant-numeric:tabular-nums; }}
-  td.sym {{ font-weight:600; color:#fde68a; }}
-  td.long {{ color:#3fb950; font-weight:600; }}
-  td.short {{ color:#f85149; font-weight:600; }}
-  td.pos {{ color:#3fb950; }}
-  td.neg {{ color:#f85149; }}
-</style>
-</head><body>
-<h1>All Trades — {total} closed</h1>
-<div class="meta">
-  Sources: {", ".join(s for s, _ in sources)} · sorted newest first ·
-  <a href="/">← back to dashboard</a>
-</div>
-<div class="filters">
-  <label>Slot<select id="f-slot"><option value="">all</option>{_opts(slots_set)}</select></label>
-  <label>Side<select id="f-side"><option value="">all</option>{_opts(sides_set)}</select></label>
-  <label>Strategy<select id="f-strat"><option value="">all</option>{_opts(strats_set)}</select></label>
-  <label>Result<select id="f-result"><option value="">all</option><option value="W">Wins</option><option value="L">Losses</option></select></label>
-  <label>Symbol contains<input id="f-symbol" type="text" placeholder="e.g. INJ"></label>
-  <label>Closed after<input id="f-after" type="date"></label>
-  <label>Closed before<input id="f-before" type="date"></label>
-  <button id="f-reset">Reset</button>
-</div>
-<div class="count" id="count">Showing {total} of {total} trades</div>
-<table id="trades-table">
-  <thead><tr>
-    <th data-col="slot">Slot</th>
-    <th data-col="closed">Closed (PT)</th>
-    <th data-col="dur">Dur</th>
-    <th data-col="side">Side</th>
-    <th data-col="symbol">Symbol</th>
-    <th data-col="strat">Strategy</th>
-    <th data-col="entry">Entry</th>
-    <th data-col="exit">Exit</th>
-    <th data-col="pnl">Net PnL</th>
-    <th data-col="fee">Fee</th>
-    <th data-col="reason">Exit Reason</th>
-    <th data-col="conf">Conf</th>
-  </tr></thead>
-  <tbody>
-{rows_html}
-  </tbody>
-</table>
-<script>
-(function() {{
-  const tbody = document.querySelector('#trades-table tbody');
-  const rows = Array.from(tbody.querySelectorAll('tr'));
-  const countEl = document.getElementById('count');
-  const filters = ['f-slot', 'f-side', 'f-strat', 'f-result', 'f-symbol', 'f-after', 'f-before'];
-
-  function applyFilters() {{
-    const slot = document.getElementById('f-slot').value;
-    const side = document.getElementById('f-side').value;
-    const strat = document.getElementById('f-strat').value;
-    const result = document.getElementById('f-result').value;
-    const symbol = document.getElementById('f-symbol').value.trim().toUpperCase();
-    const after = document.getElementById('f-after').value;
-    const before = document.getElementById('f-before').value;
-    const afterTs = after ? new Date(after + 'T00:00:00').getTime() / 1000 : null;
-    const beforeTs = before ? new Date(before + 'T23:59:59').getTime() / 1000 : null;
-
-    let shown = 0;
-    rows.forEach(r => {{
-      const ts = parseInt(r.dataset.closed, 10) || 0;
-      const ok =
-        (!slot || r.dataset.slot === slot) &&
-        (!side || r.dataset.side === side) &&
-        (!strat || r.dataset.strat === strat) &&
-        (!result || r.dataset.result === result) &&
-        (!symbol || r.dataset.symbol.toUpperCase().includes(symbol)) &&
-        (!afterTs || ts >= afterTs) &&
-        (!beforeTs || ts <= beforeTs);
-      r.style.display = ok ? '' : 'none';
-      if (ok) shown++;
-    }});
-    countEl.textContent = `Showing ${{shown}} of {total} trades`;
-  }}
-
-  filters.forEach(id => {{
-    const el = document.getElementById(id);
-    el.addEventListener('input', applyFilters);
-    el.addEventListener('change', applyFilters);
-  }});
-  document.getElementById('f-reset').addEventListener('click', () => {{
-    filters.forEach(id => document.getElementById(id).value = '');
-    applyFilters();
-  }});
-
-  // Click-to-sort columns
-  const headers = document.querySelectorAll('#trades-table thead th');
-  let sortState = {{ col: 'closed', dir: -1 }};
-  const numericCols = new Set(['dur', 'entry', 'exit', 'pnl', 'fee', 'conf', 'closed']);
-  headers.forEach((th, idx) => {{
-    th.addEventListener('click', () => {{
-      const col = th.dataset.col;
-      sortState.dir = sortState.col === col ? -sortState.dir : 1;
-      sortState.col = col;
-      const sorted = rows.slice().sort((a, b) => {{
-        let av, bv;
-        if (col === 'pnl') {{
-          av = parseFloat(a.dataset.pnl); bv = parseFloat(b.dataset.pnl);
-        }} else if (col === 'closed') {{
-          av = parseInt(a.dataset.closed, 10); bv = parseInt(b.dataset.closed, 10);
-        }} else {{
-          av = a.children[idx].textContent.trim();
-          bv = b.children[idx].textContent.trim();
-          if (numericCols.has(col)) {{
-            av = parseFloat(av.replace(/[$,h]/g, '')) || 0;
-            bv = parseFloat(bv.replace(/[$,h]/g, '')) || 0;
-          }}
-        }}
-        if (av < bv) return -sortState.dir;
-        if (av > bv) return sortState.dir;
-        return 0;
-      }});
-      sorted.forEach(r => tbody.appendChild(r));
-    }});
-  }});
-}})();
-</script>
-</body></html>"""
-
-
 # ── HTTP handler ─────────────────────────────────────────────────────────
 class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -2085,11 +2019,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(data)
-        elif self.path == "/trades":
-            html = build_trades_page()
-            data = html.encode()
+        elif self.path == "/trades" or self.path.startswith("/trades?"):
+            # The standalone trades page is gone — the merged blotter on the
+            # main dashboard replaced it (Task 3).
+            self.send_response(301)
+            self.send_header("Location", "/")
+            self.end_headers()
+        elif self.path.startswith("/api/trade"):
+            qs = parse_qs(urlparse(self.path).query)
+            tid = (qs.get("id") or [""])[0]
+            data = json.dumps(build_trade_detail(tid)).encode()
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
