@@ -50,6 +50,9 @@ STATIC_FILES = {
 # ── Watcher-enabled cache (30s TTL — avoids per-poll grep/seek) ──────────
 _watcher_cache: dict = {"v": None, "ts": 0.0}
 
+# ── Gate-stats cache (30s TTL — full bot.log parse, called 2× per poll) ──
+_gate_stats_cache: dict = {"v": None, "ts": 0.0, "path": None}
+
 # ── Sentinel-era anchors ─────────────────────────────────────────────────
 # Sentinel deployed 2026-04-01 23:01 PT (= 2026-04-02 06:01 UTC), trade #342+
 SENTINEL_DEPLOY_TS = datetime(2026, 4, 2, 6, 1, 0, tzinfo=timezone.utc).timestamp()
@@ -58,10 +61,26 @@ def strip_ansi(text: str) -> str:
 
 
 def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
-    """Parse bot.log for gate rejection counts over the last max_age_hours."""
+    """Parse bot.log for gate rejection counts over the last max_age_hours.
+
+    Result is cached for 30 seconds (keyed by log_file path).  If called with
+    a non-default path (e.g. from tests passing a sample file) the cache is
+    bypassed so that isolated test runs never bleed into each other.
+    """
     import re as _re
-    from datetime import datetime, timedelta, timezone
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    from datetime import datetime, timedelta
+
+    _now = time.time()
+    # Cache hit: same path, fresh enough
+    if (
+        log_file == LOG_FILE
+        and _gate_stats_cache["path"] == log_file
+        and _gate_stats_cache["v"] is not None
+        and _now - _gate_stats_cache["ts"] < 30
+    ):
+        return _gate_stats_cache["v"]
+
+    cutoff = datetime.now(NY_TZ) - timedelta(hours=max_age_hours)
     counts = {}
     label_map = [
         ("Tape gate",      "[TAPE GATE]"),
@@ -84,7 +103,7 @@ def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
                 ts_match = _re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
                 if ts_match:
                     try:
-                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=NY_TZ)
                         if ts < cutoff:
                             continue
                     except ValueError:
@@ -95,16 +114,24 @@ def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
                         break
     except (FileNotFoundError, PermissionError):
         pass
-    return dict(sorted(counts.items(), key=lambda x: -x[1]))
+    result = dict(sorted(counts.items(), key=lambda x: -x[1]))
+
+    # Only populate cache for the canonical log file path
+    if log_file == LOG_FILE:
+        _gate_stats_cache["v"] = result
+        _gate_stats_cache["ts"] = _now
+        _gate_stats_cache["path"] = log_file
+
+    return result
 
 
 def _reconcile_status(max_age_hours: int = 24) -> dict:
     """Parse reconcile.log for CLEAN streak and last drift message."""
     import re as _re
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     import os as _os
     rec_log = _os.path.expanduser("~/Library/Logs/Phmex-S/reconcile.log")
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    cutoff = datetime.now(NY_TZ) - timedelta(hours=max_age_hours)
     results = []
     try:
         with open(rec_log, "r", errors="replace") as fh:
@@ -114,7 +141,7 @@ def _reconcile_status(max_age_hours: int = 24) -> dict:
                 ts_match = _re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
                 if ts_match:
                     try:
-                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=NY_TZ)
                         if ts >= cutoff:
                             results.append(line.strip())
                     except ValueError:
