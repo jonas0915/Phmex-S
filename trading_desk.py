@@ -9010,9 +9010,18 @@ function animate() {
   const t = clock.getElapsedTime();
   const dt = (t - (window._lastAnimT || t));
   window._lastAnimT = t;
-  // Tick GLTF animation mixers so idle/walk clips actually play
+  // Tick GLTF animation mixers so idle/walk clips actually play.
+  // SINGLE update path (refresh-rate fix): this is the only place mixers are
+  // updated. Mixers are attached in exactly one spot — loadGLTFCharacters()
+  // sets model.userData.mixer AND charGroups[agentName] = model — so iterating
+  // charGroups covers every mixer; the old scene.traverse pass below was a
+  // redundant second update (removed). That double update (dt + hardcoded 1/30)
+  // ran clips at ~2x speed at 60Hz rAF, and the hardcoded 1/30 would have
+  // doubled again on a 120Hz display. GLTF_CLIP_SPEED = 2.0 preserves the
+  // pre-fix apparent speed at 60Hz, now consistent on any refresh rate.
+  var GLTF_CLIP_SPEED = 2.0; // preserves pre-fix apparent speed
   Object.values(charGroups).forEach(function(g){
-    if (g && g.userData && g.userData.mixer) g.userData.mixer.update(dt);
+    if (g && g.userData && g.userData.mixer) g.userData.mixer.update(dt * GLTF_CLIP_SPEED);
   });
 
   // Character idle animations
@@ -9535,12 +9544,9 @@ function animate() {
     bayFogMat.opacity = Math.max(0.01, Math.min(0.10, fogOpacity));
   }
 
-  // Update GLTF animation mixers
-  scene.traverse(function(obj) {
-    if (obj.userData && obj.userData.mixer) {
-      obj.userData.mixer.update(1/30);
-    }
-  });
+  // (GLTF mixer updates happen once, at the top of animate(), with real dt.
+  // The scene.traverse(... mixer.update(1/30)) pass that lived here was a
+  // redundant second update of the same charGroups mixers — removed.)
 
   controls.update();
   composer.render();
