@@ -399,7 +399,8 @@ def _build_api_response():
 
     # Today stats
     all_trades = state.get("closed_trades", [])
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    # "Today" rolls at PACIFIC midnight (project rule) — Mac local clock is Eastern
+    today_start = datetime.now(ZoneInfo("America/Los_Angeles")).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     today_trades = [t for t in all_trades if t.get("closed_at", 0) >= today_start]
     today_pnl = sum(_net_trade(t) for t in today_trades)
     today_count = len(today_trades)
