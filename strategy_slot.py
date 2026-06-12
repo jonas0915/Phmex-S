@@ -84,10 +84,12 @@ class StrategySlot:
 
     def _save_mode(self) -> None:
         try:
-            with open(self._mode_sidecar, "w") as f:
+            tmp = self._mode_sidecar + ".tmp"
+            with open(tmp, "w") as f:
                 json.dump({"paper_mode": self.paper_mode,
                            "capital_pct": self.capital_pct,
                            "promoted_at": self.promoted_at}, f)
+            os.replace(tmp, self._mode_sidecar)
         except Exception as e:
             logger.warning(f"[SLOT] {self.slot_id} mode sidecar save failed: {e}")
 
