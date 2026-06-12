@@ -1509,904 +1509,376 @@ def _build_l2_monitor_panel() -> str:
     )
 
 
+# ── Ticker helpers (Terminal Pro shell) ─────────────────────────────────
+def _latest_balance() -> float:
+    """Last 'Balance: X USDT' from the bot-log STATS lines (the state JSON has
+    no balance field). 0.0 if unavailable."""
+    try:
+        for line in reversed(tail_log(2000)):
+            m = re.search(r'Balance: ([\d.]+) USDT', line)
+            if m:
+                return float(m.group(1))
+    except Exception:
+        pass
+    return 0.0
+
+
+def _today_net_pnl(state: dict) -> float:
+    """Sum of NET pnl for main-state trades closed today (PT midnight onward)."""
+    try:
+        today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        return sum(_net_pnl(t) for t in state.get("closed_trades", [])
+                   if t.get("closed_at", 0) >= today_start)
+    except Exception:
+        return 0.0
+
+
+def _drawdown_pct(state: dict, balance: float = 0.0) -> float:
+    """Current drawdown from peak balance, in percent (always >= 0)."""
+    try:
+        peak = state.get("peak_balance", 0) or 0
+        bal = balance or _latest_balance()
+        if peak > 0 and bal > 0:
+            return max(0.0, (peak - bal) / peak * 100)
+    except Exception:
+        pass
+    return 0.0
+
+
+def _mr_headroom():
+    """Demote headroom for the live 5m_mean_revert slot: $5 budget + net PnL of
+    its LIVE-mode trades. None when the slot is paper (or files unreadable) —
+    the ticker omits the segment entirely in that case."""
+    try:
+        with open(os.path.join(PROJECT_DIR, "trading_state_5m_mean_revert_mode.json")) as f:
+            if json.load(f).get("paper_mode", True):
+                return None
+        with open(os.path.join(PROJECT_DIR, "trading_state_5m_mean_revert.json")) as f:
+            trades = json.load(f).get("closed_trades", []) or []
+        live_net = sum(_net_pnl(t) for t in trades if t.get("mode") == "live")
+        return 5.0 + live_net
+    except Exception:
+        return None
+
+
+def _watcher_enabled() -> bool:
+    """True if '[LIVE EXIT] watcher enabled' was logged AFTER the most recent
+    'Volume scanner ON' line (i.e. after the last bot start). Reads the last
+    ~200KB of bot.log; falls back to a full-file grep when the startup markers
+    have scrolled out of the tail window (long-running bot)."""
+    try:
+        with open(LOG_FILE, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - 200_000))
+            text = f.read().decode("utf-8", errors="replace")
+        idx = text.rfind("Volume scanner ON")
+        if idx != -1:
+            return "[LIVE EXIT] watcher enabled" in text[idx:]
+        if "[LIVE EXIT] watcher enabled" in text:
+            # watcher line in the tail with no later scanner restart → enabled
+            return True
+        # Neither marker in the tail window — grep the whole file (fast C grep).
+        out = subprocess.run(
+            ["grep", "-F", "-n", "-e", "Volume scanner ON",
+             "-e", "[LIVE EXIT] watcher enabled", LOG_FILE],
+            capture_output=True, text=True, timeout=5,
+        ).stdout
+        last_scan = last_watch = -1
+        for ln in out.splitlines():
+            no, _, rest = ln.partition(":")
+            if not no.isdigit():
+                continue
+            if "Volume scanner ON" in rest:
+                last_scan = int(no)
+            elif "[LIVE EXIT] watcher enabled" in rest:
+                last_watch = int(no)
+        return last_watch != -1 and last_watch > last_scan
+    except Exception:
+        return False
+
+
+def _latest_cycle() -> str:
+    """Most recent cycle number from the log tail ('—' if unknown)."""
+    try:
+        for line in reversed(tail_log(500)):
+            m = re.search(r'Cycle #(\d+)', line)
+            if m:
+                return m.group(1)
+    except Exception:
+        pass
+    return "—"
+
+
+def _open_pos_count() -> int:
+    """Open positions across main state + live-promoted slot state files."""
+    count = 0
+    try:
+        count += len(read_state().get("positions") or {})
+        for slot_id in _live_slot_ids():
+            if slot_id == "5m_scalp":
+                continue  # main trading_state.json already counted above
+            try:
+                with open(os.path.join(PROJECT_DIR, f"trading_state_{slot_id}.json")) as f:
+                    count += len(json.load(f).get("positions") or {})
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return count
+
+
+def build_ticker() -> str:
+    """One-line sticky status ticker (12-hour PT, NET basis)."""
+    state = read_state()
+    bal = _latest_balance()
+    today = _today_net_pnl(state)
+    arrow = "▲" if today >= 0 else "▼"
+    cls = "pos" if today >= 0 else "neg"
+    hdrm = _mr_headroom()
+    watcher = "ON" if _watcher_enabled() else "OFF"
+    now = _now_ca().strftime("%-I:%M:%S %p PT")
+    parts = ["PHMEX-S",
+             f"BAL ${bal:.2f} <span class='{cls}'>{arrow}{abs(today):.2f}</span>"]
+    if hdrm is not None:
+        parts.append(f"MR-LIVE HDRM ${hdrm:.2f}")
+    parts += [
+        f"DD {_drawdown_pct(state, bal):.1f}%",
+        f"POS {_open_pos_count()}",
+        f"WATCHER <span class='{'pos' if watcher == 'ON' else 'neg'}'>{watcher}</span>",
+        f"CYC {_latest_cycle()}",
+        now,
+    ]
+    return " ▮ ".join(parts)
+
+
+def build_feed() -> str:
+    """FEED panel inner HTML — extracted from the old Activity Feed card
+    (same event parsing, terminal-pro classes)."""
+    try:
+        activity = get_recent_activity(tail_log(3000), n=15)
+    except Exception:
+        activity = []
+    rows = ""
+    for line in activity:
+        trimmed = escape(line[:140] + "..." if len(line) > 140 else line)
+        cls = ("pos" if "ENTRY:" in line else
+               "amb" if "closed:" in line else
+               "dim" if any(k in line for k in ("REGIME", "DRAWDOWN", "SCANNER")) else "")
+        rows += f"<div class='feed-line {cls}'>{trimmed}</div>"
+    if not rows:
+        rows = "<div class='feed-line dim'>No recent activity</div>"
+    return f'<div class="ptitle">FEED</div><div class="feed-scroll">{rows}</div>'
+
+
 # ── HTML rendering ───────────────────────────────────────────────────────
 def build_content() -> str:
-    """Build just the inner content HTML (no head/style/script shell)."""
+    """Inner HTML for the swapped #content node — the six-panel command grid.
+
+    Task 1 shell: the SLOTS and GATES+WATCHLIST cells temporarily carry the
+    legacy builders forward so the dashboard stays useful between tasks;
+    Tasks 3-6 replace each placeholder with its terminal-pro builder.
+    """
     state = read_state()
+    positions = state.get("positions") or {}
     trades = state.get("closed_trades", [])
-    stats = compute_stats(trades)
-    paper_state = read_paper_state()
-    paper_trades = paper_state.get("closed_trades", [])
     factory_state = read_factory_state()
     all_slot_states = read_all_slot_states()
     sentinels = detect_sentinel_files()
-    # 3000 lines covers ~6-12 hours of recent activity — wide enough to catch
-    # ENTRY/Position-closed events that get buried under DEBUG noise on quiet days.
     lines = tail_log(3000)
-    cycle = parse_latest_cycle(lines)
-    regime = parse_regime_status(lines)
-    activity = get_recent_activity(lines, n=15)
-    # Watchlist needs more history to capture position opens/closes and scanner updates
-    wl_lines = tail_log(3000)
-    watchlist = parse_watchlist(wl_lines)
-    now = _now_ca().strftime("%I:%M:%S %p")
-    date_str = _now_ca().strftime("%b %d, %Y")
+    watchlist = parse_watchlist(lines)
 
-    # Read balance snapshots from bot log STATS lines (tail only — avoid full scan)
-    balance = 0
-    balance_start_of_day = 0
-    _log_file = os.path.join(os.path.dirname(__file__), "logs", "bot.log")
-    _today_date_str = _now_ca().strftime("%Y-%m-%d")
-    if os.path.exists(_log_file):
-        try:
-            _tail_lines = subprocess.check_output(
-                ["tail", "-n", "2000", _log_file], text=True, errors="replace"
-            ).splitlines()
-        except Exception:
-            _tail_lines = []
-        _first_today = False
-        for _ln in _tail_lines:
-            _m2 = re.search(r'Balance: ([\d.]+) USDT', _ln)
-            if _m2:
-                _bv = float(_m2.group(1))
-                balance = _bv
-                if not _first_today and _today_date_str in _ln:
-                    balance_start_of_day = _bv
-                    _first_today = True
-        if balance_start_of_day == 0:
-            balance_start_of_day = balance
-
-    audit_html = build_audit_table(trades)
-
-    # Sentinel-era audit (deployed 2026-04-01 23:01 PT = 2026-04-02 06:01 UTC, trade #342+)
-    # SENTINEL_DEPLOY_TS is module-level (see top of file)
-    sentinel_trades = [
-        t for t in trades
-        if (t.get("opened_at") or t.get("closed_at") or 0) >= SENTINEL_DEPLOY_TS
-    ]
-    sentinel_stats = compute_stats(sentinel_trades)
-    # offset = number of pre-Sentinel trades, so trade numbering matches global index
-    sentinel_audit_html = build_audit_table(
-        sentinel_trades,
-        index_offset=len(trades) - len(sentinel_trades),
-    )
-
-    paper_html = _build_paper_comparison(trades, paper_trades)
-    # Auto-hide NARROW panel if the underlying state file hasn't been updated in 7+ days
-    # (slot has been killed since 2026-04-24 — leaving the panel up shows zombie counts).
-    _narrow_path = os.path.join(PROJECT_DIR, "trading_state_5m_narrow.json")
-    if os.path.exists(_narrow_path) and (time.time() - os.path.getmtime(_narrow_path)) < 7 * 86400:
-        narrow_html = _build_narrow_panel(read_narrow_state())
+    # Panel 1 — POSITIONS (full terminal-pro rebuild in Task 5)
+    pos_rows = []
+    for owner in sorted(_live_slot_ids()):
+        if owner == "5m_scalp":
+            src = positions
+        else:
+            try:
+                with open(os.path.join(PROJECT_DIR, f"trading_state_{owner}.json")) as f:
+                    src = json.load(f).get("positions") or {}
+            except Exception:
+                src = {}
+        for sym, p in src.items():
+            short = escape(str(sym).replace("/USDT:USDT", ""))
+            side = str(p.get("side", "?"))[:5].upper()
+            side_cls = "pos" if side.startswith("L") else "neg"
+            entry = p.get("entry_price") or 0
+            sl = p.get("exchange_sl_price") or p.get("stop_loss") or 0
+            tp = p.get("take_profit") or 0
+            opened = p.get("opened_at") or 0
+            age = f"{(time.time() - opened) / 60:.0f}m" if opened else "&mdash;"
+            pos_rows.append(
+                f"<tr><td>{short}</td><td class='{side_cls}'>{side}</td>"
+                f"<td>{entry:.6g}</td><td>{sl:.6g}</td><td>{tp:.6g}</td>"
+                f"<td>{age}</td><td class='dim'>{escape(str(p.get('strategy', '')))}</td>"
+                f"<td class='dim'>{escape(owner)}</td></tr>"
+            )
+    if pos_rows:
+        positions_html = (
+            "<table><tr class='dim'><th>SYM</th><th>SIDE</th><th>ENTRY</th><th>SL</th>"
+            "<th>TP</th><th>AGE</th><th>STRAT</th><th>OWNER</th></tr>"
+            + "".join(pos_rows) + "</table>"
+        )
     else:
-        narrow_html = ""
+        last_line = ""
+        if trades:
+            lt = trades[-1]
+            try:
+                t_pt = _from_ts(lt.get("closed_at", 0)).strftime("%-I:%M %p")
+            except Exception:
+                t_pt = "?"
+            net = _net_pnl(lt)
+            net_cls = "pos" if net >= 0 else "neg"
+            last_line = (
+                f"<div class='dim' style='margin-top:6px'>last: "
+                f"{escape(str(lt.get('symbol', '?')).replace('/USDT:USDT', ''))} "
+                f"{escape(str(lt.get('side', '?'))[:3].upper())} closed {t_pt} "
+                f"<span class='{net_cls}'>{net:+.2f}</span></div>"
+            )
+        positions_html = "<div class='dim'>flat &mdash; no open positions</div>" + last_line
+
+    # Panel 2 — SLOTS + GUARDRAILS (legacy builder carried forward; Task 5 rebuilds)
     slots_html = _build_slots_overview(all_slot_states, factory_state, sentinels)
 
-    session_html = _build_session_card(trades, paper_trades, balance=balance, balance_start=balance_start_of_day)
-
-    # Activity feed
-    activity_html = ""
-    for line in activity:
-        trimmed = escape(line[:140] + "..." if len(line) > 140 else line)
-        # Color-code by type
-        line_cls = "act-entry" if "ENTRY:" in line else "act-exit" if "closed:" in line else "act-system" if any(k in line for k in ["REGIME", "DRAWDOWN", "SCANNER"]) else "act-default"
-        activity_html += f"<div class='activity-line {line_cls}'>{trimmed}</div>"
-
-    # Chart availability
-    with _chart_lock:
-        has_charts = bool(_chart_cache)
-
-    chart_section = ""
-    if has_charts:
-        with _chart_lock:
-            _v = _chart_version
-        # Removed all-time cumulative_pnl — duplicates the Sentinel chart below.
-        # PnL by exit reason is unique info, kept.
-        chart_section = f"""
-        <div class="charts-grid">
-            <div class="chart-box"><img src="/chart/pnl_by_reason?v={_v}" alt="PnL by Reason"></div>
-        </div>"""
+    # Panel 3 — BLOTTER: last 12 main-state trades, newest first
+    # (merged main+slot blotter with click-to-drill lands in Task 3).
+    blot_rows = ""
+    for t in reversed(trades[-12:]):
+        try:
+            t_pt = _from_ts(t.get("closed_at", 0)).strftime("%-I:%M %p")
+        except Exception:
+            t_pt = "?"
+        net = _net_pnl(t)
+        net_cls = "pos" if net >= 0 else "neg"
+        side = str(t.get("side", "?"))[:3].upper()
+        side_cls = "pos" if side.startswith("L") else "neg"
+        blot_rows += (
+            f"<tr><td>{t_pt}</td>"
+            f"<td>{escape(str(t.get('symbol', '?')).replace('/USDT:USDT', ''))}</td>"
+            f"<td class='{side_cls}'>{side}</td>"
+            f"<td class='dim'>{escape(str(t.get('strategy', ''))[:14])}</td>"
+            f"<td class='{net_cls}'>{net:+.2f}</td>"
+            f"<td class='dim'>{escape(str(t.get('exit_reason') or t.get('reason') or ''))}</td></tr>"
+        )
+    if blot_rows:
+        blotter_html = (
+            "<table><tr class='dim'><th>TIME</th><th>SYM</th><th>SIDE</th>"
+            "<th>STRAT</th><th>NET</th><th>REASON</th></tr>" + blot_rows + "</table>"
+        )
     else:
-        chart_section = '<div class="glass-card" style="text-align:center;padding:40px"><p style="color:#7e8aa0">No trades yet — charts appear after first closed trade</p></div>'
+        blotter_html = "<div class='dim'>no closed trades yet</div>"
 
-    # Sentinel-era chart fragment (None if cache key absent — chart returned empty bytes)
-    with _chart_lock:
-        has_sentinel_chart = "cumulative_pnl_sentinel" in _chart_cache
-        _v_sentinel = _chart_version
-    sentinel_chart_img = (
-        f'<div class="chart-box" style="margin-bottom:12px"><img src="/chart/cumulative_pnl_sentinel?v={_v_sentinel}" alt="Cumulative PnL — Sentinel Era"></div>'
-        if has_sentinel_chart else ""
-    )
+    # Panel 5 — GATES + WATCHLIST (legacy builders carried forward; Task 6 rebuilds)
+    gates_html = _build_observability_panel() + _build_watchlist_html(watchlist, positions)
 
-    # Daily stats
-    today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-    # Use closed_at for TODAY so trade count and balance delta reconcile
-    # (balance delta is cash-basis = realized PnL settled today)
-    today_trades = [t for t in trades if t.get("closed_at", 0) >= today_start]
-    has_daily = any(t.get("opened_at", 0) > 0 or t.get("closed_at", 0) > 0 for t in trades)
-    daily_pnl = sum(_net_pnl(t) for t in today_trades)  # net (post-fees)
-    daily_fees = sum(_real_fee(t) for t in today_trades)
-    daily_real_pnl = daily_pnl  # already net
-    daily_count = len(today_trades)
-    daily_wins = sum(1 for t in today_trades if _net_pnl(t) > 0)
-    daily_wr = (daily_wins / daily_count * 100) if daily_count > 0 else 0
-    current_balance = balance if balance > 0 else state.get("peak_balance", 0)
-    daily_pct = (daily_pnl / (current_balance - daily_pnl) * 100) if has_daily and (current_balance - daily_pnl) > 0 else 0
-
-    balance_change = balance - balance_start_of_day
-
-    # Current drawdown from peak (use actual balance, not cumulative PnL)
-    peak_bal = state.get("peak_balance", 0)
-    if peak_bal > 0 and current_balance > 0:
-        current_dd = max(0, peak_bal - current_balance)
-        current_dd_pct = (current_dd / peak_bal * 100)
-    else:
-        current_dd = 0
-        current_dd_pct = 0
-
-    pf = stats['profit_factor']
-    pf_str = f"{pf:.2f}" if pf != float('inf') else "---"
-    real_pnl_cls = "positive" if stats['real_pnl'] >= 0 else "negative"
-    daily_real_cls = "positive" if daily_real_pnl >= 0 else "negative"
-
-    # Regime status badge
-    regime_cls = "regime-normal" if regime == "Normal" else "regime-warn" if "pause" in regime.lower() or "halt" in regime.lower() else "regime-info"
-
-    # Win rate color
-    wr_cls = "positive" if stats['win_rate'] >= 50 else "negative"
-    daily_wr_cls = "positive" if daily_wr >= 50 else "negative"
-    pnl_cls = "positive" if stats['total_pnl'] >= 0 else "negative"
-    daily_pnl_cls = "positive" if daily_pnl >= 0 else "negative"
-    bal_change_cls = "positive" if balance_change >= 0 else "negative"
-
-    return f"""
-<!-- Top bar -->
-<div class="top-bar">
-    <div class="top-left">
-        <div class="logo">PHMEX-S</div>
-        <div class="logo-sub">Trading Desk</div>
+    return f"""<div id="grid">
+    <div class="panel" id="p-positions">
+        <div class="ptitle">POSITIONS &mdash; MAIN + SLOTS</div>
+        {positions_html}
     </div>
-    <div class="top-center">
-        <span class="regime-badge {regime_cls}">{escape(regime)}</span>
-    </div>
-    <div class="top-right">
-        <div class="clock">{now}</div>
-        <div class="date">{date_str} &middot; {escape(cycle)}</div>
-    </div>
-</div>
-
-<!-- Status bar -->
-<div class="status-bar">
-    <div class="status-item">
-        <span class="status-label">BAL</span>
-        <span class="status-value">${balance:.2f}</span>
-        <span class="status-sub">pk ${state.get('peak_balance',0):.2f}</span>
-    </div>
-    <div class="status-item">
-        <span class="status-label">TODAY</span>
-        <span class="status-value {daily_pnl_cls}">${daily_pnl:+.2f}</span>
-        <span class="status-sub">{daily_count}t {daily_wr:.0f}%</span>
-    </div>
-    <div class="status-item">
-        <span class="status-label">ALL</span>
-        <span class="status-value {pnl_cls}">${stats['total_pnl']:+.2f}</span>
-        <span class="status-sub">{stats['wins']}W/{stats['losses']}L {stats['win_rate']:.0f}%</span>
-    </div>
-    <div class="status-item">
-        <span class="status-label">DD</span>
-        <span class="status-value negative">${current_dd:.2f}</span>
-        <span class="status-sub">{current_dd_pct:.1f}%</span>
-    </div>
-</div>
-
-<!-- 3-column grid -->
-<div class="dash-grid" id="dash-grid">
-    <!-- Left column: Slots, Sessions -->
-    <div class="dash-col">
+    <div class="panel" id="p-slots">
+        <div class="ptitle">SLOTS + GUARDRAILS</div>
         {slots_html}
-        {session_html}
     </div>
-
-    <!-- Center column: Charts, Audit + Trade Log -->
-    <div class="dash-col">
-        {chart_section}
-        <div class="glass-card dash-item" data-id="audit-sentinel">
-            <h2>Performance Audit <span style="color:var(--accent);font-size:0.65em;font-weight:500;letter-spacing:0.08em">SENTINEL</span></h2>
-            <div style="font-size:0.65em;color:var(--text-dim);margin:-4px 0 8px;font-family:'JetBrains Mono',monospace">since 2026-04-01 11:01 PM PT &middot; {len(sentinel_trades)} trades</div>
-            {sentinel_chart_img}
-            <div class="perf-summary">
-                <div class="perf-summary-item"><span class="stat-label">Win Rate</span><span class="stat-value {'positive' if sentinel_stats['win_rate'] >= 50 else 'negative'}">{sentinel_stats['win_rate']:.1f}%</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Avg Win</span><span class="stat-value positive">${sentinel_stats['avg_win']:.2f}</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Avg Loss</span><span class="stat-value negative">${sentinel_stats['avg_loss']:.2f}</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Best Trade</span><span class="stat-value positive">${sentinel_stats['best']:+.2f}</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Worst Trade</span><span class="stat-value negative">${sentinel_stats['worst']:+.2f}</span></div>
-            </div>
-            {sentinel_audit_html}
-        </div>
-        <div class="glass-card dash-item" data-id="audit">
-            <h2>Performance Audit <span style="color:var(--text-dim);font-size:0.65em;font-weight:500;letter-spacing:0.08em">ALL-TIME</span></h2>
-            <div style="font-size:0.65em;color:var(--text-dim);margin:-4px 0 8px;font-family:'JetBrains Mono',monospace">{len(trades)} trades total</div>
-            <div class="perf-summary">
-                <div class="perf-summary-item"><span class="stat-label">Win Rate</span><span class="stat-value {'positive' if stats['win_rate'] >= 50 else 'negative'}">{stats['win_rate']:.1f}%</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Avg Win</span><span class="stat-value positive">${stats['avg_win']:.2f}</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Avg Loss</span><span class="stat-value negative">${stats['avg_loss']:.2f}</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Best Trade</span><span class="stat-value positive">${stats['best']:+.2f}</span></div>
-                <div class="perf-summary-item"><span class="stat-label">Worst Trade</span><span class="stat-value negative">${stats['worst']:+.2f}</span></div>
-            </div>
-            {audit_html}
-        </div>
+    <div class="panel" id="p-blotter">
+        <div class="ptitle">BLOTTER &mdash; LAST 12 (MAIN)</div>
+        {blotter_html}
     </div>
-
-    <!-- Right column: Activity, Watchlist, Paper, Shadow -->
-    <div class="dash-col">
-        <div class="glass-card dash-item" data-id="activity">
-            <h2>Activity Feed</h2>
-            <div class="activity-legend">
-                <span class="legend-dot" style="color:var(--positive)">&#9679; Entry</span>
-                <span class="legend-dot" style="color:var(--accent)">&#9679; Exit</span>
-                <span class="legend-dot" style="color:var(--warning)">&#9679; System</span>
-            </div>
-            <div class="activity-scroll">
-            {activity_html if activity_html else '<div class="activity-line act-default">No recent activity</div>'}
-            </div>
-        </div>
-        <div class="glass-card dash-item" data-id="watchlist">
-            <h2>Watchlist</h2>
-            {_build_watchlist_html(watchlist, state.get("positions") or {})}
-        </div>
-        {_build_l2_monitor_panel()}
-        {_build_reconcile_card()}
-        {_build_observability_panel()}
-        {paper_html}
-        {narrow_html}
+    <div class="panel" id="p-why">
+        <div class="ptitle">WHY NO TRADES?</div>
+        <div class="dim">live diagnostics land in Task 4</div>
     </div>
-</div>
-
-<div class="footer">
-    Auto-refresh 3s &middot; Charts {CHART_INTERVAL}s &middot; Read-only &middot; Zero API calls
+    <div class="panel" id="p-gates">
+        <div class="ptitle">GATES 24H + WATCHLIST</div>
+        {gates_html}
+    </div>
+    <div class="panel" id="p-reserved">
+        <div class="ptitle">RESERVED</div>
+        <div class="dim">equity chart renders below the grid (interactive in Task 2)</div>
+    </div>
 </div>"""
 
 
 def build_html() -> str:
-    """Full HTML page with shell + content."""
+    """Full HTML page shell — sticky ticker / swapped #content grid /
+    static #equity-root (outside the swap) / #feed."""
+    ticker = build_ticker()
     content = build_content()
+    feed = build_feed()
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PHMEX_S Trading Desk Data</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHMEX-S &mdash; Terminal</title>
 <style>
-*{{ margin:0; padding:0; box-sizing:border-box; }}
-
 :root {{
-    --bg-deep: #0d1117;
-    --panel-bg: #161b22;
-    --panel-border: #21262d;
-    --text-primary: #c9d1d9;
-    --text-secondary: #8b949e;
-    --text-dim: #484f58;
-    --accent: #39d2c0;
-    --positive: #3fb950;
-    --negative: #f85149;
-    --warning: #d29922;
-    --border-subtle: #21262d;
-    --hover-bg: #1c2128;
-}}
-
-body {{
-    background: var(--bg-deep);
-    color: var(--text-primary);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-    padding: 0;
-}}
-
-#content {{
-    width: 100%;
-    padding: 0;
-    position: relative;
-}}
-
-/* ── Top bar ── */
-.top-bar {{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 16px;
-    background: var(--panel-bg);
-    border-bottom: 1px solid var(--panel-border);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-}}
-.top-left {{ display: flex; align-items: baseline; gap: 10px; }}
-.logo {{
-    font-size: 1.1em;
-    font-weight: 700;
-    letter-spacing: 3px;
-    color: var(--accent);
-    font-family: 'JetBrains Mono', monospace;
-}}
-.logo-sub {{
-    font-size: 0.6em;
-    font-weight: 500;
-    letter-spacing: 4px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-}}
-.top-center {{ text-align: center; }}
-.top-right {{ text-align: right; }}
-.clock {{
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.1em;
-    font-weight: 500;
-    color: var(--text-primary);
-    letter-spacing: 1px;
-}}
-.date {{
-    font-size: 0.7em;
-    color: var(--text-secondary);
-    margin-top: 1px;
-    font-family: 'JetBrains Mono', monospace;
-}}
-
-/* Regime badge */
-.regime-badge {{
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 3px;
-    font-size: 0.7em;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    font-family: 'JetBrains Mono', monospace;
-}}
-.regime-normal {{
-    background: rgba(63,185,80,0.1);
-    color: var(--positive);
-    border: 1px solid rgba(63,185,80,0.25);
-}}
-.regime-warn {{
-    background: rgba(210,153,34,0.1);
-    color: var(--warning);
-    border: 1px solid rgba(210,153,34,0.25);
-    animation: pulse-warn 2s ease-in-out infinite;
-}}
-.regime-info {{
-    background: rgba(57,210,192,0.1);
-    color: var(--accent);
-    border: 1px solid rgba(57,210,192,0.25);
-}}
-@keyframes pulse-warn {{
-    0%, 100% {{ opacity: 1; }}
-    50% {{ opacity: 0.7; }}
-}}
-
-/* ── Status bar (replaces hero row) ── */
-.status-bar {{
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    padding: 8px 16px;
-    background: var(--panel-bg);
-    border-bottom: 1px solid var(--panel-border);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78em;
-    overflow-x: auto;
-    white-space: nowrap;
-}}
-.status-item {{
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}}
-.status-label {{
-    color: var(--text-dim);
-    text-transform: uppercase;
-    font-size: 0.85em;
-    letter-spacing: 0.5px;
-}}
-.status-value {{
-    font-weight: 600;
-    color: var(--text-primary);
-}}
-.status-sub {{
-    color: var(--text-dim);
-    font-size: 0.9em;
-}}
-
-/* ── 3-column grid ── */
-.dash-grid {{
-    display: grid;
-    grid-template-columns: 30% 45% 25%;
-    height: calc(100vh - 90px);
-    overflow: hidden;
-}}
-.dash-col {{
-    overflow-y: auto;
-    padding: 8px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(57,210,192,0.15) transparent;
-}}
-.dash-col::-webkit-scrollbar {{ width: 4px; }}
-.dash-col::-webkit-scrollbar-thumb {{ background: rgba(57,210,192,0.15); border-radius: 2px; }}
-
-/* ── Panel card (replaces glass-card) ── */
-.glass-card {{
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 4px;
-    padding: 12px;
-    margin-bottom: 8px;
-}}
-
-.dash-item {{
-    overflow: auto;
-    min-width: 0;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(57,210,192,0.15) transparent;
-    position: relative;
-}}
-.dash-item::-webkit-scrollbar {{ width: 4px; height: 4px; }}
-.dash-item::-webkit-scrollbar-thumb {{ background: rgba(57,210,192,0.15); border-radius: 2px; }}
-
-/* Section titles */
-
-.glass-card h2 {{
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 10px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--panel-border);
-    font-family: 'JetBrains Mono', monospace;
-}}
-
-/* ── Stats ── */
-.stat-row {{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 0;
-    font-size: 0.82em;
-    border-bottom: 1px solid rgba(33,38,45,0.5);
-}}
-.stat-row:last-child {{ border-bottom: none; }}
-.stat-label {{ color: var(--text-secondary); font-weight: 400; }}
-.stat-value {{
-    font-weight: 600;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.95em;
-}}
-.positive {{ color: var(--positive); }}
-.negative {{ color: var(--negative); }}
-
-/* ── Table ── */
-.table-wrap {{ overflow-x: auto; }}
-table {{ width: 100%; border-collapse: collapse; font-size: 0.8em; }}
-thead th {{
-    text-align: left;
-    color: var(--text-dim);
-    font-weight: 500;
-    font-size: 0.82em;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    padding: 6px 8px;
-    border-bottom: 1px solid var(--panel-border);
-}}
-tbody td {{
-    padding: 6px 8px;
-    border-bottom: 1px solid rgba(33,38,45,0.5);
-    color: var(--text-secondary);
-}}
-tbody tr:hover {{ background: var(--hover-bg); }}
-tr.win .pnl-cell {{ color: var(--positive); font-weight: 600; }}
-tr.loss .pnl-cell {{ color: var(--negative); font-weight: 600; }}
-.pair-cell {{ color: var(--text-primary); font-weight: 500; }}
-.reason-cell {{ font-size: 0.9em; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-.time-cell {{ font-family: 'JetBrains Mono', monospace; font-size: 0.9em; color: var(--text-dim); }}
-.empty-row {{ text-align: center; color: var(--text-dim); padding: 20px; }}
-
-/* Side badge */
-.side-badge {{
-    display: inline-block;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 0.8em;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-}}
-.side-long {{
-    background: rgba(63,185,80,0.1);
-    color: var(--positive);
-}}
-.side-short {{
-    background: rgba(248,81,73,0.1);
-    color: var(--negative);
-}}
-
-/* ── Charts ── */
-.charts-grid {{
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-}}
-.chart-box {{
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 4px;
-    padding: 6px;
-    text-align: center;
-}}
-.chart-box img {{
-    width: 100%;
-    border-radius: 2px;
-}}
-
-/* ── L2 Anticipation Monitor ── */
-.l2-table {{ width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 0.4rem; }}
-.l2-table th {{ text-align: left; padding: 0.3rem 0.4rem; font-weight: 600; color: var(--muted); border-bottom: 1px solid rgba(255,255,255,0.1); }}
-.l2-table td {{ padding: 0.3rem 0.4rem; border-bottom: 1px solid rgba(255,255,255,0.05); }}
-.l2-cell {{ text-align: center; font-variant-numeric: tabular-nums; }}
-.l2-ok {{ color: var(--positive); font-weight: 600; }}
-.l2-fail {{ color: var(--negative); font-weight: 600; }}
-.l2-ready {{ color: var(--positive); font-weight: 700; }}
-.l2-partial {{ color: var(--warning); font-weight: 600; }}
-.l2-whale {{ color: var(--accent); }}
-.l2-stale {{ background: rgba(251,146,60,0.15); color: var(--warning); padding: 0.3rem 0.6rem; border-radius: 4px; margin: 0.4rem 0; font-size: 0.8rem; }}
-
-/* ── Watchlist ── */
-.watchlist-grid {{
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-    gap: 4px;
-}}
-.wl-item {{
-    background: var(--bg-deep);
-    border: 1px solid var(--panel-border);
-    border-radius: 3px;
-    padding: 6px 8px;
-    font-size: 0.78em;
-}}
-.wl-item:hover {{
-    background: var(--hover-bg);
-}}
-.wl-item .sym {{
-    font-weight: 600;
-    color: var(--text-primary);
-    font-size: 0.9em;
-}}
-.wl-item .meta {{
-    color: var(--text-dim);
-    font-size: 0.72em;
-    margin-top: 2px;
-}}
-.wl-item .dot {{
-    display: inline-block;
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    margin-right: 3px;
-    vertical-align: middle;
-}}
-.dot-open {{
-    background: var(--positive);
-}}
-.dot-scanner {{
-    background: var(--accent);
-}}
-.dot-base {{ background: var(--text-dim); }}
-.wl-score {{
-    float: right;
-    color: var(--warning);
-    font-weight: 600;
-    font-size: 0.8em;
-    font-family: 'JetBrains Mono', monospace;
-}}
-
-/* ── Activity feed ── */
-.activity-card {{ max-height: 500px; }}
-.activity-scroll {{
-    max-height: 420px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(57,210,192,0.15) transparent;
-}}
-.activity-scroll::-webkit-scrollbar {{ width: 3px; }}
-.activity-scroll::-webkit-scrollbar-thumb {{ background: rgba(57,210,192,0.15); border-radius: 2px; }}
-.activity-line {{
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65em;
-    padding: 3px 4px;
-    border-radius: 2px;
-    margin-bottom: 1px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}}
-.activity-line:hover {{
-    background: var(--hover-bg);
-    white-space: normal;
-    word-break: break-all;
-}}
-.act-entry {{ color: var(--positive); }}
-.act-exit {{ color: var(--accent); }}
-.act-system {{ color: var(--warning); }}
-.act-default {{ color: var(--text-dim); }}
-.activity-legend {{ display:flex; gap:10px; padding:3px 0 6px; font-size:0.7rem; }}
-.legend-dot {{ display:flex; align-items:center; gap:3px; }}
-
-/* ── Audit ── */
-.audit-grid {{
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 8px;
-    margin-bottom: 8px;
-}}
-.audit-section {{
-    background: var(--bg-deep);
-    border: 1px solid var(--panel-border);
-    border-radius: 4px;
-    padding: 10px 12px;
-}}
-.audit-section h3 {{
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 6px;
-    font-family: 'JetBrains Mono', monospace;
-}}
-.audit-section table {{ font-size: 0.78em; }}
-.audit-section thead th {{
-    font-size: 0.8em;
-    padding: 4px 5px;
-}}
-.audit-section tbody td {{
-    padding: 3px 5px;
-    font-size: 0.9em;
-}}
-.audit-log .table-wrap {{
-    scrollbar-width: thin;
-    scrollbar-color: rgba(57,210,192,0.15) transparent;
-}}
-.audit-log .table-wrap::-webkit-scrollbar {{ width: 3px; }}
-.audit-log .table-wrap::-webkit-scrollbar-thumb {{ background: rgba(57,210,192,0.15); border-radius: 2px; }}
-
-/* ── Paper comparison ── */
-.paper-card {{
-    border-color: var(--panel-border);
-    background: var(--panel-bg);
-}}
-.paper-badge {{
-    display: inline-block;
-    background: rgba(57,210,192,0.1);
-    color: var(--accent);
-    border: 1px solid rgba(57,210,192,0.25);
-    border-radius: 3px;
-    padding: 1px 6px;
-    font-size: 0.85em;
-    letter-spacing: 1px;
-    margin-right: 6px;
-    vertical-align: middle;
-    font-family: 'JetBrains Mono', monospace;
-}}
-.compare-header {{
-    display: grid;
-    grid-template-columns: 1fr 80px 80px;
-    gap: 6px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--panel-border);
-    margin-bottom: 4px;
-}}
-.compare-col-label {{
-    font-size: 0.65em;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    text-align: right;
-    font-family: 'JetBrains Mono', monospace;
-}}
-.live-label {{ color: var(--positive); }}
-.paper-label {{ color: var(--accent); }}
-.compare-section-title {{
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    padding: 5px 0 2px;
-    border-bottom: 1px solid rgba(33,38,45,0.5);
-    font-family: 'JetBrains Mono', monospace;
-}}
-.compare-row {{
-    display: grid;
-    grid-template-columns: 1fr 80px 80px;
-    gap: 6px;
-    align-items: center;
-    padding: 3px 0;
-    font-size: 0.82em;
-    border-bottom: 1px solid rgba(33,38,45,0.5);
-}}
-.compare-label {{ color: var(--text-secondary); font-weight: 400; }}
-.compare-live, .compare-v10, .compare-paper {{
-    text-align: right;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 500;
-    font-size: 0.92em;
-}}
-.compare-paper {{ color: var(--accent); }}
-.paper-trade-row {{
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    padding: 3px 0;
-    font-size: 0.78em;
-    border-bottom: 1px solid rgba(33,38,45,0.5);
-}}
-.paper-trade-row:last-child {{ border-bottom: none; }}
-
-/* ── Session breakdown ── */
-.session-section {{
-    margin-bottom: 4px;
-}}
-.session-section-title {{
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-dim);
-    margin-bottom: 4px;
-    padding-bottom: 3px;
-    border-bottom: 1px solid var(--panel-border);
-    font-family: 'JetBrains Mono', monospace;
-}}
-.session-divider {{
-    height: 1px;
-    background: var(--panel-border);
-    margin: 8px 0;
-}}
-.session-row {{
-    padding: 5px 0;
-    border-bottom: 1px solid rgba(33,38,45,0.5);
-}}
-.session-row:last-child {{ border-bottom: none; }}
-.session-name {{
-    font-size: 0.8em;
-    color: var(--text-primary);
-    font-weight: 500;
-    margin-bottom: 3px;
-}}
-.session-label-text {{
-    vertical-align: middle;
-}}
-.session-morning .session-name {{ color: #3fb950; }}
-.session-afternoon .session-name {{ color: #d29922; }}
-.session-night .session-name {{ color: #39d2c0; }}
-.session-detail-stats {{
-    display: flex;
-    gap: 8px;
-    font-size: 0.78em;
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--text-secondary);
-    margin-bottom: 3px;
-}}
-.session-stat-item {{
-    white-space: nowrap;
-}}
-.session-bar-wrap {{
-    height: 4px;
-    background: rgba(33,38,45,0.8);
-    border-radius: 2px;
-    overflow: hidden;
-}}
-.session-bar {{
-    height: 100%;
-    border-radius: 2px;
-}}
-
-/* ── Performance summary row (inside audit card) ── */
-.perf-summary {{
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    margin-bottom: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--panel-border);
-}}
-.perf-summary-item {{
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    font-size: 0.82em;
-}}
-.perf-summary-item .stat-label {{
-    font-size: 0.8em;
-}}
-.perf-summary-item .stat-value {{
-    font-size: 1em;
-}}
-
-/* ── Footer ── */
-.footer {{
-    text-align: center;
-    color: var(--text-dim);
-    font-size: 0.65em;
-    letter-spacing: 0.5px;
-    padding: 8px 0 4px;
-    font-family: 'JetBrains Mono', monospace;
-}}
-
-/* ── Responsive ── */
-@media (max-width: 1200px) {{
-    .dash-grid {{ grid-template-columns: 1fr 1fr; height: auto; }}
-}}
-@media (max-width: 800px) {{
-    .dash-grid {{ grid-template-columns: 1fr; height: auto; }}
-}}
-@media (max-width: 768px) {{
-    .top-bar {{ flex-direction: column; gap: 6px; text-align: center; }}
-    .top-left {{ justify-content: center; }}
-    .status-bar {{ flex-wrap: wrap; }}
-}}
+  --bg:#000204; --panel:#0a0e08; --border:#2d3a1e; --txt:#9eb89e;
+  --amber:#f0a500; --pos:#4af626; --neg:#ff5555; --dim:#5a6b5a;
+  /* TEMP aliases for legacy panel fragments carried into the grid — removed in Tasks 5-6 */
+  --accent:#f0a500; --positive:#4af626; --negative:#ff5555; --warning:#f0a500;
+  --text-primary:#9eb89e; --text-secondary:#9eb89e; --text-dim:#5a6b5a;
+  --panel-bg:#0a0e08; --panel-border:#2d3a1e; --border-subtle:#2d3a1e; --hover-bg:#0a0e08;
+}}
+* {{ box-sizing:border-box; margin:0; padding:0; }}
+body {{ background:var(--bg); color:var(--txt);
+  font:11px/1.5 'SF Mono', Menlo, 'JetBrains Mono', monospace; }}
+#ticker {{ position:sticky; top:0; z-index:10; background:var(--panel);
+  color:var(--amber); border-bottom:1px solid var(--border);
+  padding:5px 10px; white-space:nowrap; overflow:hidden; font-size:12px; }}
+#grid {{ display:grid; grid-template-columns:repeat(3,1fr); gap:3px; padding:3px; }}
+.panel {{ background:var(--panel); border:1px solid var(--border); padding:6px;
+  min-height:120px; overflow-y:auto; max-height:46vh; }}
+.panel .ptitle {{ color:var(--amber); letter-spacing:1.5px; font-size:9px;
+  text-transform:uppercase; border-bottom:1px solid #1a2412;
+  padding-bottom:3px; margin-bottom:5px; }}
+.panel table {{ width:100%; border-collapse:collapse; font-size:10px; }}
+.panel td, .panel th {{ padding:1px 5px 1px 0; text-align:left; }}
+.pos {{ color:var(--pos); }} .neg {{ color:var(--neg); }} .dim {{ color:var(--dim); }}
+.amb {{ color:var(--amber); }}
+#feed {{ margin:0 3px 3px; }}
+.feed-scroll {{ max-height:150px; overflow-y:auto; }}
+.feed-line {{ padding:1px 0; color:var(--txt); font-size:10px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+.feed-line.pos {{ color:var(--pos); }} .feed-line.amb {{ color:var(--amber); }}
+.feed-line.dim {{ color:var(--dim); }}
+.footer {{ color:var(--dim); font-size:9px; padding:4px 10px 8px; }}
+/* TEMP compat for legacy fragments (slots overview, gate table, watchlist) — Tasks 5-6 remove */
+.positive {{ color:var(--pos); }} .negative {{ color:var(--neg); }} .muted {{ color:var(--dim); }}
+.glass-card {{ margin-bottom:6px; }}
+.glass-card h2 {{ color:var(--amber); font-size:9px; letter-spacing:1px;
+  text-transform:uppercase; font-weight:600; margin:4px 0; }}
+.watchlist-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:3px; }}
+.wl-item {{ border:1px solid var(--border); padding:3px 5px; font-size:10px; }}
+.wl-item .meta {{ color:var(--dim); font-size:9px; }}
+.wl-score {{ color:var(--amber); margin-left:4px; }}
+.dot {{ display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; background:var(--dim); }}
+.dot-open {{ background:var(--pos); }} .dot-scanner {{ background:var(--amber); }} .dot-base {{ background:var(--dim); }}
 </style>
 </head>
 <body>
-<div id="content">
-{content}
+<div id="ticker">{ticker}</div>
+<div id="content">{content}</div><!-- /content -->
+<div class="panel" id="equity-root" style="margin:0 3px;">
+    <div class="ptitle">EQUITY &mdash; loading&hellip;</div><div id="equity-chart"></div>
 </div>
+<div id="feed" class="panel">{feed}</div>
+<div class="footer">Auto-refresh 3s &middot; Read-only &middot; Zero API calls &middot; NET basis</div>
 <script>
-(function() {{
-  /* ── Auto-refresh ── */
-  async function refresh() {{
-    try {{
-      const resp = await fetch('/api/content');
-      if (!resp.ok) return;
-      const html = await resp.text();
-      const scrollPositions = {{}};
-      document.querySelectorAll('.dash-col').forEach((col, i) => {{
-        scrollPositions[i] = col.scrollTop;
-      }});
-      const mainScroll = window.scrollY;
-
-      // Stash existing chart <img> elements before content wipe — keyed by alt
-      // text (chart name). Preserves the in-DOM img with its already-loaded
-      // pixel buffer so we can re-attach it after, avoiding the 3s flicker
-      // from chart recreate + refetch.
-      const stashedCharts = {{}};
-      document.querySelectorAll('.chart-box img').forEach(img => {{
-        stashedCharts[img.alt] = img;
-      }});
-
-      document.getElementById('content').innerHTML = html;
-      document.querySelectorAll('.dash-col').forEach((col, i) => {{
-        if (scrollPositions[i] !== undefined) col.scrollTop = scrollPositions[i];
-      }});
-      window.scrollTo(0, mainScroll);
-
-      // Re-attach stashed chart imgs in place of the freshly-rendered placeholders.
-      // If src is unchanged (chart_version unchanged), the existing img stays
-      // bit-for-bit identical — zero flicker. If src changed, update on the
-      // SAME element (browser holds old pixels while new ones load — no blank).
-      document.querySelectorAll('.chart-box img').forEach(newImg => {{
-        const stashed = stashedCharts[newImg.alt];
-        if (!stashed) return;
-        if (stashed.src !== newImg.src) {{
-          stashed.src = newImg.src;
-        }}
-        newImg.parentNode.replaceChild(stashed, newImg);
-      }});
-    }} catch(e) {{}}
-  }}
-  setInterval(refresh, 3000);
-}})();
+async function poll(){{
+  try{{
+    const r = await fetch('/api/content'); const j = await r.json();
+    document.getElementById('ticker').innerHTML = j.ticker;
+    document.getElementById('content').innerHTML = j.content;
+    document.getElementById('feed').innerHTML = j.feed;
+  }}catch(e){{}}
+}}
+setInterval(poll, 3000); poll();
 </script>
 </body>
 </html>"""
+
 
 
 
@@ -2645,10 +2117,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html.encode())
         elif self.path == "/api/content":
-            html = build_content()
-            data = html.encode()
+            payload = json.dumps({
+                "ticker": build_ticker(),
+                "content": build_content(),
+                "feed": build_feed(),
+            })
+            data = payload.encode()
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
