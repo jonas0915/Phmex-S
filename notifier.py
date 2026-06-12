@@ -1,3 +1,4 @@
+import html
 import os
 import requests
 
@@ -27,11 +28,16 @@ def notify_startup(balance: float, pairs: list, mode: str, strategy: str):
         f"Pairs: {', '.join(p.split('/')[0] for p in pairs)}"
     )
 
-def notify_entry(symbol: str, side: str, price: float, margin: float, sl: float, tp: float, strength: float, reason: str):
+def notify_entry(symbol: str, side: str, price: float, margin: float, sl: float, tp: float, strength: float, reason: str, strategy: str = "", confidence=None):
     emoji = "🟢" if side == "long" else "🔴"
     direction = "LONG" if side == "long" else "SHORT"
+    signal_line = ""
+    if strategy:
+        conf_txt = f" ({confidence}/7)" if confidence is not None else ""
+        signal_line = f"Signal:   <b>{html.escape(strategy)}</b>{conf_txt}\n"
     send(
         f"{emoji} <b>[LIVE] {direction} ENTRY — {symbol}</b>  [{BOT_NAME}]\n"
+        f"{signal_line}"
         f"Price:    ${price:.4f}\n"
         f"Margin:   ${margin:.2f} USDT\n"
         f"SL:       ${sl:.4f}  ({(sl-price)/price*100:+.1f}%)\n"

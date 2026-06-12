@@ -1427,7 +1427,7 @@ class Phmex2Bot:
                         self.risk._save_state()
                     except Exception as _e:
                         logger.debug(f"[SNAPSHOT] live save_state after entry failed: {_e}")
-                    notifier.notify_entry(symbol, direction, fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason)
+                    notifier.notify_entry(symbol, direction, fill_price, margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason, strategy=strat_name, confidence=confidence)
                 else:
                     # Before declaring "signal lost", verify no position materialized on-exchange.
                     # Race window: our order-tracking thinks nothing filled, but a late fill
@@ -1486,7 +1486,7 @@ class Phmex2Bot:
                                 )
                             except Exception as _e:
                                 logger.warning(f"[ENTRY SAFETY] Telegram alert for orphan-adopt failed: {_e}")
-                            notifier.notify_entry(symbol, direction, gt_entry, pos.margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason + " (orphan-adopted)")
+                            notifier.notify_entry(symbol, direction, gt_entry, pos.margin, pos.stop_loss, pos.take_profit, signal.strength, signal.reason + " (orphan-adopted)", strategy=strat_name, confidence=confidence)
                             continue
                     logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
 
@@ -1882,7 +1882,8 @@ class Phmex2Bot:
                                 logger.warning(f"[SLOT LIVE] [SL FALLBACK] {slot.slot_id} {symbol} exchange SL failed — software SL@{live_pos.stop_loss:.4f}")
                             notifier.notify_entry(symbol, direction, fill_price, live_pos.margin,
                                                   live_pos.stop_loss, live_pos.take_profit,
-                                                  signal.strength, f"[slot {slot.slot_id}] {signal.reason}")
+                                                  signal.strength, f"[slot {slot.slot_id}] {signal.reason}",
+                                                  strategy=_entry_strategy_name)
                             logger.info(f"[SLOT LIVE] {slot.slot_id} ENTRY {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${live_pos.margin:.2f} | {signal.reason}")
                             # A live slot fill is a real account entry — arm the global
                             # anti-clustering cooldown just like main-bot entries do.
