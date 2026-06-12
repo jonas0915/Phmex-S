@@ -1856,46 +1856,59 @@ class Phmex2Bot:
                         if os.path.exists(".pause_trading") or self.risk._drawdown_pause_until > time.time():
                             logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} entry blocked — account halt")
                             continue
-                        order = (self.exchange.open_long(symbol, margin, price)
-                                 if direction == "long"
-                                 else self.exchange.open_short(symbol, margin, price))
-                        if not order:
-                            logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} {direction} — no fill (PostOnly miss), skipping")
-                            continue
-                        fill_price = self._extract_fill_price(order, price)
-                        slot.risk.open_position(symbol, fill_price, margin, side=direction,
-                                                atr=atr_val, regime="medium",
-                                                cycle=self.cycle_count,
-                                                strategy=_entry_strategy_name)
-                        live_pos = slot.risk.positions[symbol]
-                        fill_amount = self._extract_fill_amount(order, live_pos.amount)
-                        actual_margin = (fill_amount * fill_price) / Config.LEVERAGE
-                        _min_margin = float(os.getenv("MIN_TRADE_MARGIN", "10.0")) * 0.5
-                        if actual_margin < _min_margin:
-                            logger.warning(f"[SLOT LIVE] {slot.slot_id} {symbol} partial fill ${actual_margin:.4f} < ${_min_margin:.2f} — closing crumb")
-                            self.exchange.cancel_open_orders(symbol)
-                            closed = (self.exchange.close_long(symbol, fill_amount) if direction == "long"
-                                      else self.exchange.close_short(symbol, fill_amount))
-                            if closed:
-                                slot.risk.close_position(symbol, fill_price, "min_margin_skip", mode="live")
+                        try:
+                            order = (self.exchange.open_long(symbol, margin, price)
+                                     if direction == "long"
+                                     else self.exchange.open_short(symbol, margin, price))
+                            if not order:
+                                logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} {direction} — no fill (PostOnly miss), skipping")
+                                continue
+                            fill_price = self._extract_fill_price(order, price)
+                            slot.risk.open_position(symbol, fill_price, margin, side=direction,
+                                                    atr=atr_val, regime="medium",
+                                                    cycle=self.cycle_count,
+                                                    strategy=_entry_strategy_name)
+                            live_pos = slot.risk.positions[symbol]
+                            fill_amount = self._extract_fill_amount(order, live_pos.amount)
+                            actual_margin = (fill_amount * fill_price) / Config.LEVERAGE
+                            _min_margin = float(os.getenv("MIN_TRADE_MARGIN", "10.0")) * 0.5
+                            if actual_margin < _min_margin:
+                                logger.warning(f"[SLOT LIVE] {slot.slot_id} {symbol} partial fill ${actual_margin:.4f} < ${_min_margin:.2f} — closing crumb")
+                                self.exchange.cancel_open_orders(symbol)
+                                closed = (self.exchange.close_long(symbol, fill_amount) if direction == "long"
+                                          else self.exchange.close_short(symbol, fill_amount))
+                                if closed:
+                                    slot.risk.close_position(symbol, fill_price, "min_margin_skip", mode="live")
+                                else:
+                                    logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} crumb close FAILED — reconcile will catch")
+                                continue
+                            live_pos.amount = fill_amount
+                            live_pos.margin = actual_margin
+                            live_pos.entry_strength = signal.strength
+                            sl_tp = self.exchange.place_sl_tp(symbol, direction, fill_amount,
+                                                              live_pos.stop_loss, live_pos.take_profit)
+                            live_pos.sl_order_id = sl_tp.get("sl_order_id") or "software"
+                            live_pos.tp_order_id = sl_tp.get("tp_order_id")
+                            if sl_tp.get("sl_order_id"):
+                                live_pos.exchange_sl_price = live_pos.stop_loss
                             else:
-                                logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} crumb close FAILED — reconcile will catch")
+                                logger.warning(f"[SLOT LIVE] [SL FALLBACK] {slot.slot_id} {symbol} exchange SL failed — software SL@{live_pos.stop_loss:.4f}")
+                            notifier.notify_entry(symbol, direction, fill_price, live_pos.margin,
+                                                  live_pos.stop_loss, live_pos.take_profit,
+                                                  signal.strength, f"[slot {slot.slot_id}] {signal.reason}")
+                            logger.info(f"[SLOT LIVE] {slot.slot_id} ENTRY {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${live_pos.margin:.2f} | {signal.reason}")
+                            # A live slot fill is a real account entry — arm the global
+                            # anti-clustering cooldown just like main-bot entries do.
+                            self._last_entry_time = time.time()
+                        except Exception as _le:
+                            logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} entry sequence failed: {_le} — "
+                                         f"any landed fill will be adopted by the orphan scanner; forcing global cooldown")
+                            self._last_entry_time = time.time()
+                            try:
+                                notifier.send(f"⚠️ [SLOT LIVE] {slot.slot_id} {symbol} entry sequence error: {str(_le)[:120]} — check for naked position")
+                            except Exception:
+                                pass
                             continue
-                        live_pos.amount = fill_amount
-                        live_pos.margin = actual_margin
-                        live_pos.entry_strength = signal.strength
-                        sl_tp = self.exchange.place_sl_tp(symbol, direction, fill_amount,
-                                                          live_pos.stop_loss, live_pos.take_profit)
-                        live_pos.sl_order_id = sl_tp.get("sl_order_id") or "software"
-                        live_pos.tp_order_id = sl_tp.get("tp_order_id")
-                        if sl_tp.get("sl_order_id"):
-                            live_pos.exchange_sl_price = live_pos.stop_loss
-                        else:
-                            logger.warning(f"[SLOT LIVE] [SL FALLBACK] {slot.slot_id} {symbol} exchange SL failed — software SL@{live_pos.stop_loss:.4f}")
-                        notifier.notify_entry(symbol, direction, fill_price, live_pos.margin,
-                                              live_pos.stop_loss, live_pos.take_profit,
-                                              signal.strength, f"[slot {slot.slot_id}] {signal.reason}")
-                        logger.info(f"[SLOT LIVE] {slot.slot_id} ENTRY {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${live_pos.margin:.2f} | {signal.reason}")
 
                     # --- Shared tail (paper + live) ---
                     slot.total_entries += 1
@@ -1908,7 +1921,7 @@ class Phmex2Bot:
                         try:
                             slot.risk._save_state()
                         except Exception as _e:
-                            logger.debug(f"[SNAPSHOT] paper save_state after entry failed: {_e}")
+                            logger.debug(f"[SNAPSHOT] {slot.slot_id} save_state after entry failed: {_e}")
 
     @staticmethod
     def _classify_regime(last, df=None) -> dict:
