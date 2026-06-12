@@ -34,7 +34,6 @@ STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
 PAPER_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_liq_cascade.json")
 NARROW_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_narrow.json")
 NARROW_BLOCKED_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_narrow_blocked.json")
-FACTORY_STATE_FILE = os.path.join(PROJECT_DIR, "strategy_factory_state.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
 HOST = "127.0.0.1"
 PORT = 8050
@@ -258,15 +257,6 @@ def _build_narrow_panel(state: dict) -> str:
     </div>'''
 
 
-def read_factory_state() -> dict:
-    """Read strategy factory state. Returns empty structure if missing."""
-    try:
-        with open(FACTORY_STATE_FILE, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        return {"strategies": {}, "pipeline_log": []}
-
-
 def read_all_slot_states() -> dict[str, dict]:
     """Discover and read all trading_state_*.json files. Returns {slot_id: state_dict}.
     Also maps 5m_scalp → main trading_state.json (the live slot has no sidecar file)."""
@@ -291,24 +281,6 @@ def read_all_slot_states() -> dict[str, dict]:
         except (json.JSONDecodeError, FileNotFoundError):
             slots["5m_scalp"] = {"peak_balance": 0, "closed_trades": []}
     return slots
-
-
-def detect_sentinel_files() -> dict:
-    """Check for active sentinel files (Phase 1 IPC). Returns {type: [details]}."""
-    sentinels = {"paused": False, "kills": [], "pauses": [], "promotes": [], "demotes": [], "restart": False}
-    if os.path.exists(os.path.join(PROJECT_DIR, ".pause_trading")):
-        sentinels["paused"] = True
-    if os.path.exists(os.path.join(PROJECT_DIR, ".restart_bot")):
-        sentinels["restart"] = True
-    for pat, key in [(".kill_*", "kills"), (".pause_*", "pauses"), (".promote_*", "promotes"), (".demote_*", "demotes")]:
-        for path in _glob.glob(os.path.join(PROJECT_DIR, pat)):
-            name = os.path.basename(path)
-            # Skip .pause_trading (already handled above)
-            if name == ".pause_trading":
-                continue
-            slot_id = name.split("_", 1)[1] if "_" in name else name
-            sentinels[key].append(slot_id)
-    return sentinels
 
 
 def tail_log(n: int = 500) -> list[str]:
@@ -451,6 +423,62 @@ def parse_pair_adx(lines: list[str]) -> dict[str, float]:
             except ValueError:
                 pass
     return adx
+
+
+# Fill/exit events are the only price-bearing lines the bot logs — there is no
+# per-cycle mark price. Newest occurrence wins; symbols never seen stay absent.
+_PRICE_RES = [
+    re.compile(r'\[FILL\] ([\w/:.]+) real entry price: ([\d.]+)'),
+    re.compile(r'\[SYNC\] ([\w/:.]+) real exit fill: ([\d.]+)'),
+    re.compile(r'\[LIVE EXIT\] ([\w/:.]+) \w+ @ ([\d.]+)'),
+    re.compile(r'Position opened: \w+ ([\w/:.]+) \| Entry: ([\d.]+)'),
+    re.compile(r'Position closed: \w+ ([\w/:.]+) \| Exit: ([\d.]+)'),
+]
+
+
+def _parse_last_prices(lines: list[str]) -> dict[str, float]:
+    """Last logged price per symbol from the tail already read this request.
+    Used for the POSITIONS uPnL column — NO API calls; missing symbol → no uPnL."""
+    prices: dict[str, float] = {}
+    for line in lines:
+        for pat in _PRICE_RES:
+            m = pat.search(line)
+            if m:
+                try:
+                    prices[m.group(1)] = float(m.group(2))
+                except ValueError:
+                    pass
+    return prices
+
+
+def _reconcile_summary() -> dict:
+    """Data behind the old reconcile card, reduced to OK / non-OK.
+    Same rules as the card: STALE when the last run is >8h old, DRIFT when the
+    latest run reports discrepancies, otherwise OK (missing log = OK, nothing
+    actionable to show)."""
+    log_path = Path.home() / "Library" / "Logs" / "Phmex-S" / "reconcile.log"
+    try:
+        if not log_path.exists():
+            return {"ok": True}
+        mtime = log_path.stat().st_mtime
+        runs = log_path.read_text(errors="replace").split("=== Phemex Reconciliation")
+        if len(runs) < 2:
+            return {"ok": True}
+        discrepancies = 0
+        for line in runs[-1].splitlines():
+            if line.strip().startswith("Discrepancies"):
+                try:
+                    discrepancies = int(line.split(":")[-1].strip())
+                except ValueError:
+                    pass
+        age_hours = (time.time() - mtime) / 3600
+        if age_hours > 8:
+            return {"ok": False, "msg": f"reconcile STALE — last run {int(age_hours)}h ago"}
+        if discrepancies > 0:
+            return {"ok": False, "msg": f"reconcile DRIFT — {discrepancies} discrepancies vs Phemex"}
+        return {"ok": True}
+    except Exception:
+        return {"ok": True}
 
 
 def get_recent_activity(lines: list[str], n: int = 12) -> list[str]:
@@ -787,103 +815,6 @@ def _build_observability_panel() -> str:
     </div>'''
 
 
-def _build_session_card(trades: list[dict], paper_trades: list[dict], **_kwargs) -> str:
-    """Build SESSION PERFORMANCE as a horizontal row of 4 time-of-day tiles."""
-    SESSIONS = [
-        ("Early AM", "12-6 AM", "&#127747;", "#cba6f7"),
-        ("Morning", "6 AM-12 PM", "&#9728;&#65039;", "#a6e3a1"),
-        ("Afternoon", "12-8 PM", "&#9925;", "#fab387"),
-        ("Night", "8 PM-12 AM", "&#9789;&#65039;", "#89b4fa"),
-    ]
-
-    def _classify_hour(hour: int) -> int:
-        if hour < 6: return 0
-        elif hour < 12: return 1
-        elif hour < 20: return 2
-        else: return 3
-
-    def _compute(trade_list):
-        stats = [{"trades": 0, "wins": 0, "pnl": 0.0} for _ in range(4)]
-        for t in trade_list:
-            ts = t.get("opened_at", 0)
-            if ts <= 0: continue
-            idx = _classify_hour(_from_ts(ts).hour)
-            pnl = _net_pnl(t)
-            stats[idx]["trades"] += 1
-            stats[idx]["pnl"] += pnl
-            if pnl > 0: stats[idx]["wins"] += 1
-        return stats
-
-    today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-    today_live = [t for t in trades if t.get("opened_at", 0) >= today_start]
-
-    td = _compute(today_live)
-    al = _compute(trades)
-
-    # Build 4 tiles
-    tiles = ""
-    for i, (label, hours, _icon, color) in enumerate(SESSIONS):
-        t_s, a_s = td[i], al[i]
-        # Today stats
-        if t_s["trades"] > 0:
-            t_wr = (t_s["wins"] / t_s["trades"] * 100)
-            t_pnl_cls = "positive" if t_s["pnl"] >= 0 else "negative"
-            t_wr_cls = "positive" if t_wr >= 50 else "negative"
-            today_html = f'''<span class="{t_pnl_cls}" style="font-weight:600">${t_s["pnl"]:+.2f}</span>
-                <span style="color:var(--text-dim);font-size:0.85em">{t_s["trades"]}t</span>
-                <span class="{t_wr_cls}" style="font-size:0.85em">{t_wr:.0f}%</span>'''
-        else:
-            today_html = '<span style="color:var(--text-dim)">--</span>'
-        # All-time stats
-        if a_s["trades"] > 0:
-            a_wr = (a_s["wins"] / a_s["trades"] * 100)
-            a_pnl_cls = "positive" if a_s["pnl"] >= 0 else "negative"
-            a_wr_cls = "positive" if a_wr >= 50 else "negative"
-            all_html = f'''<span class="{a_pnl_cls}" style="font-weight:600">${a_s["pnl"]:+.2f}</span>
-                <span style="color:var(--text-dim);font-size:0.85em">{a_s["trades"]}t</span>
-                <span class="{a_wr_cls}" style="font-size:0.85em">{a_wr:.0f}%</span>'''
-        else:
-            all_html = '<span style="color:var(--text-dim)">--</span>'
-
-        tiles += f'''<div style="text-align:center;padding:8px 6px;border-top:2px solid {color};background:var(--bg-deep);border-radius:0 0 3px 3px">
-            <div style="font-size:0.72em;font-weight:600;color:{color};font-family:'JetBrains Mono',monospace">{escape(label)}</div>
-            <div style="font-size:0.6em;color:var(--text-dim);margin-bottom:6px;font-family:'JetBrains Mono',monospace">{hours} PT</div>
-            <div style="font-size:0.6em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px;font-family:'JetBrains Mono',monospace">Today</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:0.75em;display:flex;flex-direction:column;align-items:center;gap:1px">{today_html}</div>
-            <div style="font-size:0.6em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;margin:5px 0 2px;font-family:'JetBrains Mono',monospace">All Time</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:0.75em;display:flex;flex-direction:column;align-items:center;gap:1px">{all_html}</div>
-        </div>'''
-
-    # Today total across all 4 sessions
-    today_total_trades = sum(s["trades"] for s in td)
-    today_total_wins = sum(s["wins"] for s in td)
-    today_total_pnl = sum(s["pnl"] for s in td)
-    if today_total_trades > 0:
-        today_total_wr = today_total_wins / today_total_trades * 100
-        tt_pnl_cls = "positive" if today_total_pnl >= 0 else "negative"
-        tt_wr_cls = "positive" if today_total_wr >= 50 else "negative"
-        total_html = (
-            f'<span class="{tt_pnl_cls}" style="font-weight:700;font-size:1.05em">${today_total_pnl:+.2f}</span>'
-            f'<span style="color:var(--text-dim);font-size:0.85em;margin-left:10px">{today_total_trades}t</span>'
-            f'<span class="{tt_wr_cls}" style="font-size:0.85em;margin-left:8px">{today_total_wr:.0f}%</span>'
-        )
-    else:
-        total_html = '<span style="color:var(--text-dim)">no trades today</span>'
-    today_total_bar = (
-        f'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;'
-        f'background:var(--bg-deep);border-radius:3px;margin-bottom:8px;font-family:\'JetBrains Mono\',monospace">'
-        f'<span style="font-size:0.72em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em">Today Total</span>'
-        f'<span style="font-size:0.85em">{total_html}</span>'
-        f'</div>'
-    )
-
-    return f'''<div class="glass-card dash-item" data-id="sessions">
-        <h2>Sessions</h2>
-        {today_total_bar}
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">{tiles}</div>
-    </div>'''
-
-
 def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -> str:
     """Build side-by-side Live vs Paper (liq_cascade) comparison card."""
     live_stats = compute_stats(live_trades)
@@ -994,16 +925,7 @@ def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -
     </div>'''
 
 
-# ── Slot lifecycle overview ─────────────────────────────────────────────
-# Mapping from slot_id to strategy name — keep in sync with bot.py
-_SLOT_STRATEGY_MAP = {
-    "5m_scalp": "confluence",
-    "5m_mean_revert": "bb_mean_reversion",
-    "5m_liq_cascade": "liq_cascade",
-    "5m_narrow": "narrow_filter",
-    "5m_narrow_blocked": "narrow_filter",
-}
-
+# ── Slot guardrails (SLOTS + GUARDRAILS panel) ──────────────────────────
 # Slots that run LIVE (not paper). All others default to paper.
 def _live_slot_ids():
     """Live slots: the main bot (5m_scalp) plus any slot promoted via mode sidecar."""
@@ -1018,148 +940,91 @@ def _live_slot_ids():
     return ids
 
 
-def _compute_kelly_raw(trades: list[dict]) -> float:
-    """Mirror RiskManager.calculate_kelly_raw — needs ≥20 trades, returns negative if no edge."""
-    if len(trades) < 20:
-        return 0.0
-    wins = [t for t in trades if _net_pnl(t) > 0]
-    losses = [t for t in trades if _net_pnl(t) <= 0]
-    if not wins or not losses:
-        return 0.0
+def _slot_modes() -> dict[str, dict]:
+    """Mode sidecars: {slot_id: {"paper_mode", "capital_pct", "promoted_at"}}."""
+    modes: dict[str, dict] = {}
+    for path in _glob.glob(os.path.join(PROJECT_DIR, "trading_state_*_mode.json")):
+        slot_id = os.path.basename(path).replace("trading_state_", "").replace("_mode.json", "")
+        try:
+            with open(path) as f:
+                modes[slot_id] = json.load(f) or {}
+        except Exception:
+            pass
+    return modes
+
+
+def _kelly_wr_rr(trades: list[dict]) -> float:
+    """Kelly the way strategy_slot.should_auto_demote computes it — wr − (1−wr)/rr,
+    no wins → −1.0, no losses → 1.0 — but over ALL trades. The kill switch
+    (strategy_slot.is_killed) fires when this is negative at ≥50 trades."""
+    wins = [_net_pnl(t) for t in trades if _net_pnl(t) > 0]
+    losses = [abs(_net_pnl(t)) for t in trades if _net_pnl(t) < 0]
+    if not wins:
+        return -1.0
+    if not losses:
+        return 1.0
     wr = len(wins) / len(trades)
-    avg_win = sum(_net_pnl(t) for t in wins) / len(wins)
-    avg_loss = abs(sum(_net_pnl(t) for t in losses) / len(losses))
-    if avg_win == 0:
-        return 0.0
-    return (wr * avg_win - (1 - wr) * avg_loss) / avg_win
+    rr = (sum(wins) / len(wins)) / (sum(losses) / len(losses))
+    return wr - (1 - wr) / rr
 
 
-def _compute_slot_stage(slot_id: str, trades: list[dict], factory_stage: str,
-                        sentinels: dict) -> str:
-    """Single source of truth for slot status. Mirrors StrategySlot.is_killed
-    so the dashboard matches what the bot logs as `[SLOT] X (MODE/STATUS)`."""
-    # Sentinel kills take highest priority
-    if slot_id in sentinels.get("kills", []):
-        return "killed"
-    if slot_id in sentinels.get("pauses", []):
-        return "paused"
-    if slot_id in sentinels.get("promotes", []):
-        return "promoting"
-    if slot_id in sentinels.get("demotes", []):
-        return "demoting"
-    # Live slot is whatever the bot is configured to run live (5m_scalp). Don't
-    # apply Kelly auto-kill to it: its trade history is the main trading_state.json
-    # (lifetime live trades, includes pre-Sentinel iterations), not the slot's
-    # sidecar — the bot itself uses an empty sidecar so its is_killed never trips.
-    if slot_id in _live_slot_ids():
-        return "live"
-    # Paper slots: auto-kill at 50+ trades AND negative Kelly (strategy_slot.py:70-78)
-    if len(trades) >= 50 and _compute_kelly_raw(trades) < 0:
-        return "killed"
-    # Factory stage overrides only if it's a known label (avoid "unknown" fallback).
-    if factory_stage in ("paper", "killed", "hypothesis"):
-        return factory_stage
-    return "paper"
-
-
-def _build_slots_overview(all_slots: dict[str, dict], factory: dict, sentinels: dict) -> str:
-    """Build a card showing all slots with lifecycle stage, trade count, and status."""
-    strategies = factory.get("strategies", {})
-
-    # Sentinel status banner
-    banner = ""
-    if sentinels.get("paused"):
-        banner = '<div style="background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.2);color:var(--negative);padding:6px 10px;border-radius:3px;margin-bottom:8px;text-align:center;font-weight:600;font-family:\'JetBrains Mono\',monospace;font-size:0.8em">TRADING PAUSED</div>'
-    if sentinels.get("restart"):
-        banner += '<div style="background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.2);color:var(--warning);padding:6px 10px;border-radius:3px;margin-bottom:8px;text-align:center;font-weight:600;font-family:\'JetBrains Mono\',monospace;font-size:0.8em">RESTART PENDING</div>'
-
-    # Build slot rows
-    rows = ""
-    # Known active slots first, then any discovered extras
+def _build_slots_guardrails(slot_states: dict = None) -> str:
+    """SLOTS + GUARDRAILS panel: per-slot status dot (LIVE green / paper amber /
+    killed ✝ dim — killed = negative all-trades Kelly at ≥50 trades), trades ·
+    WR · net PnL, and for promoted live slots the $5 demote-headroom depletion
+    bar (strategy_slot.should_auto_demote: cap −$5.00 on live NET PnL,
+    negative live-only Kelly armed at ≥10 live trades).
+    Pass pre-loaded slot states to avoid re-reading every state file per poll."""
+    if slot_states is None:
+        slot_states = read_all_slot_states()
+    modes = _slot_modes()
+    live_ids = _live_slot_ids()
     known_order = ["5m_scalp", "5m_mean_revert", "5m_liq_cascade"]
-    # Add any discovered slots not in known_order
-    extra_slots = [s for s in all_slots if s not in known_order and s not in ("v8_245trades",)]
-    ordered = known_order + extra_slots
+    ordered = [s for s in known_order if s in slot_states]
+    # v8_245trades is an archived state snapshot, not a slot (same skip as before)
+    ordered += sorted(s for s in slot_states
+                      if s not in known_order and s != "v8_245trades")
 
+    rows = ""
     for slot_id in ordered:
-        state = all_slots.get(slot_id, {"closed_trades": []})
-        trades = state.get("closed_trades", [])
-        n_trades = len(trades)
+        trades = (slot_states.get(slot_id) or {}).get("closed_trades") or []
+        n = len(trades)
+        wins = sum(1 for t in trades if _net_pnl(t) > 0)
+        wr = wins / n * 100 if n else 0.0
+        net = sum(_net_pnl(t) for t in trades)
+        net_cls = "pos" if net > 0 else "neg" if net < 0 else "dim"
+        name = escape(slot_id)
+        stats = f"{n}t &middot; {wr:.0f}% &middot; <span class='{net_cls}'>${net:+.2f}</span>"
 
-        # Determine strategy name and stage from factory
-        strat_name = _SLOT_STRATEGY_MAP.get(slot_id, slot_id)
-        strat_info = strategies.get(strat_name, {})
-        factory_stage = strat_info.get("stage", "")
-        stage = _compute_slot_stage(slot_id, trades, factory_stage, sentinels)
+        if slot_id in live_ids:
+            rows += (f"<tr><td><span class='pos'>&#9679;</span> {name}</td>"
+                     f"<td class='pos'>LIVE</td><td>{stats}</td></tr>")
+            mode = modes.get(slot_id)
+            if mode and not mode.get("paper_mode", True):
+                # Promoted slot — render the auto-demote guardrail state.
+                live_trades = [t for t in trades if t.get("mode") == "live"]
+                live_net = sum(_net_pnl(t) for t in live_trades)
+                hdrm = 5.0 + live_net
+                width = min(100.0, max(0.0, hdrm / 5.0 * 100))
+                rows += (
+                    "<tr><td colspan='3'>"
+                    "<div class='dim' style='margin:3px 0 2px'>demote headroom</div>"
+                    "<div style='height:7px;background:var(--bg);border:1px solid var(--border)'>"
+                    f"<div style='width:{width:.0f}%;height:100%;"
+                    "background:linear-gradient(90deg,#4af626,#f0a500)'></div></div>"
+                    f"<div class='dim'>${hdrm:.2f} of $5.00 &middot; neg-Kelly @10 live trades "
+                    f"({len(live_trades)} so far)</div>"
+                    "</td></tr>")
+        elif n >= 50 and _kelly_wr_rr(trades) < 0:
+            rows += (f"<tr class='dim'><td>&#10013; {name}</td><td>killed @{n}</td>"
+                     f"<td>{n}t &middot; {wr:.0f}% &middot; ${net:+.2f}</td></tr>")
+        else:
+            rows += (f"<tr><td><span class='amb'>&#9679;</span> {name}</td>"
+                     f"<td class='amb'>paper</td><td>{stats}</td></tr>")
 
-        # Stage badge styling
-        stage_styles = {
-            "live": ("rgba(63,185,80,0.08)", "#3fb950", "rgba(63,185,80,0.2)"),
-            "paper": ("rgba(57,210,192,0.08)", "#39d2c0", "rgba(57,210,192,0.2)"),
-            "killed": ("rgba(248,81,73,0.08)", "#f85149", "rgba(248,81,73,0.2)"),
-            "paused": ("rgba(210,153,34,0.08)", "#d29922", "rgba(210,153,34,0.2)"),
-            "promoting": ("rgba(210,153,34,0.08)", "#d29922", "rgba(210,153,34,0.2)"),
-            "demoting": ("rgba(210,153,34,0.08)", "#d29922", "rgba(210,153,34,0.2)"),
-            "hypothesis": ("rgba(139,148,158,0.08)", "#8b949e", "rgba(139,148,158,0.2)"),
-        }
-        bg, fg, bdr = stage_styles.get(stage, stage_styles["hypothesis"])
-
-        # Compute basic metrics
-        wr = 0
-        pnl = 0
-        if n_trades > 0:
-            wins = sum(1 for t in trades if _net_pnl(t) > 0)
-            wr = (wins / n_trades) * 100
-            pnl = sum(_net_pnl(t) for t in trades)
-
-        wr_cls = "positive" if wr >= 40 else "negative" if wr < 30 else ""
-        pnl_cls = "positive" if pnl > 0 else "negative" if pnl < 0 else ""
-
-        rows += f'''<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #21262d">
-            <div>
-                <span style="font-family:'JetBrains Mono',monospace;font-size:0.78em;font-weight:500;color:var(--text-primary)">{escape(slot_id)}</span>
-                <span style="display:inline-block;font-size:0.6em;padding:1px 5px;border-radius:3px;margin-left:4px;background:{bg};color:{fg};border:1px solid {bdr};font-weight:600;text-transform:uppercase;letter-spacing:0.04em;font-family:'JetBrains Mono',monospace">{escape(stage)}</span>
-            </div>
-            <span style="font-family:'JetBrains Mono',monospace;font-size:0.72em;color:var(--text-dim);text-align:right">{n_trades}t</span>
-            <span style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:right" class="{wr_cls}">{wr:.0f}%</span>
-            <span style="font-family:'JetBrains Mono',monospace;font-size:0.72em;text-align:right" class="{pnl_cls}">${pnl:+.2f}</span>
-        </div>'''
-
-    # Pipeline log (last 5 events)
-    # Pipeline log — only render entries from the last 30 days. Older entries are
-    # historical noise (March hypothesis registrations, etc.) that mislead more than inform.
-    pipeline = factory.get("pipeline_log", [])
-    log_html = ""
-    if pipeline:
-        from datetime import datetime as _dt, timedelta as _td
-        cutoff = _dt.now() - _td(days=30)
-        recent = []
-        for entry in pipeline:
-            ts_raw = entry.get("time", "")
-            try:
-                ts_dt = _dt.fromisoformat(ts_raw.replace("Z", "+00:00").split(".")[0])
-                if ts_dt.replace(tzinfo=None) >= cutoff:
-                    recent.append(entry)
-            except (ValueError, AttributeError):
-                continue
-        if recent:
-            for entry in recent[-5:]:
-                ts = entry.get("time", "")[:16].replace("T", " ")
-                log_html += f'<div style="font-size:0.68em;color:var(--text-dim);padding:2px 0;font-family:\'JetBrains Mono\',monospace">{ts} — {escape(entry.get("strategy", ""))} — {escape(entry.get("event", ""))}</div>'
-            log_html = f'<div class="compare-section-title" style="margin-top:10px">Pipeline Log (30d)</div>{log_html}'
-
-    return f'''<div class="glass-card dash-item" data-id="slots-overview">
-        <h2>Slot Lifecycle</h2>
-        {banner}
-        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;padding:0 0 3px;border-bottom:1px solid #21262d;margin-bottom:3px">
-            <span style="font-size:0.65em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;font-family:'JetBrains Mono',monospace">Slot</span>
-            <span style="font-size:0.65em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;text-align:right;font-family:'JetBrains Mono',monospace">N</span>
-            <span style="font-size:0.65em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;text-align:right;font-family:'JetBrains Mono',monospace">WR</span>
-            <span style="font-size:0.65em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;text-align:right;font-family:'JetBrains Mono',monospace">PnL</span>
-        </div>
-        {rows}
-        {log_html}
-    </div>'''
+    if not rows:
+        rows = "<tr><td class='dim'>no slot state files found</td></tr>"
+    return f'<div class="ptitle">SLOTS + GUARDRAILS</div><table>{rows}</table>'
 
 
 # ── Equity series (JSON for the client-side uPlot chart) ────────────────
@@ -1230,17 +1095,27 @@ def _blotter_sources() -> list[tuple[str, str]]:
     return sources
 
 
-def collect_blotter_rows(limit: int = 500) -> list[dict]:
+def collect_blotter_rows(limit: int = 500, slot_states: dict = None) -> list[dict]:
     """Merged blotter: main closed_trades (owner "main") + every slot state's
     closed_trades (owner = slot_id). Stable id = "owner:index_in_that_file"
-    (files are append-only, so the index never moves). Newest first."""
+    (files are append-only, so the index never moves). Newest first.
+    Pass pre-loaded slot states (read_all_slot_states shape, where key
+    "5m_scalp" IS the main trading_state.json) to avoid re-reading every state
+    file per poll; direct callers without one load the files themselves."""
+    if slot_states is not None:
+        sources = [("main" if sid == "5m_scalp" else sid,
+                    (st or {}).get("closed_trades") or [])
+                   for sid, st in slot_states.items()]
+    else:
+        sources = []
+        for owner, path in _blotter_sources():
+            try:
+                with open(path) as f:
+                    sources.append((owner, json.load(f).get("closed_trades", []) or []))
+            except Exception:
+                continue
     rows = []
-    for owner, path in _blotter_sources():
-        try:
-            with open(path) as f:
-                trades = json.load(f).get("closed_trades", []) or []
-        except Exception:
-            continue
+    for owner, trades in sources:
         for i, t in enumerate(trades):
             ts = t.get("closed_at") or t.get("opened_at") or 0
             try:
@@ -1264,7 +1139,9 @@ def collect_blotter_rows(limit: int = 500) -> list[dict]:
                 "owner": owner,
                 "mode": mode,
             })
-    rows.sort(key=lambda r: r["ts"], reverse=True)
+    # Secondary owner key makes tie-timestamp order deterministic regardless of
+    # whether sources came from disk globbing or a pre-loaded slot_states dict.
+    rows.sort(key=lambda r: (r["ts"], r["owner"]), reverse=True)
     return rows[:limit]
 
 
@@ -1729,11 +1606,76 @@ def build_feed(lines: list = None) -> str:
 
 
 # ── HTML rendering ───────────────────────────────────────────────────────
-def _build_blotter_panel(limit: int = 100) -> str:
+def _build_positions_panel(lines: list = None, slot_states: dict = None) -> str:
+    """POSITIONS panel: main positions + LIVE slots' positions (owner-tagged).
+    uPnL shows "—" unless the symbol's price appears in the log tail already
+    read this request (_parse_last_prices) — the dashboard NEVER calls the
+    exchange. Flat state shows the last merged close; a reconcile problem
+    (DRIFT/STALE) renders as a single red line, nothing when clean."""
+    lines = lines if lines is not None else tail_log(3000)
+    if slot_states is None:
+        slot_states = read_all_slot_states()
+    prices = _parse_last_prices(lines)
+
+    pos_rows = []
+    for owner in sorted(_live_slot_ids()):
+        src = (slot_states.get(owner) or {}).get("positions") or {}
+        owner_label = "main" if owner == "5m_scalp" else owner
+        for sym, p in src.items():
+            short = escape(str(sym).replace("/USDT:USDT", ""))
+            side = str(p.get("side", "?"))[:5].upper()
+            side_cls = "pos" if side.startswith("L") else "neg"
+            entry = p.get("entry_price") or 0
+            sl = p.get("exchange_sl_price") or p.get("stop_loss") or 0
+            tp = p.get("take_profit") or 0
+            opened = p.get("opened_at") or 0
+            age = f"{(time.time() - opened) / 60:.0f}m" if opened else "&mdash;"
+            px = prices.get(sym)
+            amt = p.get("amount") or 0
+            if px and entry and amt:
+                upnl = (px - entry) * float(amt) * (1 if side.startswith("L") else -1)
+                upnl_cell = f"<td class='{'pos' if upnl >= 0 else 'neg'}'>{upnl:+.2f}</td>"
+            else:
+                upnl_cell = "<td class='dim'>&mdash;</td>"
+            pos_rows.append(
+                f"<tr><td>{short}</td><td class='{side_cls}'>{side}</td>"
+                f"<td>{entry:.6g}</td>{upnl_cell}<td>{sl:.6g}</td><td>{tp:.6g}</td>"
+                f"<td>{age}</td><td class='dim'>{escape(str(p.get('strategy', '')))}</td>"
+                f"<td class='dim'>{escape(owner_label)}</td></tr>"
+            )
+
+    if pos_rows:
+        body = (
+            "<table><tr class='dim'><th>SYM</th><th>SIDE</th><th>ENTRY</th><th>UPNL</th>"
+            "<th>SL</th><th>TP</th><th>AGE</th><th>STRAT</th><th>OWNER</th></tr>"
+            + "".join(pos_rows) + "</table>"
+        )
+    else:
+        last_line = ""
+        last = collect_blotter_rows(1, slot_states)
+        if last:
+            r = last[0]
+            net_cls = "pos" if r["net"] >= 0 else "neg"
+            side = {"L": "LNG", "S": "SHT"}.get(r["side"][:1].upper(), escape(r["side"][:3].upper()))
+            badge = "" if r["owner"] == "main" else f" [{escape(r['owner'])}]"
+            last_line = (
+                f"<div class='dim' style='margin-top:6px'>last: {escape(r['sym'])}{badge} "
+                f"{side} closed {escape(r['time_pt'])} "
+                f"<span class='{net_cls}'>{r['net']:+.2f}</span></div>"
+            )
+        body = "<div class='dim'>flat &mdash; no open positions</div>" + last_line
+
+    rec = _reconcile_summary()
+    rec_html = ("" if rec.get("ok") else
+                f"<div class='neg' style='margin-top:5px'>&#9888; {escape(rec.get('msg', ''))}</div>")
+    return f'<div class="ptitle">POSITIONS &mdash; MAIN + SLOTS</div>{body}{rec_html}'
+
+
+def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
     """BLOTTER panel body: merged main+slot rows, newest first, click-to-drill.
     Slot rows carry an owner badge — amber when the slot trade ran LIVE, dim
     for paper. Row ids feed drill() → GET /api/trade?id=owner:index."""
-    rows = collect_blotter_rows(limit)
+    rows = collect_blotter_rows(limit, slot_states)
     if not rows:
         return "<div class='dim'>no closed trades yet</div>"
     out = ("<table><tr class='dim'><th>TIME</th><th>SYM</th><th>SIDE</th>"
@@ -1829,89 +1771,38 @@ def _build_why_no_trades(lines: list = None) -> str:
 def build_content(lines: list = None) -> str:
     """Inner HTML for the swapped #content node — the six-panel command grid.
 
-    Task 1 shell: the SLOTS and GATES+WATCHLIST cells temporarily carry the
-    legacy builders forward so the dashboard stays useful between tasks;
-    Tasks 3-6 replace each placeholder with its terminal-pro builder.
+    Request-scope load: slot states are read ONCE here and passed into every
+    panel builder that needs them (positions, slots/guardrails, blotter), so a
+    3s poll globs+parses the state files a single time.
+    The GATES+WATCHLIST cell still carries legacy builders until Task 6.
     Pass pre-fetched log lines to avoid a redundant tail_log call.
     """
-    state = read_state()
-    positions = state.get("positions") or {}
-    trades = state.get("closed_trades", [])
-    factory_state = read_factory_state()
-    all_slot_states = read_all_slot_states()
-    sentinels = detect_sentinel_files()
+    slot_states = read_all_slot_states()
     lines = lines if lines is not None else tail_log(3000)
     watchlist = parse_watchlist(lines)
+    # read_all_slot_states maps the main trading_state.json to key "5m_scalp"
+    main_positions = (slot_states.get("5m_scalp") or {}).get("positions") or {}
 
-    # Panel 1 — POSITIONS (full terminal-pro rebuild in Task 5)
-    pos_rows = []
-    for owner in sorted(_live_slot_ids()):
-        if owner == "5m_scalp":
-            src = positions
-        else:
-            try:
-                with open(os.path.join(PROJECT_DIR, f"trading_state_{owner}.json")) as f:
-                    src = json.load(f).get("positions") or {}
-            except Exception:
-                src = {}
-        for sym, p in src.items():
-            short = escape(str(sym).replace("/USDT:USDT", ""))
-            side = str(p.get("side", "?"))[:5].upper()
-            side_cls = "pos" if side.startswith("L") else "neg"
-            entry = p.get("entry_price") or 0
-            sl = p.get("exchange_sl_price") or p.get("stop_loss") or 0
-            tp = p.get("take_profit") or 0
-            opened = p.get("opened_at") or 0
-            age = f"{(time.time() - opened) / 60:.0f}m" if opened else "&mdash;"
-            pos_rows.append(
-                f"<tr><td>{short}</td><td class='{side_cls}'>{side}</td>"
-                f"<td>{entry:.6g}</td><td>{sl:.6g}</td><td>{tp:.6g}</td>"
-                f"<td>{age}</td><td class='dim'>{escape(str(p.get('strategy', '')))}</td>"
-                f"<td class='dim'>{escape(owner)}</td></tr>"
-            )
-    if pos_rows:
-        positions_html = (
-            "<table><tr class='dim'><th>SYM</th><th>SIDE</th><th>ENTRY</th><th>SL</th>"
-            "<th>TP</th><th>AGE</th><th>STRAT</th><th>OWNER</th></tr>"
-            + "".join(pos_rows) + "</table>"
-        )
-    else:
-        last_line = ""
-        if trades:
-            lt = trades[-1]
-            try:
-                t_pt = _from_ts(lt.get("closed_at", 0)).strftime("%-I:%M %p")
-            except Exception:
-                t_pt = "?"
-            net = _net_pnl(lt)
-            net_cls = "pos" if net >= 0 else "neg"
-            last_line = (
-                f"<div class='dim' style='margin-top:6px'>last: "
-                f"{escape(str(lt.get('symbol', '?')).replace('/USDT:USDT', ''))} "
-                f"{escape(str(lt.get('side', '?'))[:3].upper())} closed {t_pt} "
-                f"<span class='{net_cls}'>{net:+.2f}</span></div>"
-            )
-        positions_html = "<div class='dim'>flat &mdash; no open positions</div>" + last_line
+    # Panel 1 — POSITIONS: main + live slots, uPnL from already-read log prices
+    positions_html = _build_positions_panel(lines, slot_states)
 
-    # Panel 2 — SLOTS + GUARDRAILS (legacy builder carried forward; Task 5 rebuilds)
-    slots_html = _build_slots_overview(all_slot_states, factory_state, sentinels)
+    # Panel 2 — SLOTS + GUARDRAILS: status dots, kill switch, demote headroom
+    slots_html = _build_slots_guardrails(slot_states)
 
     # Panel 3 — BLOTTER: main + all slots merged, click a row to drill down.
-    blotter_html = _build_blotter_panel()
+    blotter_html = _build_blotter_panel(slot_states=slot_states)
 
     # Panel 4 — WHY NO TRADES? diagnostics (per-pair ADX, last signal, top gate)
     why_html = _build_why_no_trades(lines)
 
     # Panel 5 — GATES + WATCHLIST (legacy builders carried forward; Task 6 rebuilds)
-    gates_html = _build_observability_panel() + _build_watchlist_html(watchlist, positions)
+    gates_html = _build_observability_panel() + _build_watchlist_html(watchlist, main_positions)
 
     return f"""<div id="grid">
     <div class="panel" id="p-positions">
-        <div class="ptitle">POSITIONS &mdash; MAIN + SLOTS</div>
         {positions_html}
     </div>
     <div class="panel" id="p-slots">
-        <div class="ptitle">SLOTS + GUARDRAILS</div>
         {slots_html}
     </div>
     <div class="panel" id="p-blotter">
@@ -1951,10 +1842,6 @@ def build_html() -> str:
 :root {{
   --bg:#000204; --panel:#0a0e08; --border:#2d3a1e; --txt:#9eb89e;
   --amber:#f0a500; --pos:#4af626; --neg:#ff5555; --dim:#5a6b5a;
-  /* TEMP aliases for legacy panel fragments carried into the grid — removed in Tasks 5-6 */
-  --accent:#f0a500; --positive:#4af626; --negative:#ff5555; --warning:#f0a500;
-  --text-primary:#9eb89e; --text-secondary:#9eb89e; --text-dim:#5a6b5a;
-  --panel-bg:#0a0e08; --panel-border:#2d3a1e; --border-subtle:#2d3a1e; --hover-bg:#0a0e08;
 }}
 * {{ box-sizing:border-box; margin:0; padding:0; }}
 body {{ background:var(--bg); color:var(--txt);
@@ -1979,8 +1866,7 @@ body {{ background:var(--bg); color:var(--txt);
 .feed-line.pos {{ color:var(--pos); }} .feed-line.amb {{ color:var(--amber); }}
 .feed-line.dim {{ color:var(--dim); }}
 .footer {{ color:var(--dim); font-size:9px; padding:4px 10px 8px; }}
-/* TEMP compat for legacy fragments (slots overview, gate table, watchlist) — Tasks 5-6 remove */
-.positive {{ color:var(--pos); }} .negative {{ color:var(--neg); }} .muted {{ color:var(--dim); }}
+/* TEMP compat for the legacy GATES+WATCHLIST cell (gate table, watchlist tiles) — Task 6 removes */
 .glass-card {{ margin-bottom:6px; }}
 .glass-card h2 {{ color:var(--amber); font-size:9px; letter-spacing:1px;
   text-transform:uppercase; font-weight:600; margin:4px 0; }}

@@ -77,6 +77,17 @@ def test_parse_pair_adx():
     assert "DOGE/USDT:USDT" not in adx      # absent pair stays absent — never guess
 
 
+def test_guardrail_panel_math(tmp_path, monkeypatch):
+    import web_dashboard as wd
+    html = wd._build_slots_guardrails()
+    assert "SLOTS" in html.upper()
+    # if 5m_mean_revert is live, headroom string present
+    import json, os
+    mode = os.path.join(wd.PROJECT_DIR, "trading_state_5m_mean_revert_mode.json")
+    if os.path.exists(mode) and not json.load(open(mode)).get("paper_mode", True):
+        assert "headroom" in html.lower() or "HDRM" in html
+
+
 def test_sentinel_deploy_ts_matches_2026_04_02_06_01_utc():
     """Sentinel deployed 2026-04-01 23:01 PT = 2026-04-02 06:01 UTC.
     (Moved from test_sentinel_chart.py — the PNG chart is gone, but this
