@@ -31,9 +31,6 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
-PAPER_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_liq_cascade.json")
-NARROW_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_narrow.json")
-NARROW_BLOCKED_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_narrow_blocked.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
 HOST = "127.0.0.1"
 PORT = 8050
@@ -182,81 +179,6 @@ def read_state() -> dict:
         return {"peak_balance": 0, "closed_trades": []}
 
 
-def read_paper_state() -> dict:
-    """Read paper slot state file. Returns empty structure if missing."""
-    try:
-        with open(PAPER_STATE_FILE, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        return {"peak_balance": 0, "closed_trades": []}
-
-
-def read_narrow_state() -> dict:
-    """Read 5m_narrow paper slot state file. Returns empty structure if missing."""
-    try:
-        with open(NARROW_STATE_FILE, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        return {"peak_balance": 0, "closed_trades": [], "blocked_counts": {}}
-
-
-def _build_narrow_panel(state: dict) -> str:
-    """Build the NARROW (paper) panel — trade stats plus blocked-signal counts."""
-    trades = state.get("closed_trades", []) or []
-    try:
-        with open(NARROW_BLOCKED_FILE) as f:
-            blocked = json.load(f) or {}
-    except (FileNotFoundError, json.JSONDecodeError):
-        blocked = {"blocked_symbol": 0, "blocked_hour": 0, "blocked_ensemble": 0}
-    b_sym = int(blocked.get("blocked_symbol", 0) or 0)
-    b_hr = int(blocked.get("blocked_hour", 0) or 0)
-    b_ens = int(blocked.get("blocked_ensemble", 0) or 0)
-
-    if not trades and b_sym == 0 and b_hr == 0 and b_ens == 0:
-        body = '<div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.85em">Awaiting first trade.</div>'
-        return f'''<div class="glass-card dash-item paper-card" data-id="narrow-panel">
-            <h2><span class="paper-badge">PAPER</span> NARROW (paper)</h2>
-            {body}
-        </div>'''
-
-    stats = compute_stats(trades)
-    total = stats["total"]
-    wr = stats["win_rate"]
-    pnl = stats["total_pnl"]
-    wr_cls = "positive" if wr >= 50 else "negative" if wr < 30 else ""
-    pnl_cls = "positive" if pnl >= 0 else "negative"
-
-    def _row(label, val, cls=""):
-        return (
-            f'<div class="compare-row">'
-            f'<span class="compare-label">{escape(label)}</span>'
-            f'<span class="compare-paper {cls}" style="grid-column:2 / span 2;text-align:right">{val}</span>'
-            f'</div>'
-        )
-
-    def _blocked_row(label, val):
-        # Highlighted block-count row
-        color = "var(--warning)" if val > 0 else "var(--text-dim)"
-        return (
-            f'<div class="compare-row" style="background:rgba(210,153,34,0.05);border-radius:3px">'
-            f'<span class="compare-label">{escape(label)}</span>'
-            f'<span class="compare-paper" style="grid-column:2 / span 2;text-align:right;color:{color};font-weight:600">{val}</span>'
-            f'</div>'
-        )
-
-    return f'''<div class="glass-card dash-item paper-card" data-id="narrow-panel">
-        <h2><span class="paper-badge">PAPER</span> NARROW (paper)</h2>
-        <div class="compare-section-title">Performance</div>
-        {_row("Trades", total)}
-        {_row("Win Rate", f"{wr:.1f}%", wr_cls)}
-        {_row("Net PnL", f"${pnl:+.2f}", pnl_cls)}
-        <div class="compare-section-title" style="margin-top:10px">Blocked Signals</div>
-        {_blocked_row("blocked_symbol", b_sym)}
-        {_blocked_row("blocked_hour", b_hr)}
-        {_blocked_row("blocked_ensemble", b_ens)}
-    </div>'''
-
-
 def read_all_slot_states() -> dict[str, dict]:
     """Discover and read all trading_state_*.json files. Returns {slot_id: state_dict}.
     Also maps 5m_scalp → main trading_state.json (the live slot has no sidecar file)."""
@@ -366,14 +288,15 @@ def parse_watchlist(lines: list[str]) -> dict:
 
         # Scanner results with scores — current SCALPSCAN format (post-2026-04-16 composite scanner):
         # "  INJ/USDT:USDT             score=0.628 (hist=0.90 x mkt=0.00) | vol=$3,284,863 | 24h= -3.9%"
-        m = re.search(r'(\S+/USDT:USDT)\s+score=([\d.]+) \(hist=([\d.]+) x mkt=([\d.]+)\) \| vol=\$[\d,]+ \| 24h=\s*([\-\+]?[\d.]+)%', line)
+        m = re.search(r'(\S+/USDT:USDT)\s+score=([\d.]+) \(hist=([\d.]+) x mkt=([\d.]+)\) \| vol=\$([\d,]+) \| 24h=\s*([\-\+]?[\d.]+)%', line)
         if m:
-            change_24h = float(m.group(5))
+            change_24h = float(m.group(6))
             scanner_pairs.append({
                 "symbol": m.group(1),
                 "score": float(m.group(2)),
                 "hist_score": float(m.group(3)),
                 "mkt_score": float(m.group(4)),
+                "vol_usd": float(m.group(5).replace(",", "")),
                 "change_24h": change_24h,
                 "trend": "↑" if change_24h >= 0 else "↓",
                 # Legacy fields kept for any consumer expecting the old shape
@@ -651,277 +574,6 @@ def build_audit_table(trades: list[dict], index_offset: int = 0) -> str:
         <table>{log_header}<tbody>{recent_rows}</tbody></table>
         </div>
         {older_section}
-    </div>'''
-
-
-def compute_stats(trades: list[dict]) -> dict:
-    if not trades:
-        return {"total": 0, "wins": 0, "losses": 0, "win_rate": 0,
-                "total_pnl": 0, "total_fees": 0, "real_pnl": 0,
-                "avg_win": 0, "avg_loss": 0, "profit_factor": 0,
-                "best": 0, "worst": 0, "max_dd": 0, "max_dd_pct": 0}
-    wins = [t for t in trades if _net_pnl(t) > 0]
-    losses = [t for t in trades if _net_pnl(t) <= 0]
-    # total_pnl is now NET (post-fees) — this is the honest number
-    total_pnl = sum(_net_pnl(t) for t in trades)
-    gp = sum(_net_pnl(t) for t in wins) if wins else 0
-    gl = abs(sum(_net_pnl(t) for t in losses)) if losses else 0
-    best = max(_net_pnl(t) for t in trades)
-    worst = min(_net_pnl(t) for t in trades)
-
-    # Max drawdown from cumulative net curve
-    cum = 0
-    peak = 0
-    max_dd = 0
-    max_dd_pct = 0
-    for t in trades:
-        cum += _net_pnl(t)
-        if cum > peak:
-            peak = cum
-        dd = peak - cum
-        if dd > max_dd:
-            max_dd = dd
-            max_dd_pct = (dd / peak * 100) if peak > 0 else 0
-
-    # Real fees from exchange capture (falls back to estimate for old trades)
-    total_fees = sum(_real_fee(t) for t in trades)
-    real_pnl = total_pnl  # already net
-
-    return {
-        "total": len(trades), "wins": len(wins), "losses": len(losses),
-        "win_rate": len(wins) / len(trades) * 100,
-        "total_pnl": total_pnl, "total_fees": total_fees, "real_pnl": real_pnl,
-        "avg_win": gp / len(wins) if wins else 0,
-        "avg_loss": gl / len(losses) if losses else 0,
-        "profit_factor": gp / gl if gl > 0 else float('inf'),
-        "best": best, "worst": worst, "max_dd": max_dd, "max_dd_pct": max_dd_pct,
-    }
-
-
-def _build_reconcile_card() -> str:
-    """Reconciliation status vs Phemex exchange truth.
-
-    Reads ~/Library/Logs/Phmex-S/reconcile.log written every 4h by
-    scripts/reconcile_phemex.py (launchd: com.phmex.reconcile).
-    """
-    log_path = Path.home() / "Library" / "Logs" / "Phmex-S" / "reconcile.log"
-    if not log_path.exists():
-        return '''<div class="glass-card dash-item" data-id="reconcile">
-            <h2>Reconciliation vs Phemex</h2>
-            <div style="color:var(--text-dim);font-size:0.8em;padding:6px 0">No reconciliation data yet</div>
-        </div>'''
-    try:
-        mtime = log_path.stat().st_mtime
-        text = log_path.read_text(errors="replace")
-    except Exception as e:
-        return f'''<div class="glass-card dash-item" data-id="reconcile">
-            <h2>Reconciliation vs Phemex</h2>
-            <div style="color:var(--negative);font-size:0.8em">Read error: {escape(str(e))}</div>
-        </div>'''
-
-    runs = text.split("=== Phemex Reconciliation")
-    if len(runs) < 2:
-        return '''<div class="glass-card dash-item" data-id="reconcile">
-            <h2>Reconciliation vs Phemex</h2>
-            <div style="color:var(--text-dim);font-size:0.8em">Waiting for first run</div>
-        </div>'''
-    latest = runs[-1]
-
-    discrepancies = 0
-    max_drift = 0.0
-    symbol_count = 0
-    for line in latest.splitlines():
-        line = line.strip()
-        if line.startswith("Discrepancies"):
-            try:
-                discrepancies = int(line.split(":")[-1].strip())
-            except Exception:
-                pass
-        if "/USDT:USDT" in line:
-            symbol_count += 1
-            parts = line.split()
-            try:
-                dnet = float(parts[-2 if "<--" in line else -1].replace("DIFF", "").strip() or 0)
-            except Exception:
-                dnet = 0.0
-            if abs(dnet) > abs(max_drift):
-                max_drift = dnet
-
-    age_hours = (time.time() - mtime) / 3600
-    if age_hours > 8:
-        status_icon = "&#128308;"  # red circle
-        status_text = "STALE"
-        status_color = "var(--negative)"
-    elif discrepancies > 0:
-        status_icon = "&#128993;"  # yellow circle
-        status_text = f"DRIFT ({discrepancies})"
-        status_color = "var(--warning)"
-    else:
-        status_icon = "&#128994;"  # green circle
-        status_text = "CLEAN"
-        status_color = "var(--positive)"
-
-    last_ts = datetime.fromtimestamp(mtime, tz=CA_TZ).strftime("%b %d %I:%M %p")
-    age_str = f"{int(age_hours)}h ago" if age_hours >= 1 else f"{int(age_hours*60)}m ago"
-
-    return f'''<div class="glass-card dash-item" data-id="reconcile">
-        <h2>Reconciliation vs Phemex</h2>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:0.78em;line-height:1.7">
-            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d">
-                <span style="color:var(--text-dim)">Status</span>
-                <span style="color:{status_color};font-weight:700">{status_icon} {status_text}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d">
-                <span style="color:var(--text-dim)">Last run</span>
-                <span>{last_ts}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d">
-                <span style="color:var(--text-dim)">Age</span>
-                <span>{age_str}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d">
-                <span style="color:var(--text-dim)">Symbols</span>
-                <span>{symbol_count}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding:3px 0">
-                <span style="color:var(--text-dim)">Max drift</span>
-                <span class="{'negative' if abs(max_drift) > 0.05 else ''}">${max_drift:+.2f}</span>
-            </div>
-        </div>
-    </div>'''
-
-
-def _build_observability_panel() -> str:
-    """Build Phase 2c observability HTML panel (Gate Rejection Breakdown only).
-
-    Note: Reconcile Status card was removed to eliminate duplication with
-    _build_reconcile_card(); reconcile data is now shown in one place only.
-    """
-    from html import escape as _esc
-    stats = _gate_stats(LOG_FILE)
-    if stats:
-        total_blocks = sum(stats.values())
-        gate_rows = ""
-        for label, count in list(stats.items())[:8]:
-            pct = count / total_blocks * 100 if total_blocks else 0
-            gate_rows += f'<tr><td style="padding:4px 8px;font-size:13px">{_esc(label)}</td><td style="padding:4px 8px;text-align:right;font-family:monospace">{count:,}</td><td style="padding:4px 8px;text-align:right;color:#888;font-size:12px">{pct:.0f}%</td></tr>'
-        gates_html = f'<div style="margin-bottom:8px;color:#888;font-size:12px">{total_blocks:,} total blocks (last 24h)</div><div class="table-wrap"><table><thead><tr><th>Gate</th><th style="text-align:right">Blocks</th><th style="text-align:right">%</th></tr></thead><tbody>{gate_rows}</tbody></table></div>'
-    else:
-        gates_html = '<div style="color:#888;font-size:13px">No gate rejections found in log</div>'
-
-    return f'''<div class="glass-card dash-item" data-id="obs-gates">
-        <h2>Gate Rejection Breakdown (24h)</h2>
-        {gates_html}
-    </div>'''
-
-
-def _build_paper_comparison(live_trades: list[dict], paper_trades: list[dict]) -> str:
-    """Build side-by-side Live vs Paper (liq_cascade) comparison card."""
-    live_stats = compute_stats(live_trades)
-    paper_stats = compute_stats(paper_trades)
-
-    today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-    live_today = [t for t in live_trades if t.get("opened_at", 0) >= today_start]
-    paper_today = [t for t in paper_trades if t.get("opened_at", 0) >= today_start]
-    live_today_stats = compute_stats(live_today)
-    paper_today_stats = compute_stats(paper_today)
-
-    has_paper = len(paper_trades) > 0
-
-    def _stat_col(label, live_val, paper_val, is_pnl=False, is_pct=False):
-        def _fmt(val, has_data):
-            if not has_data:
-                return ("", "--")
-            if is_pnl:
-                return ("positive" if val >= 0 else "negative", f"${val:+.2f}")
-            elif is_pct:
-                return ("positive" if val >= 50 else "negative", f"{val:.1f}%")
-            else:
-                return ("", str(val))
-        l_cls, l_str = _fmt(live_val, True)
-        p_cls, p_str = _fmt(paper_val, has_paper)
-        return f'''<div class="compare-row">
-            <span class="compare-label">{label}</span>
-            <span class="compare-live {l_cls}">{l_str}</span>
-            <span class="compare-paper {p_cls}">{p_str}</span>
-        </div>'''
-
-    # Recent paper trades list (last 5)
-    # Gate tag summary for paper trades
-    gate_summary = ""
-    tagged = [t for t in paper_trades if t.get("gate_tags") and t["gate_tags"] != "none"]
-    untagged = [t for t in paper_trades if not t.get("gate_tags") or t["gate_tags"] == "none"]
-    if paper_trades:
-        _would_pass = len(untagged)
-        _would_block = len(tagged)
-        _pass_pnl = sum(_net_pnl(t) for t in untagged)
-        _block_pnl = sum(_net_pnl(t) for t in tagged)
-        _pass_wr = (sum(1 for t in untagged if _net_pnl(t) > 0) / len(untagged) * 100) if untagged else 0
-        _block_wr = (sum(1 for t in tagged if _net_pnl(t) > 0) / len(tagged) * 100) if tagged else 0
-        _pass_cls = "positive" if _pass_pnl >= 0 else "negative"
-        _block_cls = "positive" if _block_pnl >= 0 else "negative"
-        gate_summary = f'''<div class="compare-section-title" style="margin-top:10px">Gate Shadow Tags</div>
-            <div class="compare-row">
-                <span class="compare-label">Would PASS live</span>
-                <span style="font-family:'JetBrains Mono',monospace;font-size:0.8em;color:var(--text-primary)">{_would_pass}t / {_pass_wr:.0f}%</span>
-                <span class="{_pass_cls}" style="font-family:'JetBrains Mono',monospace;font-size:0.8em">${_pass_pnl:+.2f}</span>
-            </div>
-            <div class="compare-row">
-                <span class="compare-label">Would be BLOCKED</span>
-                <span style="font-family:'JetBrains Mono',monospace;font-size:0.8em;color:var(--text-primary)">{_would_block}t / {_block_wr:.0f}%</span>
-                <span class="{_block_cls}" style="font-family:'JetBrains Mono',monospace;font-size:0.8em">${_block_pnl:+.2f}</span>
-            </div>'''
-
-    recent_paper = ""
-    if has_paper:
-        last5 = paper_trades[-5:]
-        for t in reversed(last5):
-            pnl = _net_pnl(t)
-            sym = escape(t.get("symbol", "?").replace("/USDT:USDT", ""))
-            side = t.get("side", "?").upper()
-            reason = escape(t.get("exit_reason") or t.get("reason") or "?")
-            tags = t.get("gate_tags", "")
-            tag_badge = ""
-            if tags and tags != "none":
-                tag_badge = f'<span style="font-size:0.6em;padding:1px 4px;border-radius:2px;background:rgba(248,81,73,0.1);color:#f85149;border:1px solid rgba(248,81,73,0.2);margin-left:3px">{escape(tags)}</span>'
-            elif tags == "none":
-                tag_badge = '<span style="font-size:0.6em;padding:1px 4px;border-radius:2px;background:rgba(63,185,80,0.1);color:#3fb950;border:1px solid rgba(63,185,80,0.2);margin-left:3px">PASS</span>'
-            cls = "positive" if pnl > 0 else "negative"
-            side_cls = "side-long" if side == "LONG" else "side-short"
-            closed_at = t.get("closed_at", 0)
-            time_str = _from_ts(closed_at).strftime("%m/%d %I:%M%p").lower() if closed_at > 0 else "--"
-            recent_paper += f'''<div class="paper-trade-row">
-                <span class="side-badge {side_cls}" style="font-size:0.7em">{side}</span>
-                <span style="color:var(--text-primary);font-weight:500">{sym}</span>
-                <span class="{cls}" style="font-family:'JetBrains Mono',monospace;font-weight:600">${pnl:+.2f}</span>
-                <span style="color:var(--text-dim);font-size:0.85em">{reason}</span>
-                {tag_badge}
-                <span style="color:var(--text-dim);font-size:0.8em;font-family:'JetBrains Mono',monospace">{time_str}</span>
-            </div>'''
-    else:
-        recent_paper = '<div style="color:var(--text-dim);text-align:center;padding:12px;font-size:0.85em">Paper slot not active yet.</div>'
-
-    return f'''<div class="glass-card dash-item paper-card" data-id="paper-comparison">
-        <h2><span class="paper-badge">PAPER</span> Live vs Liq Cascade</h2>
-        <div class="compare-header">
-            <span class="compare-label"></span>
-            <span class="compare-col-label live-label">LIVE</span>
-            <span class="compare-col-label paper-label">PAPER</span>
-        </div>
-        <div class="compare-section-title">All Time</div>
-        {_stat_col("Trades", live_stats["total"], paper_stats["total"])}
-        {_stat_col("Win Rate", live_stats["win_rate"], paper_stats["win_rate"], is_pct=True)}
-        {_stat_col("PnL", live_stats["total_pnl"], paper_stats["total_pnl"], is_pnl=True)}
-        {_stat_col("Profit Factor", round(live_stats["profit_factor"], 2) if live_stats["profit_factor"] != float("inf") else 0, round(paper_stats["profit_factor"], 2) if paper_stats["profit_factor"] != float("inf") else 0)}
-        {_stat_col("Avg Win", live_stats["avg_win"], paper_stats["avg_win"], is_pnl=True)}
-        {_stat_col("Avg Loss", -live_stats["avg_loss"], -paper_stats["avg_loss"], is_pnl=True)}
-        <div class="compare-section-title" style="margin-top:10px">Today</div>
-        {_stat_col("Trades", live_today_stats["total"], paper_today_stats["total"])}
-        {_stat_col("Win Rate", live_today_stats["win_rate"], paper_today_stats["win_rate"], is_pct=True)}
-        {_stat_col("PnL", live_today_stats["total_pnl"], paper_today_stats["total_pnl"], is_pnl=True)}
-        {gate_summary}
-        <div class="compare-section-title" style="margin-top:10px">Recent Paper Trades</div>
-        {recent_paper}
     </div>'''
 
 
@@ -1204,228 +856,6 @@ def build_trade_detail(trade_id: str, sym: str = None) -> dict:
         }
     except Exception:
         return {"error": "not found"}
-
-
-def _build_watchlist_html(wl: dict, positions: dict | None = None) -> str:
-    """Render watchlist as a grid of coin tiles with status dots.
-
-    positions: live state positions dict (trading_state.json), used to show the
-    exchange-resting SL on open-position tiles.
-    """
-    positions = positions or {}
-    base = wl["base_pairs"]
-    scanner = {s["symbol"]: s for s in wl["scanner_pairs"]}
-    open_syms = wl["open_symbols"]
-
-    # Merge: all unique symbols, open first, then scanner, then base
-    seen = set()
-    ordered = []
-    # Open positions first
-    for sym in sorted(open_syms):
-        if sym not in seen:
-            ordered.append(sym)
-            seen.add(sym)
-    # Scanner pairs next
-    for sym in scanner:
-        if sym not in seen:
-            ordered.append(sym)
-            seen.add(sym)
-    # Base pairs last
-    for sym in base:
-        if sym not in seen:
-            ordered.append(sym)
-            seen.add(sym)
-
-    if not ordered:
-        return '<div style="color:#6c7086;font-size:0.85em">No pairs detected yet</div>'
-
-    html = '<div class="watchlist-grid">'
-    for sym in ordered:
-        short = escape(sym.replace("/USDT:USDT", ""))
-        is_open = sym in open_syms
-        is_scanner = sym in scanner
-
-        if is_open:
-            dot_cls = "dot-open"
-            status = "OPEN"
-        elif is_scanner:
-            dot_cls = "dot-scanner"
-            status = "Scanner"
-        else:
-            dot_cls = "dot-base"
-            status = "Base"
-
-        score_html = ""
-        meta_parts = [status]
-        if is_open:
-            pos = positions.get(sym) or {}
-            # Prefer the exchange-resting SL (durable trailing stop) so the tile
-            # never shows internal stop_loss while the resting order sits elsewhere.
-            # Old state files lack exchange_sl_price — fall back to stop_loss.
-            sl_val = pos.get("exchange_sl_price")
-            sl_label = "Exch SL"
-            if sl_val is None:
-                sl_val = pos.get("stop_loss")
-                sl_label = "SL"
-            if sl_val:
-                meta_parts.append(f"{sl_label} {sl_val:.6g}")
-        if is_scanner and sym in scanner:
-            s = scanner[sym]
-            score_html = f'<span class="wl-score">{s["score"]:.1f}</span>'
-            meta_parts.append(f'{s["change_24h"]:+.1f}% {s["trend"]}')
-
-        html += f'''<div class="wl-item">
-            <span class="dot {dot_cls}"></span><span class="sym">{short}</span>{score_html}
-            <div class="meta">{" &middot; ".join(meta_parts)}</div>
-        </div>'''
-    html += '</div>'
-    return html
-
-
-def _build_l2_monitor_panel() -> str:
-    """Render the L2 Anticipation Signal Monitor panel from l2_snapshot.json."""
-    import html as _html
-    try:
-        with open("l2_snapshot.json") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        return (
-            '<div class="glass-card dash-item" data-id="l2monitor">'
-            '<h2>&#128225; L2 Anticipation Monitor</h2>'
-            '<div class="muted">No L2 snapshot yet &mdash; bot is starting up.</div>'
-            '</div>'
-        )
-    except Exception as e:
-        return (
-            '<div class="glass-card dash-item" data-id="l2monitor">'
-            '<h2>&#128225; L2 Anticipation Monitor</h2>'
-            f'<div class="muted">Snapshot unreadable &mdash; {_html.escape(str(e))}</div>'
-            '</div>'
-        )
-
-    updated_at = data.get("updated_at", 0)
-    age_sec = max(0, int(time.time() - updated_at))
-    stale = age_sec > 120
-    symbols = data.get("symbols", {})
-
-    if not symbols:
-        return (
-            '<div class="glass-card dash-item" data-id="l2monitor">'
-            '<h2>&#128225; L2 Anticipation Monitor</h2>'
-            '<div class="muted">No symbols in snapshot.</div>'
-            '</div>'
-        )
-
-    rows = []
-    for sym in sorted(symbols.keys()):
-        s = symbols[sym]
-        tc = s.get("trade_count", 0) or 0
-        short_sym = sym.split("/")[0]
-
-        if tc < 5:
-            rows.append(
-                f'<tr><td>{_html.escape(short_sym)}</td>'
-                f'<td class="l2-cell muted">&#9679;</td>'
-                f'<td class="l2-cell muted">&#9679;</td>'
-                f'<td class="l2-cell muted">&#9679;</td>'
-                f'<td class="l2-cell muted">&#9679;</td>'
-                f'<td class="l2-cell muted">no feed</td></tr>'
-            )
-            continue
-
-        br = s.get("buy_ratio")
-        cvd = s.get("cvd_slope")
-        bd = s.get("bid_depth_usdt") or 0
-        ad = s.get("ask_depth_usdt") or 0
-        lt = s.get("large_trade_bias", 0) or 0
-
-        # Direction per signal: +1 long, -1 short, 0 neutral
-        if br is None:
-            br_cell, br_dir = '<span class="muted">&mdash;</span>', 0
-        elif br > 0.55:
-            br_cell, br_dir = f'<span class="l2-ok">{br:.2f}&#8593;</span>', 1
-        elif br < 0.45:
-            br_cell, br_dir = f'<span class="l2-ok">{br:.2f}&#8595;</span>', -1
-        else:
-            br_cell, br_dir = f'<span class="l2-fail">{br:.2f}</span>', 0
-
-        if cvd is None:
-            cvd_cell, cvd_dir = '<span class="muted">&mdash;</span>', 0
-        elif cvd > 0.1:
-            cvd_cell, cvd_dir = f'<span class="l2-ok">{cvd:+.2f}&#8593;</span>', 1
-        elif cvd < -0.1:
-            cvd_cell, cvd_dir = f'<span class="l2-ok">{cvd:+.2f}&#8595;</span>', -1
-        else:
-            cvd_cell, cvd_dir = f'<span class="l2-fail">{cvd:+.2f}</span>', 0
-
-        if bd > 0 and ad > 0:
-            ratio = bd / ad
-            if ratio > 1.2:
-                depth_cell, depth_dir = f'<span class="l2-ok">{ratio:.2f}&times;&#8593;</span>', 1
-            elif ratio < 0.83:
-                depth_cell, depth_dir = f'<span class="l2-ok">{ratio:.2f}&times;&#8595;</span>', -1
-            else:
-                depth_cell, depth_dir = f'<span class="l2-fail">{ratio:.2f}&times;</span>', 0
-        else:
-            depth_cell, depth_dir = '<span class="muted">&mdash;</span>', 0
-
-        whale = '&#128011;' if abs(lt) > 0.2 else '&nbsp;'
-        whale_cell = f'<span class="l2-whale">{whale} {lt:+.2f}</span>' if lt else f'<span>{whale}</span>'
-
-        # Aligned direction: all 3 leaning same way (no opposites, at least 1 directional)
-        dirs = [d for d in (br_dir, cvd_dir, depth_dir) if d != 0]
-        long_count = sum(1 for d in dirs if d == 1)
-        short_count = sum(1 for d in dirs if d == -1)
-        if long_count == 3:
-            ready_cell = '<span class="l2-ready">&#9989; LONG 3/3</span>'
-        elif short_count == 3:
-            ready_cell = '<span class="l2-ready">&#9989; SHORT 3/3</span>'
-        elif long_count > 0 and short_count > 0:
-            ready_cell = f'<span class="l2-partial">&#9888;&#65039; MIXED {long_count}L/{short_count}S</span>'
-        elif long_count > 0:
-            ready_cell = f'<span class="l2-partial">&#128992; LONG {long_count}/3</span>'
-        elif short_count > 0:
-            ready_cell = f'<span class="l2-partial">&#128992; SHORT {short_count}/3</span>'
-        else:
-            ready_cell = '<span class="l2-fail">&#128308; 0/3</span>'
-
-        rows.append(
-            f'<tr><td>{_html.escape(short_sym)}</td>'
-            f'<td class="l2-cell">{br_cell}</td>'
-            f'<td class="l2-cell">{cvd_cell}</td>'
-            f'<td class="l2-cell">{depth_cell}</td>'
-            f'<td class="l2-cell">{whale_cell}</td>'
-            f'<td class="l2-cell">{ready_cell}</td></tr>'
-        )
-
-    stale_banner = ''
-    if stale:
-        stale_banner = (
-            f'<div class="l2-stale">Snapshot stale &mdash; last update {age_sec}s ago</div>'
-        )
-
-    table_html = (
-        '<table class="l2-table">'
-        '<thead><tr>'
-        '<th>Symbol</th>'
-        '<th>buy_ratio</th>'
-        '<th>cvd_slope</th>'
-        '<th>depth b/a</th>'
-        '<th>whale</th>'
-        '<th>READY</th>'
-        '</tr></thead>'
-        f'<tbody>{"".join(rows)}</tbody>'
-        '</table>'
-    )
-
-    return (
-        '<div class="glass-card dash-item" data-id="l2monitor">'
-        '<h2>&#128225; L2 Anticipation Monitor</h2>'
-        f'<div class="muted">Live snapshot &mdash; updated {age_sec}s ago</div>'
-        f'{stale_banner}'
-        f'{table_html}'
-        '</div>'
-    )
 
 
 # ── Ticker helpers (Terminal Pro shell) ─────────────────────────────────
@@ -1759,7 +1189,7 @@ def _build_why_no_trades(lines: list = None) -> str:
                     pass
             break
 
-    # ── Top gate blocker 24h (same counts source as the observability panel) ──
+    # ── Top gate blocker 24h (same counts source as the GATES panel) ──
     stats = _gate_stats(LOG_FILE)
     if stats:
         name, count = next(iter(stats.items()))  # _gate_stats sorts desc
@@ -1770,20 +1200,143 @@ def _build_why_no_trades(lines: list = None) -> str:
     return adx_html + sig_html + gate_html
 
 
+_OB_SPREAD_RE = re.compile(r'\[OB\] ([\w/:.]+) imb=\S+ spread=([\d.]+)%')
+
+# Short tokens for the one-line 24h gate summary ("ens 169 · time 42 · …")
+_GATE_SHORT = {
+    "Tape gate": "tape", "OB gate": "ob", "Ensemble <4/7": "ens",
+    "Time block": "time", "ADX too low": "adx", "Low volume": "vol",
+    "No confluence": "conf", "Choppy market": "chop", "Cooldown": "cool",
+    "QUIET regime": "quiet", "Divergence": "div",
+}
+
+
+def _parse_pair_spreads(lines: list[str]) -> dict[str, float]:
+    """Latest spread%% per pair from [OB] lines. Forward iteration so the newest
+    line wins. Pairs with no [OB] line in the tail stay ABSENT — never invent."""
+    spreads: dict[str, float] = {}
+    for line in lines:
+        m = _OB_SPREAD_RE.search(line)
+        if m:
+            try:
+                spreads[m.group(1)] = float(m.group(2))
+            except ValueError:
+                pass
+    return spreads
+
+
+def _build_gates_watchlist(lines: list = None) -> str:
+    """GATES 24H + WATCHLIST panel body.
+
+    Top: one dim line of 24h gate-rejection counts (top 6 by count, _gate_stats).
+    Middle: watchlist table SYM/VOL/SPREAD/RDY — same parse_watchlist data the old
+    tile grid used; readiness dot keeps open=green / scanner=amber / base=dim.
+    VOL comes from the latest scanner lines, SPREAD from [OB] lines; values not in
+    the log tail render as em-dash — never invented.
+    Bottom: compact per-symbol L2 readiness rows from l2_snapshot.json (same
+    thresholds the old L2 monitor used).
+    Pass pre-fetched log lines to avoid a redundant tail_log call."""
+    lines = lines if lines is not None else tail_log(3000)
+
+    # ── 24h gate counts, one dim line (top 6; _gate_stats sorts desc) ──
+    stats = _gate_stats(LOG_FILE)
+    if stats:
+        parts = [f"{escape(_GATE_SHORT.get(name, name.lower()))} {count}"
+                 for name, count in list(stats.items())[:6]]
+        gates_html = "<div class='dim'>" + " &middot; ".join(parts) + "</div>"
+    else:
+        gates_html = "<div class='dim'>no gate rejections in 24h log</div>"
+
+    # ── Watchlist table: open positions first, then scanner picks, then base ──
+    wl = parse_watchlist(lines)
+    scanner = {s["symbol"]: s for s in wl["scanner_pairs"]}
+    open_syms = wl["open_symbols"]
+    spreads = _parse_pair_spreads(lines)
+    seen: set = set()
+    ordered = []
+    for sym in (*sorted(open_syms), *scanner, *wl["base_pairs"]):
+        if sym not in seen:
+            ordered.append(sym)
+            seen.add(sym)
+    if ordered:
+        rows = ""
+        for sym in ordered:
+            short = escape(sym.replace("/USDT:USDT", ""))
+            vol = (scanner.get(sym) or {}).get("vol_usd")
+            if vol is not None:
+                vol_cell = f"<td>{vol / 1e6:.1f}M</td>" if vol >= 1e6 else f"<td>{vol / 1e3:.0f}K</td>"
+            else:
+                vol_cell = "<td class='dim'>&mdash;</td>"
+            spread = spreads.get(sym)
+            spread_cell = (f"<td>{spread:.3g}%</td>" if spread is not None
+                           else "<td class='dim'>&mdash;</td>")
+            rdy_cls = "pos" if sym in open_syms else "amb" if sym in scanner else "dim"
+            rows += (f"<tr><td>{short}</td>{vol_cell}{spread_cell}"
+                     f"<td class='{rdy_cls}'>&#9679;</td></tr>")
+        wl_html = ("<table style='margin-top:4px'><tr class='dim'><th>SYM</th>"
+                   "<th>VOL</th><th>SPREAD</th><th>RDY</th></tr>" + rows + "</table>")
+    else:
+        wl_html = "<div class='dim' style='margin-top:4px'>no pairs in log tail</div>"
+
+    # ── L2 readiness: per-symbol signal direction from l2_snapshot.json ──
+    try:
+        with open(os.path.join(PROJECT_DIR, "l2_snapshot.json")) as f:
+            snap = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        snap = None
+    if not snap or not snap.get("symbols"):
+        l2_html = "<div class='dim' style='margin-top:6px'>L2: no snapshot</div>"
+    else:
+        age = max(0, int(time.time() - (snap.get("updated_at") or 0)))
+        stale = " <span class='neg'>STALE</span>" if age > 120 else ""
+        l2_rows = ""
+        for sym in sorted(snap["symbols"]):
+            s = snap["symbols"][sym]
+            short = escape(sym.split("/")[0])
+            if (s.get("trade_count") or 0) < 5:
+                l2_rows += f"<div class='dim'>{short} no feed</div>"
+                continue
+            # Same per-signal thresholds as the old L2 monitor: buy_ratio
+            # 0.45/0.55, cvd_slope ±0.1, bid/ask depth ratio 1.2/0.83.
+            dirs = []
+            br = s.get("buy_ratio")
+            if br is not None:
+                dirs.append(1 if br > 0.55 else -1 if br < 0.45 else 0)
+            cvd = s.get("cvd_slope")
+            if cvd is not None:
+                dirs.append(1 if cvd > 0.1 else -1 if cvd < -0.1 else 0)
+            bd, ad = s.get("bid_depth_usdt") or 0, s.get("ask_depth_usdt") or 0
+            if bd > 0 and ad > 0:
+                ratio = bd / ad
+                dirs.append(1 if ratio > 1.2 else -1 if ratio < 0.83 else 0)
+            n_long = sum(1 for d in dirs if d == 1)
+            n_short = sum(1 for d in dirs if d == -1)
+            if n_long == 3 or n_short == 3:
+                l2_rows += (f"<div class='pos'>{short} "
+                            f"{'LONG' if n_long == 3 else 'SHORT'} 3/3</div>")
+            elif n_long and n_short:
+                l2_rows += f"<div class='dim'>{short} MIXED {n_long}L/{n_short}S</div>"
+            elif n_long or n_short:
+                side, n = ("LONG", n_long) if n_long else ("SHORT", n_short)
+                l2_rows += f"<div class='amb'>{short} {side} {n}/3</div>"
+            else:
+                l2_rows += f"<div class='dim'>{short} 0/3</div>"
+        l2_html = (f"<div class='dim' style='margin-top:6px'>L2 READINESS "
+                   f"&middot; {age}s ago{stale}</div>" + l2_rows)
+
+    return gates_html + wl_html + l2_html
+
+
 def build_content(lines: list = None) -> str:
     """Inner HTML for the swapped #content node — the six-panel command grid.
 
     Request-scope load: slot states are read ONCE here and passed into every
     panel builder that needs them (positions, slots/guardrails, blotter), so a
     3s poll globs+parses the state files a single time.
-    The GATES+WATCHLIST cell still carries legacy builders until Task 6.
     Pass pre-fetched log lines to avoid a redundant tail_log call.
     """
     slot_states = read_all_slot_states()
     lines = lines if lines is not None else tail_log(3000)
-    watchlist = parse_watchlist(lines)
-    # read_all_slot_states maps the main trading_state.json to key "5m_scalp"
-    main_positions = (slot_states.get("5m_scalp") or {}).get("positions") or {}
 
     # Panel 1 — POSITIONS: main + live slots, uPnL from already-read log prices
     positions_html = _build_positions_panel(lines, slot_states)
@@ -1797,8 +1350,8 @@ def build_content(lines: list = None) -> str:
     # Panel 4 — WHY NO TRADES? diagnostics (per-pair ADX, last signal, top gate)
     why_html = _build_why_no_trades(lines)
 
-    # Panel 5 — GATES + WATCHLIST (legacy builders carried forward; Task 6 rebuilds)
-    gates_html = _build_observability_panel() + _build_watchlist_html(watchlist, main_positions)
+    # Panel 5 — GATES + WATCHLIST: 24h gate counts, pair table, L2 readiness
+    gates_html = _build_gates_watchlist(lines)
 
     return f"""<div id="grid">
     <div class="panel" id="p-positions">
@@ -1868,16 +1421,6 @@ body {{ background:var(--bg); color:var(--txt);
 .feed-line.pos {{ color:var(--pos); }} .feed-line.amb {{ color:var(--amber); }}
 .feed-line.dim {{ color:var(--dim); }}
 .footer {{ color:var(--dim); font-size:9px; padding:4px 10px 8px; }}
-/* TEMP compat for the legacy GATES+WATCHLIST cell (gate table, watchlist tiles) — Task 6 removes */
-.glass-card {{ margin-bottom:6px; }}
-.glass-card h2 {{ color:var(--amber); font-size:9px; letter-spacing:1px;
-  text-transform:uppercase; font-weight:600; margin:4px 0; }}
-.watchlist-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:3px; }}
-.wl-item {{ border:1px solid var(--border); padding:3px 5px; font-size:10px; }}
-.wl-item .meta {{ color:var(--dim); font-size:9px; }}
-.wl-score {{ color:var(--amber); margin-left:4px; }}
-.dot {{ display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; background:var(--dim); }}
-.dot-open {{ background:var(--pos); }} .dot-scanner {{ background:var(--amber); }} .dot-base {{ background:var(--dim); }}
 .era-btn {{ background:none; border:1px solid var(--border); color:var(--dim);
   font:inherit; font-size:9px; letter-spacing:1px; padding:0 6px; cursor:pointer; }}
 .era-btn.active {{ color:var(--amber); border-color:var(--amber); }}
