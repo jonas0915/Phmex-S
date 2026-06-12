@@ -658,7 +658,7 @@ class RiskManager:
         }
         if fees_pending:
             trade["fees_pending"] = True
-        if mode:
+        if mode is not None:
             trade["mode"] = mode
         self.closed_trades.append(trade)
         self._save_state()
