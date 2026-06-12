@@ -265,6 +265,8 @@ def read_all_slot_states() -> dict[str, dict]:
     slots = {}
     for path in _glob.glob(os.path.join(PROJECT_DIR, "trading_state_*.json")):
         fname = os.path.basename(path)
+        if fname.endswith("_mode.json"):
+            continue  # promotion sidecar (paper/live flag), not a slot state file
         # Extract slot_id: trading_state_5m_liq_cascade.json → 5m_liq_cascade
         slot_id = fname.replace("trading_state_", "").replace(".json", "")
         try:
@@ -977,7 +979,17 @@ _SLOT_STRATEGY_MAP = {
 }
 
 # Slots that run LIVE (not paper). All others default to paper.
-_LIVE_SLOTS = {"5m_scalp"}
+def _live_slot_ids():
+    """Live slots: the main bot (5m_scalp) plus any slot promoted via mode sidecar."""
+    ids = {"5m_scalp"}
+    for path in _glob.glob(os.path.join(PROJECT_DIR, "trading_state_*_mode.json")):
+        try:
+            with open(path) as f:
+                if not json.load(f).get("paper_mode", True):
+                    ids.add(os.path.basename(path).replace("trading_state_", "").replace("_mode.json", ""))
+        except Exception:
+            pass
+    return ids
 
 
 def _compute_kelly_raw(trades: list[dict]) -> float:
@@ -1013,7 +1025,7 @@ def _compute_slot_stage(slot_id: str, trades: list[dict], factory_stage: str,
     # apply Kelly auto-kill to it: its trade history is the main trading_state.json
     # (lifetime live trades, includes pre-Sentinel iterations), not the slot's
     # sidecar — the bot itself uses an empty sidecar so its is_killed never trips.
-    if slot_id in _LIVE_SLOTS:
+    if slot_id in _live_slot_ids():
         return "live"
     # Paper slots: auto-kill at 50+ trades AND negative Kelly (strategy_slot.py:70-78)
     if len(trades) >= 50 and _compute_kelly_raw(trades) < 0:
@@ -2407,7 +2419,7 @@ def build_trades_page() -> str:
     sources = [("live", "trading_state.json")]
     for path in sorted(_glob.glob(os.path.join(PROJECT_DIR, "trading_state_5m_*.json"))):
         fname = os.path.basename(path)
-        if fname.endswith(".bak"):
+        if fname.endswith(".bak") or fname.endswith("_mode.json"):
             continue
         slot = fname.replace("trading_state_", "").replace(".json", "")
         sources.append((slot, fname))

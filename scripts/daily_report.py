@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Daily bot performance report — runs via cron, saves to reports/"""
+import glob
 import json
 import os
 import re
@@ -13,6 +14,7 @@ BOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE_FILE = os.path.join(BOT_DIR, "trading_state.json")
 LOG_FILE = os.path.join(BOT_DIR, "logs", "bot.log")
 REPORT_DIR = os.path.join(BOT_DIR, "reports")
+LIVE_LOSS_CAP = -5.0  # promoted slot auto-demotes when live PnL hits this
 
 os.makedirs(REPORT_DIR, exist_ok=True)
 
@@ -66,6 +68,44 @@ def analyze_trades(state, date_str):
         if date_str in str(ts):
             today_trades.append(t)
     return today_trades
+
+
+def live_slot_summaries(date_str):
+    """Stats for strategy slots promoted to LIVE via trading_state_<slot>_mode.json
+    sidecars (paper_mode false). Returns [] when nothing is promoted, so the
+    report/Telegram sections simply don't render."""
+    summaries = []
+    for mode_path in sorted(glob.glob(os.path.join(BOT_DIR, "trading_state_*_mode.json"))):
+        try:
+            with open(mode_path) as f:
+                mode = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            continue
+        if mode.get("paper_mode", True):
+            continue
+        slot_id = os.path.basename(mode_path).replace("trading_state_", "").replace("_mode.json", "")
+        try:
+            with open(os.path.join(BOT_DIR, f"trading_state_{slot_id}.json")) as f:
+                slot_state = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, IOError):
+            slot_state = {}
+        live_trades = [t for t in slot_state.get("closed_trades", []) or [] if t.get("mode") == "live"]
+        live_today = []
+        for t in live_trades:
+            closed_at = t.get("closed_at", 0)
+            if closed_at and datetime.fromtimestamp(closed_at, tz=CA_TZ).strftime("%Y-%m-%d") == date_str:
+                live_today.append(t)
+        wins = sum(1 for t in live_today if _net(t) > 0)
+        summaries.append({
+            "slot_id": slot_id,
+            "trades": len(live_today),
+            "wins": wins,
+            "losses": len(live_today) - wins,
+            "wr": (wins / len(live_today) * 100) if live_today else 0,
+            "pnl_today": sum(_net(t) for t in live_today),
+            "live_pnl": sum(t.get("pnl_usdt", 0) for t in live_trades),
+        })
+    return summaries
 
 
 def generate_report():
@@ -311,6 +351,15 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
         )
         report += f"- Delta vs Live: ${narrow_delta:+.2f} (NARROW minus Live)\n"
 
+    # Live slot sections (promoted via mode sidecar) — absent when nothing is promoted
+    for ls in live_slot_summaries(date_str):
+        report += f"\n## Live Slot: {ls['slot_id']}\n"
+        report += f"- Trades today: {ls['trades']} ({ls['wins']}W / {ls['losses']}L)\n"
+        report += f"- Win Rate: {ls['wr']:.1f}%\n"
+        report += f"- Net PnL today: ${ls['pnl_today']:.2f}\n"
+        report += f"- Live PnL since promotion: ${ls['live_pnl']:.2f}\n"
+        report += f"- Cap headroom: ${ls['live_pnl'] - LIVE_LOSS_CAP:.2f} until -${abs(LIVE_LOSS_CAP):.2f} auto-demote\n"
+
     # Save
     report_path = os.path.join(REPORT_DIR, f"{date_str}.md")
     with open(report_path, "w") as f:
@@ -442,6 +491,17 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
         msg += (
             "\n🧪 <b>NARROW (paper)</b>\n"
             "No state file yet — slot has not run.\n"
+        )
+
+    # Promoted live slots (mode sidecar paper_mode false) — absent when none
+    for ls in live_slot_summaries(date_str):
+        t_sign = "+" if ls["pnl_today"] >= 0 else ""
+        p_sign = "+" if ls["live_pnl"] >= 0 else ""
+        msg += (
+            f"\n🔴 <b>LIVE Slot: {ls['slot_id']}</b>\n"
+            f"{ls['trades']} trades | {ls['wr']:.0f}% WR | {t_sign}${ls['pnl_today']:.2f}\n"
+            f"Since promotion: {p_sign}${ls['live_pnl']:.2f} | "
+            f"Headroom: ${ls['live_pnl'] - LIVE_LOSS_CAP:.2f} until -${abs(LIVE_LOSS_CAP):.2f} demote\n"
         )
 
     try:
