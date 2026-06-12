@@ -63,3 +63,14 @@ def test_no_demote_when_healthy(slot):
                                [_fake_trade(-0.4, mode="live")] * 5)
     demote, _ = slot.should_auto_demote()
     assert not demote
+
+def test_close_position_records_mode(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from risk_manager import RiskManager
+    rm = RiskManager(state_file=str(tmp_path / "state.json"))
+    rm.open_position("DOGE/USDT:USDT", 0.08, 10.0, side="long")
+    rm.close_position("DOGE/USDT:USDT", 0.081, "take_profit", mode="live")
+    assert rm.closed_trades[-1]["mode"] == "live"
+    rm.open_position("DOGE/USDT:USDT", 0.08, 10.0, side="long")
+    rm.close_position("DOGE/USDT:USDT", 0.081, "take_profit")
+    assert "mode" not in rm.closed_trades[-1]

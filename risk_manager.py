@@ -598,7 +598,7 @@ class RiskManager:
         if open_positions:
             self._save_state()
 
-    def close_position(self, symbol: str, exit_price: float, reason: str, fees_usdt: float = None):
+    def close_position(self, symbol: str, exit_price: float, reason: str, fees_usdt: float = None, mode: str = None):
         if symbol not in self.positions:
             return
         pos = self.positions.pop(symbol)
@@ -658,6 +658,8 @@ class RiskManager:
         }
         if fees_pending:
             trade["fees_pending"] = True
+        if mode:
+            trade["mode"] = mode
         self.closed_trades.append(trade)
         self._save_state()
 
