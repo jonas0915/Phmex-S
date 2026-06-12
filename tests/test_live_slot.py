@@ -213,3 +213,17 @@ def test_live_close_triggers_auto_demote_on_loss_cap(slot, monkeypatch):
     assert ok is True
     # The close pushed live PnL past -$5 → auto-demote must have fired
     assert slot.paper_mode is True
+
+def test_set_live_flips_risk_manager_semantics(slot):
+    assert slot.risk.is_paper is True
+    slot.set_live()
+    assert slot.risk.is_paper is False
+    slot.set_paper()
+    assert slot.risk.is_paper is True
+
+def test_mode_reload_restores_risk_semantics(slot):
+    slot.set_live()
+    s2 = StrategySlot(slot_id="t_revert", strategy_name="bb_mean_reversion",
+                      timeframe="5m", max_positions=1, capital_pct=0.2, paper_mode=True)
+    assert s2.paper_mode is False
+    assert s2.risk.is_paper is False

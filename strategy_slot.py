@@ -87,6 +87,15 @@ class StrategySlot:
                 self.promoted_at = float(data.get("promoted_at", 0.0))
         except Exception as e:
             logger.warning(f"[SLOT] {self.slot_id} mode sidecar load failed: {e}")
+        self._sync_risk_semantics()
+
+    def _sync_risk_semantics(self) -> None:
+        """Keep the slot's RiskManager record/log semantics in step with slot mode.
+        A promoted slot must record like live (gross pnl_usdt, real fees, no sim
+        fee subtraction) and log without the [PAPER] prefix — mirrors the
+        derivation at RiskManager.__init__ (risk_manager.py:269-270)."""
+        self.risk.is_paper = self.paper_mode
+        self.risk._log_prefix = "[PAPER] " if self.paper_mode else ""
 
     def _save_mode(self) -> None:
         try:
@@ -104,11 +113,13 @@ class StrategySlot:
         if capital_pct is not None:
             self.capital_pct = capital_pct
         self.promoted_at = time.time()
+        self._sync_risk_semantics()
         self._save_mode()
 
     def set_paper(self) -> None:
         self.paper_mode = True
         self.capital_pct = 0.0
+        self._sync_risk_semantics()
         self._save_mode()
 
     def live_trades(self) -> list:
@@ -190,7 +201,7 @@ class StrategySlot:
         if not trades:
             return {"slot": self.slot_id, "trades": 0, "wr": 0, "pnl": 0, "kelly": 0}
         wins = sum(1 for t in trades if t.get("pnl_usdt", 0) > 0)
-        pnl = sum(t.get("pnl_usdt", 0) for t in trades)
+        pnl = sum(_trade_net(t) for t in trades)
         return {
             "slot": self.slot_id,
             "trades": len(trades),
