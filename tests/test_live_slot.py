@@ -74,3 +74,17 @@ def test_close_position_records_mode(tmp_path, monkeypatch):
     rm.open_position("DOGE/USDT:USDT", 0.08, 10.0, side="long")
     rm.close_position("DOGE/USDT:USDT", 0.081, "take_profit")
     assert "mode" not in rm.closed_trades[-1]
+
+def test_owner_map_includes_live_slots(slot):
+    from bot import _build_position_owners
+    class _MainRisk:
+        positions = {"BTC/USDT:USDT": object()}
+    slot.set_live()
+    slot.risk.positions = {"DOGE/USDT:USDT": object()}
+    paper = StrategySlot(slot_id="t_paper", strategy_name="bb_mean_reversion",
+                         timeframe="5m", paper_mode=True)
+    paper.risk.positions = {"ETH/USDT:USDT": object()}
+    owners = _build_position_owners(_MainRisk(), [slot, paper])
+    assert "BTC/USDT:USDT" in owners and owners["BTC/USDT:USDT"][1] is None
+    assert "DOGE/USDT:USDT" in owners and owners["DOGE/USDT:USDT"][1] is slot
+    assert "ETH/USDT:USDT" not in owners

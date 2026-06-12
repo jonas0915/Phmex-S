@@ -175,6 +175,21 @@ def _write_l2_snapshot(snapshot_dict: dict, path: str = "l2_snapshot.json") -> N
         logger.debug(f"[L2_SNAPSHOT] write failed: {e}")
 
 
+def _build_position_owners(main_risk, slots):
+    """symbol -> (owner_risk_manager, slot_or_None) for every EXCHANGE-BACKED position.
+    Main bot positions map to (main_risk, None); live-slot positions map to
+    (slot.risk, slot). Paper slots are simulation-only and excluded.
+    Used by _sync_exchange_closes so reconciliation is slot-aware."""
+    owners = {s: (main_risk, None) for s in main_risk.positions}
+    for slot in slots:
+        if slot.paper_mode:
+            continue
+        for s in slot.risk.positions:
+            if s not in owners:
+                owners[s] = (slot.risk, slot)
+    return owners
+
+
 class Phmex2Bot:
     def __init__(self):
         Config.validate()
@@ -2201,12 +2216,14 @@ class Phmex2Bot:
         exchange_symbols = set(exchange_map.keys())
 
         # --- (A) Closes: tracked locally but gone from exchange ---
+        # Owner map covers main bot AND live-slot positions (paper slots excluded);
+        # it is materialized up front, so close_position calls inside the loop are safe.
         try:
-            for symbol in list(self.risk.positions.keys()):
-                if symbol in getattr(self, "_closing", set()):
-                    continue  # watcher mid-close — its fill will record the trade
+            for symbol, (owner_risk, slot) in _build_position_owners(self.risk, self.slots).items():
+                if slot is None and symbol in getattr(self, "_closing", set()):
+                    continue  # watcher mid-close — its fill will record the trade (watcher manages main positions only)
                 if symbol not in exchange_symbols:
-                    pos = self.risk.positions[symbol]
+                    pos = owner_risk.positions[symbol]
                     # Try to get actual fill price from recent trades
                     exit_price = prices.get(symbol, pos.entry_price)
                     sync_fee = 0.0
@@ -2237,17 +2254,28 @@ class Phmex2Bot:
                                 logger.debug(f"[SYNC] {symbol} no post-entry close trade found yet — using mark price")
                     except Exception:
                         pass
-                    # Tag fills at a ratcheted durable-SL level as durable_sl so they
-                    # don't pollute the exchange_close (rode-to-disaster) bucket.
-                    close_reason = "exchange_close"
-                    if getattr(pos, "sl_ratcheted", False) and pos.exchange_sl_price:
-                        if abs(exit_price - pos.exchange_sl_price) / pos.exchange_sl_price <= 0.005:
-                            close_reason = "durable_sl"
-                    logger.info(f"[SYNC] {symbol} closed on exchange (SL/TP triggered) — removing from tracker (reason={close_reason})")
-                    self.exchange.cancel_open_orders(symbol)
-                    self._set_cooldown_if_loss(symbol, pos.pnl_percent(exit_price))
-                    notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), close_reason)
-                    self.risk.close_position(symbol, exit_price, close_reason, fees_usdt=sync_fee)
+                    if slot is None:
+                        # Main-bot position — behavior unchanged.
+                        # Tag fills at a ratcheted durable-SL level as durable_sl so they
+                        # don't pollute the exchange_close (rode-to-disaster) bucket.
+                        close_reason = "exchange_close"
+                        if getattr(pos, "sl_ratcheted", False) and pos.exchange_sl_price:
+                            if abs(exit_price - pos.exchange_sl_price) / pos.exchange_sl_price <= 0.005:
+                                close_reason = "durable_sl"
+                        logger.info(f"[SYNC] {symbol} closed on exchange (SL/TP triggered) — removing from tracker (reason={close_reason})")
+                        self.exchange.cancel_open_orders(symbol)
+                        self._set_cooldown_if_loss(symbol, pos.pnl_percent(exit_price))
+                        notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), close_reason)
+                        self.risk.close_position(symbol, exit_price, close_reason, fees_usdt=sync_fee)
+                    else:
+                        # Live-slot position — no durable-SL ratchet tag (slots have no
+                        # ratchet) and no main-bot pair cooldown (slot cooldown semantics
+                        # are owned by the slot, not here).
+                        logger.info(f"[SYNC] {symbol} closed on exchange (slot {slot.slot_id} SL/TP triggered) — removing from slot tracker")
+                        self.exchange.cancel_open_orders(symbol)
+                        notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), f"exchange_close [slot {slot.slot_id}]")
+                        owner_risk.close_position(symbol, exit_price, "exchange_close", fees_usdt=sync_fee, mode="live")
+                        self._maybe_auto_demote(slot)
         except Exception as e:
             logger.warning(f"[SYNC] (A) close-detection path failed: {e} — continuing to orphan scan")
 
@@ -2255,7 +2283,7 @@ class Phmex2Bot:
         # Snapshotted after (A) so any positions just closed locally are excluded.
         # Runs independently of (A) — a bug in close-detection must not block orphan discovery.
         try:
-            tracked_symbols = set(self.risk.positions.keys())
+            tracked_symbols = set(_build_position_owners(self.risk, self.slots).keys())
             # NOTE: list comprehension is materialized before _adopt_orphan_position can mutate
             # self.risk.positions. Safe, but if refactored to a generator this becomes a bug.
             orphans = [p for p in exchange_positions if p["symbol"] not in tracked_symbols]
@@ -2266,6 +2294,13 @@ class Phmex2Bot:
                     logger.error(f"[ORPHAN] Failed to adopt {orphan.get('symbol')}: {e}")
         except Exception as e:
             logger.warning(f"[SYNC] (B) orphan-scan path failed: {e}")
+
+    def _maybe_auto_demote(self, slot):
+        """Auto-demote check after a live slot close. Full demote execution lands
+        with the live-exit task; trigger logic lives on the slot."""
+        demote, reason = slot.should_auto_demote()
+        if demote:
+            logger.warning(f"[SLOT] {slot.slot_id} auto-demote triggered ({reason}) — demote execution pending")
 
     def _adopt_orphan_position(self, orphan: dict):
         """Adopt an exchange-visible position that the bot isn't tracking.
