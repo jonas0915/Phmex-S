@@ -6960,6 +6960,9 @@ function updateAgentLED(name, status) {
 }
 
 // ── MONITOR RENDERING ──
+// PnL basis: net (apiData.pnl_basis) — falls back to recorded gross only when net absent
+function netPnl(t){ return (t && typeof t.net_pnl === 'number') ? t.net_pnl : ((t && t.pnl_usdt) || 0); }
+
 function drawMonitorContent(name, ctx, w, h) {
   // Dark background
   ctx.fillStyle = '#0a0e18';
@@ -6977,33 +6980,13 @@ function drawMonitorContent(name, ctx, w, h) {
   ctx.textBaseline = 'top';
 
   if(name.startsWith('scanner')) {
-    // Scanner monitors: pair status
-    ctx.fillStyle = '#00ff88';
-    ctx.font = 'bold 11px monospace';
-    ctx.fillText('SCANNER', 6, 4);
-    const holdEvts = events.filter(e=>e.type==='hold').slice(-8);
-    const scanEvts = events.filter(e=>e.type==='scanner').slice(-3);
-    ctx.font = '9px monospace';
-    let y = 20;
-    holdEvts.forEach(e => {
-      const sym = (e.symbol||'').replace('/USDT:USDT','');
-      ctx.fillStyle = '#556677';
-      ctx.fillText('HOLD', 6, y);
-      ctx.fillStyle = '#8899aa';
-      ctx.fillText(sym, 42, y);
-      // vol bar
-      ctx.fillStyle = '#1a3322';
-      ctx.fillRect(120, y+1, 80, 7);
-      ctx.fillStyle = '#2d7a35';
-      ctx.fillRect(120, y+1, 20+Math.random()*50, 7);
-      y += 12;
-    });
     if(name.endsWith('2')) {
       ctx.fillStyle = '#ffb830';
       ctx.font = 'bold 10px monospace';
       ctx.fillText('LIVE SCAN', 6, 4);
       ctx.font = '9px monospace';
-      y = 20;
+      const scanEvts = events.filter(e=>e.type==='scanner').slice(-3);
+      let y = 20;
       scanEvts.forEach(e => {
         ctx.fillStyle = '#aabb88';
         const msg = (e.msg||'').substring(0,32);
@@ -7014,36 +6997,49 @@ function drawMonitorContent(name, ctx, w, h) {
         ctx.fillStyle = '#445566';
         ctx.fillText('Waiting for scan...', 6, 20);
       }
+    } else {
+      // Truthful per-pair 1H ADX bars — real values from apiData.pair_adx, dim dash when absent
+      ctx.fillStyle = '#00ff88';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText('SCANNER', 6, 4);
+      ctx.fillStyle = '#556677';
+      ctx.font = '8px monospace';
+      ctx.fillText('1H ADX vs 25', 150, 6);
+      const adxMap = apiData?.pair_adx || {};
+      const pairs = (apiData?.watchlist || []).map(p=>p[0]).slice(0,6);
+      const BAR_X = 100, BAR_W = 90;
+      ctx.font = '9px monospace';
+      let y = 20;
+      pairs.forEach(sym => {
+        ctx.fillStyle = '#8899aa';
+        ctx.fillText(sym, 6, y);
+        const adx = adxMap[sym + '/USDT:USDT'];
+        ctx.fillStyle = '#1a2433';
+        ctx.fillRect(BAR_X, y+1, BAR_W, 7);
+        // threshold tick at ADX 25
+        ctx.fillStyle = '#33475c';
+        ctx.fillRect(BAR_X + (25/45)*BAR_W, y, 1, 9);
+        if(typeof adx === 'number'){
+          ctx.fillStyle = adx >= 25 ? '#4ecb71' : '#ffb830';
+          ctx.fillRect(BAR_X, y+1, Math.min(adx,45)/45*BAR_W, 7);
+          ctx.fillStyle = '#aabbcc';
+          ctx.font = '8px monospace';
+          ctx.fillText(adx.toFixed(1), BAR_X+BAR_W+6, y+1);
+          ctx.font = '9px monospace';
+        } else {
+          ctx.fillStyle = '#445566';
+          ctx.fillText('—', BAR_X+BAR_W/2-3, y);
+        }
+        y += 12;
+      });
+      if(pairs.length===0){
+        ctx.fillStyle = '#445566';
+        ctx.fillText('No pairs scanned yet', 6, 20);
+      }
     }
   }
   else if(name.startsWith('risk')) {
-    ctx.fillStyle = '#ff4444';
-    ctx.font = 'bold 11px monospace';
-    ctx.fillText('RISK MANAGER', 6, 4);
-    // Drawdown bar
     const dd = s.drawdown || 0;
-    ctx.fillStyle = '#889';
-    ctx.font = '9px monospace';
-    ctx.fillText('Drawdown', 6, 22);
-    ctx.fillStyle = '#1a1a2a';
-    ctx.fillRect(6, 34, 180, 12);
-    ctx.fillStyle = dd > 15 ? '#ff3333' : dd > 10 ? '#ffaa33' : '#33aa55';
-    ctx.fillRect(6, 34, Math.min(dd/20*180, 180), 12);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(dd.toFixed(1)+'%', 80, 35);
-    // Positions
-    ctx.fillStyle = '#aab';
-    ctx.fillText('Positions: '+(cy.positions||0), 6, 54);
-    // Last trades
-    ctx.fillText('Last Trades:', 6, 70);
-    let y = 82;
-    trades.slice(-5).forEach(t => {
-      const pnl = t.pnl_usdt || 0;
-      ctx.fillStyle = pnl >= 0 ? '#4ecb71' : '#e05252';
-      const sym = (t.symbol||'').replace('/USDT:USDT','');
-      ctx.fillText(`${sym} ${pnl>=0?'+':''}${pnl.toFixed(2)}`, 6, y);
-      y += 11;
-    });
     if(name.endsWith('2')){
       ctx.fillStyle = '#ff6644';
       ctx.font = 'bold 10px monospace';
@@ -7056,6 +7052,49 @@ function drawMonitorContent(name, ctx, w, h) {
       ctx.fillText('Hard exit: 4h', 6, 64);
       ctx.fillStyle = dd > 15 ? '#ff3333' : '#33aa55';
       ctx.fillText(dd > 15 ? 'WARNING' : 'STATUS: OK', 6, 84);
+    } else {
+      ctx.fillStyle = '#ff4444';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText('RISK MANAGER', 6, 4);
+      // Drawdown bar
+      ctx.fillStyle = '#889';
+      ctx.font = '9px monospace';
+      ctx.fillText('Drawdown', 6, 22);
+      ctx.fillStyle = '#1a1a2a';
+      ctx.fillRect(6, 34, 180, 12);
+      ctx.fillStyle = dd > 15 ? '#ff3333' : dd > 10 ? '#ffaa33' : '#33aa55';
+      ctx.fillRect(6, 34, Math.min(dd/20*180, 180), 12);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(dd.toFixed(1)+'%', 80, 35);
+      // Mean-revert live guardrail — real headroom from apiData.slots, or paper status
+      const mr = (apiData?.slots||[]).find(sl=>sl.id==='5m_mean_revert');
+      ctx.fillStyle = '#889';
+      ctx.fillText('MR Guardrail', 6, 54);
+      if(mr && mr.live && typeof mr.headroom === 'number'){
+        const frac = Math.max(0, mr.headroom/5);
+        ctx.fillStyle = '#1a1a2a';
+        ctx.fillRect(6, 66, 180, 12);
+        ctx.fillStyle = frac > 0.5 ? '#33aa55' : '#ffaa33';
+        ctx.fillRect(6, 66, Math.min(frac,1)*180, 12);
+        ctx.fillStyle = '#fff';
+        ctx.fillText('HDRM $'+mr.headroom.toFixed(2)+' / $5.00', 36, 67);
+      } else {
+        ctx.fillStyle = '#445566';
+        ctx.fillText('MR: paper', 6, 66);
+      }
+      // Positions
+      ctx.fillStyle = '#aab';
+      ctx.fillText('Positions: '+(cy.positions||0), 6, 86);
+      // Last trades (net basis)
+      ctx.fillText('Last Trades (net):', 6, 100);
+      let y = 112;
+      trades.slice(-4).forEach(t => {
+        const pnl = netPnl(t);
+        ctx.fillStyle = pnl >= 0 ? '#4ecb71' : '#e05252';
+        const sym = (t.symbol||'').replace('/USDT:USDT','');
+        ctx.fillText(`${sym} ${pnl>=0?'+':''}${pnl.toFixed(2)}`, 6, y);
+        y += 11;
+      });
     }
   }
   else if(name.startsWith('ensemble')) {
@@ -7162,52 +7201,74 @@ function drawMonitorContent(name, ctx, w, h) {
     }
   }
   else if(name.startsWith('executor')) {
-    // Executor agent monitors — Keltner Squeeze, Momentum Burst, Trend Scalp
-    ctx.fillStyle = '#60a5fa';
-    ctx.font = 'bold 11px monospace';
-    ctx.fillText('TREND ENGINE', 6, 4);
-    ctx.fillStyle = '#889';
-    ctx.font = '9px monospace';
-    // ADX meter
-    ctx.fillText('ADX Strength', 6, 22);
-    ctx.fillStyle = '#1a1a2a';
-    ctx.fillRect(6, 34, 180, 12);
-    const holdEvts = events.filter(e=>e.type==='hold');
-    const lastH = holdEvts.length ? holdEvts[holdEvts.length-1] : null;
-    const adxMatch = lastH ? (lastH.detail||'').match(/ADX=([\d.]+)/) : null;
-    const adx = adxMatch ? parseFloat(adxMatch[1]) : 15+Math.random()*25;
-    ctx.fillStyle = adx > 25 ? '#60a5fa' : adx > 20 ? '#fbbf24' : '#555';
-    ctx.fillRect(6, 34, Math.min(adx/50*180, 180), 12);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(adx.toFixed(1), 80, 35);
-    // Strategy status
-    ctx.fillStyle = '#8899aa';
-    ctx.fillText('Keltner Squeeze', 6, 54);
-    ctx.fillStyle = adx > 25 ? '#4ecb71' : '#555';
-    ctx.fillText(adx > 25 ? 'ACTIVE' : 'STANDBY', 130, 54);
-    ctx.fillStyle = '#8899aa';
-    ctx.fillText('Momentum Burst', 6, 68);
-    ctx.fillStyle = adx > 25 ? '#4ecb71' : '#555';
-    ctx.fillText(adx > 25 ? 'ACTIVE' : 'STANDBY', 130, 68);
-    ctx.fillStyle = '#8899aa';
-    ctx.fillText('Trend Scalp', 6, 82);
-    ctx.fillStyle = adx > 25 ? '#4ecb71' : '#555';
-    ctx.fillText(adx > 25 ? 'ACTIVE' : 'STANDBY', 130, 82);
+    // Executor desk — watcher status + last enforced live exit (truth only)
+    const watcherOn = apiData?.watcher === true;
+    const lexEvts = events.filter(e=>/live.?exit/i.test(e.msg||''));
+    const liveExit = lexEvts.length ? lexEvts[lexEvts.length-1] : null;
     if(name.endsWith('2')){
-      // MACD-style mini chart
       ctx.fillStyle = '#3366aa';
       ctx.font = 'bold 10px monospace';
-      ctx.fillText('MOMENTUM', 6, 4);
-      let cx2 = 6;
-      for(let i=0;i<24;i++){
-        const v = (Math.random()-0.5)*30;
-        ctx.fillStyle = v > 0 ? '#60a5fa' : '#334466';
-        ctx.fillRect(cx2, 50-Math.max(v,0), 5, Math.abs(v));
-        cx2 += 7;
-      }
+      ctx.fillText('LIVE EXIT WATCHER', 6, 4);
+      ctx.font = 'bold 16px monospace';
+      ctx.fillStyle = watcherOn ? '#4ecb71' : '#e05252';
+      ctx.fillText(watcherOn ? 'WATCHER ON' : 'WATCHER OFF', 6, 28);
+      ctx.font = '9px monospace';
       ctx.fillStyle = '#8899aa';
-      ctx.font = '8px monospace';
-      ctx.fillText('MACD Histogram', 6, 90);
+      ctx.fillText('Last enforcement:', 6, 60);
+      if(liveExit){
+        ctx.fillStyle = '#ffb830';
+        ctx.fillText((liveExit.msg||'').substring(0,28), 6, 74);
+      } else {
+        ctx.fillStyle = '#445566';
+        ctx.fillText('—', 6, 74);
+      }
+    } else {
+      ctx.fillStyle = '#60a5fa';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText('TREND ENGINE', 6, 4);
+      ctx.fillStyle = '#889';
+      ctx.font = '9px monospace';
+      // ADX meter — real value from last hold event, dim dash when absent
+      ctx.fillText('ADX Strength', 6, 22);
+      ctx.fillStyle = '#1a1a2a';
+      ctx.fillRect(6, 34, 180, 12);
+      const holdEvts = events.filter(e=>e.type==='hold');
+      const lastH = holdEvts.length ? holdEvts[holdEvts.length-1] : null;
+      const adxMatch = lastH ? (lastH.detail||'').match(/ADX=([\d.]+)/) : null;
+      const adx = adxMatch ? parseFloat(adxMatch[1]) : null;
+      if(adx !== null){
+        ctx.fillStyle = adx > 25 ? '#60a5fa' : adx > 20 ? '#fbbf24' : '#555';
+        ctx.fillRect(6, 34, Math.min(adx/50*180, 180), 12);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(adx.toFixed(1), 80, 35);
+      } else {
+        ctx.fillStyle = '#445566';
+        ctx.fillText('—', 90, 35);
+      }
+      // Strategy status — unknown (dash) when no ADX observed
+      [['Keltner Squeeze',54],['Momentum Burst',68],['Trend Scalp',82]].forEach(([label, sy]) => {
+        ctx.fillStyle = '#8899aa';
+        ctx.fillText(label, 6, sy);
+        if(adx !== null){
+          ctx.fillStyle = adx > 25 ? '#4ecb71' : '#555';
+          ctx.fillText(adx > 25 ? 'ACTIVE' : 'STANDBY', 130, sy);
+        } else {
+          ctx.fillStyle = '#445566';
+          ctx.fillText('—', 130, sy);
+        }
+      });
+      // Watcher status + newest live-exit enforcement
+      ctx.font = 'bold 10px monospace';
+      ctx.fillStyle = watcherOn ? '#4ecb71' : '#e05252';
+      ctx.fillText(watcherOn ? 'WATCHER ON' : 'WATCHER OFF', 6, 100);
+      ctx.font = '9px monospace';
+      if(liveExit){
+        ctx.fillStyle = '#ffb830';
+        ctx.fillText((liveExit.msg||'').substring(0,28), 6, 114);
+      } else {
+        ctx.fillStyle = '#445566';
+        ctx.fillText('no live exits', 6, 114);
+      }
     }
   }
   else if(name.startsWith('strategy')) {
@@ -7281,7 +7342,7 @@ function drawMonitorContent(name, ctx, w, h) {
     // Header
     ctx.fillStyle = '#44aaff';
     ctx.font = 'bold 13px monospace';
-    ctx.fillText('DAILY DASHBOARD', 8, 12);
+    ctx.fillText('DAILY DASHBOARD (NET)', 8, 12);
     // Today card
     ctx.fillStyle = '#aab';
     ctx.font = '10px monospace';
@@ -7299,11 +7360,11 @@ function drawMonitorContent(name, ctx, w, h) {
     // Recent trades table
     ctx.fillStyle = '#6699bb';
     ctx.font = 'bold 9px monospace';
-    ctx.fillText('SIDE  PAIR       PNL      ROI    REASON', 8, 66);
+    ctx.fillText('SIDE  PAIR       NET      ROI    REASON', 8, 66);
     ctx.font = '8px monospace';
     let ty = 78;
     trades2.slice(-8).reverse().forEach(t => {
-      const p = t.pnl_usdt||0;
+      const p = netPnl(t);
       const roi = t.pnl_pct||0;
       ctx.fillStyle = p >= 0 ? '#4ecb71' : '#e05252';
       const sym = (t.symbol||'').replace('/USDT:USDT','').padEnd(10);
@@ -7316,10 +7377,10 @@ function drawMonitorContent(name, ctx, w, h) {
     ctx.fillRect(8, 170, 240, 1);
     ctx.fillStyle = '#556677';
     ctx.font = '8px monospace';
-    ctx.fillText('CUMULATIVE P&L', 8, 182);
+    ctx.fillText('CUMULATIVE NET P&L', 8, 182);
     if(trades2.length > 1) {
       let cum = 0;
-      const pts = trades2.map(t => { cum += (t.pnl_usdt||0); return cum; });
+      const pts = trades2.map(t => { cum += netPnl(t); return cum; });
       const maxP = Math.max(...pts.map(Math.abs), 0.01);
       ctx.strokeStyle = '#44aaff';
       ctx.lineWidth = 1.5;
@@ -7386,6 +7447,20 @@ function drawMonitorContent(name, ctx, w, h) {
       ctx.font = '11px monospace';
       ctx.fillText('Waiting for scanner data...', 10, 65);
     }
+    // MR-LIVE guardrail row (bottom) — real values from apiData.slots or paper status
+    const mrW = (apiData?.slots||[]).find(sl=>sl.id==='5m_mean_revert');
+    ctx.fillStyle = '#223344';
+    ctx.fillRect(10, 140, 300, 1);
+    ctx.font = 'bold 10px monospace';
+    if(mrW && mrW.live){
+      const ln = (typeof mrW.live_net === 'number') ? '$'+mrW.live_net.toFixed(2) : '—';
+      const hr = (typeof mrW.headroom === 'number') ? '$'+mrW.headroom.toFixed(2) : '—';
+      ctx.fillStyle = '#4ecb71';
+      ctx.fillText('MR-LIVE  net '+ln+'  hdrm '+hr, 10, 148);
+    } else {
+      ctx.fillStyle = '#556677';
+      ctx.fillText('MR paper', 10, 148);
+    }
   }
   else if(name === 'walldash') {
     // Wall dashboard — Performance overview
@@ -7395,7 +7470,7 @@ function drawMonitorContent(name, ctx, w, h) {
     // Header
     ctx.fillStyle = '#89b4fa';
     ctx.font = 'bold 14px monospace';
-    ctx.fillText('PHMEX-S PERFORMANCE', 10, 16);
+    ctx.fillText('PHMEX-S PERFORMANCE (NET)', 10, 16);
     // Balance
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 20px monospace';
@@ -7413,7 +7488,7 @@ function drawMonitorContent(name, ctx, w, h) {
     ctx.fillStyle = wr2 >= 50 ? '#4ecb71' : '#e05252';
     ctx.fillText('WR: '+wr2.toFixed(1)+'%', 100, 60);
     ctx.fillStyle = pnl2 >= 0 ? '#4ecb71' : '#e05252';
-    ctx.fillText('PnL: '+(pnl2>=0?'+':'')+pnl2.toFixed(2), 170, 60);
+    ctx.fillText('Net: '+(pnl2>=0?'+':'')+pnl2.toFixed(2), 170, 60);
     // Separator
     ctx.fillStyle = '#223344';
     ctx.fillRect(10, 68, 236, 1);
@@ -7431,7 +7506,7 @@ function drawMonitorContent(name, ctx, w, h) {
     // Top pairs
     ctx.fillStyle = '#6699bb';
     ctx.font = 'bold 9px monospace';
-    ctx.fillText('TOP PAIRS', 10, 114);
+    ctx.fillText('TOP PAIRS (NET)', 10, 114);
     ctx.font = '9px monospace';
     let py = 126;
     tp.forEach(([sym, pnlVal]) => {
@@ -7480,7 +7555,7 @@ function drawMonitorContent(name, ctx, w, h) {
       ctx.font = '8px monospace';
       let y = 20;
       trades.slice(-8).forEach(t=>{
-        const p = t.pnl_usdt||0;
+        const p = netPnl(t);
         ctx.fillStyle = p>=0?'#4ecb71':'#e05252';
         const sym = (t.symbol||'').replace('/USDT:USDT','');
         ctx.fillText(`${t.side||'?'} ${sym} ${p>=0?'+':''}${p.toFixed(2)} [${t.reason||'?'}]`, 4, y);
@@ -7502,8 +7577,58 @@ function drawMonitorContent(name, ctx, w, h) {
   ctx.restore();
 }
 
+// ── REDRAW DISCIPLINE (desk v2) — each canvas redraws only when its data slice changed ──
+const _monHash = {};
+function monChanged(key, slice){
+  const h = JSON.stringify(slice);
+  if(_monHash[key] === h) return false;
+  _monHash[key] = h; return true;
+}
+
+// Per-monitor data slices — each covers EXACTLY the fields its draw branch reads.
+function _monSlices(){
+  const s = apiData?.stats || {};
+  const cy = apiData?.cycle || {};
+  const trades = apiData?.recent_trades || [];
+  const events = apiData?.events || [];
+  const mr = (apiData?.slots||[]).find(sl=>sl.id==='5m_mean_revert') || null;
+  const holds = events.filter(e=>e.type==='hold');
+  const lastHold = holds.length ? (holds[holds.length-1].detail||'') : '';
+  const lex = events.filter(e=>/live.?exit/i.test(e.msg||''));
+  const liveExit = lex.length ? (lex[lex.length-1].msg||'') : '';
+  const scanMsgs = events.filter(e=>e.type==='scanner').slice(-3).map(e=>e.msg);
+  const entryMsgs = events.filter(e=>e.type==='entry'||e.type==='entry_detail').slice(-6).map(e=>e.msg);
+  const tapeMsgs = events.filter(e=>e.type==='tape'||e.type==='orderbook'||e.type==='depth').slice(-8).map(e=>e.msg);
+  const ensBase = [cy.cycle, cy.positions, apiData?.ensemble, apiData?.kelly];
+  return {
+    scanner_mon1:  [apiData?.pair_adx, apiData?.watchlist],
+    scanner_mon2:  [scanMsgs],
+    risk_mon1:     [s.drawdown, cy.positions, trades.slice(-4), mr],
+    risk_mon2:     [s.drawdown],
+    ensemble_mon1: ensBase,
+    ensemble_mon2: ensBase.concat([entryMsgs]),
+    ensemble_mon3: ensBase.concat([s.total_pnl]),
+    tape_mon1:     ['static'],
+    tape_mon2:     [tapeMsgs],
+    executor_mon1: [lastHold, apiData?.watcher, liveExit],
+    executor_mon2: [apiData?.watcher, liveExit],
+    strategy_mon1: [lastHold],
+    strategy_mon2: ['static'],
+    jonas_mon1:    [s.balance, s.total_pnl, s.win_rate],
+    jonas_mon2:    [s.balance, s.total_pnl, s.win_rate, trades.slice(-8)],
+    jonas_mon3:    [s.balance, s.total_pnl, s.win_rate, apiData?.peak_balance, apiData?.total_trades],
+    conftv:        [apiData?.today, trades],
+    wallwatch:     [apiData?.watchlist, cy.positions, mr],
+    walldash:      [s, apiData?.peak_balance, apiData?.total_trades, apiData?.avg_win,
+                    apiData?.avg_loss, apiData?.best_trade, apiData?.worst_trade, apiData?.top_pairs],
+  };
+}
+
 function updateAllMonitors() {
+  const slices = _monSlices();
   Object.keys(monitorCanvases).forEach(name => {
+    const slice = (slices[name] !== undefined) ? slices[name] : ['static'];
+    if(!monChanged(name, slice)) return;   // unchanged data → no redraw, no texture upload
     const cnv = monitorCanvases[name];
     const ctx = cnv.getContext('2d');
     drawMonitorContent(name, ctx, cnv.width, cnv.height);
