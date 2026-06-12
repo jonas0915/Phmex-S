@@ -4,12 +4,22 @@ symbols that traded live during the sprint window, and compare the aggregate
 (count / net PnL / WR) against the live htf_l2_anticipation trades.
 
 Multi-symbol counterpart to calibrate_compare.py. Run from repo root:
-    python scripts/calibrate_flow.py
+    python scripts/calibrate_flow.py [--ae-threshold -999.0] [--ae-cycles 10] [--fee-rt 0.22]
+
+2026-06-11: exit-model recalibration —
+  - AE default now -999.0 (LIVE PARITY: adverse exit was DISABLED live for the
+    whole 5/11-5/30 window; the 5/30 run wrongly passed -3.0).
+  - Live window is now bounded ABOVE by the last 5m candle in backtest_data_may,
+    so re-runs after 5/30 still compare the same 53-trade live set.
+  - Live baseline split into EXECUTED trades vs zero-PnL min_margin_skip ghosts
+    (8 of the 53 "trades" are $0 partial-fill skips the sim can never produce).
+  - Per-exit-reason live-vs-sim table added.
 """
+import argparse
 import json
 import os
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -41,6 +51,15 @@ SYMBOLS = [
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--ae-threshold", type=float, default=-999.0,
+                    help="Adverse-exit ROI threshold. LIVE PARITY for 5/11-5/30 window "
+                         "is -999.0 (disabled since 2026-05-07).")
+    ap.add_argument("--ae-cycles", type=int, default=10)
+    ap.add_argument("--fee-rt", type=float, default=0.22,
+                    help="Round-trip fee+slippage %% of notional (risk_manager paper model).")
+    args = ap.parse_args()
+
     pair_data, htf_data = {}, {}
     for sym in SYMBOLS:
         safe = sym.replace("/", "_").replace(":", "_")
@@ -52,26 +71,36 @@ def main():
             htf_data[sym] = load_candles(p1)
     print(f"loaded candles for {len(pair_data)} symbols")
 
+    # Upper bound of the calibration window = end of the May candle archive.
+    # (flow_capture.jsonl keeps growing live; without this bound, re-runs after
+    # 5/30 would silently pull post-window live trades into the baseline.)
+    data_end = max(int(df.index[-1].timestamp()) for df in pair_data.values()) + 300
+
     idx = FlowIndex()
     lo, hi = idx.coverage_window()
     f = lambda t: datetime.fromtimestamp(t, tz=timezone.utc).isoformat() if t else "n/a"
     print(f"flow: {idx.row_count} rows / {idx.symbol_count} symbols / {f(lo)} -> {f(hi)}")
+    print(f"calibration window: {f(lo)} -> {f(data_end)} (candle archive end)")
+    print(f"adverse exit: threshold={args.ae_threshold} cycles={args.ae_cycles} | fee RT: {args.fee_rt}%")
 
     sim = run_backtest(
         pair_data,
         htf_data=htf_data,
         flow_index=idx,
         flow_replay=True,
-        ae_threshold=-3.0,
-        ae_cycles=10,
+        ae_threshold=args.ae_threshold,
+        ae_cycles=args.ae_cycles,
+        fee_rt_pct=args.fee_rt,
     )
 
     with open("trading_state.json") as fh:
         state = json.load(fh)
-    live = [
+    live_all = [
         t for t in state.get("closed_trades", [])
-        if t.get("strategy") == STRATEGY and t.get("opened_at", 0) >= lo
+        if t.get("strategy") == STRATEGY and lo <= t.get("opened_at", 0) <= data_end
     ]
+    live = [t for t in live_all if t.get("exit_reason") != "min_margin_skip"]
+    skips = len(live_all) - len(live)
 
     def live_pnl(t):
         return t.get("net_pnl", t.get("pnl_usdt", 0))
@@ -87,15 +116,45 @@ def main():
 
     print("\n=== FLOW-REPLAY CALIBRATION (aggregate, all symbols) ===")
     print(f"  Strategy: {STRATEGY}")
-    print(f"  Window:   {f(lo)} -> {f(hi)}")
+    print(f"  Window:   {f(lo)} -> {f(data_end)}")
+    print(f"  Live records in window: {len(live_all)} ({live_n} executed + {skips} zero-PnL min_margin_skip)")
     print("  ---")
-    print(f"  Live: {live_n:>3} trades | ${lv_pnl:+7.2f} net | {lv_wr:4.1f}% WR")
-    print(f"  Sim:  {sim_n:>3} trades | ${sim_pnl:+7.2f} net | {sim_wr:4.1f}% WR")
+    print(f"  Live (executed): {live_n:>3} trades | ${lv_pnl:+7.2f} net | {lv_wr:4.1f}% WR")
+    print(f"  Sim:             {sim_n:>3} trades | ${sim_pnl:+7.2f} net | {sim_wr:4.1f}% WR")
     print("  ---")
     print(f"  Count delta: {count_delta:+6.1f}%  (target +/-30%)  {'PASS' if abs(count_delta)<=30 else 'FAIL'}")
     print(f"  PnL delta:   {pnl_delta:+6.1f}%  (target +/-15%)  {'PASS' if abs(pnl_delta)<=15 else 'FAIL'}")
     cal = abs(count_delta) <= 30 and abs(pnl_delta) <= 15
     print(f"  CALIBRATION: {'PASS' if cal else 'FAIL'}")
+
+    # Per-exit-reason comparison (live exchange_close == resting SL/TP fills
+    # detected between 60s cycles; sim tags intra-bar resting fills the same way)
+    lv_r = defaultdict(lambda: [0, 0.0, 0])
+    for t in live:
+        r = t.get("exit_reason") or t.get("reason") or "?"
+        lv_r[r][0] += 1
+        lv_r[r][1] += live_pnl(t)
+        lv_r[r][2] += 1 if live_pnl(t) > 0 else 0
+    sm_r = defaultdict(lambda: [0, 0.0, 0])
+    for t in sim:
+        sm_r[t.exit_reason][0] += 1
+        sm_r[t.exit_reason][1] += t.pnl_usd
+        sm_r[t.exit_reason][2] += 1 if t.pnl_usd > 0 else 0
+    print("\n  per-exit-reason (live n/pnl/wins | sim n/pnl/wins):")
+    for r in sorted(set(lv_r) | set(sm_r)):
+        ln, lp, lw = lv_r.get(r, [0, 0.0, 0])
+        sn, sp, sw = sm_r.get(r, [0, 0.0, 0])
+        print(f"    {r:<20} live {ln:>3} ${lp:+7.2f} w{lw:<3} | sim {sn:>3} ${sp:+7.2f} w{sw}")
+
+    # Dump sim trades for forensics (ZEC overfire investigation etc.)
+    dump = [{
+        "pair": t.pair, "dir": t.direction, "entry": t.entry_price, "exit": t.exit_price,
+        "entry_time": str(t.entry_time), "exit_time": str(t.exit_time),
+        "pnl": round(t.pnl_usd, 4), "roi": round(t.roi_pct, 2), "reason": t.exit_reason,
+    } for t in sim]
+    with open("logs/calibrate_flow_trades.json", "w") as fh:
+        json.dump(dump, fh, indent=1)
+    print(f"\n  sim trades dumped: logs/calibrate_flow_trades.json ({len(dump)})")
 
     sim_by = Counter(t.pair for t in sim)
     live_by = Counter(t["symbol"] for t in live)

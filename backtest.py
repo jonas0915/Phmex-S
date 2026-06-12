@@ -33,8 +33,10 @@ from strategies import Signal, TradeSignal, confluence_strategy, htf_confluence_
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts"))
 try:
     from flow_replay import passes_flow_gates as _passes_flow_gates
+    from flow_replay import replay_confidence as _replay_confidence
 except Exception:
     _passes_flow_gates = None
+    _replay_confidence = None
 
 # ---------------------------------------------------------------------------
 # Constants (match .env)
@@ -155,6 +157,36 @@ def _extract_strategy_name(reason: str) -> str:
     return "unknown"
 
 
+def _classify_regime_label(last, df=None) -> str:
+    """Port of bot.py:1810 _classify_regime (label only — that's all the gate uses)."""
+    try:
+        close = float(last.get("close", 0))
+        adx = float(last.get("adx", 0))
+        atr = float(last.get("atr", 0))
+        ema9 = float(last.get("ema_9", 0))
+        ema21 = float(last.get("ema_21", 0))
+        ema50 = float(last.get("ema_50", 0))
+        ema200 = float(last.get("ema_200", 0))
+        vol = float(last.get("volume", 0))
+        vol_avg = float(df["volume"].iloc[-20:].mean()) if df is not None and len(df) >= 20 else 0
+    except (TypeError, ValueError):
+        return "UNKNOWN"
+    atr_pct = (atr / close) if close > 0 else 0
+    vol_ratio = (vol / vol_avg) if vol_avg > 0 else 1.0
+    above_ema200 = close > ema200 if ema200 > 0 else True
+    stack_bull = ema9 > ema21 > ema50 > 0
+    stack_bear = 0 < ema9 < ema21 < ema50
+    if atr_pct > 0.015 or vol_ratio > 2.5:
+        return "VOLATILE"
+    if adx >= 25 and stack_bull and above_ema200:
+        return "TRENDING_UP"
+    if adx >= 25 and stack_bear and not above_ema200:
+        return "TRENDING_DOWN"
+    if adx < 20:
+        return "CHOPPY"
+    return "QUIET"
+
+
 # ---------------------------------------------------------------------------
 # Position tracking
 # ---------------------------------------------------------------------------
@@ -173,6 +205,8 @@ class BTPosition:
     peak_price: float = 0.0
     breakeven_moved: bool = False
     trailing_stop_price: Optional[float] = None
+    entry_epoch: float = 0.0    # epoch seconds of entry (bar close) — live exit model
+    entry_meta: dict = field(default_factory=dict)  # entry-time diagnostics (cohort-gate sims)
 
     def roi(self, current_price: float) -> float:
         """ROI as % of margin (leveraged)."""
@@ -209,6 +243,7 @@ class ClosedTrade:
     exit_reason: str
     strategy: str
     margin: float
+    entry_meta: dict = field(default_factory=dict)  # entry-time diagnostics (cohort-gate sims)
 
 
 # ---------------------------------------------------------------------------
@@ -321,9 +356,15 @@ def calculate_sl_tp(
     min_sl_dist = entry_price * (SL_FLOOR_PCT / 100)
     max_sl_dist = min_sl_dist * 3
     sl_dist = max(min_sl_dist, min(sl_dist, max_sl_dist))
+    max_tp_dist = entry_price * (TP_CAP_PCT / 100)
+    # R:R >= 1:1 cap (risk_manager.py:508-512) — was MISSING here, letting sim SL
+    # run up to 3.6% while live SL is hard-pinned. With TP cap 1.6% and tp_ratio 2.0
+    # this collapses live SL to exactly the 1.2% floor and TP to 1.6% — confirmed by
+    # live trades in the 5/11-5/30 window clustering at -13%/+16% ROI on exchange fills.
+    max_sl_for_rr = max_tp_dist / mults["tp_ratio"]
+    sl_dist = min(sl_dist, max(min_sl_dist, max_sl_for_rr))
     tp_dist = sl_dist * mults["tp_ratio"]
     # Cap TP at configured max so it's reachable on 1m scalp
-    max_tp_dist = entry_price * (TP_CAP_PCT / 100)
     tp_dist = min(tp_dist, max_tp_dist)
 
     if direction == "long":
@@ -513,6 +554,278 @@ def check_exits(
 
 
 # ---------------------------------------------------------------------------
+# Live-fidelity exit engine (flow-replay calibration, 2026-06-11)
+#
+# Replaces the bar-close exit model above when flow replay is active. Mirrors
+# the live 60s loop:
+#   bot.py:680  early_exit        -> risk_manager.py:119 should_exit_early
+#   bot.py:704  flat_exit         -> risk_manager.py:237 (240 cycles, -4<=roi<4)
+#   bot.py:733  htf_trend_flip    -> bot.py:144-160 (1h ema21/ema50 flip)
+#   bot.py:757  adverse_exit      -> risk_manager.py:207 (roi<=thresh after N cycles)
+#   bot.py:815  hard_time_exit    -> risk_manager.py:218 (240 cycles, 1.5x ext if roi>=5)
+#   bot.py:850  breakeven+trailing-> risk_manager.py:248 / risk_manager.py:44 tiers
+#   bot.py:890  check_positions   -> risk_manager.py:670-691 software TP/SL/trailing
+# plus the RESTING exchange SL/TP orders which fire intra-bar between cycles
+# (live tags those fills "exchange_close" via _sync_exchange_closes).
+#
+# Intra-bar price path = captured flow snapshot prices (~75s cadence,
+# FlowIndex.prices_between). Bars with no snapshot fall back to bar-close as a
+# single cycle point + OHLC wick check (counted in stats["fallback_bars"]).
+#
+# Approximations (documented, unavoidable offline):
+#   - early-exit indicator signals (rsi/macd/ema9) read the CURRENT 5m bar's
+#     final values for intra-bar cycles (up to 5 min lookahead on those three
+#     signals only; the dominant peak-drawdown + ROI conditions use snapshot
+#     prices with no lookahead).
+#   - when SL and TP are both inside one path segment / wick range, SL fills
+#     first (pessimistic).
+#   - live bot restarts reset cycle counters (time-based exits stretch); not modeled.
+# ---------------------------------------------------------------------------
+
+EARLY_EXIT_MIN_ROI = 3.0      # risk_manager.py:125
+FLAT_EXIT_CYCLES_LIVE = 240   # risk_manager.py:241 (240 x 60s = 4h)
+HARD_TIME_CYCLES_LIVE = 240   # risk_manager.py:223
+
+
+def _live_update_trailing(pos: BTPosition, price: float) -> None:
+    """Port of risk_manager.py:44-98 update_trailing_stop (tiered, ROI-based)."""
+    roi = pos.roi(price)
+    if roi < 5.0:
+        return
+    tiers = [
+        (20.0, 15.0, 5.0),
+        (15.0, 10.0, 5.0),
+        (10.0,  6.0, 4.0),
+        ( 8.0,  4.0, 4.0),
+        ( 5.0,  2.0, 3.0),
+    ]
+    lock_in_pct, trail_pct = 2.0, 3.0
+    for threshold, lock, trail in tiers:
+        if roi >= threshold:
+            lock_in_pct, trail_pct = lock, trail
+            break
+    if pos.direction == "long":
+        if price > pos.peak_price or pos.peak_price == 0.0:
+            pos.peak_price = price
+        trail_price = pos.peak_price * (1 - trail_pct / 100 / LEVERAGE)
+        lock_price = pos.entry_price * (1 + lock_in_pct / 100 / LEVERAGE)
+        new_trail = max(trail_price, lock_price)
+        if pos.trailing_stop_price is None or new_trail > pos.trailing_stop_price:
+            pos.trailing_stop_price = new_trail
+    else:
+        if price < pos.peak_price or pos.peak_price == 0.0:
+            pos.peak_price = price
+        trail_price = pos.peak_price * (1 + trail_pct / 100 / LEVERAGE)
+        lock_price = pos.entry_price * (1 - lock_in_pct / 100 / LEVERAGE)
+        new_trail = min(trail_price, lock_price)
+        if pos.trailing_stop_price is None or new_trail < pos.trailing_stop_price:
+            pos.trailing_stop_price = new_trail
+
+
+def _live_check_breakeven(pos: BTPosition, price: float) -> None:
+    """Port of risk_manager.py:248-263 check_breakeven (1R -> entry +/- 0.25%)."""
+    r_distance = abs(pos.entry_price - pos.sl_price)
+    if r_distance <= 0:
+        return
+    if pos.direction == "long":
+        if price >= pos.entry_price + r_distance:
+            new_sl = pos.entry_price * 1.0025
+            if new_sl > pos.sl_price:
+                pos.sl_price = new_sl
+    else:
+        if price <= pos.entry_price - r_distance:
+            new_sl = pos.entry_price * 0.9975
+            if new_sl < pos.sl_price:
+                pos.sl_price = new_sl
+
+
+def _live_should_exit_early(pos: BTPosition, price: float,
+                            last: pd.Series, prev: pd.Series) -> bool:
+    """Port of risk_manager.py:119-193 should_exit_early (incl. peak tracking)."""
+    roi = pos.roi(price)
+    if roi < EARLY_EXIT_MIN_ROI:
+        return False
+
+    # Peak update inline (risk_manager.py:128-132)
+    if pos.direction == "long" and price > pos.peak_price:
+        pos.peak_price = price
+    elif pos.direction == "short" and (price < pos.peak_price or pos.peak_price == 0.0):
+        pos.peak_price = price
+
+    signals = 0
+    # Signal 1: RSI reversal
+    rsi_v = last.get("rsi", 50)
+    if pos.direction == "long":
+        if rsi_v < 45:
+            signals += 1
+    else:
+        if rsi_v > 55:
+            signals += 1
+    # Signal 2: MACD fresh crossover against position
+    if "macd" in last and "macd_signal" in last:
+        if pos.direction == "long":
+            if last["macd"] < last["macd_signal"] and prev["macd"] >= prev["macd_signal"]:
+                signals += 1
+        else:
+            if last["macd"] > last["macd_signal"] and prev["macd"] <= prev["macd_signal"]:
+                signals += 1
+    # Signal 3: price beyond EMA-9 two candles
+    if "ema_9" in last and "ema_9" in prev:
+        if pos.direction == "long":
+            if last["close"] < last["ema_9"] and prev["close"] < prev["ema_9"]:
+                signals += 1
+        else:
+            if last["close"] > last["ema_9"] and prev["close"] > prev["ema_9"]:
+                signals += 1
+    # Signal 4: peak drawdown (risk_manager.py:164-183)
+    peak_roi = 0.0
+    drawdown_from_peak = 0.0
+    if pos.peak_price > 0 and pos.peak_price != pos.entry_price:
+        if pos.direction == "long":
+            peak_roi = (pos.peak_price - pos.entry_price) / pos.entry_price * 100 * LEVERAGE
+            drawdown_from_peak = (pos.peak_price - price) / pos.peak_price * 100 * LEVERAGE
+        else:
+            peak_roi = (pos.entry_price - pos.peak_price) / pos.entry_price * 100 * LEVERAGE
+            drawdown_from_peak = (price - pos.peak_price) / pos.peak_price * 100 * LEVERAGE
+        if peak_roi >= 8.0 and drawdown_from_peak >= 3.0:
+            return True  # Tier 1: immediate
+        if peak_roi >= 5.0 and drawdown_from_peak >= 2.0:
+            signals += 1  # Tier 2: counts as one signal
+
+    if roi >= 8.0:
+        return signals >= 1
+    return signals >= 2
+
+
+def _effective_stop(pos: BTPosition) -> float:
+    """Live should_stop_loss (risk_manager.py:100-105): once the trail is armed
+    it replaces the base SL (trail >= breakeven lock > base SL by construction)."""
+    return pos.trailing_stop_price if pos.trailing_stop_price is not None else pos.sl_price
+
+
+def _resting_order_hit(pos: BTPosition, seg_lo: float, seg_hi: float) -> Optional[tuple[float, str]]:
+    """Did the price path segment [seg_lo, seg_hi] touch a RESTING exchange order?
+    Fills between 60s cycles are what live tags 'exchange_close'.
+
+    May-window vintage (verified in logs/bot.log.5+4+3): the exchange SL only
+    ever moved on BREAKEVEN ('[BREAKEVEN] ... exchange SL updated'); the tiered
+    trailing stop was SOFTWARE-ONLY (checked at 60s cycle prices). So intra-bar
+    touches use pos.sl_price (breakeven-ratcheted base SL) — NOT the trail.
+    Pessimistic: SL wins when both SL and TP are inside the segment."""
+    if seg_lo <= pos.sl_price <= seg_hi:
+        return pos.sl_price, "exchange_close"
+    if seg_lo <= pos.tp_price <= seg_hi:
+        return pos.tp_price, "exchange_close"
+    return None
+
+
+def check_exits_live(
+    pos: BTPosition,
+    candle: pd.Series,
+    idx: int,
+    df: pd.DataFrame,
+    htf_window: Optional[pd.DataFrame],
+    cycle_points: list[tuple[int, float]],
+    bar_close_ts: int,
+    ae_threshold: float,
+    ae_cycles: int,
+    stats: dict,
+) -> Optional[tuple[float, str]]:
+    """One 5m bar of the live exit pipeline. Returns (exit_price, reason) or None.
+
+    cycle_points: [(epoch_s, price)] captured flow snapshots inside this bar —
+    the 60s-cadence software exit checks run at each of these. Empty -> fall
+    back to a single bar-close cycle + OHLC wick check (and count it).
+    """
+    open_p = float(candle["open"])
+    high = float(candle["high"])
+    low = float(candle["low"])
+    close = float(candle["close"])
+
+    last = df.iloc[idx]
+    prev = df.iloc[idx - 1] if idx >= 1 else last
+
+    points = [(t, p) for (t, p) in cycle_points if t > pos.entry_epoch]
+    if points:
+        stats["flow_bars"] = stats.get("flow_bars", 0) + 1
+    else:
+        stats["fallback_bars"] = stats.get("fallback_bars", 0) + 1
+        points = [(bar_close_ts, close)]
+
+    # HTF trend-flip state for this bar (bot.py:144-160) — htf_l2_anticipation
+    # and htf_confluence_pullback only (bot.py:726).
+    flip = False
+    if pos.strategy in HTF_STRATEGIES and htf_window is not None and len(htf_window):
+        h_last = htf_window.iloc[-1]
+        ema21, ema50 = h_last.get("ema_21"), h_last.get("ema_50")
+        if ema21 is not None and ema50 is not None and ema21 == ema21 and ema50 == ema50:
+            if pos.direction == "long" and ema21 < ema50:
+                flip = True
+            elif pos.direction == "short" and ema21 > ema50:
+                flip = True
+
+    prev_p = open_p
+    for t, p in points:
+        # --- 0. Resting exchange SL/TP touched between cycles (intra-bar) ---
+        hit = _resting_order_hit(pos, min(prev_p, p), max(prev_p, p))
+        if hit:
+            return hit
+        prev_p = p
+
+        roi = pos.roi(p)
+        cycles_held = (t - pos.entry_epoch) / 60.0  # live cycle == 60s
+
+        # --- 1. early_exit (bot.py:680) ---
+        if _live_should_exit_early(pos, p, last, prev):
+            return p, "early_exit"
+
+        # --- 2. flat_exit (bot.py:704, risk_manager.py:237-246) ---
+        if cycles_held >= FLAT_EXIT_CYCLES_LIVE and -4.0 <= roi < 4.0:
+            return p, "flat_exit"
+
+        # --- 3. HTF trend-flip exit (bot.py:733) ---
+        if flip:
+            return p, "htf_trend_flip_exit"
+
+        # --- 4. adverse_exit (bot.py:757, risk_manager.py:207-216) ---
+        if cycles_held >= ae_cycles and roi <= ae_threshold:
+            return p, "adverse_exit"
+
+        # --- 5. hard time exit (bot.py:815, risk_manager.py:218-235) ---
+        if cycles_held >= HARD_TIME_CYCLES_LIVE:
+            if roi >= 5.0:
+                if cycles_held >= HARD_TIME_CYCLES_LIVE * 1.5:
+                    return p, "hard_time_exit"
+            else:
+                return p, "hard_time_exit"
+
+        # --- 6. breakeven + trailing ratchet (bot.py:850-851) ---
+        _live_check_breakeven(pos, p)
+        _live_update_trailing(pos, p)
+
+        # --- 7. software TP/SL/trailing at cycle price (risk_manager.py:670-691) ---
+        if pos.direction == "long":
+            tp_hit, sl_hit = p >= pos.tp_price, p <= _effective_stop(pos)
+        else:
+            tp_hit, sl_hit = p <= pos.tp_price, p >= _effective_stop(pos)
+        if tp_hit:
+            return p, "take_profit"
+        if sl_hit:
+            in_profit = pos.pnl_usd(p) > 0
+            if pos.trailing_stop_price is not None and in_profit:
+                return p, "trailing_stop"
+            if in_profit:
+                return p, "take_profit"
+            return p, "stop_loss"
+
+    # --- End of bar: wick check beyond the sampled path (resting orders) ---
+    hit = _resting_order_hit(pos, low, high)
+    if hit:
+        return hit
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Core backtest engine
 # ---------------------------------------------------------------------------
 
@@ -525,6 +838,13 @@ def run_backtest(
     ae_cycles: int = DEFAULT_AE_MIN_CYCLES,
     flow_index=None,
     flow_replay: bool = False,
+    live_exit_model: Optional[bool] = None,
+    fee_rt_pct: float = (TAKER_FEE_PCT + SLIPPAGE_PCT) * 2,
+    block_ltbias: Optional[float] = None,
+    block_adx5m: Optional[float] = None,
+    min_conf: Optional[int] = None,
+    extra_blocked_hours: Optional[set] = None,
+    no_whale_boost: bool = False,
 ) -> list[ClosedTrade]:
     """
     Run the full backtest across all pairs simultaneously.
@@ -535,8 +855,30 @@ def run_backtest(
     calibration_mode: if True, bypass confluence_strategy router and call
                      htf_confluence_pullback directly. Used for backtester calibration
                      against live PnL when l2_anticipation can't be replayed (no flow).
+    live_exit_model: use the 60s-cadence live exit pipeline (check_exits_live) with
+                     captured flow prices as the intra-bar path. Defaults to ON when
+                     flow_replay is on. Fee model becomes risk_manager.py:611 paper
+                     model: net = gross - notional * fee_rt_pct/100 (0.22% RT default),
+                     no separate price slippage on entry/exit fills.
+
+    Phase-3 cohort-gate flags (2026-06-11 edge plan §6, ALL default-off — existing
+    calibration runs are unaffected). Candidate entry gates simulated, NOT live:
+    block_ltbias:        skip entry when ALIGNED large_trade_bias >= X (aligned =
+                         raw lt_bias for longs, negated for shorts). Needs flow_replay.
+    block_adx5m:         skip entry when the 5m ADX at entry >= X.
+    min_conf:            override the replay ensemble floor (live 4/7). NOTE replay
+                         confidence caps at 6/7 (funding layer not captured).
+    extra_blocked_hours: set of extra UTC hours appended to BLOCKED_HOURS_UTC.
+    no_whale_boost:      undo the aligned-whale strength boost (+0.03,
+                         strategies.py:601-606) post-hoc before the min-strength
+                         check — the sim calls the real strategy, so the boost is
+                         reversed here in the harness (strategies.py untouched).
+                         Exact because the 0.92 strength cap can never bind for
+                         htf_l2_anticipation in replay (max 0.82+0.03+0.02+0.02=0.89).
     """
     htf_data = htf_data or {}
+    if live_exit_model is None:
+        live_exit_model = flow_replay
 
     # Compute indicators on full datasets upfront (5m and 1h)
     pair_dfs: dict[str, pd.DataFrame] = {}
@@ -575,6 +917,13 @@ def run_backtest(
     regime_pause_until = 0  # candle index when regime pause expires
     drawdown_pause_until = 0  # candle index when drawdown pause expires
     virtual_candle = 0  # global candle counter
+    exit_stats: dict = {}  # live exit model: flow_bars / fallback_bars counters
+
+    # Bar duration (sec) per pair — needed to anchor entry_epoch / cycle clocks
+    bar_seconds: dict[str, int] = {}
+    for pair, df in pair_dfs.items():
+        diffs = pd.Series(df.index).diff().dropna()
+        bar_seconds[pair] = int(diffs.median().total_seconds()) if len(diffs) else 300
 
     # For each pair, find start/end indices within its own df
     pair_ranges: dict[str, tuple[int, int]] = {}
@@ -632,11 +981,38 @@ def run_backtest(
             win_start = max(0, idx - 5)
             df_window = df.iloc[win_start:idx + 1]
 
-            result = check_exits(pos, candle, idx, df_window, ae_threshold=ae_threshold, ae_cycles=ae_cycles)
+            if live_exit_model:
+                if idx <= pos.entry_candle:
+                    continue  # exits start the bar after entry (live: position opens mid-loop)
+                bar_open_ts = int(df.index[idx].timestamp())
+                bar_close_ts = bar_open_ts + bar_seconds.get(pair, 300)
+                cycle_points = (
+                    flow_index.prices_between(pair, bar_open_ts, bar_close_ts)
+                    if flow_index is not None else []
+                )
+                # HTF window for trend-flip exit (sliced to current time, no lookahead)
+                htf_df_full_x = htf_dfs.get(pair)
+                htf_window_x = None
+                if htf_df_full_x is not None and pos.strategy in HTF_STRATEGIES:
+                    h_idx = htf_df_full_x.index.searchsorted(candle_time, side="right") - 1
+                    if h_idx >= 1:
+                        htf_window_x = htf_df_full_x.iloc[max(0, h_idx - 2):h_idx + 1]
+                result = check_exits_live(
+                    pos, candle, idx, df, htf_window_x, cycle_points, bar_close_ts,
+                    ae_threshold=ae_threshold, ae_cycles=ae_cycles, stats=exit_stats,
+                )
+            else:
+                result = check_exits(pos, candle, idx, df_window, ae_threshold=ae_threshold, ae_cycles=ae_cycles)
             if result is not None:
                 exit_price, reason = result
                 gross_pnl = pos.pnl_usd(exit_price)
-                fees = round_trip_fees(pos.size_usd)
+                # Fee model: live exit model uses the risk_manager.py:611 paper round
+                # trip (taker 0.06% + slippage 0.05% per side on notional, 0.22% RT);
+                # legacy model keeps explicit price slippage + taker-only fees.
+                if live_exit_model:
+                    fees = pos.size_usd * fee_rt_pct / 100.0
+                else:
+                    fees = round_trip_fees(pos.size_usd)
                 net_pnl = gross_pnl - fees
                 roi_pct = net_pnl / pos.margin * 100
 
@@ -654,6 +1030,7 @@ def run_backtest(
                     exit_reason=reason,
                     strategy=pos.strategy,
                     margin=pos.margin,
+                    entry_meta=pos.entry_meta,
                 )
                 closed_trades.append(trade)
                 balance += net_pnl
@@ -788,20 +1165,77 @@ def run_backtest(
             if signal.signal == Signal.HOLD:
                 continue
 
-            # Min strength check (v4.0: 0.70)
-            if signal.strength < SCALP_MIN_STRENGTH:
-                continue
-
             strategy_name = _extract_strategy_name(signal.reason)
+            _dir = "long" if signal.signal == Signal.BUY else "short"
+            _entry_conf = None  # diagnostics (set below when flow gates run)
+
+            # --- Cohort gate A' (--no-whale-boost, default OFF): reverse the
+            # aligned-whale +0.03 strength boost (strategies.py:601-606) post-hoc.
+            # The sim calls the real strategy, so the boost is undone here in the
+            # harness instead of editing strategies.py. Exact: the min(strength,
+            # 0.92) cap never binds for htf_l2_anticipation in replay (walls are
+            # sanitized to [], max possible = 0.82+0.03+0.02+0.02 = 0.89).
+            raw_strength = signal.strength
+            if no_whale_boost and flow_replay and strategy_name == "htf_l2_anticipation" and flow_rp:
+                _lt_nb = flow_rp.get("large_trade_bias", 0.0) or 0.0
+                if (_dir == "long" and _lt_nb > 0.2) or (_dir == "short" and _lt_nb < -0.2):
+                    raw_strength -= 0.03
+
+            # Short penalty (bot.py:1051-1053): -0.04 strength on SELL signals,
+            # applied BEFORE the min-strength check. Was never ported — root cause
+            # of the ZEC 10x overfire (sim 30 shorts vs live 15; longs matched 22=22).
+            # NOTE: keep the live float semantics (0.84-0.04 = 0.7999... < 0.80 blocks).
+            sig_strength = raw_strength - 0.04 if signal.signal == Signal.SELL else raw_strength
+
+            # Min strength check (live: Config.SCALP_MIN_STRENGTH)
+            if sig_strength < SCALP_MIN_STRENGTH:
+                continue
 
             # --- Flow gate port (live bot.py:1082-1143), replayed from capture ---
             if flow_replay and not no_gates and _passes_flow_gates is not None:
-                _dir = "long" if signal.signal == Signal.BUY else "short"
                 # Live uses one-bar-back EMA for slope (bot.py:289) -> iloc[-2].
                 _htf_last = htf_window.iloc[-1] if htf_window is not None and len(htf_window) else None
                 _htf_prev = htf_window.iloc[-2] if htf_window is not None and len(htf_window) >= 2 else _htf_last
-                _ok, _ = _passes_flow_gates(strategy_name, _dir, ob_rp, flow_rp, candle, _htf_last, _htf_prev)
+                _ok, _ = _passes_flow_gates(strategy_name, _dir, ob_rp, flow_rp, candle,
+                                            _htf_last, _htf_prev, min_conf=min_conf)
                 if not _ok:
+                    continue
+                if _replay_confidence is not None:
+                    _entry_conf, _ = _replay_confidence(candle, ob_rp, flow_rp,
+                                                        _htf_last, _htf_prev, _dir,
+                                                        strat_name=strategy_name)
+
+                # QUIET regime gate (bot.py:1303-1322 + _classify_regime bot.py:1810):
+                # ADX in [20,25) with no EMA stack/trend and not volatile -> block
+                # unless flow CVD confirms direction. Was never ported (second ZEC
+                # overfire contributor — live blocked ZEC shorts in QUIET chop).
+                if _classify_regime_label(candle, df_window) == "QUIET":
+                    _flow_confirms = False
+                    if flow_rp and flow_rp.get("trade_count", 0) > 5:
+                        if _dir == "long" and flow_rp.get("cvd_slope", 0) > 0.2:
+                            _flow_confirms = True
+                        if _dir == "short" and flow_rp.get("cvd_slope", 0) < -0.2:
+                            _flow_confirms = True
+                    if not _flow_confirms:
+                        continue
+
+            # --- Phase-3 cohort gate A (--block-ltbias, default OFF): skip entry
+            # when ALIGNED large_trade_bias >= threshold. Aligned = raw lt_bias for
+            # longs, negated for shorts (audit 2026-06-11 §2.1: the >=0.36 aligned
+            # tercile is the worst cohort, -$9.97 / 35.5% WR). Missing key -> 0.0
+            # (gate passes); presence is measured via entry_meta coverage.
+            if block_ltbias is not None and flow_replay and flow_rp is not None:
+                _lt_a = flow_rp.get("large_trade_bias", 0.0) or 0.0
+                _aligned_lt = _lt_a if _dir == "long" else -_lt_a
+                if _aligned_lt >= block_ltbias:
+                    continue
+
+            # --- Phase-3 cohort gate B (--block-adx5m, default OFF): skip entry
+            # when the 5m ADX at entry >= threshold (audit §2.5: ADX>=25 cohort
+            # 38.7% WR vs 53-63% below). NaN ADX passes (no data, no gate).
+            if block_adx5m is not None:
+                _adx5 = float(candle.get("adx", float("nan")))
+                if _adx5 == _adx5 and _adx5 >= block_adx5m:
                     continue
 
             # --- Cooldowns (skip in no-gates mode) ---
@@ -815,8 +1249,12 @@ def run_backtest(
                     continue
 
                 # Time-of-day filter (matches live bot.py:1172, 417-trade analysis)
+                # Phase-3 cohort gate D (--extra-blocked-hours, default OFF) appends
+                # extra UTC hours (audit §2.6: UTC 21-23 = 2-4 PM PT, -$9.34/n=22).
                 _utc_hour = candle_time.hour if hasattr(candle_time, "hour") else 0
                 if _utc_hour in BLOCKED_HOURS_UTC:
+                    continue
+                if extra_blocked_hours and _utc_hour in extra_blocked_hours:
                     continue
 
                 # HTF cluster throttle (matches live bot.py:1182, 30 min between any htf entry)
@@ -827,7 +1265,9 @@ def run_backtest(
             # --- Open position ---
             entry_price = float(candle["close"])
             direction = "long" if signal.signal == Signal.BUY else "short"
-            fill_price = apply_slippage(entry_price, direction, entering=True)
+            # Live exit model charges slippage inside the 0.22% RT fee (risk_manager
+            # paper model) — don't also worsen the fill price.
+            fill_price = entry_price if live_exit_model else apply_slippage(entry_price, direction, entering=True)
 
             sl_price, tp_price = calculate_sl_tp(fill_price, direction, atr_val, regime)
 
@@ -843,6 +1283,24 @@ def run_backtest(
             if margin > balance:
                 continue
 
+            # Entry-time diagnostics for the cohort-gate sims (carried onto the
+            # ClosedTrade; lets the sweep report measure gate coverage + cohorts).
+            entry_meta = {}
+            if flow_replay:
+                _lt_m = flow_rp.get("large_trade_bias") if flow_rp else None
+                _adx_m = float(candle.get("adx", float("nan")))
+                entry_meta = {
+                    "lt_bias": _lt_m,
+                    "aligned_lt": (_lt_m if direction == "long" else -_lt_m) if _lt_m is not None else None,
+                    "adx5m": _adx_m if _adx_m == _adx_m else None,
+                    "conf": _entry_conf,
+                    "hour_utc": int(candle_time.hour) if hasattr(candle_time, "hour") else None,
+                    "trade_count": flow_rp.get("trade_count") if flow_rp else None,
+                    "strength": round(sig_strength, 4),
+                    "flow_age_s": (flow_index.snapshot_age(pair, int(candle_time.timestamp()))
+                                   if flow_index is not None and hasattr(flow_index, "snapshot_age") else None),
+                }
+
             notional = margin * LEVERAGE
             pos = BTPosition(
                 pair=pair,
@@ -855,6 +1313,8 @@ def run_backtest(
                 tp_price=tp_price,
                 strategy=strategy_name,
                 peak_price=fill_price,
+                entry_epoch=int(df.index[idx].timestamp()) + bar_seconds.get(pair, 300),
+                entry_meta=entry_meta,
             )
             open_positions[pair] = pos
             last_entry_candle = virtual_candle
@@ -867,9 +1327,13 @@ def run_backtest(
     for pair, pos in open_positions.items():
         df = pair_dfs[pair]
         last_candle = df.iloc[-1]
-        exit_price = apply_slippage(float(last_candle["close"]), pos.direction, entering=False)
+        if live_exit_model:
+            exit_price = float(last_candle["close"])
+            fees = pos.size_usd * fee_rt_pct / 100.0
+        else:
+            exit_price = apply_slippage(float(last_candle["close"]), pos.direction, entering=False)
+            fees = round_trip_fees(pos.size_usd)
         gross_pnl = pos.pnl_usd(exit_price)
-        fees = round_trip_fees(pos.size_usd)
         net_pnl = gross_pnl - fees
 
         trade = ClosedTrade(
@@ -886,9 +1350,18 @@ def run_backtest(
             exit_reason="end_of_data",
             strategy=pos.strategy,
             margin=pos.margin,
+            entry_meta=pos.entry_meta,
         )
         closed_trades.append(trade)
         balance += net_pnl
+
+    if live_exit_model:
+        fb = exit_stats.get("fallback_bars", 0)
+        fl = exit_stats.get("flow_bars", 0)
+        tot = fb + fl
+        pct = fb / tot * 100 if tot else 0.0
+        print(f"\n  [exit model] live 60s-cadence pipeline | bars with flow price path: {fl} | "
+              f"bar-close fallback (no snapshot in bar): {fb} ({pct:.1f}%)")
 
     return closed_trades
 
@@ -1220,6 +1693,55 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_AE_MIN_CYCLES,
         help="Minimum candles held before adverse-exit can fire (matches live ADVERSE_EXIT_CYCLES).",
     )
+    # --- Phase-3 cohort-gate flags (2026-06-11 edge plan §6). ALL default-off:
+    # existing runs / calibration are unaffected unless explicitly passed. The
+    # flow-dependent ones (--block-ltbias, --no-whale-boost, --min-conf) only act
+    # in flow-replay runs (driven via scripts/, not this network-fetch CLI path).
+    parser.add_argument(
+        "--block-ltbias",
+        type=float,
+        default=None,
+        metavar="X",
+        help="Skip entry when ALIGNED large_trade_bias >= X (raw for longs, negated for shorts). "
+             "Audit nominal: 0.35. Flow-replay runs only.",
+    )
+    parser.add_argument(
+        "--block-adx5m",
+        type=float,
+        default=None,
+        metavar="X",
+        help="Skip entry when 5m ADX at entry >= X. Audit nominal: 25.",
+    )
+    parser.add_argument(
+        "--min-conf",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Override the ensemble confidence floor (live 4/7). Audit nominal: 5. "
+             "Replay confidence caps at 6/7 (funding layer not captured).",
+    )
+    parser.add_argument(
+        "--extra-blocked-hours",
+        type=str,
+        default=None,
+        metavar="H,H,...",
+        help='Extra UTC hours appended to BLOCKED_HOURS_UTC, e.g. "21,22,23".',
+    )
+    parser.add_argument(
+        "--no-whale-boost",
+        action="store_true",
+        default=False,
+        help="Reverse the aligned large_trade_bias +0.03 strength boost (strategies.py:601-606) "
+             "post-hoc in the sim harness. Flow-replay runs only.",
+    )
+    parser.add_argument(
+        "--fee-rt",
+        type=float,
+        default=None,
+        metavar="PCT",
+        help="Round-trip fee %% of notional for the live exit model (measured live: 0.0663, "
+             "docs/2026-06-11-fee-ground-truth.md). Default keeps the 0.22 paper model.",
+    )
     parser.add_argument(
         "--starting-balance",
         type=float,
@@ -1288,6 +1810,14 @@ def main() -> None:
     print("  RUNNING BACKTEST")
     print(f"{'=' * 40}")
 
+    _extra_hours = None
+    if args.extra_blocked_hours:
+        _extra_hours = {int(h) for h in args.extra_blocked_hours.split(",") if h.strip() != ""}
+
+    _rb_kwargs = {}
+    if args.fee_rt is not None:
+        _rb_kwargs["fee_rt_pct"] = args.fee_rt
+
     trades = run_backtest(
         pair_data,
         htf_data=htf_data,
@@ -1295,6 +1825,12 @@ def main() -> None:
         calibration_mode=args.calibration,
         ae_threshold=args.ae_threshold,
         ae_cycles=args.ae_cycles,
+        block_ltbias=args.block_ltbias,
+        block_adx5m=args.block_adx5m,
+        min_conf=args.min_conf,
+        extra_blocked_hours=_extra_hours,
+        no_whale_boost=args.no_whale_boost,
+        **_rb_kwargs,
     )
 
     if args.output_json:

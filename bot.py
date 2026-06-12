@@ -439,6 +439,16 @@ class Phmex2Bot:
         # Set running flag before starting thread so loop guard evaluates correctly
         self.running = True
 
+        # Live exit watcher (tier 2): enforce software exit levels at ~1s against
+        # the WS price. Claims in self._closing prevent double-closes with the
+        # cycle. Spec: docs/superpowers/specs/2026-06-11-live-exit-watcher-design.md
+        self._pos_lock = threading.Lock()
+        self._closing: set = set()
+        if Config.is_live() and Config.LIVE_EXIT_WATCHER and self._ws_feed:
+            threading.Thread(target=self._live_exit_watcher_loop, daemon=True,
+                             name="live-exit-watcher").start()
+            logger.info("[LIVE EXIT] watcher enabled (1s interval, WS price, enforcement-only)")
+
         # Start L2 snapshot live writer thread (updates every 5s for real-time dashboard)
         threading.Thread(
             target=self._l2_live_writer_loop,
@@ -671,6 +681,8 @@ class Phmex2Bot:
 
         # Early exit check — momentum reversal while in profit
         for symbol, pos in list(self.risk.positions.items()):
+            if symbol in self._closing:
+                continue  # live exit watcher is mid-close on this symbol
             price = prices.get(symbol)
             df_check = ohlcv_cache.get(symbol)
             if not price or df_check is None:
@@ -696,8 +708,8 @@ class Phmex2Bot:
 
         # Flat exit — cut indecisive positions after 20 min
         for symbol, pos in list(self.risk.positions.items()):
-            if symbol not in self.risk.positions:
-                continue  # already closed by early_exit above
+            if symbol not in self.risk.positions or symbol in self._closing:
+                continue  # already closed by early_exit above / watcher mid-close
             price = prices.get(symbol)
             if not price:
                 continue
@@ -721,7 +733,7 @@ class Phmex2Bot:
 
         # Trend-flip exit — close htf_confluence_pullback positions when 1h EMA flips
         for symbol, pos in list(self.risk.positions.items()):
-            if symbol not in self.risk.positions:
+            if symbol not in self.risk.positions or symbol in self._closing:
                 continue
             if pos.strategy not in ("htf_confluence_pullback", "htf_l2_anticipation"):
                 continue
@@ -749,8 +761,8 @@ class Phmex2Bot:
 
         # Adverse exit — bail out of wrong-direction trades early
         for symbol, pos in list(self.risk.positions.items()):
-            if symbol not in self.risk.positions:
-                continue  # already closed by earlier exit this cycle
+            if symbol not in self.risk.positions or symbol in self._closing:
+                continue  # already closed by earlier exit this cycle / watcher mid-close
             price = prices.get(symbol)
             if not price:
                 continue
@@ -787,6 +799,8 @@ class Phmex2Bot:
 
         # Verify SL orders still active — re-place if cancelled (skip software-managed)
         for symbol, pos in list(self.risk.positions.items()):
+            if symbol in self._closing:
+                continue  # watcher mid-close — cancel_open_orders here could kill its in-flight close order
             if pos.sl_order_id == "software":
                 continue  # managed by bot's check_positions loop
             if pos.sl_order_id and not self.exchange.verify_sl_order(symbol, pos.sl_order_id):
@@ -807,8 +821,8 @@ class Phmex2Bot:
 
         # Time-based exit — close stale positions (strategy-specific thresholds)
         for symbol, pos in list(self.risk.positions.items()):
-            if symbol not in self.risk.positions:
-                continue  # already closed by early_exit/flat_exit this cycle
+            if symbol not in self.risk.positions or symbol in self._closing:
+                continue  # already closed by early_exit/flat_exit this cycle / watcher mid-close
             price = prices.get(symbol)
             if not price:
                 continue
@@ -841,8 +855,8 @@ class Phmex2Bot:
         # Spec: docs/superpowers/specs/2026-06-08-breakeven-sl-solidify-design.md (Part A)
         #     + 2026-06-08-part-b-trailing-protection-plan.md (fast-track addendum).
         for symbol, pos in list(self.risk.positions.items()):
-            if symbol not in self.risk.positions:
-                continue  # already closed earlier this cycle
+            if symbol not in self.risk.positions or symbol in self._closing:
+                continue  # already closed earlier this cycle / watcher mid-close
             price = prices.get(symbol)
             if not price:
                 continue
@@ -889,6 +903,8 @@ class Phmex2Bot:
         # Check exit conditions for open positions
         to_close = self.risk.check_positions(prices)
         for symbol, reason in to_close:
+            if symbol in self._closing:
+                continue  # live exit watcher is mid-close on this symbol
             price = prices.get(symbol)
             if price:
                 pos = self.risk.positions.get(symbol)
@@ -1320,6 +1336,26 @@ class Phmex2Bot:
                     # NOT hard-blocked yet (lessons.md:407: sim before live changes).
                     _quiet_exempt = True
 
+                # Phase 3 shadow gates (2026-06-11): tag-only, NEVER block. Records
+                # what each candidate gate would have done so the forward live book
+                # validates the in-sample sims (Method 1 pRnd / Method 2 replay)
+                # before any hard gate ships. Decision target: ~June 23 with the
+                # durable-trail verdict.
+                _shadow_gates = {}
+                try:
+                    _lt = float((flow or {}).get("large_trade_bias") or 0.0)
+                    _aligned_lt = _lt if direction == "long" else -_lt
+                    _adx5 = _regime_snap.get("adx")
+                    _hour_utc = datetime.datetime.utcnow().hour
+                    _shadow_gates = {
+                        "sg_ltbias040": _aligned_lt >= 0.40,
+                        "sg_adx25": _adx5 is not None and float(_adx5) >= 25.0,
+                        "sg_conf_lt5": confidence < 5,
+                        "sg_utc2123": _hour_utc in (21, 22, 23),
+                    }
+                except Exception as _sge:
+                    logger.debug(f"[SHADOW GATES] tag computation failed: {_sge}")
+
                 # Phase 2b Gate B: VOLATILE 5m regime shadow-tag (pullback-specific, shadow only — no hard-gate path)
                 # Reuses _regime_snap from QUIET block above; VOLATILE label = atr_pct > 1.5% or vol_ratio > 2.5x
                 if strat_name == "htf_confluence_pullback" and _regime_snap.get("label") == "VOLATILE":
@@ -1372,7 +1408,7 @@ class Phmex2Bot:
                         self._last_htf_entry_time = time.time()
                     logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${pos.margin:.2f} | Conf: {confidence}/7 | {signal.reason} | Strength: {signal.strength:.2f}")
                     _htf_adx_val = float(htf_df.iloc[-1].get("adx", 0)) if htf_df is not None and len(htf_df) > 0 else None
-                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df, htf_adx=_htf_adx_val, extra_tags={"quiet_exempt": True} if _quiet_exempt else None)
+                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df, htf_adx=_htf_adx_val, extra_tags={**_shadow_gates, **({"quiet_exempt": True} if _quiet_exempt else {})} or None)
                     try:
                         self.risk._save_state()
                     except Exception as _e:
@@ -1930,6 +1966,73 @@ class Phmex2Bot:
         except Exception as e:
             logger.debug(f"[FLOW CAPTURE] write failed: {e}")
 
+    def _live_exit_watcher_loop(self) -> None:
+        """Tier 2: enforce software exit levels (trailing/SL/TP) against the live
+        WS price every ~1s. Enforcement-only — never ratchets levels (that stays
+        on the 60s cycle). Claims symbols in self._closing so the cycle and the
+        watcher can never double-close. Additive: any failure leaves the position
+        for the 60s cycle to handle exactly as before.
+        Spec: docs/superpowers/specs/2026-06-11-live-exit-watcher-design.md
+        KNOWN TRADE-OFF (Mar 26 lesson): 1s enforcement fires on intra-minute
+        wicks at the current trail level that the 60s loop would have survived —
+        measured forward via [LIVE EXIT] logs vs cycle exits."""
+        fail_cooldown: dict = {}   # symbol -> retry-not-before ts (failed closes back off 30s)
+        last_err_alert = 0.0       # throttle Telegram on persistent iteration errors
+        while self.running:
+            try:
+                time.sleep(1.0)
+                if not self.risk.positions or self._ws_feed is None:
+                    continue
+                for symbol in list(self.risk.positions.keys()):
+                    if time.time() < fail_cooldown.get(symbol, 0):
+                        continue  # recent failed close — let the 60s cycle retry, don't hammer at 1Hz
+                    lp = self._ws_feed.last_price(symbol)
+                    if lp is None or lp[1] > 10.0:
+                        continue  # stale/no WS — the 60s cycle stays the authority
+                    price = lp[0]
+                    with self._pos_lock:
+                        if symbol in self._closing or symbol not in self.risk.positions:
+                            continue
+                        reason = self.risk.evaluate_exit(symbol, price)
+                        if reason is None:
+                            continue
+                        self._closing.add(symbol)
+                    try:
+                        pos = self.risk.positions.get(symbol)
+                        if pos is None:
+                            continue
+                        logger.info(f"[LIVE EXIT] {symbol} {reason} @ {price:.6f} (WS age {lp[1]:.1f}s)")
+                        if pos.side == "long":
+                            order = self.exchange.close_long(symbol, pos.amount)
+                        else:
+                            order = self.exchange.close_short(symbol, pos.amount)
+                        if not order:
+                            fail_cooldown[symbol] = time.time() + 30.0
+                            logger.error(f"[LIVE EXIT] close failed for {symbol} — position intact, cycle will retry")
+                            try:
+                                notifier.send(f"⚠️ [LIVE EXIT] close order failed for {symbol} ({reason}) — position intact, 60s cycle is backstop")
+                            except Exception:
+                                pass
+                            continue
+                        fill_price = self._extract_fill_price(order, price, is_exit=True)
+                        self._set_cooldown_if_loss(symbol, pos.pnl_percent(fill_price))
+                        self.risk.close_position(symbol, fill_price, reason, fees_usdt=self.exchange.extract_order_fee(order, symbol))
+                        self.exchange.cancel_open_orders(symbol)
+                        notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), reason)
+                    finally:
+                        with self._pos_lock:
+                            self._closing.discard(symbol)
+            except Exception as e:
+                logger.error(f"[LIVE EXIT] watcher iteration error: {e}")
+                if time.time() - last_err_alert > 300:
+                    last_err_alert = time.time()
+                    try:
+                        notifier.send(f"⚠️ [LIVE EXIT] watcher error: {str(e)[:150]} — cycle exits still active")
+                    except Exception:
+                        pass
+                time.sleep(5)
+        logger.info("[LIVE EXIT] watcher stopped")
+
     def _log_shadow_trail(self, prices: dict, ohlcv_cache: dict) -> None:
         """Part B shadow-logger: forward-log armed trailing stops so we can later
         measure how an exchange-resting trail would have behaved on intra-candle
@@ -2100,6 +2203,8 @@ class Phmex2Bot:
         # --- (A) Closes: tracked locally but gone from exchange ---
         try:
             for symbol in list(self.risk.positions.keys()):
+                if symbol in getattr(self, "_closing", set()):
+                    continue  # watcher mid-close — its fill will record the trade
                 if symbol not in exchange_symbols:
                     pos = self.risk.positions[symbol]
                     # Try to get actual fill price from recent trades

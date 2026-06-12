@@ -6,7 +6,12 @@ from config import Config
 
 
 def setup_logger(name: str = "DegenCryt") -> logging.Logger:
-    os.makedirs(os.path.dirname(Config.LOG_FILE), exist_ok=True)
+    # PHMEX_LOG_FILE override exists so test runs don't write mocked-order lines
+    # into the live bot.log — they read like real fills in forensics (2026-06-11:
+    # a pytest run's "BTC @ 99.0 amend rejected" lines were nearly mistaken for a
+    # live SL-move failure). tests/conftest.py sets it; live default unchanged.
+    log_file = os.environ.get("PHMEX_LOG_FILE", Config.LOG_FILE)
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
     logger = logging.getLogger(name)
     logger.setLevel(getattr(logging, Config.LOG_LEVEL.upper(), logging.INFO))
@@ -30,7 +35,7 @@ def setup_logger(name: str = "DegenCryt") -> logging.Logger:
 
     # File handler with rotation (10MB max, keep 5 backups)
     file_handler = logging.handlers.RotatingFileHandler(
-        Config.LOG_FILE, maxBytes=10 * 1024 * 1024, backupCount=5
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5
     )
     file_handler.setFormatter(logging.Formatter(
         "%(asctime)s [%(levelname)s] %(message)s",

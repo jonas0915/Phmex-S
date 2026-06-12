@@ -550,69 +550,106 @@ class Exchange:
             logger.error(f"Failed to close short for {symbol}: {e}")
             return None
 
+    # Hard ceiling on the opt-in maker-exit patience window. close_long/close_short
+    # block the main loop while the limit rests; the 180s cycle watchdog (bot.py:453)
+    # raises TimeoutError mid-cycle, which would abandon the resting order AND skip
+    # the market fallback — an unmanaged position. Worst case MAX_OPEN_TRADES=3
+    # simultaneous exits: 3 x 45s = 135s, leaving ~45s for the rest of the cycle.
+    MAKER_EXIT_PATIENCE_MAX_S = 45.0
+
+    def _market_close_remainder(self, symbol: str, side: str, amount: float, filled_amount: float) -> None:
+        """Market-close (reduceOnly) the unfilled remainder of a partial limit exit."""
+        remaining = self._round_amount(symbol, amount - float(filled_amount))
+        if remaining <= 0:
+            return
+        try:
+            self.client.create_order(symbol, "market", side, remaining, None, params={"reduceOnly": True})
+            logger.info(f"[MAKER EXIT] Partial {filled_amount}, market remainder {remaining} {symbol}")
+        except Exception as me:
+            logger.error(f"[MAKER EXIT] Remainder market failed {symbol}: {me}")
+
     def _try_limit_exit(self, symbol: str, side: str, amount: float, limit_price: float) -> Optional[dict]:
-        """Try limit exit for maker fees. 4s timeout (8 polls x 0.5s), market fallback if unfilled."""
+        """Post-only limit exit at the touch for maker fees (0.01% vs 0.06% taker).
+
+        Returns the filled order, or None — and EVERY None return means the caller
+        (close_long/close_short) MUST market-close: the resting order is by then
+        cancelled-by-id, confirmed dead, or at worst still resting as reduceOnly
+        (which cannot double-close a flat position; bot.py also sweeps leftovers
+        via cancel_open_orders after every close). The position is never left
+        without a mandatory market fallback.
+
+        Patience window:
+          - Config.MAKER_EXIT_ENABLED=False (default): legacy 4s (8 x 0.5s polls).
+            Known to yield 0% maker fills — kept so deploying this code changes
+            nothing until .env opts in.
+          - True: rests Config.MAKER_EXIT_PATIENCE_S (clamped to
+            MAKER_EXIT_PATIENCE_MAX_S, 2s polls) before cancel + market fallback.
+
+        Order-path house rule (lessons.md:290): direct client calls that complete
+        or raise — never _call_with_timeout-wrapped.
+        """
         limit_price = self._round_price(symbol, limit_price)
+        if Config.MAKER_EXIT_ENABLED:
+            poll_interval = 2.0
+            patience_s = min(float(Config.MAKER_EXIT_PATIENCE_S), self.MAKER_EXIT_PATIENCE_MAX_S)
+            if Config.MAKER_EXIT_PATIENCE_S > self.MAKER_EXIT_PATIENCE_MAX_S:
+                logger.warning(f"[MAKER EXIT] MAKER_EXIT_PATIENCE_S={Config.MAKER_EXIT_PATIENCE_S} "
+                               f"clamped to {self.MAKER_EXIT_PATIENCE_MAX_S}s (cycle-watchdog budget)")
+            polls = max(1, int(patience_s / poll_interval))
+        else:
+            poll_interval = 0.5
+            polls = 8  # legacy 4s window — pre-fix behavior
         try:
             order = self.client.create_order(symbol, "limit", side, amount, limit_price,
                                              params={"reduceOnly": True, "timeInForce": "PostOnly"})
             order_id = order.get("id")
-            logger.info(f"[MAKER EXIT] Limit {side} {amount} {symbol} @ {limit_price}")
+            logger.info(f"[MAKER EXIT] Limit {side} {amount} {symbol} @ {limit_price} "
+                        f"(patience {polls * poll_interval:.0f}s, id={order_id})")
 
-            for _ in range(8):  # 4s total — more time for maker fill on exits
-                time.sleep(0.5)
+            for _ in range(polls):
+                time.sleep(poll_interval)
                 try:
                     fetched = self.client.fetch_order(order_id, symbol)
-                    if fetched.get("status") == "closed":
-                        logger.info(f"[MAKER EXIT] Filled for {symbol}")
+                except Exception as e:
+                    logger.debug(f"[MAKER EXIT] poll fetch_order failed {symbol} id={order_id}: {e}")
+                    continue
+                status = fetched.get("status", "")
+                if status == "closed":
+                    logger.info(f"[MAKER EXIT] Filled for {symbol}")
+                    return fetched
+                if status in ("canceled", "cancelled", "rejected", "expired"):
+                    # PostOnly rejected (would-cross) or externally cancelled — the
+                    # order is dead; don't burn the remaining patience window.
+                    filled_now = float(fetched.get("filled", 0) or 0)
+                    if filled_now > 0:
+                        self._market_close_remainder(symbol, side, amount, filled_now)
                         return fetched
-                except Exception:
-                    pass
+                    logger.info(f"[MAKER EXIT] Order {status} unfilled for {symbol} — market fallback")
+                    return None
 
-            # Cancel unfilled limit
+            # Patience expired — cancel-by-id BEFORE the caller's market fallback
+            # so the same position can never be closed twice.
             try:
                 self.client.cancel_order(order_id, symbol)
-                # Check for partial fill after cancel
-                try:
-                    fetched = self.client.fetch_order(order_id, symbol)
-                    filled_amount = fetched.get("filled", 0) or 0
-                    if fetched.get("status") == "closed":
-                        logger.info(f"[MAKER EXIT] Filled (raced cancel) for {symbol}")
-                        return fetched
-                    if filled_amount > 0:
-                        # Market-close the remainder to avoid orphan position
-                        remaining = amount - float(filled_amount)
-                        remaining = self._round_amount(symbol, remaining)
-                        if remaining > 0:
-                            try:
-                                self.client.create_order(symbol, "market", side, remaining, None, params={"reduceOnly": True})
-                                logger.info(f"[MAKER EXIT] Partial {filled_amount}, market remainder {remaining} {symbol}")
-                            except Exception as me:
-                                logger.error(f"[MAKER EXIT] Remainder market failed {symbol}: {me}")
-                        return fetched
-                    else:
-                        logger.info(f"[MAKER EXIT] Not filled, cancelled {symbol}")
-                except Exception:
-                    logger.info(f"[MAKER EXIT] Cancelled {symbol}")
-            except Exception:
-                try:
-                    fetched = self.client.fetch_order(order_id, symbol)
-                    if fetched.get("status") == "closed":
-                        return fetched
-                    filled_amount = fetched.get("filled", 0) or 0
-                    if filled_amount > 0:
-                        # Market-close the remainder to avoid orphan position
-                        remaining = amount - float(filled_amount)
-                        remaining = self._round_amount(symbol, remaining)
-                        if remaining > 0:
-                            try:
-                                self.client.create_order(symbol, "market", side, remaining, None, params={"reduceOnly": True})
-                                logger.info(f"[MAKER EXIT] Partial {filled_amount}, market remainder {remaining} {symbol}")
-                            except Exception as me:
-                                logger.error(f"[MAKER EXIT] Remainder market failed {symbol}: {me}")
-                        return fetched
-                except Exception:
-                    pass
+            except Exception as ce:
+                # Cancel can fail because the order just filled, or transient API
+                # error. Either way fall through to the post-cancel fetch; if that
+                # is inconclusive we still return None — the market fallback and
+                # the resting order are both reduceOnly, so a double-close is
+                # rejected by the exchange rather than flipping the position.
+                logger.warning(f"[MAKER EXIT] cancel failed {symbol} id={order_id}: {ce}")
+            try:
+                fetched = self.client.fetch_order(order_id, symbol)
+                if fetched.get("status") == "closed":
+                    logger.info(f"[MAKER EXIT] Filled (raced cancel) for {symbol}")
+                    return fetched
+                filled_amount = float(fetched.get("filled", 0) or 0)
+                if filled_amount > 0:
+                    self._market_close_remainder(symbol, side, amount, filled_amount)
+                    return fetched
+            except Exception as fe:
+                logger.warning(f"[MAKER EXIT] post-cancel fetch_order failed {symbol} id={order_id}: {fe}")
+            logger.info(f"[MAKER EXIT] Not filled in {polls * poll_interval:.0f}s, market fallback {symbol}")
             return None
         except Exception as e:
             logger.warning(f"[MAKER EXIT] Limit failed for {symbol}: {e}")

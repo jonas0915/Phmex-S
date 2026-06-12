@@ -488,3 +488,21 @@ counting teardown latency. If `_call_with_timeout` is ever refactored, pass
 - `edit_order` NEVER live-validated yet — first live amend is the probe (verbose-logged,
   fallback is the net). CHECK `[SL-MOVE]` log lines after the first armed trail.
 - Pre-existing flaw still open: `[SL CHECK]` re-place (bot.py ~785) cancels-before-places.
+
+### Test runs were writing mocked-order lines into the live bot.log
+2026-06-11 evening: investigating tonight's trading, bot.log showed "[SL-MOVE] amend
+BTC ... rejected" x6 + "[MAKER EXIT]" fills at 20:05:16 — looked exactly like the
+first live edit_order validation failing. It was pytest: test_durable_trail.py +
+test_maker_exit.py import exchange.py, whose module-level setup_logger() attaches a
+RotatingFileHandler on logs/bot.log, so every mocked order logged into the LIVE log.
+Giveaways in hindsight: BTC at $99/$105, ids "old-1"/"x1", all lines same second.
+
+**Why:** forensics on this project routinely greps bot.log to reconstruct live order
+activity; mock lines are indistinguishable from real ones at a glance and nearly
+caused a false incident diagnosis (and could corrupt a future loss audit).
+
+**How to apply:** tests/conftest.py now sets PHMEX_LOG_FILE=logs/test_run.log and
+logger.py honors it (live default unchanged). When grepping bot.log history BEFORE
+2026-06-11 20:10, ignore blocks where many order lines share one timestamp with
+round prices — those are today's pre-fix test runs. Never run pytest with that env
+var unset removed.

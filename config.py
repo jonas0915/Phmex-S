@@ -59,6 +59,22 @@ class Config:
     TAKER_FEE_PERCENT = float(os.getenv("TAKER_FEE_PERCENT", "0.06"))
     SLIPPAGE_PERCENT = float(os.getenv("SLIPPAGE_PERCENT", "0.05"))
 
+    # Maker exit patience (opt-in, prepared 2026-06-11 — exit maker fills were 0%
+    # because the legacy limit-exit window is 4s; flow data shows ~0% touch at 4s).
+    # OFF (default): _try_limit_exit keeps the legacy 4s window — behavior unchanged.
+    # ON: post-only exit rests MAKER_EXIT_PATIENCE_S seconds before cancel-by-id +
+    # market fallback. Exchange.py hard-clamps patience to 45s: the close call blocks
+    # the main loop, and the 180s cycle watchdog (bot.py:453) raising mid-rest would
+    # orphan the resting order. 3 exits x 45s = 135s is the ceiling that still fits.
+    MAKER_EXIT_ENABLED = os.getenv("MAKER_EXIT_ENABLED", "false").lower() == "true"
+    MAKER_EXIT_PATIENCE_S = float(os.getenv("MAKER_EXIT_PATIENCE_S", "30"))
+
+    # Live exit watcher (tier 2, 2026-06-11): enforce software exit levels
+    # (trailing/SL/TP) against live WS price at ~1s instead of the 60s cycle.
+    # Enforcement-only — level ratcheting stays on the cycle (see design spec
+    # docs/superpowers/specs/2026-06-11-live-exit-watcher-design.md).
+    LIVE_EXIT_WATCHER = os.getenv("LIVE_EXIT_WATCHER", "true").lower() == "true"
+
     # Loop interval in seconds
     LOOP_INTERVAL = float(os.getenv("LOOP_INTERVAL", "60"))
 

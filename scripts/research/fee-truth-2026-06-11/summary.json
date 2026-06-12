@@ -1,0 +1,46 @@
+{
+  "generated_at": 1781204300,
+  "window": {
+    "first_fill": "2026-05-03 10:17 AM",
+    "last_fill": "2026-06-09 12:01 PM",
+    "days": 37.07
+  },
+  "fills": 200,
+  "maker": {
+    "fills": 0,
+    "notional": 0,
+    "fees": 0,
+    "fee_rate_pct": null
+  },
+  "taker": {
+    "fills": 0,
+    "notional": 0,
+    "fees": 0,
+    "fee_rate_pct": null
+  },
+  "entry": {
+    "fills": 95,
+    "notional": 6548.7382,
+    "fees": 0.703774,
+    "fee_rate_pct": 0.010747
+  },
+  "exit": {
+    "fills": 77,
+    "notional": 5356.0368,
+    "fees": 2.948358,
+    "fee_rate_pct": 0.055047
+  },
+  "unmatched": {
+    "fills": 28,
+    "notional": 2319.396,
+    "fees": 0.566476,
+    "fee_rate_pct": 0.024423
+  },
+  "total_fees": 4.218609,
+  "total_notional": 14224.1709,
+  "annualized_window": 41.54,
+  "annualized_30d": 43.34,
+  "rt_trades_full": 65,
+  "rt_fee_rate_mean_pct": 0.066277,
+  "rt_fee_rate_median_pct": 0.069999
+}

@@ -690,6 +690,25 @@ class RiskManager:
                     to_close.append((symbol, "stop_loss"))
         return to_close
 
+    def evaluate_exit(self, symbol: str, price: float) -> Optional[str]:
+        """Non-mutating exit check for the live exit watcher: identical
+        classification branches to check_positions but NEVER calls
+        update_trailing_stop — enforcement at 1Hz must not ratchet levels
+        (design spec 2026-06-11-live-exit-watcher-design.md §2). Keep these
+        branches in sync with check_positions (regression guard lessons.md:306)."""
+        pos = self.positions.get(symbol)
+        if pos is None or not price:
+            return None
+        if pos.should_take_profit(price):
+            return "take_profit"
+        if pos.should_stop_loss(price):
+            if pos.trailing_stop_price is not None and pos.pnl_usdt(price) > 0:
+                return "trailing_stop"
+            if pos.pnl_usdt(price) > 0:
+                return "take_profit"
+            return "stop_loss"
+        return None
+
     def partial_close_position(self, symbol: str, exit_price: float):
         """Close half the position, move SL to breakeven + fees, let remainder run."""
         if symbol not in self.positions:

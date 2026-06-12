@@ -133,6 +133,17 @@ class WSDataFeed:
         df.set_index("timestamp", inplace=True)
         return df
 
+    def last_price(self, symbol: str) -> tuple[float, float] | None:
+        """O(1) live price: (forming-candle close, age_seconds). None if no data.
+        For the live exit watcher — no DataFrame build (called ~1/s per position)."""
+        with self._lock:
+            data = self._cache.get(symbol)
+            last = self._last_update.get(symbol)
+            if not data or last is None:
+                return None
+            close = float(data[-1][4])
+        return close, _time.time() - last
+
     @property
     def is_ready(self) -> bool:
         return self._ready.is_set()

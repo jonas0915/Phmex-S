@@ -66,6 +66,8 @@ class FlowIndex:
         # symbol -> (sorted list of ts, parallel list of (ob, flow))
         self._ts: dict[str, list[int]] = {}
         self._snap: dict[str, list[tuple]] = {}
+        # symbol -> parallel list of captured prices (may contain None for old rows)
+        self._px: dict[str, list] = {}
         self._load(path)
 
     def _load(self, path):
@@ -87,12 +89,13 @@ class FlowIndex:
                 ts = d.get("ts")
                 if sym is None or ts is None:
                     continue
-                rows.setdefault(sym, []).append((int(ts), d.get("ob"), d.get("flow")))
+                rows.setdefault(sym, []).append((int(ts), d.get("ob"), d.get("flow"), d.get("price")))
                 n += 1
         for sym, items in rows.items():
             items.sort(key=lambda x: x[0])
             self._ts[sym] = [it[0] for it in items]
             self._snap[sym] = [(it[1], it[2]) for it in items]
+            self._px[sym] = [it[3] for it in items]
         self.row_count = n
         self.symbol_count = len(rows)
 
@@ -122,6 +125,36 @@ class FlowIndex:
             return None, None
         ob, flow = self._snap[symbol][i]
         return _sanitize_ob(ob), flow
+
+    def snapshot_age(self, symbol, epoch_s):
+        """Age in seconds of the snapshot get() would return at epoch_s, or None
+        if no snapshot within tolerance. Diagnostics only (entry-time flow
+        coverage measurement for the 2026-06-11 cohort-gate sims)."""
+        ts_list = self._ts.get(symbol)
+        if not ts_list:
+            return None
+        i = bisect_right(ts_list, epoch_s) - 1
+        if i < 0:
+            return None
+        age = epoch_s - ts_list[i]
+        return age if age <= self.tolerance_s else None
+
+    def prices_between(self, symbol, t0, t1):
+        """All captured (ts, price) snapshots with t0 < ts <= t1, in time order.
+
+        Used by backtest.py's live-fidelity exit model as the intra-bar price
+        path: the live bot's 60s exit loop saw a fresh price every cycle, and
+        the capture writes one price per symbol per scan (~75s cadence), so
+        these are the closest thing to the prices the live exit checks ran on.
+        Rows with no captured price (pre-2026-05-10 schema) are skipped.
+        """
+        ts_list = self._ts.get(symbol)
+        if not ts_list:
+            return []
+        i = bisect_right(ts_list, t0)
+        j = bisect_right(ts_list, t1)
+        px = self._px[symbol]
+        return [(ts_list[k], float(px[k])) for k in range(i, j) if px[k]]
 
 
 def replay_confidence(candle_row, ob, flow, htf_last, htf_prev, direction,
@@ -200,11 +233,16 @@ def replay_confidence(candle_row, ob, flow, htf_last, htf_prev, direction,
 
 
 def passes_flow_gates(strat_name, direction, ob, flow,
-                      candle_row, htf_last, htf_prev):
+                      candle_row, htf_last, htf_prev, min_conf=None):
     """Faithful port of the live bot's post-signal flow gate block (bot.py:1082-1143).
 
     Returns (passed: bool, reason: str). reason is '' when passed.
     Mirrors live order: tape -> cvd -> divergence -> large_trade -> ensemble(4/7).
+
+    min_conf: optional override of the ensemble floor (live default 4/7). Used by
+    the 2026-06-11 Phase-3 cohort-gate sims (--min-conf). NOTE: funding (layer 5)
+    is never captured, so replay confidence caps at 6/7 — min_conf=5 in replay is
+    stricter than live 5/7 would be.
     """
     tc = flow.get("trade_count", 0) if flow else 0
 
@@ -244,7 +282,8 @@ def passes_flow_gates(strat_name, direction, ob, flow,
     # ===== ENSEMBLE CONFIDENCE GATE (4/7) -- bot.py:1138 =====
     conf, _ = replay_confidence(candle_row, ob, flow, htf_last, htf_prev, direction,
                                 strat_name=strat_name)
-    if conf < MIN_ENSEMBLE_CONFIDENCE:
+    _floor = MIN_ENSEMBLE_CONFIDENCE if min_conf is None else int(min_conf)
+    if conf < _floor:
         return False, f"ensemble({conf}/7)"
 
     return True, ""

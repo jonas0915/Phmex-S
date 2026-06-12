@@ -36,8 +36,10 @@ Overlapping cohorts ranked by impact:
 4. **conf=4 floor cohort: −$4.73** (n=11, 27.3% WR) — directionally consistent with
    raising the ensemble floor to 5, but n is small.
 5. **5m ADX ≥ 25 at entry: 38.7% WR** vs 53-63% below — un-gated, measurable.
-6. Hours: only 4/24 PT-hours gross-positive all-time. 2–4 PM PT = −$9.34 (n=22) sits
-   OUTSIDE the current block; 7 AM PT −$5.18 (n=11) also unblocked.
+6. Hours: only 4/24 PT-hours gross-positive all-time. 2–4 PM PT and 7 AM PT sit
+   OUTSIDE the current block. [CORRECTED by gate-sim cross-check 6/11 PM: the
+   original n/$ here were htf_l2-only mislabeled as whole-book. Actual whole-book:
+   UTC 21-23 n=53/−$14.90; UTC 14 n=20/−$7.68. Direction unchanged, magnitudes larger.]
 
 What's already working: cluster throttle, per-pair cooldowns, time blocks (zero leaks
 in 91 entries), early_exit (+$11.03, 100% WR) and trailing_stop (+$2.42) exits.
