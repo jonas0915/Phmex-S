@@ -8989,11 +8989,24 @@ async function fetchData() {
 
 
 // ── ANIMATION LOOP ──
+// 5s console FPS/draw-call sampler (desk v2 Task 4) — diagnostic, cheap, console-only.
+// Called after the %2 frame skip, so it reports RENDERED fps (target floor ~30),
+// not the raw requestAnimationFrame rate (~60).
+let _fpsN=0,_fpsT=performance.now();
+function _fpsTick(){ _fpsN++; const now=performance.now();
+  if(now-_fpsT>5000){ console.log(`[PERF] fps=${(_fpsN/((now-_fpsT)/1000)).toFixed(1)} calls=${renderer.info.render.calls}`);
+    _fpsN=0; _fpsT=now; } }
+
 let frameCount = 0;
 function animate() {
   requestAnimationFrame(animate);
   frameCount++;
   if(frameCount % 2 !== 0) return; // ~30fps instead of 60fps
+  _fpsTick();
+  // Slow bucket: every 4th RENDERED frame (~7.5Hz). Rendered frames are the even
+  // frameCounts (2,4,6,8,…) thanks to the %2 skip above, so every 4th rendered
+  // frame is frameCount 8,16,24,… → frameCount % 8 === 0.
+  const slowTick = (frameCount % 8 === 0);
   const t = clock.getElapsedTime();
   const dt = (t - (window._lastAnimT || t));
   window._lastAnimT = t;
@@ -9477,8 +9490,11 @@ function animate() {
     updateTimeOfDay();
   }
 
-  // Bay water waves — multi-layered sine/cosine displacement for realistic waves
-  if (typeof waterPlane !== 'undefined' && waterPlane.geometry) {
+  // Bay water waves — multi-layered sine/cosine displacement for realistic waves.
+  // Bucketed to the slow tick (desk v2 Task 4): ~3.2k vertices x 3 trig calls each
+  // plus a full GPU position-attribute re-upload per pass; waves are slow swells
+  // (dominant frequencies 0.22-0.8 rad/s) so ~7.5Hz updates are visually identical.
+  if (slowTick && typeof waterPlane !== 'undefined' && waterPlane.geometry) {
     var wPos = waterPlane.geometry.attributes.position;
     for (var wi = 0; wi < wPos.count; wi++) {
       var wx = wPos.getX(wi);
@@ -9494,8 +9510,10 @@ function animate() {
     wPos.needsUpdate = true;
   }
 
-  // Dynamic bay fog — thick at dawn (5-7am) and dusk (18-20pm), thin midday
-  if (typeof bayFogMat !== 'undefined') {
+  // Dynamic bay fog — thick at dawn (5-7am) and dusk (18-20pm), thin midday.
+  // Bucketed to the slow tick (desk v2 Task 4): time-of-day branching + a 0.1 rad/s
+  // "breathing" sine — far slower than 7.5Hz, no need to recompute per rendered frame.
+  if (slowTick && typeof bayFogMat !== 'undefined') {
     var fogHour = getTimeOfDay();
     var fogOpacity = 0.02; // base midday opacity (barely visible haze)
     // Dawn fog (5-7am peak at 6am)
