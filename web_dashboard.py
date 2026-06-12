@@ -1806,6 +1806,7 @@ async function loadEquity(){{
           fill:(u,si,i)=> eqMeta[i] && eqMeta[i].win ? '#4af626' : '#ff5555'}}}}],
       axes:[{{stroke:'#5a6b5a',grid:{{stroke:'#1a2412'}}}},{{stroke:'#5a6b5a',grid:{{stroke:'#1a2412'}}}}],
       cursor:{{}}, legend:{{show:false}}}};
+    if(plot){{ plot.destroy(); plot=null; }}
     node.innerHTML='';
     plot=new uPlot(opts,[d.t,d.v],node);
     // tooltip: absolutely-positioned div fed from meta at the cursor's idx
