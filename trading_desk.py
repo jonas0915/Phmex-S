@@ -7159,11 +7159,17 @@ function drawMonitorContent(name, ctx, w, h) {
     ctx.fillStyle = '#00e5ff';
     ctx.font = 'bold 11px monospace';
     ctx.fillText('TAPE READER', 6, 4);
-    // Aggressor ratio bar
-    const ratio = 0.3 + Math.random()*0.4;
+    // OB imbalance bar — real value from newest [OB] event, dim dash when absent
+    const obEvts = events.filter(e=>e.type==='orderbook');
+    const lastOb = obEvts.length ? obEvts[obEvts.length-1] : null;
+    const imbMatch = lastOb ? (lastOb.msg||'').match(/imb=([+-]?[\d.]+)/) : null;
+    const hasImb = imbMatch !== null;
+    const imb = hasImb ? parseFloat(imbMatch[1]) : 0;
+    // imb is -1..+1; map to buy fraction 0..1 for the bar
+    const ratio = hasImb ? Math.max(0, Math.min(1, (imb + 1) / 2)) : 0.5;
     ctx.fillStyle = '#889';
     ctx.font = '9px monospace';
-    ctx.fillText('Aggressor Ratio', 6, 22);
+    ctx.fillText('OB Imbalance', 6, 22);
     ctx.fillStyle = '#1a1a2a';
     ctx.fillRect(6, 34, 180, 14);
     ctx.fillStyle = '#e05252';
@@ -7172,19 +7178,25 @@ function drawMonitorContent(name, ctx, w, h) {
     ctx.fillRect(6, 34, ratio*180, 14);
     ctx.fillStyle = '#fff';
     ctx.font = '8px monospace';
-    ctx.fillText('BUY', 10, 37);
-    ctx.fillText('SELL', 160, 37);
-    // Depth bars
+    ctx.fillText('BID', 10, 37);
+    ctx.fillText('ASK', 160, 37);
+    // Imbalance value + pair
     ctx.fillStyle = '#889';
     ctx.font = '9px monospace';
-    ctx.fillText('Bid/Ask Depth', 6, 58);
-    for(let i=0;i<8;i++){
-      const bw = 20+Math.random()*60;
-      const aw = 20+Math.random()*60;
-      ctx.fillStyle = '#1a4a2a';
-      ctx.fillRect(90-bw, 72+i*10, bw, 7);
-      ctx.fillStyle = '#4a1a1a';
-      ctx.fillRect(94, 72+i*10, aw, 7);
+    ctx.fillText('Latest OB', 6, 58);
+    if(hasImb){
+      const obPair = (lastOb.msg||'').match(/\[OB\] (\S+)/);
+      const pairLabel = obPair ? obPair[1].replace('/USDT:USDT','') : '';
+      ctx.fillStyle = imb >= 0 ? '#4ecb71' : '#e05252';
+      ctx.fillText('imb '+(imb>=0?'+':'')+imb.toFixed(2)+'  '+pairLabel, 6, 72);
+      const spreadMatch = (lastOb.msg||'').match(/spread=([\d.]+)%/);
+      if(spreadMatch){
+        ctx.fillStyle = '#667788';
+        ctx.fillText('spread '+spreadMatch[1]+'%', 6, 84);
+      }
+    } else {
+      ctx.fillStyle = '#445566';
+      ctx.fillText('—', 6, 72);
     }
     if(name.endsWith('2')){
       ctx.fillStyle = '#00ccdd';
@@ -7285,11 +7297,16 @@ function drawMonitorContent(name, ctx, w, h) {
     const holdEvts2 = events.filter(e=>e.type==='hold');
     const lastH2 = holdEvts2.length ? holdEvts2[holdEvts2.length-1] : null;
     const chopMatch = lastH2 ? (lastH2.detail||'').match(/CHOP=([\d.]+)/) : null;
-    const chop = chopMatch ? parseFloat(chopMatch[1]) : 40+Math.random()*30;
-    ctx.fillStyle = chop > 61.8 ? '#e05252' : chop > 50 ? '#fbbf24' : '#a78bfa';
-    ctx.fillRect(6, 34, Math.min(chop/100*180, 180), 12);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(chop.toFixed(1), 80, 35);
+    const chop = chopMatch ? parseFloat(chopMatch[1]) : null;
+    if(chop !== null){
+      ctx.fillStyle = chop > 61.8 ? '#e05252' : chop > 50 ? '#fbbf24' : '#a78bfa';
+      ctx.fillRect(6, 34, Math.min(chop/100*180, 180), 12);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(chop.toFixed(1), 80, 35);
+    } else {
+      ctx.fillStyle = '#445566';
+      ctx.fillText('—', 80, 35);
+    }
     // 61.8 Fibonacci threshold line
     ctx.strokeStyle = '#ff4444';
     ctx.setLineDash([3,3]);
@@ -7311,28 +7328,36 @@ function drawMonitorContent(name, ctx, w, h) {
     ctx.fillStyle = adx2 < 25 ? '#4ecb71' : '#555';
     ctx.fillText(adx2 < 25 ? 'ACTIVE' : 'STANDBY', 130, 78);
     if(name.endsWith('2')){
-      // Bollinger Band mini visualization
-      ctx.fillStyle = '#6644aa';
+      // Strategy P&L table — real per-strategy breakdown from strat_stats
+      ctx.fillStyle = '#a78bfa';
       ctx.font = 'bold 10px monospace';
-      ctx.fillText('BB BANDS', 6, 4);
-      // Draw bands
-      ctx.strokeStyle = '#8866cc';
-      ctx.lineWidth = 1;
-      let lastMid=50, lastUp=65, lastLow=35;
-      for(let i=0;i<30;i++){
-        const mid = 50 + (Math.random()-0.5)*10;
-        const spread = 12+Math.random()*8;
-        const up = mid+spread, low = mid-spread;
-        if(i>0){
-          ctx.strokeStyle='#6644aa44'; ctx.beginPath(); ctx.moveTo(4+(i-1)*6,lastUp+10); ctx.lineTo(4+i*6,up+10); ctx.stroke();
-          ctx.strokeStyle='#6644aa44'; ctx.beginPath(); ctx.moveTo(4+(i-1)*6,lastLow+10); ctx.lineTo(4+i*6,low+10); ctx.stroke();
-          ctx.strokeStyle='#a78bfa'; ctx.beginPath(); ctx.moveTo(4+(i-1)*6,lastMid+10); ctx.lineTo(4+i*6,mid+10); ctx.stroke();
-        }
-        lastMid=mid; lastUp=up; lastLow=low;
+      ctx.fillText('STRATEGY P&L (NET)', 6, 4);
+      const strats = apiData?.strat_stats || {};
+      const stratKeys = Object.keys(strats).slice(0, 5);
+      if(stratKeys.length === 0){
+        ctx.fillStyle = '#445566';
+        ctx.font = '9px monospace';
+        ctx.fillText('—', 6, 22);
+      } else {
+        // Header
+        ctx.fillStyle = '#667788';
+        ctx.font = '8px monospace';
+        ctx.fillText('NAME        CNT  WR%   NET$', 6, 18);
+        ctx.fillStyle = '#223344';
+        ctx.fillRect(6, 22, 240, 1);
+        let sy = 32;
+        stratKeys.forEach(sname => {
+          const d = strats[sname];
+          const label = sname.substring(0, 10).padEnd(10);
+          const cnt = String(d.count||0).padStart(3);
+          const wr = ((d.wr||0).toFixed(0)+'%').padStart(4);
+          const net = d.pnl >= 0 ? ('+'+d.pnl.toFixed(2)) : d.pnl.toFixed(2);
+          ctx.fillStyle = d.pnl >= 0 ? '#4ecb71' : '#e05252';
+          ctx.font = '8px monospace';
+          ctx.fillText(label+' '+cnt+' '+wr+'  '+net, 6, sy);
+          sy += 12;
+        });
       }
-      // Price dot
-      ctx.fillStyle='#fff';
-      ctx.beginPath(); ctx.arc(4+29*6, lastMid+10, 2, 0, Math.PI*2); ctx.fill();
     }
   }
   else if(name === 'conftv') {
@@ -7538,16 +7563,25 @@ function drawMonitorContent(name, ctx, w, h) {
     ctx.fillStyle = '#aab';
     ctx.font = '10px monospace';
     ctx.fillText('Win Rate: '+(s.win_rate||0).toFixed(1)+'%', 6, 76);
-    // Sparkline
-    const sparkY = 96;
-    ctx.strokeStyle = '#4ecb71';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    for(let i=0;i<30;i++){
-      const v = sparkY + (Math.sin(i*0.5+Date.now()*0.001)*8) + (Math.random()*4-2);
-      if(i===0) ctx.moveTo(6+i*6, v); else ctx.lineTo(6+i*6, v);
+    // Sparkline — cumulative PnL from recent trades (real data, no animation)
+    const sparkTrades = (apiData?.recent_trades || []).slice(-30);
+    if(sparkTrades.length >= 2){
+      const sparkY = 96;
+      let cum = 0;
+      const cumVals = sparkTrades.map(t=>{ cum += netPnl(t); return cum; });
+      const minV = Math.min(...cumVals), maxV = Math.max(...cumVals);
+      const range = maxV - minV || 1;
+      const sparkH = 14;
+      ctx.strokeStyle = cum >= 0 ? '#4ecb71' : '#e05252';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      cumVals.forEach((v,i)=>{
+        const px = 6 + i*(180/(sparkTrades.length-1));
+        const py = sparkY + sparkH - (v - minV)/range * sparkH;
+        if(i===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      });
+      ctx.stroke();
     }
-    ctx.stroke();
     if(name.endsWith('2')){
       ctx.fillStyle = '#ddaa22';
       ctx.font = 'bold 10px monospace';
@@ -7608,12 +7642,12 @@ function _monSlices(){
     ensemble_mon1: ensBase,
     ensemble_mon2: ensBase.concat([entryMsgs]),
     ensemble_mon3: ensBase.concat([s.total_pnl]),
-    tape_mon1:     ['static'],
+    tape_mon1:     [events.filter(e=>e.type==='orderbook').slice(-1).map(e=>e.msg)],
     tape_mon2:     [tapeMsgs],
     executor_mon1: [lastHold, apiData?.watcher, liveExit],
     executor_mon2: [apiData?.watcher, liveExit],
     strategy_mon1: [lastHold],
-    strategy_mon2: ['static'],
+    strategy_mon2: [apiData?.strat_stats],
     jonas_mon1:    [s.balance, s.total_pnl, s.win_rate],
     jonas_mon2:    [s.balance, s.total_pnl, s.win_rate, trades.slice(-8)],
     jonas_mon3:    [s.balance, s.total_pnl, s.win_rate, apiData?.peak_balance, apiData?.total_trades],
