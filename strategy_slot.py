@@ -200,7 +200,7 @@ class StrategySlot:
         trades = self.risk.closed_trades
         if not trades:
             return {"slot": self.slot_id, "trades": 0, "wr": 0, "pnl": 0, "kelly": 0}
-        wins = sum(1 for t in trades if t.get("pnl_usdt", 0) > 0)
+        wins = sum(1 for t in trades if _trade_net(t) > 0)
         pnl = sum(_trade_net(t) for t in trades)
         return {
             "slot": self.slot_id,
