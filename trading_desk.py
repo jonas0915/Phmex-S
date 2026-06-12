@@ -8313,9 +8313,9 @@ function switchToIdleAnim(name) {
   }
 }
 
-function startAgentReport() {
-  const target = visitOrder[visitIdx % visitOrder.length];
-  visitIdx++;
+function startAgentReport(forcedTarget) {
+  const target = forcedTarget || visitOrder[visitIdx % visitOrder.length];
+  if(!forcedTarget) visitIdx++;
 
   // Jonas and ws_feed: Claude walks to THEM (they outrank or it's private)
   if(target === 'jonas' || target === 'ws_feed') {
@@ -8658,6 +8658,8 @@ function updateHUD() {
   Object.keys(plumbobs).forEach(name => {
     const pb = plumbobs[name];
     if(!pb) return;
+    const ov = _storyPulse[name];
+    if(ov && Date.now() < ov.until){ pb.style.background = ov.color; pb.style.color = ov.color; return; }
     let color = '#4ecb71'; // green
     if(pnlVal < -3) color = '#e05252'; // red
     else if(pnlVal < 0) color = '#f5c842'; // yellow
@@ -8784,6 +8786,161 @@ function updateTimeOfDay() {
 updateTimeOfDay();
 
 
+// === EVENT→BEHAVIOR MAP (desk v2) ===
+// Strategy → owning agent. No explicit map existed anywhere in the JS, so per
+// the desk-v2 spec the default owner is the 'strategy' agent; mean_revert /
+// htf_l2_anticipation / bb_mean_reversion / confluence all route there.
+const STRATEGY_AGENT = {
+  htf_l2_anticipation: 'strategy',
+  bb_mean_reversion: 'strategy',
+  confluence: 'strategy',
+  mean_revert: 'strategy',
+};
+function strategyAgent(name){
+  return STRATEGY_AGENT[String(name||'').replace(/^5m_/,'')] || 'strategy';
+}
+
+// Story pulse — there is no plumbob-pulse primitive (plumbobs exist but are
+// CSS display:none), so the nearest visible mechanism is the desk LED via the
+// existing updateAgentLED(); we also tint the plumbob via its existing setter
+// in updateHUD so it lights correctly if plumbobs are ever un-hidden.
+const _storyPulse = {};
+function storyPulse(agent, color, ledStatus, ms){
+  _storyPulse[agent] = { color: color, led: ledStatus, until: Date.now() + ms };
+}
+
+function _ts12(){
+  const d = new Date();
+  let h = d.getHours(); const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return h + ':' + String(d.getMinutes()).padStart(2,'0') + ' ' + ap;
+}
+
+// Full busy-flag set — story behaviors are garnish: if anything is in motion,
+// DROP the behavior (never queue, never deadlock the sim).
+function storySimBusy(){
+  return claudeWalking || reportingWalking || coffeeWalking || facilityWalking ||
+         teamEventActive || inMeeting || inTeamMeeting || agentTherapyActive;
+}
+
+const _seenEvt = new Set();
+// NOTE: API events carry `msg` (verified in _parse_log_events), not `text`.
+function evtKey(e){ return (e.time||'') + '|' + (e.type||'') + '|' + (e.text||e.msg||'').slice(0,40); }
+let _evtSeeded = false;
+function processStoryEvents(){
+  if(!apiData || !apiData.events) return;
+  if(!_evtSeeded){
+    // First load: pre-seed every current event WITHOUT firing behaviors —
+    // a page refresh must not replay history.
+    for(const e of apiData.events) _seenEvt.add(evtKey(e));
+    _evtSeeded = true;
+    return;
+  }
+  for(const e of apiData.events){
+    const k = evtKey(e);
+    if(_seenEvt.has(k)) continue;
+    _seenEvt.add(k);
+    if(_seenEvt.size > 200){ const it=_seenEvt.values(); _seenEvt.delete(it.next().value); }
+    try { routeStoryEvent(e); } catch(err){ console.warn('[story]', err); }
+  }
+}
+
+function routeStoryEvent(e){
+  const msg = e.msg || '';
+  const ts = _ts12();
+
+  // 1+2. Trade close — win celebration / loss gloom. Real pnl + symbol from
+  // the event; if either is absent, do nothing (never invent).
+  if(e.type === 'close'){
+    if(typeof e.pnl !== 'number' || !e.symbol) return;
+    const sym = String(e.symbol).replace('/USDT:USDT','');
+    const owner = strategyAgent(e.strategy);
+    if(e.pnl > 0){
+      showBubble(owner, '+$' + e.pnl.toFixed(2) + ' ' + sym + ' ✔');
+      storyPulse(owner, '#4ecb71', 'active', 10000);
+      addComm(ts, '✔ WIN +$' + e.pnl.toFixed(2) + ' ' + sym + (e.reason ? ' (' + e.reason + ')' : ''), 'green');
+    } else {
+      showBubble(owner, '−$' + Math.abs(e.pnl).toFixed(2) + ' ' + sym);
+      storyPulse(owner, '#555f6b', 'idle', 10000);
+      addComm(ts, '✖ LOSS −$' + Math.abs(e.pnl).toFixed(2) + ' ' + sym + (e.reason ? ' (' + e.reason + ')' : ''), 'red');
+      // therapy walks stay owned by the existing checkTherapyTriggers — not duplicated here
+    }
+    return;
+  }
+
+  // 3. Live-exit enforcement (e.g. "[LIVE EXIT] ARB/USDT:USDT stop_loss @ 0.083400")
+  // → executor walks to Claude (ensemble desk) via the existing report routine.
+  // Watcher start/stop/failure lines don't match this shape on purpose.
+  let m = msg.match(/\[LIVE EXIT\] (\S+) (\w+) @ ([\d.]+)/);
+  if(m){
+    const sym = m[1].replace('/USDT:USDT','');
+    addComm(ts, '⚡ LIVE EXIT ' + sym + ' ' + m[2] + ' @ ' + m[3], 'amber');
+    if(!storySimBusy() && !reportingAgent && !isSleepHours()){
+      startAgentReport('executor');
+      showBubble('executor', 'enforced ' + sym + ' exit');
+    }
+    return;
+  }
+
+  // 4. Slot PROMOTED (e.g. "[SENTINEL] Slot '5m_mean_revert' PROMOTED to live at 20%")
+  // → all-hands gather: rewind the existing team-meeting timer so the inline
+  // routine in animate() fires next frame under its own busy-flag guards.
+  if(/PROMOTED/.test(msg)){
+    m = msg.match(/Slot '([^']+)' PROMOTED/);
+    const slot = m ? m[1] : 'slot';
+    addComm(ts, '🚀 ' + slot + ' promoted to live', 'purple');
+    if(!storySimBusy()){
+      lastTeamMeeting = 0;
+      showBubble('ensemble', slot + ' is live — conference room, everyone.');
+    }
+    return;
+  }
+
+  // 5. Slot DEMOTED (e.g. "[SLOT DEMOTE] 5m_mean_revert → paper (loss cap)")
+  // → walk of shame to the B1 rec area.
+  if(/\[SLOT DEMOTE\]|DEMOTED|auto.?demote/i.test(msg)){
+    m = msg.match(/\[SLOT DEMOTE\] (\S+)/);
+    const slot = m ? m[1] : 'slot';
+    addComm(ts, '⬇ ' + slot + ' demoted to paper', 'red');
+    startWalkOfShame(strategyAgent(slot), slot);
+    return;
+  }
+}
+
+// One-off teamEvents-style outing: owning agent + 2 nearest colleagues slink
+// to the B1 rec area. Reuses the existing team-event walk machinery (the
+// generic updater in animate() drives all motion and the return reset).
+function startWalkOfShame(owner, slot){
+  if(storySimBusy() || isSleepHours()) return; // drop, never queue
+  if(!charGroups[owner] || !deskPositions[owner]) return;
+  const pool = ['scanner','risk','tape','executor','strategy','ws_feed','pos_monitor']
+    .filter(n => n !== owner && charGroups[n] && deskPositions[n]);
+  const op = deskPositions[owner];
+  pool.sort((a,b) =>
+    Math.hypot(deskPositions[a].x-op.x, deskPositions[a].z-op.z) -
+    Math.hypot(deskPositions[b].x-op.x, deskPositions[b].z-op.z));
+  const agents = [owner].concat(pool.slice(0,2));
+  lastTeamEvent = Date.now(); // hold off the random team event
+  teamEventActive = true;
+  teamEventLocation = 'rec';
+  teamEventReturning = false;
+  teamEventWalkStart = clock.getElapsedTime();
+  teamEventAgents = agents;
+  teamEventWalking = agents.map(() => true);
+  agents.forEach(n => switchToWalkAnim(n));
+  showBubble(owner, slot + ' demoted… I need a minute.');
+  const gloom = ['Rough one.', 'Back to paper…', 'We\'ll regroup.'];
+  agents.slice(1).forEach((n, i) => setTimeout(() => showBubble(n, gloom[i % gloom.length]), 600 + i*400));
+  setTimeout(() => {
+    if(!teamEventActive || teamEventLocation !== 'rec') return;
+    teamEventReturning = true;
+    teamEventWalkStart = clock.getElapsedTime();
+    teamEventWalking = teamEventAgents.map(() => true);
+    teamEventAgents.forEach(n => switchToWalkAnim(n));
+  }, TEAM_EVENT_DURATION + WALK_DURATION * 1500);
+}
+
+
 // ── DATA FETCH ──
 async function fetchData() {
   try {
@@ -8791,6 +8948,7 @@ async function fetchData() {
     apiData = await r.json();
     updateHUD();
     updateAllMonitors();
+    processStoryEvents();   // desk v2: event-driven story behaviors
     checkTherapyTriggers();
     // v8.0: pipe ensemble events to comms
     (apiData.ensemble||[]).forEach(e => {
@@ -8820,6 +8978,12 @@ async function fetchData() {
         }
       });
     }
+    // Story pulses override LEDs until they expire (desk v2)
+    Object.keys(_storyPulse).forEach(function(n){
+      const ov = _storyPulse[n];
+      if (Date.now() < ov.until) { updateAgentLED(n, ov.led); }
+      else { updateAgentLED(n, 'idle'); delete _storyPulse[n]; }
+    });
   } catch(e) { /* silent */ }
 }
 
