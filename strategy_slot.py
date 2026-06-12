@@ -9,6 +9,9 @@ from logger import setup_logger
 
 logger = setup_logger()
 
+LIVE_LOSS_CAP_USDT = -5.0      # auto-demote when live net PnL breaches this
+LIVE_KELLY_MIN_TRADES = 10     # negative-kelly demote needs at least this many live trades
+
 
 @dataclass
 class StrategySlot:
@@ -41,6 +44,11 @@ class StrategySlot:
             os.path.dirname(__file__), f"trading_state_{self.slot_id}_blocked.json"
         )
         self.blocked_counts: dict = self._load_blocked_counts()
+        self.promoted_at: float = 0.0
+        self._mode_sidecar = os.path.join(
+            os.path.dirname(__file__), f"trading_state_{self.slot_id}_mode.json"
+        )
+        self._load_mode()
 
     def _load_blocked_counts(self) -> dict:
         try:
@@ -61,6 +69,66 @@ class StrategySlot:
                 json.dump(self.blocked_counts, f)
         except Exception as e:
             logger.debug(f"[SLOT] {self.slot_id} bump_blocked({tag}) failed: {e}")
+
+    def _load_mode(self) -> None:
+        """Restore promotion state across restarts (constructor defaults are paper)."""
+        try:
+            if os.path.exists(self._mode_sidecar):
+                with open(self._mode_sidecar) as f:
+                    data = json.load(f)
+                self.paper_mode = bool(data.get("paper_mode", self.paper_mode))
+                self.capital_pct = float(data.get("capital_pct", self.capital_pct))
+                self.promoted_at = float(data.get("promoted_at", 0.0))
+        except Exception as e:
+            logger.warning(f"[SLOT] {self.slot_id} mode sidecar load failed: {e}")
+
+    def _save_mode(self) -> None:
+        try:
+            with open(self._mode_sidecar, "w") as f:
+                json.dump({"paper_mode": self.paper_mode,
+                           "capital_pct": self.capital_pct,
+                           "promoted_at": self.promoted_at}, f)
+        except Exception as e:
+            logger.warning(f"[SLOT] {self.slot_id} mode sidecar save failed: {e}")
+
+    def set_live(self, capital_pct: float = None) -> None:
+        self.paper_mode = False
+        if capital_pct is not None:
+            self.capital_pct = capital_pct
+        self.promoted_at = time.time()
+        self._save_mode()
+
+    def set_paper(self) -> None:
+        self.paper_mode = True
+        self.capital_pct = 0.0
+        self._save_mode()
+
+    def live_trades(self) -> list:
+        return [t for t in self.risk.closed_trades if t.get("mode") == "live"]
+
+    def live_pnl(self) -> float:
+        return sum(t.get("pnl_usdt", 0) for t in self.live_trades())
+
+    def should_auto_demote(self) -> tuple:
+        """(demote: bool, reason: str). Checked after every live close."""
+        trades = self.live_trades()
+        pnl = sum(t.get("pnl_usdt", 0) for t in trades)
+        if pnl <= LIVE_LOSS_CAP_USDT:
+            return True, f"live loss cap: ${pnl:.2f} <= ${LIVE_LOSS_CAP_USDT:.2f}"
+        if len(trades) >= LIVE_KELLY_MIN_TRADES:
+            wins = [t["pnl_usdt"] for t in trades if t.get("pnl_usdt", 0) > 0]
+            losses = [abs(t["pnl_usdt"]) for t in trades if t.get("pnl_usdt", 0) < 0]
+            if losses and wins:
+                wr = len(wins) / len(trades)
+                rr = (sum(wins) / len(wins)) / (sum(losses) / len(losses))
+                kelly = wr - (1 - wr) / rr
+            elif not wins:
+                kelly = -1.0
+            else:
+                kelly = 1.0
+            if kelly < 0:
+                return True, f"negative live Kelly ({kelly:.3f}) after {len(trades)} live trades"
+        return False, ""
 
     @property
     def is_active(self) -> bool:
