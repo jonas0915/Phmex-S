@@ -656,12 +656,12 @@ class Phmex2Bot:
         # for symbols not yet in the WS cache (e.g. freshly scanned pairs).
         ohlcv_cache = {}
         prices = {}
-        # Include paper-slot open-position symbols so their exits always get a price —
-        # without this, a paper position on a no-longer-scanned pair never exits
-        # (the 5m_narrow DOGE freeze, audit 2026-06-11).
-        paper_pos_symbols = {s for slot in self.slots if slot.paper_mode
-                             for s in slot.risk.positions.keys()}
-        all_symbols = list(set(self.active_pairs) | set(self.risk.positions.keys()) | paper_pos_symbols)
+        # Include slot open-position symbols (paper AND live) so their exits always
+        # get a price — without this, a slot position on a no-longer-scanned pair
+        # never exits (the 5m_narrow DOGE freeze, audit 2026-06-11).
+        slot_pos_symbols = {s for slot in self.slots
+                            for s in slot.risk.positions.keys()}
+        all_symbols = list(set(self.active_pairs) | set(self.risk.positions.keys()) | slot_pos_symbols)
         for symbol in all_symbols:
             df_raw = None
             if self._ws_feed and not self._ws_feed.is_stale(symbol):
@@ -1506,9 +1506,9 @@ class Phmex2Bot:
                     f"${margin_in_use:.2f} margin in use (likely API failure)"
                 )
 
-        # Evaluate paper slots (completely isolated — no real orders)
+        # Evaluate strategy slots (paper slots simulate; live slots place real orders)
         try:
-            self._evaluate_paper_slots(self.active_pairs, prices)
+            self._evaluate_slots(self.active_pairs, prices)
         except Exception as e:
             logger.debug(f"[PAPER] Slot evaluation error: {e}")
 
@@ -1544,11 +1544,9 @@ class Phmex2Bot:
                 logger.debug(f"[L2_LIVE] writer tick failed: {e}")
             time.sleep(interval_sec)
 
-    def _evaluate_paper_slots(self, active_pairs: list, prices: dict):
-        """Evaluate paper slots — simulate entries/exits without placing real orders."""
+    def _evaluate_slots(self, active_pairs: list, prices: dict):
+        """Evaluate strategy slots — paper slots simulate; live (promoted) slots place real orders."""
         for slot in self.slots:
-            if not slot.paper_mode:
-                continue
             # NOTE: killed slots (is_active False) still run the EXIT block below —
             # skipping them entirely froze a DOGE position in 5m_narrow from 4/24 to
             # 6/11 (audit finding). The is_active guard now sits before entries only.
@@ -1558,61 +1556,63 @@ class Phmex2Bot:
                 continue
 
             # --- Paper exits first (check existing paper positions) ---
-            for symbol in list(slot.risk.positions.keys()):
-                price = prices.get(symbol)
-                if not price:
-                    logger.debug(f"[PAPER] {slot.slot_id} no price for {symbol}, skipping exit check")
-                    continue
-                pos = slot.risk.positions[symbol]
+            # Live-slot exits: exchange SL/TP + reconcile Path A; cycle exits land in Task 5.
+            if slot.paper_mode:
+                for symbol in list(slot.risk.positions.keys()):
+                    price = prices.get(symbol)
+                    if not price:
+                        logger.debug(f"[PAPER] {slot.slot_id} no price for {symbol}, skipping exit check")
+                        continue
+                    pos = slot.risk.positions[symbol]
 
-                # Check SL
-                if (pos.side == "long" and price <= pos.stop_loss) or \
-                   (pos.side == "short" and price >= pos.stop_loss):
-                    pnl = pos.pnl_usdt(price)
-                    pnl_pct = pos.pnl_percent(price)
-                    slot.risk.close_position(symbol, price, "stop_loss")
-                    notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "stop_loss")
-                    continue
-
-                # Check TP
-                if (pos.side == "long" and price >= pos.take_profit) or \
-                   (pos.side == "short" and price <= pos.take_profit):
-                    pnl = pos.pnl_usdt(price)
-                    pnl_pct = pos.pnl_percent(price)
-                    slot.risk.close_position(symbol, price, "take_profit")
-                    notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "take_profit")
-                    continue
-
-                # Trend-flip exit for htf_confluence_pullback paper positions
-                if slot.strategy_name in ("htf_confluence_pullback", "htf_l2_anticipation"):
-                    htf_df_tuple = self._htf_cache.get(symbol)
-                    htf_df = htf_df_tuple[0] if htf_df_tuple else None
-                    should_flip, flip_reason = _check_htf_trend_flip_exit(pos.side, htf_df)
-                    if should_flip:
+                    # Check SL
+                    if (pos.side == "long" and price <= pos.stop_loss) or \
+                       (pos.side == "short" and price >= pos.stop_loss):
                         pnl = pos.pnl_usdt(price)
                         pnl_pct = pos.pnl_percent(price)
-                        logger.info(f"[PAPER TREND-FLIP EXIT] {slot.slot_id} {symbol} {pos.side} — 1h EMA flipped")
-                        slot.risk.close_position(symbol, price, flip_reason)
-                        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, flip_reason)
+                        slot.risk.close_position(symbol, price, "stop_loss")
+                        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "stop_loss")
                         continue
 
-                # Check adverse exit
-                if pos.should_adverse_exit(self.cycle_count, price):
-                    pnl = pos.pnl_usdt(price)
-                    pnl_pct = pos.pnl_percent(price)
-                    slot.risk.close_position(symbol, price, "adverse_exit")
-                    notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "adverse_exit")
-                    continue
+                    # Check TP
+                    if (pos.side == "long" and price >= pos.take_profit) or \
+                       (pos.side == "short" and price <= pos.take_profit):
+                        pnl = pos.pnl_usdt(price)
+                        pnl_pct = pos.pnl_percent(price)
+                        slot.risk.close_position(symbol, price, "take_profit")
+                        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "take_profit")
+                        continue
 
-                # Check time exit
-                should_exit, is_hard = pos.should_time_exit(self.cycle_count, price)
-                if should_exit:
-                    pnl = pos.pnl_usdt(price)
-                    pnl_pct = pos.pnl_percent(price)
-                    reason = "hard_time_exit" if is_hard else "time_exit"
-                    slot.risk.close_position(symbol, price, reason)
-                    notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, reason)
-                    continue
+                    # Trend-flip exit for htf_confluence_pullback paper positions
+                    if slot.strategy_name in ("htf_confluence_pullback", "htf_l2_anticipation"):
+                        htf_df_tuple = self._htf_cache.get(symbol)
+                        htf_df = htf_df_tuple[0] if htf_df_tuple else None
+                        should_flip, flip_reason = _check_htf_trend_flip_exit(pos.side, htf_df)
+                        if should_flip:
+                            pnl = pos.pnl_usdt(price)
+                            pnl_pct = pos.pnl_percent(price)
+                            logger.info(f"[PAPER TREND-FLIP EXIT] {slot.slot_id} {symbol} {pos.side} — 1h EMA flipped")
+                            slot.risk.close_position(symbol, price, flip_reason)
+                            notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, flip_reason)
+                            continue
+
+                    # Check adverse exit
+                    if pos.should_adverse_exit(self.cycle_count, price):
+                        pnl = pos.pnl_usdt(price)
+                        pnl_pct = pos.pnl_percent(price)
+                        slot.risk.close_position(symbol, price, "adverse_exit")
+                        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, "adverse_exit")
+                        continue
+
+                    # Check time exit
+                    should_exit, is_hard = pos.should_time_exit(self.cycle_count, price)
+                    if should_exit:
+                        pnl = pos.pnl_usdt(price)
+                        pnl_pct = pos.pnl_percent(price)
+                        reason = "hard_time_exit" if is_hard else "time_exit"
+                        slot.risk.close_position(symbol, price, reason)
+                        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, reason)
+                        continue
 
             # --- Paper entries ---
             if not slot.is_active:
@@ -1833,24 +1833,75 @@ class Phmex2Bot:
                     # generic "confluence" label — preserves per-strategy attribution in logs.
                     _entry_strategy_name = _strat_name if (slot.slot_id == "5m_narrow" and _strat_name) else slot.strategy_name
 
-                    slot.risk.open_position(
-                        symbol, price, margin, side=direction,
-                        atr=atr_val, regime="medium",
-                        cycle=self.cycle_count,
-                        strategy=_entry_strategy_name
-                    )
-                    notifier.notify_paper_entry(
-                        symbol, direction, price, margin,
-                        signal.strength, signal.reason
-                    )
+                    _block_label = f" [WOULD BLOCK: {_tag_str}]" if _would_block else ""
+
+                    if slot.paper_mode:
+                        slot.risk.open_position(
+                            symbol, price, margin, side=direction,
+                            atr=atr_val, regime="medium",
+                            cycle=self.cycle_count,
+                            strategy=_entry_strategy_name
+                        )
+                        notifier.notify_paper_entry(
+                            symbol, direction, price, margin,
+                            signal.strength, signal.reason
+                        )
+                        logger.info(
+                            f"[PAPER] {slot.slot_id} ENTRY {direction.upper()} {symbol} | "
+                            f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}{_block_label}"
+                        )
+                    else:
+                        # --- LIVE slot entry (spec 2026-06-12) ---
+                        # account halts: pause sentinel + main drawdown pause (risk_manager.py:351)
+                        if os.path.exists(".pause_trading") or self.risk._drawdown_pause_until > time.time():
+                            logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} entry blocked — account halt")
+                            continue
+                        order = (self.exchange.open_long(symbol, margin, price)
+                                 if direction == "long"
+                                 else self.exchange.open_short(symbol, margin, price))
+                        if not order:
+                            logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} {direction} — no fill (PostOnly miss), skipping")
+                            continue
+                        fill_price = self._extract_fill_price(order, price)
+                        slot.risk.open_position(symbol, fill_price, margin, side=direction,
+                                                atr=atr_val, regime="medium",
+                                                cycle=self.cycle_count,
+                                                strategy=_entry_strategy_name)
+                        live_pos = slot.risk.positions[symbol]
+                        fill_amount = self._extract_fill_amount(order, live_pos.amount)
+                        actual_margin = (fill_amount * fill_price) / Config.LEVERAGE
+                        _min_margin = float(os.getenv("MIN_TRADE_MARGIN", "10.0")) * 0.5
+                        if actual_margin < _min_margin:
+                            logger.warning(f"[SLOT LIVE] {slot.slot_id} {symbol} partial fill ${actual_margin:.4f} < ${_min_margin:.2f} — closing crumb")
+                            self.exchange.cancel_open_orders(symbol)
+                            closed = (self.exchange.close_long(symbol, fill_amount) if direction == "long"
+                                      else self.exchange.close_short(symbol, fill_amount))
+                            if closed:
+                                slot.risk.close_position(symbol, fill_price, "min_margin_skip", mode="live")
+                            else:
+                                logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} crumb close FAILED — reconcile will catch")
+                            continue
+                        live_pos.amount = fill_amount
+                        live_pos.margin = actual_margin
+                        live_pos.entry_strength = signal.strength
+                        sl_tp = self.exchange.place_sl_tp(symbol, direction, fill_amount,
+                                                          live_pos.stop_loss, live_pos.take_profit)
+                        live_pos.sl_order_id = sl_tp.get("sl_order_id") or "software"
+                        live_pos.tp_order_id = sl_tp.get("tp_order_id")
+                        if sl_tp.get("sl_order_id"):
+                            live_pos.exchange_sl_price = live_pos.stop_loss
+                        else:
+                            logger.warning(f"[SLOT LIVE] [SL FALLBACK] {slot.slot_id} {symbol} exchange SL failed — software SL@{live_pos.stop_loss:.4f}")
+                        notifier.notify_entry(symbol, direction, fill_price, live_pos.margin,
+                                              live_pos.stop_loss, live_pos.take_profit,
+                                              signal.strength, f"[slot {slot.slot_id}] {signal.reason}")
+                        logger.info(f"[SLOT LIVE] {slot.slot_id} ENTRY {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${live_pos.margin:.2f} | {signal.reason}")
+
+                    # --- Shared tail (paper + live) ---
                     slot.total_entries += 1
                     _entered_this_symbol = True
-                    _block_label = f" [WOULD BLOCK: {_tag_str}]" if _would_block else ""
-                    logger.info(
-                        f"[PAPER] {slot.slot_id} ENTRY {direction.upper()} {symbol} | "
-                        f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}{_block_label}"
-                    )
-                    snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, _entry_strategy_name, signal.strength, price, 0, None, flow, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None)
+                    entry_px = price if slot.paper_mode else fill_price
+                    snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, _entry_strategy_name, signal.strength, entry_px, 0, None, flow, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None)
                     if symbol in slot.risk.positions:
                         slot.risk.positions[symbol].entry_snapshot = snap
                         slot.risk.positions[symbol].gate_tags = _tag_str
