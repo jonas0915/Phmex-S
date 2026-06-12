@@ -8740,22 +8740,22 @@ function updateTimeOfDay() {
   } else if(isGolden) {
     const t = (h-16.5)/2.5;
     ambientLight.intensity = 0.35 - t*0.1;
-    ambientLight.color.setHex(0xffe8cc);
+    ambientLight.color.setHex(0xffddbb);
     dirLight.intensity = 1.8 - t*0.8;
-    dirLight.color.setHex(0xffaa66);
-    const bg = Math.floor(0x30 + (1-t)*0x50);
-    scene.background.setRGB(bg/255*0.8, bg/255*0.5, bg/255*0.3);
+    dirLight.color.setHex(0xff9944);
+    const bg = Math.floor(0x38 + (1-t)*0x58);
+    scene.background.setRGB(bg/255*0.88, bg/255*0.48, bg/255*0.22);
     scene.fog.color.copy(scene.background);
-    renderer.toneMappingExposure = 1.2 - t*0.15;
-    bloomPass.strength = 0.15 + t*0.1;
+    renderer.toneMappingExposure = 1.25 - t*0.15;
+    bloomPass.strength = 0.18 + t*0.12;
     setCeilingBrightness(1.0 - t*0.7);
   } else if(isNight) {
     ambientLight.intensity = 0.7;
-    ambientLight.color.setHex(0xeeeeff);
+    ambientLight.color.setHex(0xdde5ff);
     dirLight.intensity = 0.3;
-    dirLight.color.setHex(0xccddff);
-    scene.background.setHex(0x050810);
-    scene.fog.color.setHex(0x050810);
+    dirLight.color.setHex(0xbbd0ff);
+    scene.background.setHex(0x030814);
+    scene.fog.color.setHex(0x030814);
     scene.fog.density = 0.0003;
     renderer.toneMappingExposure = 1.1;
     bloomPass.strength = 0.15;
