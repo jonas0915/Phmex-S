@@ -6077,6 +6077,25 @@ function createMonitor(parent, lx, ly, lz, w=0.35, h=0.22, name='mon') {
   return g;
 }
 
+// Shared lamp glow — one radial-gradient canvas texture, one SpriteMaterial, all 9 lamps
+const _lampGlowTex = (function() {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+  const ctx2 = c.getContext('2d');
+  const grad = ctx2.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0,   'rgba(255,220,140,0.9)');
+  grad.addColorStop(0.3, 'rgba(255,180,80,0.5)');
+  grad.addColorStop(1,   'rgba(255,140,30,0)');
+  ctx2.fillStyle = grad;
+  ctx2.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const _lampGlowMat = new THREE.SpriteMaterial({
+  map: _lampGlowTex,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  transparent: true,
+});
+
 function createLamp(parent, lx, lz) {
   const g = new THREE.Group();
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.02, 8), lampBaseMat);
@@ -6092,6 +6111,11 @@ function createLamp(parent, lx, lz) {
   const light = new THREE.PointLight(0xffaa55, 0.3, 3);
   light.position.set(0.02, 0.33, -0.08);
   g.add(light);
+  // Glow sprite at lamp head — shared texture/material, static, no animation
+  const glow = new THREE.Sprite(_lampGlowMat);
+  glow.scale.set(0.6, 0.6, 1);
+  glow.position.set(0.02, 0.36, -0.08);
+  g.add(glow);
   g.position.set(lx, 0.78, lz);
   parent.add(g);
   return light;
