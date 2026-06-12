@@ -18,6 +18,7 @@ from urllib.parse import urlparse, parse_qs
 from zoneinfo import ZoneInfo
 
 CA_TZ = ZoneInfo("America/Los_Angeles")
+NY_TZ = ZoneInfo("America/New_York")  # bot.log timestamps are local Eastern
 
 def _now_ca():
     return datetime.now(CA_TZ)
@@ -406,6 +407,23 @@ def parse_watchlist(lines: list[str]) -> dict:
         "scanner_pairs": scanner_pairs,
         "open_symbols": open_symbols,
     }
+
+
+ADX_HOLD_RE = re.compile(r'\[HOLD\] (\S+) — No confluence signal \(1h ADX=([\d.]+)\)')
+
+
+def parse_pair_adx(lines: list[str]) -> dict[str, float]:
+    """Latest 1h ADX per pair from [HOLD] lines. Forward iteration so the
+    newest line wins. Pairs with no HOLD line stay ABSENT — never invent."""
+    adx: dict[str, float] = {}
+    for line in lines:
+        m = ADX_HOLD_RE.search(line)
+        if m:
+            try:
+                adx[m.group(1)] = float(m.group(2))
+            except ValueError:
+                pass
+    return adx
 
 
 def get_recent_activity(lines: list[str], n: int = 12) -> list[str]:
@@ -1223,9 +1241,11 @@ def collect_blotter_rows(limit: int = 500) -> list[dict]:
     return rows[:limit]
 
 
-def build_trade_detail(trade_id: str) -> dict:
+def build_trade_detail(trade_id: str, sym: str = None) -> dict:
     """Drill-down payload for one blotter row id ("owner:index").
-    Re-reads the owning state file; unknown/malformed id → {"error": "not found"}."""
+    Re-reads the owning state file; unknown/malformed id → {"error": "not found"}.
+    Optional sym cross-check: if the caller says which symbol it clicked and the
+    record at that index holds a different one, the index moved → "stale id"."""
     try:
         owner, idx_s = str(trade_id).split(":", 1)
         idx = int(idx_s)
@@ -1238,6 +1258,9 @@ def build_trade_detail(trade_id: str) -> dict:
             t = (json.load(f).get("closed_trades", []) or [])[idx]
     except Exception:
         return {"error": "not found"}
+    rec_sym = str(t.get("symbol") or "")
+    if sym and rec_sym and sym not in (rec_sym, rec_sym.replace("/USDT:USDT", "")):
+        return {"error": "stale id"}
     try:
         opened, closed = t.get("opened_at") or 0, t.get("closed_at") or 0
         def _fmt(ts):
@@ -1249,6 +1272,7 @@ def build_trade_detail(trade_id: str) -> dict:
         return {
             "trade": {
                 "sym": str(t.get("symbol") or "?").replace("/USDT:USDT", ""),
+                **({"symbol": rec_sym} if rec_sym else {}),
                 "side": str(t.get("side") or "?"),
                 "strat": str(t.get("strategy") or ""),
                 "entry_price": t.get("entry_price") or t.get("entry"),
@@ -1696,9 +1720,10 @@ def _build_blotter_panel(limit: int = 100) -> str:
         if r["owner"] != "main":
             b_cls = "amb" if r["mode"] == "live" else "dim"
             badge = f" <span class='{b_cls}'>[{escape(r['owner'])}]</span>"
-        # id is generated server-side as owner:index ([A-Za-z0-9_:] only) — safe in attr
+        # id is generated server-side as owner:index ([A-Za-z0-9_:] only) — safe in attr;
+        # sym rides along so /api/trade can reject a stale index ("stale id").
         out += (
-            f"<tr onclick=\"drill(this,'{r['id']}')\" style='cursor:pointer'>"
+            f"<tr onclick=\"drill(this,'{r['id']}','{escape(r['sym'])}')\" style='cursor:pointer'>"
             f"<td>{escape(r['time_pt'])}</td>"
             f"<td>{escape(r['sym'])}{badge}</td>"
             f"<td class='{side_cls}'>{side}</td>"
@@ -1707,6 +1732,71 @@ def _build_blotter_panel(limit: int = 100) -> str:
             f"<td class='dim'>{escape(r['reason'][:14])}</td></tr>"
         )
     return out + "</table>"
+
+
+_SIGNAL_RE = re.compile(r'\[ENTRY\]|\[SLOT LIVE\] .* ENTRY|Position opened')
+
+
+def _build_why_no_trades(lines: list = None) -> str:
+    """WHY NO TRADES? panel body: per-pair 1h ADX vs the 25 entry gate,
+    newest entry signal seen in the tail, and the top 24h gate blocker.
+    Read-only log diagnostics; every section degrades to em-dash / no data.
+    Pass pre-fetched log lines to avoid a redundant tail_log call."""
+    lines = lines if lines is not None else tail_log(3000)
+    adx = parse_pair_adx(lines)
+    pairs = parse_watchlist(lines).get("base_pairs") or []
+
+    # ── Per-pair ADX + 9-block bar scaled 0-45 (gate fires at 25) ──
+    if pairs:
+        rows = ""
+        for sym in pairs:
+            short = escape(str(sym).replace("/USDT:USDT", ""))
+            val = adx.get(sym)
+            if val is None:
+                # No HOLD line for this pair in the tail — unknown, NOT zero.
+                rows += (f"<tr><td>{short}</td><td class='dim'>&mdash;</td>"
+                         f"<td class='dim'>&mdash;</td></tr>")
+                continue
+            filled = max(0, min(9, round(val / 45 * 9)))
+            bar = "▓" * filled + "░" * (9 - filled)
+            if val >= 25:
+                rows += (f"<tr><td>{short}</td><td class='pos'>{val:.1f}</td>"
+                         f"<td class='pos'>{bar} ✓</td></tr>")
+            else:
+                rows += (f"<tr><td>{short}</td><td>{val:.1f}</td>"
+                         f"<td class='dim'>{bar}</td></tr>")
+        adx_html = ("<table><tr class='dim'><th>PAIR</th><th>1H ADX</th>"
+                    "<th>GATE 25</th></tr>" + rows + "</table>")
+    else:
+        adx_html = "<div class='dim'>no data &mdash; watchlist not in log tail</div>"
+
+    # ── Last entry signal (log ts = local Eastern → render PT + relative) ──
+    sig_html = "<div class='dim' style='margin-top:5px'>last signal: &mdash; none in log tail</div>"
+    for line in reversed(lines):
+        if _SIGNAL_RE.search(line):
+            m = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+            if m:
+                try:
+                    ts = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=NY_TZ)
+                    ts_pt = ts.astimezone(CA_TZ)
+                    mins = max(0, int((datetime.now(CA_TZ) - ts_pt).total_seconds() // 60))
+                    ago = f"{mins}m ago" if mins < 120 else f"{mins // 60}h {mins % 60}m ago"
+                    sig_html = (f"<div style='margin-top:5px'>last signal: "
+                                f"{escape(ts_pt.strftime('%-I:%M %p PT'))} "
+                                f"<span class='dim'>({escape(ago)})</span></div>")
+                except Exception:
+                    pass
+            break
+
+    # ── Top gate blocker 24h (same counts source as the observability panel) ──
+    stats = _gate_stats(LOG_FILE)
+    if stats:
+        name, count = next(iter(stats.items()))  # _gate_stats sorts desc
+        gate_html = f"<div class='dim'>top gate 24h: {escape(name)} &times;{count}</div>"
+    else:
+        gate_html = "<div class='dim'>top gate 24h: no data</div>"
+
+    return adx_html + sig_html + gate_html
 
 
 def build_content(lines: list = None) -> str:
@@ -1782,6 +1872,9 @@ def build_content(lines: list = None) -> str:
     # Panel 3 — BLOTTER: main + all slots merged, click a row to drill down.
     blotter_html = _build_blotter_panel()
 
+    # Panel 4 — WHY NO TRADES? diagnostics (per-pair ADX, last signal, top gate)
+    why_html = _build_why_no_trades(lines)
+
     # Panel 5 — GATES + WATCHLIST (legacy builders carried forward; Task 6 rebuilds)
     gates_html = _build_observability_panel() + _build_watchlist_html(watchlist, positions)
 
@@ -1800,7 +1893,7 @@ def build_content(lines: list = None) -> str:
     </div>
     <div class="panel" id="p-why">
         <div class="ptitle">WHY NO TRADES?</div>
-        <div class="dim">live diagnostics land in Task 4</div>
+        {why_html}
     </div>
     <div class="panel" id="p-gates">
         <div class="ptitle">GATES 24H + WATCHLIST</div>
@@ -1907,12 +2000,13 @@ setInterval(poll, 3000); poll();
 // an expanded row collapses on the next poll — acceptable for v1. ──
 function escq(v){{ return String(v==null?'':v).replace(/&/g,'&amp;')
   .replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }}
-async function drill(tr, id){{
+async function drill(tr, id, sym){{
   const next = tr.nextElementSibling;
   if(next && next.dataset && next.dataset.drill === id){{ next.remove(); return; }}
   let d;
   try{{
-    const r = await fetch('/api/trade?id='+encodeURIComponent(id));
+    const r = await fetch('/api/trade?id='+encodeURIComponent(id)+
+      (sym ? '&sym='+encodeURIComponent(sym) : ''));
     d = await r.json();
   }}catch(e){{ return; }}
   const tbl = tr.closest('table');
@@ -2028,7 +2122,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         elif self.path.startswith("/api/trade"):
             qs = parse_qs(urlparse(self.path).query)
             tid = (qs.get("id") or [""])[0]
-            data = json.dumps(build_trade_detail(tid)).encode()
+            sym = (qs.get("sym") or [None])[0]
+            data = json.dumps(build_trade_detail(tid, sym)).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))

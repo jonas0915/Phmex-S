@@ -61,6 +61,22 @@ def test_trade_detail_endpoint():
         assert "snapshot" in d  # dict or the string "no snapshot recorded"
 
 
+SAMPLE_LOG = """
+2026-06-12 09:52:08 [DEBUG] [HOLD] ZEC/USDT:USDT — No confluence signal (1h ADX=15.3)
+2026-06-12 09:52:09 [DEBUG] [STRAT] l2_anticipation: 1h ADX 23.2 < 25
+2026-06-12 09:52:09 [DEBUG] [HOLD] INJ/USDT:USDT — No confluence signal (1h ADX=23.2)
+2026-06-12 09:53:08 [DEBUG] [HOLD] ZEC/USDT:USDT — No confluence signal (1h ADX=15.9)
+"""
+
+
+def test_parse_pair_adx():
+    import web_dashboard as wd
+    adx = wd.parse_pair_adx(SAMPLE_LOG.strip().splitlines())
+    assert adx["ZEC/USDT:USDT"] == 15.9     # newest wins
+    assert adx["INJ/USDT:USDT"] == 23.2
+    assert "DOGE/USDT:USDT" not in adx      # absent pair stays absent — never guess
+
+
 def test_sentinel_deploy_ts_matches_2026_04_02_06_01_utc():
     """Sentinel deployed 2026-04-01 23:01 PT = 2026-04-02 06:01 UTC.
     (Moved from test_sentinel_chart.py — the PNG chart is gone, but this
