@@ -735,16 +735,27 @@ def _drawdown_pct(state: dict, balance: float = 0.0) -> float:
     return 0.0
 
 
-def _mr_headroom():
+def _mr_headroom(slot_states: dict = None):
     """Demote headroom for the live 5m_mean_revert slot: $5 budget + net PnL of
     its LIVE-mode trades. None when the slot is paper (or files unreadable) —
-    the ticker omits the segment entirely in that case."""
+    the ticker omits the segment entirely in that case.
+    Pass pre-loaded slot_states dict to avoid re-reading state files."""
     try:
-        with open(os.path.join(PROJECT_DIR, "trading_state_5m_mean_revert_mode.json")) as f:
+        # Resolve mode sidecar: prefer slot_states if provided, else direct read
+        if slot_states is not None:
+            mode_data = None
+            # mode sidecar is NOT in slot_states (those are excluded by read_all_slot_states)
+            # fall through to direct read for the mode sidecar only
+        mode_path = os.path.join(PROJECT_DIR, "trading_state_5m_mean_revert_mode.json")
+        with open(mode_path) as f:
             if json.load(f).get("paper_mode", True):
                 return None
-        with open(os.path.join(PROJECT_DIR, "trading_state_5m_mean_revert.json")) as f:
-            trades = json.load(f).get("closed_trades", []) or []
+        # Resolve slot state: use preloaded dict when available
+        if slot_states is not None and "5m_mean_revert" in slot_states:
+            trades = slot_states["5m_mean_revert"].get("closed_trades", []) or []
+        else:
+            with open(os.path.join(PROJECT_DIR, "trading_state_5m_mean_revert.json")) as f:
+                trades = json.load(f).get("closed_trades", []) or []
         live_net = sum(_net_pnl(t) for t in trades if t.get("mode") == "live")
         return 5.0 + live_net
     except Exception:
@@ -810,34 +821,40 @@ def _latest_cycle(lines: list = None) -> str:
     return "—"
 
 
-def _open_pos_count() -> int:
-    """Open positions across main state + live-promoted slot state files."""
+def _open_pos_count(state: dict = None, slot_states: dict = None) -> int:
+    """Open positions across main state + live-promoted slot state files.
+    Pass pre-loaded state/slot_states to avoid re-reading files on each poll."""
     count = 0
     try:
-        count += len(read_state().get("positions") or {})
-        for slot_id in _live_slot_ids():
+        _state = state if state is not None else read_state()
+        count += len(_state.get("positions") or {})
+        live_ids = _live_slot_ids()
+        for slot_id in live_ids:
             if slot_id == "5m_scalp":
                 continue  # main trading_state.json already counted above
-            try:
-                with open(os.path.join(PROJECT_DIR, f"trading_state_{slot_id}.json")) as f:
-                    count += len(json.load(f).get("positions") or {})
-            except Exception:
-                pass
+            if slot_states is not None and slot_id in slot_states:
+                count += len(slot_states[slot_id].get("positions") or {})
+            else:
+                try:
+                    with open(os.path.join(PROJECT_DIR, f"trading_state_{slot_id}.json")) as f:
+                        count += len(json.load(f).get("positions") or {})
+                except Exception:
+                    pass
     except Exception:
         pass
     return count
 
 
-def build_ticker(lines: list = None) -> str:
+def build_ticker(lines: list = None, slot_states: dict = None, state: dict = None) -> str:
     """One-line sticky status ticker (12-hour PT, NET basis).
-    Pass pre-fetched log lines to avoid redundant tail_log calls per poll."""
+    Pass pre-fetched lines/slot_states/state to avoid redundant file reads per poll."""
     # all log-derived strings must be escape()d (innerHTML sink)
-    state = read_state()
+    _state = state if state is not None else read_state()
     bal = _latest_balance(lines)
-    today = _today_net_pnl(state)
+    today = _today_net_pnl(_state)
     arrow = "▲" if today >= 0 else "▼"
     cls = "pos" if today >= 0 else "neg"
-    hdrm = _mr_headroom()
+    hdrm = _mr_headroom(slot_states)
     watcher = "ON" if _watcher_enabled() else "OFF"
     now = escape(_now_ca().strftime("%-I:%M:%S %p PT"))
     parts = ["PHMEX-S",
@@ -845,8 +862,8 @@ def build_ticker(lines: list = None) -> str:
     if hdrm is not None:
         parts.append(f"MR-LIVE HDRM ${hdrm:.2f}")
     parts += [
-        f"DD {_drawdown_pct(state, bal):.1f}%",
-        f"POS {_open_pos_count()}",
+        f"DD {_drawdown_pct(_state, bal):.1f}%",
+        f"POS {_open_pos_count(_state, slot_states)}",
         f"WATCHER <span class='{'pos' if watcher == 'ON' else 'neg'}'>{escape(watcher)}</span>",
         f"CYC {escape(_latest_cycle(lines))}",
         now,
@@ -1166,15 +1183,15 @@ def _build_gates_watchlist(lines: list = None) -> str:
     return gates_html + wl_html + l2_html
 
 
-def build_content(lines: list = None) -> str:
+def build_content(lines: list = None, slot_states: dict = None, state: dict = None) -> str:
     """Inner HTML for the swapped #content node — the six-panel command grid.
 
     Request-scope load: slot states are read ONCE here and passed into every
     panel builder that needs them (positions, slots/guardrails, blotter), so a
     3s poll globs+parses the state files a single time.
-    Pass pre-fetched log lines to avoid a redundant tail_log call.
+    Pass pre-fetched lines/slot_states/state to avoid redundant file reads per poll.
     """
-    slot_states = read_all_slot_states()
+    slot_states = slot_states if slot_states is not None else read_all_slot_states()
     lines = lines if lines is not None else tail_log(3000)
 
     # Panel 1 — POSITIONS: main + live slots, uPnL from already-read log prices
@@ -1220,10 +1237,14 @@ def build_content(lines: list = None) -> str:
 
 def build_html() -> str:
     """Full HTML page shell — sticky ticker / swapped #content grid /
-    static #equity-root (outside the swap) / #feed."""
-    ticker = build_ticker()
-    content = build_content()
-    feed = build_feed()
+    static #equity-root (outside the swap) / #feed.
+    Single triple-read: lines/state/slot_states loaded once and threaded down."""
+    _lines = tail_log(3000)
+    _state = read_state()
+    _slot_states = read_all_slot_states()
+    ticker = build_ticker(_lines, _slot_states, _state)
+    content = build_content(_lines, _slot_states, _state)
+    feed = build_feed(_lines)
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1402,13 +1423,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(html.encode())))
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(html.encode())
         elif self.path == "/api/content":
-            _lines = tail_log(3000)  # single log tail for the entire poll
+            _lines = tail_log(3000)       # single log tail for the entire poll
+            _state = read_state()         # single state read
+            _slot_states = read_all_slot_states()  # single slot-states glob+read
             payload = json.dumps({
-                "ticker": build_ticker(_lines),
-                "content": build_content(_lines),
+                "ticker": build_ticker(_lines, _slot_states, _state),
+                "content": build_content(_lines, _slot_states, _state),
                 "feed": build_feed(_lines),
             })
             data = payload.encode()
