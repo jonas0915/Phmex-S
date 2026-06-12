@@ -2660,7 +2660,8 @@ for(let x=-3;x<=3;x+=6){
 const glassMat = new THREE.MeshPhysicalMaterial({
   color:0x88aacc, transparent:true, opacity:0.06,
   roughness:0.04, metalness:0.12, side:THREE.DoubleSide,
-  transmission:0.92, ior:1.5, thickness:0.05,
+  // NO transmission: it forces a per-frame scene-color-buffer grab (extra full
+  // render pass) on integrated GPUs — violates the smoothness-wins rule.
   reflectivity:0.7, envMapIntensity:1.0,
 });
 const frameMat = new THREE.MeshStandardMaterial({color:0x334450, metalness:0.7, roughness:0.3});
