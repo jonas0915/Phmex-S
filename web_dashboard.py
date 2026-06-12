@@ -51,6 +51,9 @@ _chart_cache = {}  # name -> PNG bytes
 _chart_lock = threading.Lock()
 _chart_version = 0  # bumped each time refresh_charts() actually writes new bytes
 
+# ── Watcher-enabled cache (30s TTL — avoids per-poll grep/seek) ──────────
+_watcher_cache: dict = {"v": None, "ts": 0.0}
+
 # ── Sentinel-era anchors ─────────────────────────────────────────────────
 # Sentinel deployed 2026-04-01 23:01 PT (= 2026-04-02 06:01 UTC), trade #342+
 SENTINEL_DEPLOY_TS = datetime(2026, 4, 2, 6, 1, 0, tzinfo=timezone.utc).timestamp()
@@ -310,7 +313,8 @@ def tail_log(n: int = 500) -> list[str]:
             capture_output=True, text=True, timeout=5
         )
         return [strip_ansi(line) for line in result.stdout.splitlines()]
-    except Exception:
+    except Exception as e:
+        print(f"[DASH] tail_log failed: {e}", flush=True)
         return []
 
 
@@ -1510,11 +1514,13 @@ def _build_l2_monitor_panel() -> str:
 
 
 # ── Ticker helpers (Terminal Pro shell) ─────────────────────────────────
-def _latest_balance() -> float:
+def _latest_balance(lines: list = None) -> float:
     """Last 'Balance: X USDT' from the bot-log STATS lines (the state JSON has
-    no balance field). 0.0 if unavailable."""
+    no balance field). 0.0 if unavailable.
+    Pass pre-fetched log lines to avoid a redundant tail_log call."""
     try:
-        for line in reversed(tail_log(2000)):
+        src = lines if lines is not None else tail_log(2000)
+        for line in reversed(src):
             m = re.search(r'Balance: ([\d.]+) USDT', line)
             if m:
                 return float(m.group(1))
@@ -1565,7 +1571,11 @@ def _watcher_enabled() -> bool:
     """True if '[LIVE EXIT] watcher enabled' was logged AFTER the most recent
     'Volume scanner ON' line (i.e. after the last bot start). Reads the last
     ~200KB of bot.log; falls back to a full-file grep when the startup markers
-    have scrolled out of the tail window (long-running bot)."""
+    have scrolled out of the tail window (long-running bot). Result cached 30s."""
+    now = time.time()
+    if now - _watcher_cache["ts"] < 30 and _watcher_cache["v"] is not None:
+        return _watcher_cache["v"]
+    result = False
     try:
         with open(LOG_FILE, "rb") as f:
             f.seek(0, os.SEEK_END)
@@ -1574,34 +1584,40 @@ def _watcher_enabled() -> bool:
             text = f.read().decode("utf-8", errors="replace")
         idx = text.rfind("Volume scanner ON")
         if idx != -1:
-            return "[LIVE EXIT] watcher enabled" in text[idx:]
-        if "[LIVE EXIT] watcher enabled" in text:
+            result = "[LIVE EXIT] watcher enabled" in text[idx:]
+        elif "[LIVE EXIT] watcher enabled" in text:
             # watcher line in the tail with no later scanner restart → enabled
-            return True
-        # Neither marker in the tail window — grep the whole file (fast C grep).
-        out = subprocess.run(
-            ["grep", "-F", "-n", "-e", "Volume scanner ON",
-             "-e", "[LIVE EXIT] watcher enabled", LOG_FILE],
-            capture_output=True, text=True, timeout=5,
-        ).stdout
-        last_scan = last_watch = -1
-        for ln in out.splitlines():
-            no, _, rest = ln.partition(":")
-            if not no.isdigit():
-                continue
-            if "Volume scanner ON" in rest:
-                last_scan = int(no)
-            elif "[LIVE EXIT] watcher enabled" in rest:
-                last_watch = int(no)
-        return last_watch != -1 and last_watch > last_scan
+            result = True
+        else:
+            # Neither marker in the tail window — grep the whole file (fast C grep).
+            out = subprocess.run(
+                ["grep", "-F", "-n", "-e", "Volume scanner ON",
+                 "-e", "[LIVE EXIT] watcher enabled", LOG_FILE],
+                capture_output=True, text=True, timeout=5,
+            ).stdout
+            last_scan = last_watch = -1
+            for ln in out.splitlines():
+                no, _, rest = ln.partition(":")
+                if not no.isdigit():
+                    continue
+                if "Volume scanner ON" in rest:
+                    last_scan = int(no)
+                elif "[LIVE EXIT] watcher enabled" in rest:
+                    last_watch = int(no)
+            result = last_watch != -1 and last_watch > last_scan
     except Exception:
-        return False
+        pass
+    _watcher_cache["v"] = result
+    _watcher_cache["ts"] = now
+    return result
 
 
-def _latest_cycle() -> str:
-    """Most recent cycle number from the log tail ('—' if unknown)."""
+def _latest_cycle(lines: list = None) -> str:
+    """Most recent cycle number from the log tail ('—' if unknown).
+    Pass pre-fetched log lines to avoid a redundant tail_log call."""
     try:
-        for line in reversed(tail_log(500)):
+        src = lines if lines is not None else tail_log(500)
+        for line in reversed(src):
             m = re.search(r'Cycle #(\d+)', line)
             if m:
                 return m.group(1)
@@ -1628,35 +1644,39 @@ def _open_pos_count() -> int:
     return count
 
 
-def build_ticker() -> str:
-    """One-line sticky status ticker (12-hour PT, NET basis)."""
+def build_ticker(lines: list = None) -> str:
+    """One-line sticky status ticker (12-hour PT, NET basis).
+    Pass pre-fetched log lines to avoid redundant tail_log calls per poll."""
+    # all log-derived strings must be escape()d (innerHTML sink)
     state = read_state()
-    bal = _latest_balance()
+    bal = _latest_balance(lines)
     today = _today_net_pnl(state)
     arrow = "▲" if today >= 0 else "▼"
     cls = "pos" if today >= 0 else "neg"
     hdrm = _mr_headroom()
     watcher = "ON" if _watcher_enabled() else "OFF"
-    now = _now_ca().strftime("%-I:%M:%S %p PT")
+    now = escape(_now_ca().strftime("%-I:%M:%S %p PT"))
     parts = ["PHMEX-S",
-             f"BAL ${bal:.2f} <span class='{cls}'>{arrow}{abs(today):.2f}</span>"]
+             f"BAL ${bal:.2f} <span class='{cls}'>{escape(arrow)}{abs(today):.2f}</span>"]
     if hdrm is not None:
         parts.append(f"MR-LIVE HDRM ${hdrm:.2f}")
     parts += [
         f"DD {_drawdown_pct(state, bal):.1f}%",
         f"POS {_open_pos_count()}",
-        f"WATCHER <span class='{'pos' if watcher == 'ON' else 'neg'}'>{watcher}</span>",
-        f"CYC {_latest_cycle()}",
+        f"WATCHER <span class='{'pos' if watcher == 'ON' else 'neg'}'>{escape(watcher)}</span>",
+        f"CYC {escape(_latest_cycle(lines))}",
         now,
     ]
     return " ▮ ".join(parts)
 
 
-def build_feed() -> str:
+def build_feed(lines: list = None) -> str:
     """FEED panel inner HTML — extracted from the old Activity Feed card
-    (same event parsing, terminal-pro classes)."""
+    (same event parsing, terminal-pro classes).
+    Pass pre-fetched log lines to avoid a redundant tail_log call."""
     try:
-        activity = get_recent_activity(tail_log(3000), n=15)
+        src = lines if lines is not None else tail_log(3000)
+        activity = get_recent_activity(src, n=15)
     except Exception:
         activity = []
     rows = ""
@@ -1672,12 +1692,13 @@ def build_feed() -> str:
 
 
 # ── HTML rendering ───────────────────────────────────────────────────────
-def build_content() -> str:
+def build_content(lines: list = None) -> str:
     """Inner HTML for the swapped #content node — the six-panel command grid.
 
     Task 1 shell: the SLOTS and GATES+WATCHLIST cells temporarily carry the
     legacy builders forward so the dashboard stays useful between tasks;
     Tasks 3-6 replace each placeholder with its terminal-pro builder.
+    Pass pre-fetched log lines to avoid a redundant tail_log call.
     """
     state = read_state()
     positions = state.get("positions") or {}
@@ -1685,7 +1706,7 @@ def build_content() -> str:
     factory_state = read_factory_state()
     all_slot_states = read_all_slot_states()
     sentinels = detect_sentinel_files()
-    lines = tail_log(3000)
+    lines = lines if lines is not None else tail_log(3000)
     watchlist = parse_watchlist(lines)
 
     # Panel 1 — POSITIONS (full terminal-pro rebuild in Task 5)
@@ -2117,10 +2138,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html.encode())
         elif self.path == "/api/content":
+            _lines = tail_log(3000)  # single log tail for the entire poll
             payload = json.dumps({
-                "ticker": build_ticker(),
-                "content": build_content(),
-                "feed": build_feed(),
+                "ticker": build_ticker(_lines),
+                "content": build_content(_lines),
+                "feed": build_feed(_lines),
             })
             data = payload.encode()
             self.send_response(200)
