@@ -1267,6 +1267,14 @@ body {{ background:var(--bg); color:var(--txt);
 #eqtip {{ position:absolute; display:none; pointer-events:none; z-index:20;
   background:var(--panel); border:1px solid var(--amber); color:var(--txt);
   padding:3px 6px; font-size:10px; white-space:nowrap; }}
+@media (max-width:700px){{
+  #grid {{ grid-template-columns:1fr; }}
+  .panel {{ max-height:none; }}
+  #ticker {{ white-space:normal; font-size:11px; }}
+  #p-slots{{order:1}} #p-positions{{order:2}} #p-blotter{{order:3}}
+  #p-why{{order:4}} #p-gates{{order:5}}
+  #p-blotter tr:nth-child(n+12){{display:none}}
+}}
 </style>
 </head>
 <body>
