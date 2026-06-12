@@ -249,18 +249,32 @@ def _watcher_enabled() -> bool:
     return result
 
 
+# ── Net-basis helper ─────────────────────────────────────────────────────────
+
+def _net_trade(t: dict) -> float:
+    """Return net PnL for a trade dict: net_pnl if present, else pnl_usdt."""
+    v = t.get("net_pnl")
+    return float(v) if v is not None else float(t.get("pnl_usdt", 0))
+
+
 # ported from web_dashboard.py — keep in sync
-_gate_counts_cache: dict = {"v": None, "ts": 0.0}
+_gate_counts_cache: dict = {"v": None, "ts": 0.0, "path": None}
 
 
-def gate_counts_24h() -> dict:
+def gate_counts_24h(log_file: str = LOG_FILE) -> dict:
     """Parse bot.log for gate rejection counts over the last 24h.
-    Returns dict sorted descending by count. Cached 30s.
+    Returns dict sorted descending by count. Cached 30s (keyed by path;
+    non-default paths bypass cache so test runs never bleed into each other).
 
     # ported from web_dashboard.py — keep in sync
     """
     _now = time.time()
-    if _gate_counts_cache["v"] is not None and _now - _gate_counts_cache["ts"] < 30:
+    if (
+        log_file == LOG_FILE
+        and _gate_counts_cache["path"] == log_file
+        and _gate_counts_cache["v"] is not None
+        and _now - _gate_counts_cache["ts"] < 30
+    ):
         return _gate_counts_cache["v"]
 
     cutoff = datetime.now(NY_TZ) - timedelta(hours=24)
@@ -279,7 +293,7 @@ def gate_counts_24h() -> dict:
         ("Divergence",     "divergence"),
     ]
     try:
-        with open(LOG_FILE, "r", errors="replace") as fh:
+        with open(log_file, "r", errors="replace") as fh:
             for line in fh:
                 if not any(kw.lower() in line.lower() for _, kw in label_map):
                     continue
@@ -298,8 +312,11 @@ def gate_counts_24h() -> dict:
     except (FileNotFoundError, PermissionError):
         pass
     result = dict(sorted(counts.items(), key=lambda x: -x[1]))
-    _gate_counts_cache["v"] = result
-    _gate_counts_cache["ts"] = _now
+    # Only populate cache for the canonical log file path
+    if log_file == LOG_FILE:
+        _gate_counts_cache["v"] = result
+        _gate_counts_cache["ts"] = _now
+        _gate_counts_cache["path"] = log_file
     return result
 
 
@@ -318,15 +335,11 @@ def build_slot_truth() -> list:
         except (OSError, json.JSONDecodeError):
             continue
 
-        def _net(t):
-            v = t.get("net_pnl")
-            return float(v) if v is not None else float(t.get("pnl_usdt", 0))
-
-        wins = sum(1 for t in trades if _net(t) > 0)
+        wins = sum(1 for t in trades if _net_trade(t) > 0)
         rec = {"id": slot_id,
                "trades": len(trades),
                "wr": round(wins / len(trades) * 100, 1) if trades else 0,
-               "net_pnl": round(sum(_net(t) for t in trades), 2),
+               "net_pnl": round(sum(_net_trade(t) for t in trades), 2),
                "live": False}
         try:
             with open(os.path.join(BASE_DIR, f"trading_state_{slot_id}_mode.json")) as f:
@@ -335,7 +348,7 @@ def build_slot_truth() -> list:
             pass
         if rec["live"]:
             live = [t for t in trades if t.get("mode") == "live"]
-            live_net = round(sum(_net(t) for t in live), 2)
+            live_net = round(sum(_net_trade(t) for t in live), 2)
             rec.update({"live_net": live_net,
                         "headroom": round(5.0 + live_net, 2),
                         "live_trades": len(live)})
@@ -388,16 +401,16 @@ def _build_api_response():
     all_trades = state.get("closed_trades", [])
     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     today_trades = [t for t in all_trades if t.get("closed_at", 0) >= today_start]
-    today_pnl = sum(t.get("pnl_usdt", 0) for t in today_trades)
+    today_pnl = sum(_net_trade(t) for t in today_trades)
     today_count = len(today_trades)
-    today_wins = sum(1 for t in today_trades if t.get("pnl_usdt", 0) > 0)
+    today_wins = sum(1 for t in today_trades if _net_trade(t) > 0)
     today_wr = (today_wins / today_count * 100) if today_count > 0 else 0
 
     # Per-pair PnL (top 5 by absolute PnL)
     pair_pnl = {}
     for t in all_trades:
         sym = t.get("symbol", "?").replace("/USDT:USDT", "")
-        pair_pnl[sym] = pair_pnl.get(sym, 0) + t.get("pnl_usdt", 0)
+        pair_pnl[sym] = pair_pnl.get(sym, 0) + _net_trade(t)
     top_pairs = sorted(pair_pnl.items(), key=lambda x: abs(x[1]), reverse=True)[:5]
 
     # Watchlist — unique symbols from recent hold events + open positions
@@ -415,8 +428,8 @@ def _build_api_response():
     watchlist_sorted = sorted(watchlist.items())
 
     # Avg win / avg loss
-    wins = [t.get("pnl_usdt", 0) for t in all_trades if t.get("pnl_usdt", 0) > 0]
-    losses = [t.get("pnl_usdt", 0) for t in all_trades if t.get("pnl_usdt", 0) < 0]
+    wins = [_net_trade(t) for t in all_trades if _net_trade(t) > 0]
+    losses = [_net_trade(t) for t in all_trades if _net_trade(t) < 0]
     avg_win = sum(wins) / len(wins) if wins else 0
     avg_loss = sum(losses) / len(losses) if losses else 0
     best_trade = max(wins) if wins else 0
@@ -439,9 +452,9 @@ def _build_api_response():
         if s not in strat_stats:
             strat_stats[s] = {"count": 0, "wins": 0, "pnl": 0.0}
         strat_stats[s]["count"] += 1
-        if t.get("pnl_usdt", 0) > 0:
+        if _net_trade(t) > 0:
             strat_stats[s]["wins"] += 1
-        strat_stats[s]["pnl"] += t.get("pnl_usdt", 0)
+        strat_stats[s]["pnl"] += _net_trade(t)
     for s in strat_stats:
         strat_stats[s]["pnl"] = round(strat_stats[s]["pnl"], 2)
         strat_stats[s]["wr"] = round(strat_stats[s]["wins"] / strat_stats[s]["count"] * 100, 1) if strat_stats[s]["count"] > 0 else 0
@@ -453,7 +466,7 @@ def _build_api_response():
         if r not in exit_reasons:
             exit_reasons[r] = {"count": 0, "pnl": 0.0}
         exit_reasons[r]["count"] += 1
-        exit_reasons[r]["pnl"] += t.get("pnl_usdt", 0)
+        exit_reasons[r]["pnl"] += _net_trade(t)
     for r in exit_reasons:
         exit_reasons[r]["pnl"] = round(exit_reasons[r]["pnl"], 2)
 
@@ -518,6 +531,7 @@ def _build_api_response():
         "watcher": watcher,
         "pair_adx": pair_adx,
         "top_gates": top_gates,
+        "pnl_basis": "net",
         "timestamp": time.time(),
     }
 
