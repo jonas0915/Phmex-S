@@ -6,13 +6,11 @@ Reads trading_state.json and bot.log only. Zero API calls, zero bot imports.
 Usage:  python web_dashboard.py
 Open:   http://127.0.0.1:8050
 """
-import io
 import glob as _glob
 import json
 import os
 import re
 import subprocess
-import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,11 +27,6 @@ from collections import defaultdict
 from html import escape
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
-import matplotlib
-matplotlib.use("Agg")  # MUST be before pyplot import
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
 PAPER_STATE_FILE = os.path.join(PROJECT_DIR, "trading_state_5m_liq_cascade.json")
@@ -43,13 +36,14 @@ FACTORY_STATE_FILE = os.path.join(PROJECT_DIR, "strategy_factory_state.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
 HOST = "127.0.0.1"
 PORT = 8050
-CHART_INTERVAL = 30  # seconds between chart refreshes
 ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
 
-# ── Chart cache ──────────────────────────────────────────────────────────
-_chart_cache = {}  # name -> PNG bytes
-_chart_lock = threading.Lock()
-_chart_version = 0  # bumped each time refresh_charts() actually writes new bytes
+# ── Static assets (vendored uPlot — the ONLY files /static/ will serve) ──
+STATIC_DIR = os.path.join(PROJECT_DIR, "static")
+STATIC_FILES = {
+    "uplot.iife.min.js": "application/javascript; charset=utf-8",
+    "uplot.min.css": "text/css; charset=utf-8",
+}
 
 # ── Watcher-enabled cache (30s TTL — avoids per-poll grep/seek) ──────────
 _watcher_cache: dict = {"v": None, "ts": 0.0}
@@ -57,24 +51,6 @@ _watcher_cache: dict = {"v": None, "ts": 0.0}
 # ── Sentinel-era anchors ─────────────────────────────────────────────────
 # Sentinel deployed 2026-04-01 23:01 PT (= 2026-04-02 06:01 UTC), trade #342+
 SENTINEL_DEPLOY_TS = datetime(2026, 4, 2, 6, 1, 0, tzinfo=timezone.utc).timestamp()
-# Strategy cull (Option A) commit 479f879 landed 2026-04-26 19:22:55 PT
-SENTINEL_CULL_TS = datetime(2026, 4, 27, 2, 22, 55, tzinfo=timezone.utc).timestamp()
-
-
-def _cull_marker_index(sentinel_trades: list[dict]) -> int | None:
-    """Return 1-based index of the first post-cull trade, or None if none exist.
-
-    Index is 1-based to match the chart's x-axis convention (trade #1, #2, ...).
-    Falls back to ``closed_at`` if ``opened_at`` is missing — mirrors the
-    existing filter logic in ``render()``.
-    """
-    for i, t in enumerate(sentinel_trades, start=1):
-        ts = t.get("opened_at") or t.get("closed_at") or 0
-        if ts >= SENTINEL_CULL_TS:
-            return i
-    return None
-
-
 def strip_ansi(text: str) -> str:
     return ANSI_RE.sub('', text)
 
@@ -1140,155 +1116,58 @@ def _build_slots_overview(all_slots: dict[str, dict], factory: dict, sentinels: 
     </div>'''
 
 
-# ── Chart generation ────────────────────────────────────────────────────
-def _fig_to_png(fig) -> bytes:
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=120, bbox_inches="tight",
-                facecolor="#1e1e2e", edgecolor="none")
-    plt.close(fig)
-    buf.seek(0)
-    return buf.read()
+# ── Equity series (JSON for the client-side uPlot chart) ────────────────
+def build_equity_series(era: str = "sentinel") -> dict:
+    """Cumulative NET PnL series for /api/equity — rendered client-side by uPlot.
 
-
-def _make_cumulative_pnl(trades: list[dict]) -> bytes:
-    if not trades:
-        return b""
-    pnls = [_net_pnl(t) for t in trades]
-    cum = []
-    r = 0
-    for p in pnls:
-        r += p
-        cum.append(r)
-    x = list(range(1, len(cum) + 1))
-
-    fig, ax = plt.subplots(figsize=(9, 4), facecolor="#1e1e2e")
-    ax.set_facecolor("#1e1e2e")
-    ax.plot(x, cum, color="#89b4fa", linewidth=2, marker="o", markersize=3)
-    ax.fill_between(x, cum, 0, where=[c >= 0 for c in cum], color="#a6e3a1", alpha=0.15)
-    ax.fill_between(x, cum, 0, where=[c < 0 for c in cum], color="#f38ba8", alpha=0.15)
-    ax.axhline(y=0, color="#585b70", linestyle="--", alpha=0.5)
-    ax.set_xlabel("Trade #", color="#cdd6f4")
-    ax.set_ylabel("Cumulative PnL (USDT)", color="#cdd6f4")
-    ax.set_title("Cumulative PnL (net)", color="#cdd6f4", fontsize=13)
-    ax.tick_params(colors="#a6adc8")
-    ax.grid(True, alpha=0.15, color="#585b70")
-    for spine in ax.spines.values():
-        spine.set_color("#585b70")
-    return _fig_to_png(fig)
-
-
-def _make_cumulative_pnl_sentinel(trades: list[dict]) -> bytes:
-    """Cumulative net PnL chart, filtered to Sentinel-era trades only.
-
-    Mirrors _make_cumulative_pnl style. Adds a vertical dashed marker at the
-    2026-04-26 strategy cull commit (479f879). Returns b"" if no Sentinel
-    trades exist, so render() can omit the cache key.
+    Merges main closed_trades with live-promoted slots' LIVE-mode closed trades
+    (slot trades carry mode=="live"), sorted by close timestamp.
+    era="sentinel" reuses the exact cutoff the removed PNG sentinel chart
+    used: (opened_at or closed_at) >= SENTINEL_DEPLOY_TS. era="all" = everything.
+    Returns {"t": [unix_ts], "v": [cum_net], "meta": [per-trade dict]}.
     """
-    sentinel_trades = [
-        t for t in trades
-        if (t.get("opened_at") or t.get("closed_at") or 0) >= SENTINEL_DEPLOY_TS
-    ]
-    if not sentinel_trades:
-        return b""
-
-    pnls = [_net_pnl(t) for t in sentinel_trades]
-    cum = []
-    r = 0.0
-    for p in pnls:
-        r += p
-        cum.append(r)
-    x = list(range(1, len(cum) + 1))
-
-    fig, ax = plt.subplots(figsize=(9, 4), facecolor="#1e1e2e")
-    ax.set_facecolor("#1e1e2e")
-    ax.plot(x, cum, color="#89b4fa", linewidth=2, marker="o", markersize=3)
-    ax.fill_between(x, cum, 0, where=[c >= 0 for c in cum], color="#a6e3a1", alpha=0.15)
-    ax.fill_between(x, cum, 0, where=[c < 0 for c in cum], color="#f38ba8", alpha=0.15)
-    ax.axhline(y=0, color="#585b70", linestyle="--", alpha=0.5)
-
-    cull_x = _cull_marker_index(sentinel_trades)
-    if cull_x is not None:
-        ax.axvline(x=cull_x, color="#f9e2af", linestyle="--", linewidth=1, alpha=0.6)
-        # Place "cull" label near the top of the axes
-        y_top = max(cum) if cum else 0
-        ax.text(cull_x, y_top, " cull", color="#a6adc8", fontsize=8,
-                va="top", ha="left")
-
-    ax.set_xlabel("Trade # (Sentinel-era)", color="#cdd6f4")
-    ax.set_ylabel("Cumulative PnL (USDT)", color="#cdd6f4")
-    ax.set_title("Cumulative PnL — Sentinel Era", color="#cdd6f4", fontsize=13)
-    ax.tick_params(colors="#a6adc8")
-    ax.grid(True, alpha=0.15, color="#585b70")
-    for spine in ax.spines.values():
-        spine.set_color("#585b70")
-    return _fig_to_png(fig)
-
-
-
-def _make_pnl_by_reason(trades: list[dict]) -> bytes:
-    if not trades:
-        return b""
-    reason_pnl = defaultdict(float)
-    reason_count = defaultdict(int)
-    for t in trades:
-        r = t.get("exit_reason") or t.get("reason") or "unknown"
-        reason_pnl[r] += _net_pnl(t)
-        reason_count[r] += 1
-    reasons = list(reason_pnl.keys())
-    vals = [reason_pnl[r] for r in reasons]
-    counts = [reason_count[r] for r in reasons]
-    colors = ["#a6e3a1" if v >= 0 else "#f38ba8" for v in vals]
-
-    fig, ax = plt.subplots(figsize=(7, 4), facecolor="#1e1e2e")
-    ax.set_facecolor("#1e1e2e")
-    bars = ax.bar(reasons, vals, color=colors, alpha=0.85, edgecolor="#585b70", linewidth=0.5)
-    for bar, c in zip(bars, counts):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
-                f"{c}t", ha="center", va="bottom", fontsize=8, color="#a6adc8")
-    ax.axhline(y=0, color="#585b70", linewidth=0.8)
-    ax.set_ylabel("PnL (USDT)", color="#cdd6f4")
-    ax.set_title("PnL by Exit Reason", color="#cdd6f4", fontsize=13)
-    ax.tick_params(colors="#a6adc8")
-    ax.grid(True, alpha=0.15, color="#585b70", axis="y")
-    for spine in ax.spines.values():
-        spine.set_color("#585b70")
-    return _fig_to_png(fig)
-
-
-
-
-
-
-
-def refresh_charts():
-    """Regenerate all charts and cache as PNG bytes."""
-    global _chart_version
-    state = read_state()
-    trades = state.get("closed_trades", [])
-    charts = {}
-    if trades:
-        charts["cumulative_pnl"] = _make_cumulative_pnl(trades)
-        charts["pnl_by_reason"] = _make_pnl_by_reason(trades)
-        sentinel_png = _make_cumulative_pnl_sentinel(trades)
-        if sentinel_png:
-            charts["cumulative_pnl_sentinel"] = sentinel_png
-    with _chart_lock:
-        _chart_cache.update(charts)
-        # Drop sentinel key when chart is empty so a state-file restore
-        # (e.g. *.bak rollback) can't leave stale Sentinel-era PNG bytes cached.
-        if not charts.get("cumulative_pnl_sentinel"):
-            _chart_cache.pop("cumulative_pnl_sentinel", None)
-        _chart_version += 1
-
-
-def chart_thread_loop():
-    """Background thread that periodically refreshes charts."""
-    while True:
+    rows = [("main", t) for t in read_state().get("closed_trades", []) or []]
+    for slot_id in sorted(_live_slot_ids()):
+        if slot_id == "5m_scalp":
+            continue  # main trading_state.json already merged above
         try:
-            refresh_charts()
-        except Exception as e:
-            print(f"[CHART] Error refreshing charts: {e}")
-        time.sleep(CHART_INTERVAL)
+            with open(os.path.join(PROJECT_DIR, f"trading_state_{slot_id}.json")) as f:
+                slot_trades = json.load(f).get("closed_trades", []) or []
+        except Exception:
+            continue
+        rows.extend((slot_id, t) for t in slot_trades if t.get("mode") == "live")
+    if era == "sentinel":
+        # Same cutoff logic as the removed _make_cumulative_pnl_sentinel.
+        rows = [(o, t) for o, t in rows
+                if (t.get("opened_at") or t.get("closed_at") or 0) >= SENTINEL_DEPLOY_TS]
+    rows.sort(key=lambda r: r[1].get("closed_at") or r[1].get("opened_at") or 0)
+
+    ts, vals, meta = [], [], []
+    cum = 0.0
+    for owner, t in rows:
+        net = _net_pnl(t)
+        cum += net
+        x = t.get("closed_at") or t.get("opened_at") or 0
+        if not x:
+            # 19 earliest trades predate timestamping. A time-scaled x-axis
+            # would plot them at 1970 — fold their PnL into the baseline
+            # instead of fabricating an x position.
+            continue
+        try:
+            time_pt = _from_ts(x).strftime("%-m/%-d %-I:%M %p PT")
+        except Exception:
+            time_pt = "?"
+        ts.append(x)
+        vals.append(round(cum, 4))
+        meta.append({
+            "sym": str(t.get("symbol") or "?").replace("/USDT:USDT", ""),
+            "strat": str(t.get("strategy") or owner),
+            "pnl": round(net, 4),
+            "reason": str(t.get("exit_reason") or t.get("reason") or ""),
+            "win": net > 0,
+            "time_pt": time_pt,
+        })
+    return {"t": ts, "v": vals, "meta": meta}
 
 
 def _build_watchlist_html(wl: dict, positions: dict | None = None) -> str:
@@ -1816,7 +1695,7 @@ def build_content(lines: list = None) -> str:
     </div>
     <div class="panel" id="p-reserved">
         <div class="ptitle">RESERVED</div>
-        <div class="dim">equity chart renders below the grid (interactive in Task 2)</div>
+        <div class="dim">equity chart renders below the grid</div>
     </div>
 </div>"""
 
@@ -1833,6 +1712,8 @@ def build_html() -> str:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PHMEX-S &mdash; Terminal</title>
+<link rel="stylesheet" href="/static/uplot.min.css">
+<script src="/static/uplot.iife.min.js"></script>
 <style>
 :root {{
   --bg:#000204; --panel:#0a0e08; --border:#2d3a1e; --txt:#9eb89e;
@@ -1876,16 +1757,28 @@ body {{ background:var(--bg); color:var(--txt);
 .wl-score {{ color:var(--amber); margin-left:4px; }}
 .dot {{ display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; background:var(--dim); }}
 .dot-open {{ background:var(--pos); }} .dot-scanner {{ background:var(--amber); }} .dot-base {{ background:var(--dim); }}
+.era-btn {{ background:none; border:1px solid var(--border); color:var(--dim);
+  font:inherit; font-size:9px; letter-spacing:1px; padding:0 6px; cursor:pointer; }}
+.era-btn.active {{ color:var(--amber); border-color:var(--amber); }}
+#equity-chart {{ position:relative; }}
+#eqtip {{ position:absolute; display:none; pointer-events:none; z-index:20;
+  background:var(--panel); border:1px solid var(--amber); color:var(--txt);
+  padding:3px 6px; font-size:10px; white-space:nowrap; }}
 </style>
 </head>
 <body>
 <div id="ticker">{ticker}</div>
 <div id="content">{content}</div><!-- /content -->
 <div class="panel" id="equity-root" style="margin:0 3px;">
-    <div class="ptitle">EQUITY &mdash; loading&hellip;</div><div id="equity-chart"></div>
+    <div class="ptitle"><span id="eq-title">EQUITY &mdash; loading&hellip;</span>
+        <span style="float:right">
+            <button class="era-btn active" id="era-sentinel" onclick="setEra('sentinel')">SENTINEL</button>
+            <button class="era-btn" id="era-all" onclick="setEra('all')">ALL</button>
+        </span>
+    </div><div id="equity-chart"></div>
 </div>
 <div id="feed" class="panel">{feed}</div>
-<div class="footer">Auto-refresh 3s &middot; Read-only &middot; Zero API calls &middot; NET basis</div>
+<div class="footer">Auto-refresh 3s &middot; Equity 30s &middot; Read-only &middot; Zero API calls &middot; NET basis</div>
 <script>
 async function poll(){{
   try{{
@@ -1896,6 +1789,46 @@ async function poll(){{
   }}catch(e){{}}
 }}
 setInterval(poll, 3000); poll();
+
+// ── Equity chart (uPlot, vendored at /static/, refreshed every 30s) ──
+let plot=null, era='sentinel', eqMeta=[];
+async function loadEquity(){{
+  const title=document.getElementById('eq-title');
+  try{{
+    if(typeof uPlot==='undefined') throw new Error('uPlot not loaded');
+    const r=await fetch('/api/equity?era='+era); const d=await r.json();
+    eqMeta=d.meta;
+    const node=document.getElementById('equity-chart');
+    const opts={{width:node.clientWidth||800,
+      height:180, scales:{{x:{{time:true}}}},
+      series:[{{}}, {{label:'NET PnL', stroke:'#f0a500', width:1.5,
+        points:{{show:true, size:5,
+          fill:(u,si,i)=> eqMeta[i] && eqMeta[i].win ? '#4af626' : '#ff5555'}}}}],
+      axes:[{{stroke:'#5a6b5a',grid:{{stroke:'#1a2412'}}}},{{stroke:'#5a6b5a',grid:{{stroke:'#1a2412'}}}}],
+      cursor:{{}}, legend:{{show:false}}}};
+    node.innerHTML='';
+    plot=new uPlot(opts,[d.t,d.v],node);
+    // tooltip: absolutely-positioned div fed from meta at the cursor's idx
+    const tip=document.createElement('div'); tip.id='eqtip'; node.appendChild(tip);
+    plot.over.addEventListener('mousemove', ()=>{{
+      const i=plot.cursor.idx;
+      if(i==null || !eqMeta[i]){{ tip.style.display='none'; return; }}
+      const m=eqMeta[i], sign=m.pnl>=0?'+':'';
+      tip.innerHTML=m.time_pt+' &middot; '+m.sym+' &middot; '+m.strat+
+        ' &middot; <span class="'+(m.win?'pos':'neg')+'">'+sign+m.pnl.toFixed(2)+'</span>'+
+        (m.reason?' &middot; '+m.reason:'');
+      tip.style.display='block';
+      tip.style.left=Math.min(plot.cursor.left+14, Math.max(0,node.clientWidth-260))+'px';
+      tip.style.top=(plot.cursor.top+12)+'px';
+    }});
+    plot.over.addEventListener('mouseleave', ()=>{{ tip.style.display='none'; }});
+    document.getElementById('era-sentinel').classList.toggle('active', era==='sentinel');
+    document.getElementById('era-all').classList.toggle('active', era==='all');
+    title.textContent='EQUITY — CUMULATIVE NET PNL ('+era.toUpperCase()+' · '+d.t.length+' trades)';
+  }}catch(e){{ title.textContent='EQUITY — chart assets missing'; }}
+}}
+function setEra(e){{ era=e; loadEquity(); }}
+loadEquity(); setInterval(loadEquity, 30000);
 </script>
 </body>
 </html>"""
@@ -2160,19 +2093,36 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(data)
-        elif self.path.startswith("/chart/"):
-            # Strip "/chart/" prefix and any ?v= query param (versioning is in URL)
-            name = self.path[7:].split("?")[0]
-            with _chart_lock:
-                data = _chart_cache.get(name, b"")
+        elif self.path.startswith("/api/equity"):
+            era = "sentinel"
+            if "era=" in self.path:
+                era = self.path.split("era=", 1)[1].split("&")[0]
+            if era not in ("sentinel", "all"):
+                era = "sentinel"
+            data = json.dumps(build_equity_series(era)).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(data)
+        elif self.path.startswith("/static/"):
+            # Serve ONLY the two vendored uPlot files. basename() kills any
+            # path-traversal attempt; the whitelist kills everything else.
+            name = os.path.basename(self.path.split("?")[0])
+            ctype = STATIC_FILES.get(name)
+            data = b""
+            if ctype:
+                try:
+                    with open(os.path.join(STATIC_DIR, name), "rb") as f:
+                        data = f.read()
+                except OSError:
+                    data = b""
             if data:
                 self.send_response(200)
-                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(data)))
-                # URL is versioned (?v=<chart_version>) — when bytes change, URL changes.
-                # Browser can safely cache for 1 year. This prevents the 3s flicker
-                # where each innerHTML replace was triggering a fresh chart fetch.
-                self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+                self.send_header("Cache-Control", "public, max-age=86400")
                 self.end_headers()
                 self.wfile.write(data)
             else:
@@ -2188,14 +2138,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
 # ── Main ─────────────────────────────────────────────────────────────────
 def main():
-    # Initial chart render
-    print("Generating initial charts...")
-    refresh_charts()
-
-    # Start background chart thread
-    t = threading.Thread(target=chart_thread_loop, daemon=True, name="chart-refresh")
-    t.start()
-
     server = ThreadingHTTPServer((HOST, PORT), DashboardHandler)
     print(f"Phmex-S Dashboard running at http://{HOST}:{PORT}")
     print("Press Ctrl+C to stop.")
