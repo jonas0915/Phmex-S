@@ -6,21 +6,26 @@ Zero bot imports, zero API calls.
 import json
 import os
 import re
+import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from html import escape
 
-ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ASSET_DIR = os.path.join(BASE_DIR, "assets")
 MIME_OVERRIDES = {
     ".glb": "model/gltf-binary",
     ".gltf": "model/gltf+json",
     ".hdr": "application/octet-stream",
 }
 
-LOG_FILE = "logs/bot.log"
-STATE_FILE = "trading_state.json"
+LOG_FILE = os.path.join(BASE_DIR, "logs", "bot.log")
+STATE_FILE = os.path.join(BASE_DIR, "trading_state.json")
 HOST, PORT = "127.0.0.1", 8060
+
+NY_TZ = ZoneInfo("America/New_York")  # bot.log timestamps are Eastern
 
 
 def _tail(path, n=150):
@@ -169,6 +174,178 @@ def _parse_log_events(lines):
     return events
 
 
+# ── Ported functions (keep in sync with web_dashboard.py) ────────────────────
+
+# ported from web_dashboard.py — keep in sync
+_ADX_HOLD_RE = re.compile(r'\[HOLD\] (\S+) — No confluence signal \(1h ADX=([\d.]+)\)')
+
+
+def parse_pair_adx(lines: list) -> dict:
+    """Latest 1h ADX per pair from [HOLD] lines. Forward iteration so the
+    newest line wins. Pairs with no HOLD line stay ABSENT — never invent.
+
+    # ported from web_dashboard.py — keep in sync
+    """
+    adx: dict = {}
+    for line in lines:
+        m = _ADX_HOLD_RE.search(line)
+        if m:
+            try:
+                adx[m.group(1)] = float(m.group(2))
+            except ValueError:
+                pass
+    return adx
+
+
+# ported from web_dashboard.py — keep in sync
+_watcher_cache: dict = {"v": None, "ts": 0.0}
+
+
+def _watcher_enabled() -> bool:
+    """True if '[LIVE EXIT] watcher enabled' was logged AFTER the most recent
+    'Volume scanner ON' line (i.e. after the last bot start). Reads the last
+    ~200KB of bot.log; falls back to a full-file grep when the startup markers
+    have scrolled out of the tail window (long-running bot). Result cached 30s.
+
+    # ported from web_dashboard.py — keep in sync
+    """
+    now = time.time()
+    if now - _watcher_cache["ts"] < 30 and _watcher_cache["v"] is not None:
+        return _watcher_cache["v"]
+    result = False
+    try:
+        with open(LOG_FILE, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - 200_000))
+            text = f.read().decode("utf-8", errors="replace")
+        idx = text.rfind("Volume scanner ON")
+        if idx != -1:
+            result = "[LIVE EXIT] watcher enabled" in text[idx:]
+        elif "[LIVE EXIT] watcher enabled" in text:
+            # watcher line in the tail with no later scanner restart → enabled
+            result = True
+        else:
+            # Neither marker in the tail window — grep the whole file (fast C grep).
+            out = subprocess.run(
+                ["grep", "-F", "-n", "-e", "Volume scanner ON",
+                 "-e", "[LIVE EXIT] watcher enabled", LOG_FILE],
+                capture_output=True, text=True, timeout=5,
+            ).stdout
+            last_scan = last_watch = -1
+            for ln in out.splitlines():
+                no, _, rest = ln.partition(":")
+                if not no.isdigit():
+                    continue
+                if "Volume scanner ON" in rest:
+                    last_scan = int(no)
+                elif "[LIVE EXIT] watcher enabled" in rest:
+                    last_watch = int(no)
+            result = last_watch != -1 and last_watch > last_scan
+    except Exception:
+        pass
+    _watcher_cache["v"] = result
+    _watcher_cache["ts"] = now
+    return result
+
+
+# ported from web_dashboard.py — keep in sync
+_gate_counts_cache: dict = {"v": None, "ts": 0.0}
+
+
+def gate_counts_24h() -> dict:
+    """Parse bot.log for gate rejection counts over the last 24h.
+    Returns dict sorted descending by count. Cached 30s.
+
+    # ported from web_dashboard.py — keep in sync
+    """
+    _now = time.time()
+    if _gate_counts_cache["v"] is not None and _now - _gate_counts_cache["ts"] < 30:
+        return _gate_counts_cache["v"]
+
+    cutoff = datetime.now(NY_TZ) - timedelta(hours=24)
+    counts: dict = {}
+    label_map = [
+        ("Tape gate",      "[TAPE GATE]"),
+        ("OB gate",        "[OB GATE]"),
+        ("Ensemble <4/7",  "ENSEMBLE SKIP"),
+        ("Time block",     "time_block"),
+        ("ADX too low",    "ADX"),
+        ("Low volume",     "low vol"),
+        ("No confluence",  "No confluence"),
+        ("Choppy market",  "Choppy"),
+        ("Cooldown",       "cooldown"),
+        ("QUIET regime",   "QUIET regime"),
+        ("Divergence",     "divergence"),
+    ]
+    try:
+        with open(LOG_FILE, "r", errors="replace") as fh:
+            for line in fh:
+                if not any(kw.lower() in line.lower() for _, kw in label_map):
+                    continue
+                ts_match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
+                if ts_match:
+                    try:
+                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=NY_TZ)
+                        if ts < cutoff:
+                            continue
+                    except ValueError:
+                        pass
+                for label, keyword in label_map:
+                    if keyword.lower() in line.lower():
+                        counts[label] = counts.get(label, 0) + 1
+                        break
+    except (FileNotFoundError, PermissionError):
+        pass
+    result = dict(sorted(counts.items(), key=lambda x: -x[1]))
+    _gate_counts_cache["v"] = result
+    _gate_counts_cache["ts"] = _now
+    return result
+
+
+def build_slot_truth() -> list:
+    """Per-slot truth for desk monitors. Net basis; live slots add guardrail fields."""
+    import glob as _g
+    out = []
+    for path in sorted(_g.glob(os.path.join(BASE_DIR, "trading_state_5m_*.json"))):
+        base = os.path.basename(path)
+        if base.endswith("_mode.json") or base.endswith("_blocked.json"):
+            continue
+        slot_id = base.replace("trading_state_", "").replace(".json", "")
+        try:
+            with open(path) as f:
+                trades = json.load(f).get("closed_trades", [])
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        def _net(t):
+            v = t.get("net_pnl")
+            return float(v) if v is not None else float(t.get("pnl_usdt", 0))
+
+        wins = sum(1 for t in trades if _net(t) > 0)
+        rec = {"id": slot_id,
+               "trades": len(trades),
+               "wr": round(wins / len(trades) * 100, 1) if trades else 0,
+               "net_pnl": round(sum(_net(t) for t in trades), 2),
+               "live": False}
+        try:
+            with open(os.path.join(BASE_DIR, f"trading_state_{slot_id}_mode.json")) as f:
+                rec["live"] = not json.load(f).get("paper_mode", True)
+        except (OSError, json.JSONDecodeError):
+            pass
+        if rec["live"]:
+            live = [t for t in trades if t.get("mode") == "live"]
+            live_net = round(sum(_net(t) for t in live), 2)
+            rec.update({"live_net": live_net,
+                        "headroom": round(5.0 + live_net, 2),
+                        "live_trades": len(live)})
+        out.append(rec)
+    return out
+
+
+# ── End ported functions ──────────────────────────────────────────────────────
+
+
 def _get_state():
     """Read trading_state.json."""
     try:
@@ -280,8 +457,15 @@ def _build_api_response():
     for r in exit_reasons:
         exit_reasons[r]["pnl"] = round(exit_reasons[r]["pnl"], 2)
 
+    # Truth fields (Task 1 — reuse the same deduped lines, no second read)
+    pair_adx = parse_pair_adx(deduped)
+    watcher = _watcher_enabled()
+    slots = build_slot_truth()
+    _gc = gate_counts_24h()
+    top_gates = [[name, count] for name, count in list(_gc.items())[:4]]
+
     # Paper slot data
-    paper_state_file = os.path.join(os.path.dirname(__file__), "trading_state_5m_liq_cascade.json")
+    paper_state_file = os.path.join(BASE_DIR, "trading_state_5m_liq_cascade.json")
     paper_data = {"trades": 0, "wr": 0, "pnl": 0, "today_trades": 0, "today_wr": 0, "today_pnl": 0, "recent": []}
     if os.path.exists(paper_state_file):
         try:
@@ -330,6 +514,10 @@ def _build_api_response():
         "strat_stats": strat_stats,
         "exit_reasons": exit_reasons,
         "paper": paper_data,
+        "slots": slots,
+        "watcher": watcher,
+        "pair_adx": pair_adx,
+        "top_gates": top_gates,
         "timestamp": time.time(),
     }
 
