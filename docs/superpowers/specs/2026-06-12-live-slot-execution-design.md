@@ -102,6 +102,15 @@ would apply, contradicts decision 1, results incomparable with paper record;
   watcher (deployed 2026-06-11 11:55 PM PT) has handled ≥ 2 real exits — one live
   change at a time.
 
+## Known accepted gap (final review 2026-06-12)
+
+After a bot restart with a live slot position open, the position is restored from the
+slot state file but `sl_order_id` is not persisted, and the startup SL re-placement
+loop covers main-bot positions only. Protection across restart = the exchange-resting
+SL/TP placed at entry (they survive restarts) + cycle adverse/time exits + reconcile
+Path A. This is the designed v1 protection level for slots; an explicit startup
+re-verify loop for slot positions is queued as a follow-up.
+
 ## Rollback
 
 `touch .demote_5m_mean_revert` — runtime, no restart, closes position, back to paper.
