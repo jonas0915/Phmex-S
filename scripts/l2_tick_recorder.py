@@ -3,11 +3,14 @@
 Standalone L2 order-book tick recorder for Phemex (research data collection).
 
 Completely decoupled from the live bot: no project imports, no API keys,
-public WebSocket only (ccxt.pro watch_order_book). Records one JSON line per
-order-book update to logs/l2_ticks/<symbol_sanitized>/<YYYY-MM-DD>.jsonl (UTC
-dates), gzip-rotates at day end, purges compressed files older than
-RETENTION_DAYS, and pauses recording (without crashing) if the tick directory
-exceeds MAX_DIR_BYTES.
+public WebSocket only (ccxt.pro watch_order_book + watch_trades). Records one
+JSON line per order-book update to
+logs/l2_ticks/<symbol_sanitized>/<YYYY-MM-DD>.jsonl and one JSON line per
+trade print (tape) to
+logs/l2_ticks/<symbol_sanitized>/trades-<YYYY-MM-DD>.jsonl (UTC dates),
+gzip-rotates at day end, purges compressed files older than RETENTION_DAYS,
+and pauses recording (without crashing) if the tick directory exceeds
+MAX_DIR_BYTES.
 
 Purpose: tick-level data to test whether early whale accumulation is
 detectable at our latency (see docs/2026-06-01-imbalance-reversion-edge-findings.md
@@ -41,7 +44,12 @@ SYMBOLS = [
 ]
 DEPTH = 5                           # top-N levels per side recorded
                                     # (depth 10 measured ~1.05 GB/day on 2026-06-11 — over budget)
-RETENTION_DAYS = 14                 # delete .jsonl.gz older than this
+RETENTION_DAYS = 60                 # delete .jsonl.gz older than this
+                                    # disk math: ~41 MB/day gzipped (measured
+                                    # 2026-06-12: 22.7+13.8+3.0+1.6 MB across 4
+                                    # symbols) x 60d ~= 2.5 GB — under the 5 GB
+                                    # hard-pause cap below with headroom for the
+                                    # (much smaller) trades channel
 MAX_DIR_BYTES = 5 * 1024**3        # 5 GB hard cap on logs/l2_ticks/
 RESUME_BYTES = int(MAX_DIR_BYTES * 0.90)  # resume below 90% of cap
 FLUSH_SECONDS = 5.0                 # max seconds between fsync-less flushes
@@ -76,11 +84,20 @@ def utc_date() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
+def file_date(name: str) -> str:
+    """Extract the YYYY-MM-DD part from '2026-06-12.jsonl[.gz]' or
+    'trades-2026-06-12.jsonl[.gz]' — keys rotation/purge for both channels."""
+    if name.startswith("trades-"):
+        name = name[len("trades-"):]
+    return name[:10]
+
+
 # ── Per-symbol JSONL writer with daily gzip rotation ──────────────────────────
 
 class SymbolWriter:
-    def __init__(self, symbol: str):
+    def __init__(self, symbol: str, prefix: str = ""):
         self.symbol = symbol
+        self.prefix = prefix    # "" = book channel, "trades-" = tape channel
         self.dir = TICK_DIR / sanitize(symbol)
         self.dir.mkdir(parents=True, exist_ok=True)
         self._fh = None
@@ -104,11 +121,12 @@ class SymbolWriter:
     def _rotate(self, today: str):
         old_path = None
         if self._fh:
-            old_path = self.dir / f"{self._date}.jsonl"
+            old_path = self.dir / f"{self.prefix}{self._date}.jsonl"
             self._fh.flush()
             self._fh.close()
         self._date = today
-        self._fh = open(self.dir / f"{today}.jsonl", "a", encoding="utf-8")
+        self._fh = open(self.dir / f"{self.prefix}{today}.jsonl", "a",
+                        encoding="utf-8")
         self._last_flush = time.monotonic()
         if old_path and old_path.exists():
             gzip_file(old_path)
@@ -140,7 +158,7 @@ def compress_stale_jsonl():
     """At startup: gzip any leftover .jsonl files from previous UTC days."""
     today = utc_date()
     for path in TICK_DIR.glob("*/*.jsonl"):
-        if path.stem != today:
+        if file_date(path.name) != today:
             gzip_file(path)
 
 
@@ -149,9 +167,9 @@ def purge_old_archives():
     cutoff = time.time() - RETENTION_DAYS * 86400
     for path in TICK_DIR.glob("*/*.jsonl.gz"):
         try:
-            file_date = datetime.strptime(path.name[:10], "%Y-%m-%d") \
+            fdate = datetime.strptime(file_date(path.name), "%Y-%m-%d") \
                 .replace(tzinfo=timezone.utc)
-            if file_date.timestamp() < cutoff:
+            if fdate.timestamp() < cutoff:
                 path.unlink()
                 logger.info(f"Purged old archive {path.name} ({path.parent.name})")
         except ValueError:
@@ -175,6 +193,8 @@ class L2Recorder:
     def __init__(self):
         self.exchange = None
         self.writers = {s: SymbolWriter(s) for s in SYMBOLS}
+        self.trade_writers = {s: SymbolWriter(s, prefix="trades-")
+                              for s in SYMBOLS}
         self.stop_event = asyncio.Event()
         self.paused = False
 
@@ -213,6 +233,44 @@ class L2Recorder:
                     pass
                 backoff = min(backoff * 2, 60)
 
+    async def watch_trades_symbol(self, symbol: str):
+        """Stream public trade prints (tape) for one symbol with the same
+        reconnect/backoff pattern as the book stream. ccxt.pro runs with
+        newUpdates enabled by default, so each await resolves with only the
+        trades that arrived since the previous call. Volume is far below
+        book updates — no extra throttling needed."""
+        writer = self.trade_writers[symbol]
+        backoff = 2
+        while not self.stop_event.is_set():
+            try:
+                trades = await self.exchange.watch_trades(symbol)
+                backoff = 2
+                if self.paused:
+                    continue
+                recv_ms = int(time.time() * 1000)
+                for t in trades:
+                    line = json.dumps({
+                        "ts": recv_ms,                # local receive time
+                        "et": t.get("timestamp"),     # exchange trade ts (ms)
+                        "sym": symbol,
+                        "px": t.get("price"),
+                        "sz": t.get("amount"),
+                        "side": t.get("side"),
+                    }, separators=(",", ":")) + "\n"
+                    writer.write(line)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                if self.stop_event.is_set():
+                    break
+                logger.warning(f"{symbol} trades stream error, retry in "
+                               f"{backoff}s: {str(e)[:150]}")
+                try:
+                    await asyncio.wait_for(self.stop_event.wait(), timeout=backoff)
+                except asyncio.TimeoutError:
+                    pass
+                backoff = min(backoff * 2, 60)
+
     async def disk_guard(self):
         """Enforce retention and the hard size cap; pause instead of crash."""
         while not self.stop_event.is_set():
@@ -240,6 +298,7 @@ class L2Recorder:
     async def stats_reporter(self):
         """Log per-symbol update rates so health is visible in the log."""
         prev = {s: 0 for s in SYMBOLS}
+        prev_trades = {s: 0 for s in SYMBOLS}
         prev_t = time.monotonic()
         while not self.stop_event.is_set():
             try:
@@ -250,16 +309,24 @@ class L2Recorder:
             now = time.monotonic()
             dt = now - prev_t
             parts = []
+            tparts = []
             for s in SYMBOLS:
                 w = self.writers[s]
+                tw = self.trade_writers[s]
                 rate = (w.lines - prev[s]) / dt if dt > 0 else 0
+                trate = (tw.lines - prev_trades[s]) / dt if dt > 0 else 0
                 parts.append(f"{s.split('/')[0]}={rate:.1f}/s")
+                tparts.append(f"{s.split('/')[0]}={trate:.1f}/s")
                 prev[s] = w.lines
+                prev_trades[s] = tw.lines
             prev_t = now
             total_mb = sum(w.bytes for w in self.writers.values()) / 1024**2
+            trades_mb = sum(w.bytes for w in self.trade_writers.values()) / 1024**2
             state = "PAUSED" if self.paused else "recording"
-            logger.info(f"[stats] {state} | " + " ".join(parts) +
-                        f" | session total {total_mb:.1f} MB")
+            logger.info(f"[stats] {state} | book " + " ".join(parts) +
+                        f" | tape " + " ".join(tparts) +
+                        f" | session total {total_mb:.1f} MB book"
+                        f" + {trades_mb:.1f} MB tape")
 
     async def run(self):
         TICK_DIR.mkdir(parents=True, exist_ok=True)
@@ -275,6 +342,8 @@ class L2Recorder:
                     f"retention {RETENTION_DAYS}d")
         try:
             tasks = [asyncio.create_task(self.watch_symbol(s)) for s in SYMBOLS]
+            tasks += [asyncio.create_task(self.watch_trades_symbol(s))
+                      for s in SYMBOLS]
             tasks.append(asyncio.create_task(self.disk_guard()))
             tasks.append(asyncio.create_task(self.stats_reporter()))
             await self.stop_event.wait()
@@ -286,10 +355,12 @@ class L2Recorder:
                 await self.exchange.close()
             except Exception:
                 pass
-            for w in self.writers.values():
+            for w in list(self.writers.values()) + list(self.trade_writers.values()):
                 w.close()
             total = sum(w.lines for w in self.writers.values())
-            logger.info(f"Shut down cleanly — {total} updates recorded this session.")
+            total_trades = sum(w.lines for w in self.trade_writers.values())
+            logger.info(f"Shut down cleanly — {total} book updates + "
+                        f"{total_trades} trade prints recorded this session.")
 
     def request_stop(self, signame: str):
         logger.info(f"Received {signame} — shutting down...")

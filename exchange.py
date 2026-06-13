@@ -22,6 +22,7 @@ class Exchange:
 
         self.paper_balances: dict = {}
         self.paper_orders: list = []
+        self._reduce_only_aborts: dict = {}  # symbol -> ts of last 11011/TE_REDUCE_ONLY_ABORT close failure
         self._last_balance: dict = {}   # value cache for failed fetches
         self._balance_fetch_ts: float = 0  # timestamp of last successful fetch
         self._BALANCE_TTL: float = 30.0    # only hit the API every 30 seconds
@@ -484,27 +485,36 @@ class Exchange:
         limit_price = ob["best_bid"] if ob and ob.get("best_bid") else price
         return self._try_limit_entry(symbol, "long", amount, limit_price)
 
-    def close_long(self, symbol: str, coin_amount: float) -> Optional[dict]:
+    def close_long(self, symbol: str, coin_amount: float, urgent: bool = True) -> Optional[dict]:
+        """urgent=True (default): straight to market reduceOnly — protective exits
+        (SL/trail/watcher/emergency) must not burn seconds on a limit that has
+        never filled. urgent=False: patient maker attempt first (sell at ask),
+        then market fallback."""
         if not Config.is_live():
             return self._paper_close(symbol, coin_amount, side="long")
         coin_amount = self._round_amount(symbol, coin_amount)
         if coin_amount <= 0:
             logger.error(f"Amount rounded to 0 for close_long {symbol}")
             return None
-        # Sell at best ask for maker exit
-        ob = self.get_order_book(symbol, depth=5)
-        limit_price = ob["best_ask"] if ob and ob.get("best_ask") else None
-        if limit_price:
-            result = self._try_limit_exit(symbol, "sell", coin_amount, limit_price)
-            if result:
-                return result
+        if not urgent:
+            # Sell at best ask for maker exit
+            ob = self.get_order_book(symbol, depth=5)
+            limit_price = ob["best_ask"] if ob and ob.get("best_ask") else None
+            if limit_price:
+                result = self._try_limit_exit(symbol, "sell", coin_amount, limit_price,
+                                              patience_s=self.PATIENT_EXIT_PATIENCE_S)
+                if result:
+                    return result
         # Fallback to market
         try:
             order = self.client.create_market_sell_order(symbol, coin_amount, params={"reduceOnly": True})
             logger.info(f"[TAKER] CLOSE LONG {coin_amount} {symbol}")
             return order
         except Exception as e:
-            logger.error(f"Failed to close long for {symbol}: {e}")
+            if self._note_reduce_only_abort(symbol, e):
+                logger.info(f"[TAKER] close_long {symbol} reduceOnly abort — position is being closed elsewhere")
+            else:
+                logger.error(f"Failed to close long for {symbol}: {e}")
             return None
 
     # ── Short ────────────────────────────────────────────────────────────────
@@ -527,27 +537,33 @@ class Exchange:
         limit_price = ob["best_ask"] if ob and ob.get("best_ask") else price
         return self._try_limit_entry(symbol, "short", amount, limit_price)
 
-    def close_short(self, symbol: str, coin_amount: float) -> Optional[dict]:
+    def close_short(self, symbol: str, coin_amount: float, urgent: bool = True) -> Optional[dict]:
+        """See close_long — same urgency contract, mirrored sides."""
         if not Config.is_live():
             return self._paper_close(symbol, coin_amount, side="short")
         coin_amount = self._round_amount(symbol, coin_amount)
         if coin_amount <= 0:
             logger.error(f"Amount rounded to 0 for close_short {symbol}")
             return None
-        # Buy at best bid for maker exit
-        ob = self.get_order_book(symbol, depth=5)
-        limit_price = ob["best_bid"] if ob and ob.get("best_bid") else None
-        if limit_price:
-            result = self._try_limit_exit(symbol, "buy", coin_amount, limit_price)
-            if result:
-                return result
+        if not urgent:
+            # Buy at best bid for maker exit
+            ob = self.get_order_book(symbol, depth=5)
+            limit_price = ob["best_bid"] if ob and ob.get("best_bid") else None
+            if limit_price:
+                result = self._try_limit_exit(symbol, "buy", coin_amount, limit_price,
+                                              patience_s=self.PATIENT_EXIT_PATIENCE_S)
+                if result:
+                    return result
         # Fallback to market
         try:
             order = self.client.create_market_buy_order(symbol, coin_amount, params={"reduceOnly": True})
             logger.info(f"[TAKER] CLOSE SHORT {coin_amount} {symbol}")
             return order
         except Exception as e:
-            logger.error(f"Failed to close short for {symbol}: {e}")
+            if self._note_reduce_only_abort(symbol, e):
+                logger.info(f"[TAKER] close_short {symbol} reduceOnly abort — position is being closed elsewhere")
+            else:
+                logger.error(f"Failed to close short for {symbol}: {e}")
             return None
 
     # Hard ceiling on the opt-in maker-exit patience window. close_long/close_short
@@ -556,6 +572,28 @@ class Exchange:
     # the market fallback — an unmanaged position. Worst case MAX_OPEN_TRADES=3
     # simultaneous exits: 3 x 45s = 135s, leaving ~45s for the rest of the cycle.
     MAKER_EXIT_PATIENCE_MAX_S = 45.0
+
+    # Patience for urgent=False exits (flat/time/TP — no protective deadline).
+    # 25s keeps worst case MAX_OPEN_TRADES=3 patient exits at 75s, well inside
+    # the 180s cycle-watchdog budget — do not raise without re-checking that math.
+    PATIENT_EXIT_PATIENCE_S = 25.0
+
+    _REDUCE_ONLY_ABORT_MARKERS = ("11011", "TE_REDUCE_ONLY_ABORT")
+
+    def _note_reduce_only_abort(self, symbol: str, exc: Exception) -> bool:
+        """Record a Phemex 11011/TE_REDUCE_ONLY_ABORT close failure: the reduceOnly
+        order found no position to reduce — it is being closed elsewhere (resting
+        TP/SL fill or a racing close), not an execution failure."""
+        if any(m in str(exc) for m in self._REDUCE_ONLY_ABORT_MARKERS):
+            self._reduce_only_aborts[symbol] = time.time()
+            return True
+        return False
+
+    def pop_reduce_only_abort(self, symbol: str, within_s: float = 10.0) -> bool:
+        """True if the last close attempt for symbol failed with a reduceOnly
+        abort within the last `within_s` seconds. Consumes the flag."""
+        ts = self._reduce_only_aborts.pop(symbol, None)
+        return ts is not None and (time.time() - ts) <= within_s
 
     def _market_close_remainder(self, symbol: str, side: str, amount: float, filled_amount: float) -> None:
         """Market-close (reduceOnly) the unfilled remainder of a partial limit exit."""
@@ -568,7 +606,8 @@ class Exchange:
         except Exception as me:
             logger.error(f"[MAKER EXIT] Remainder market failed {symbol}: {me}")
 
-    def _try_limit_exit(self, symbol: str, side: str, amount: float, limit_price: float) -> Optional[dict]:
+    def _try_limit_exit(self, symbol: str, side: str, amount: float, limit_price: float,
+                        patience_s: float = None) -> Optional[dict]:
         """Post-only limit exit at the touch for maker fees (0.01% vs 0.06% taker).
 
         Returns the filled order, or None — and EVERY None return means the caller
@@ -584,17 +623,20 @@ class Exchange:
             nothing until .env opts in.
           - True: rests Config.MAKER_EXIT_PATIENCE_S (clamped to
             MAKER_EXIT_PATIENCE_MAX_S, 2s polls) before cancel + market fallback.
+          - An explicit patience_s argument (urgency-gated patient exits) takes
+            precedence over both, same clamp.
 
         Order-path house rule (lessons.md:290): direct client calls that complete
         or raise — never _call_with_timeout-wrapped.
         """
         limit_price = self._round_price(symbol, limit_price)
-        if Config.MAKER_EXIT_ENABLED:
+        if patience_s is not None or Config.MAKER_EXIT_ENABLED:
             poll_interval = 2.0
-            patience_s = min(float(Config.MAKER_EXIT_PATIENCE_S), self.MAKER_EXIT_PATIENCE_MAX_S)
-            if Config.MAKER_EXIT_PATIENCE_S > self.MAKER_EXIT_PATIENCE_MAX_S:
-                logger.warning(f"[MAKER EXIT] MAKER_EXIT_PATIENCE_S={Config.MAKER_EXIT_PATIENCE_S} "
+            requested_s = float(patience_s if patience_s is not None else Config.MAKER_EXIT_PATIENCE_S)
+            if requested_s > self.MAKER_EXIT_PATIENCE_MAX_S:
+                logger.warning(f"[MAKER EXIT] patience {requested_s} "
                                f"clamped to {self.MAKER_EXIT_PATIENCE_MAX_S}s (cycle-watchdog budget)")
+            patience_s = min(requested_s, self.MAKER_EXIT_PATIENCE_MAX_S)
             polls = max(1, int(patience_s / poll_interval))
         else:
             poll_interval = 0.5

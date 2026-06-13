@@ -593,12 +593,9 @@ def htf_l2_anticipation(
     # Strength calculation
     strength = 0.82
 
-    # Booster 1: whale accumulation
-    lt_bias = flow.get("large_trade_bias", 0.0)
-    if direction == Signal.BUY and lt_bias > 0.2:
-        strength += 0.03
-    elif direction == Signal.SELL and lt_bias < -0.2:
-        strength += 0.03
+    # Booster 1 (whale accumulation) removed 2026-06-12: aligned large_trade_bias
+    # is inverted — boosted cohort won 37.5% vs 52.6% without.
+    # See docs/2026-06-11-gate-sim-results.md.
 
     # Booster 2: support/resistance wall within 1%
     price = close

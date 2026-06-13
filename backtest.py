@@ -582,24 +582,67 @@ def check_exits(
 #   - live bot restarts reset cycle counters (time-based exits stretch); not modeled.
 # ---------------------------------------------------------------------------
 
-EARLY_EXIT_MIN_ROI = 3.0      # risk_manager.py:125
+EARLY_EXIT_MIN_ROI = 3.0      # risk_manager.py:125 (override: --early-exit-min-roi)
 FLAT_EXIT_CYCLES_LIVE = 240   # risk_manager.py:241 (240 x 60s = 4h)
 HARD_TIME_CYCLES_LIVE = 240   # risk_manager.py:223
+
+# --- Research exit knobs (2026-06-12 Phase 1 A/Bs; defaults = live parity) ---
+TRAIL_ARM_ROI = 5.0           # risk_manager.py:47 arm threshold (override: --trail-arm-roi)
+TRAIL_TIER1_LOCK = 2.0        # lock_in pct of the lowest trail tier AND fallthrough
+                              # default (override: --trail-tier1-lock; pass -999 to
+                              # remove the lock floor -> pure 3% trail in tier 1)
+SL_RATCHET: list[tuple[float, float]] = []   # [(cycles, sl_pct_of_entry)] sorted asc;
+                                             # empty = off (override: --sl-ratchet)
+DEEP_RED_ROI: Optional[float] = None         # deep-red cut: exit when roi <= this ...
+DEEP_RED_CYCLES = 120.0                      # ... after this many cycles. None = off.
+
+
+def parse_sl_ratchet(spec: str) -> list[tuple[float, float]]:
+    """Parse '60:0.8,120:0.6' -> [(60.0, 0.8), (120.0, 0.6)], sorted by cycles."""
+    out = []
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        cyc, pct = part.split(":")
+        out.append((float(cyc), float(pct)))
+    return sorted(out)
+
+
+def apply_exit_overrides(args) -> None:
+    """Set the module-level exit knobs from an argparse namespace (shared by the
+    CLI below and scripts/calibrate_exits.py). Only touches knobs present on args."""
+    g = globals()
+    for attr, name in [
+        ("sl_floor_pct", "SL_FLOOR_PCT"),
+        ("tp_cap_pct", "TP_CAP_PCT"),
+        ("early_exit_min_roi", "EARLY_EXIT_MIN_ROI"),
+        ("trail_arm_roi", "TRAIL_ARM_ROI"),
+        ("trail_tier1_lock", "TRAIL_TIER1_LOCK"),
+        ("deep_red_roi", "DEEP_RED_ROI"),
+        ("deep_red_cycles", "DEEP_RED_CYCLES"),
+    ]:
+        v = getattr(args, attr, None)
+        if v is not None:
+            g[name] = v
+    spec = getattr(args, "sl_ratchet", None)
+    if spec:
+        g["SL_RATCHET"] = parse_sl_ratchet(spec)
 
 
 def _live_update_trailing(pos: BTPosition, price: float) -> None:
     """Port of risk_manager.py:44-98 update_trailing_stop (tiered, ROI-based)."""
     roi = pos.roi(price)
-    if roi < 5.0:
+    if roi < TRAIL_ARM_ROI:
         return
     tiers = [
         (20.0, 15.0, 5.0),
         (15.0, 10.0, 5.0),
         (10.0,  6.0, 4.0),
         ( 8.0,  4.0, 4.0),
-        ( 5.0,  2.0, 3.0),
+        ( 5.0, TRAIL_TIER1_LOCK, 3.0),
     ]
-    lock_in_pct, trail_pct = 2.0, 3.0
+    lock_in_pct, trail_pct = TRAIL_TIER1_LOCK, 3.0
     for threshold, lock, trail in tiers:
         if roi >= threshold:
             lock_in_pct, trail_pct = lock, trail
@@ -791,6 +834,12 @@ def check_exits_live(
         if cycles_held >= ae_cycles and roi <= ae_threshold:
             return p, "adverse_exit"
 
+        # --- 4b. deep-red cut (research knob, off unless --deep-red-roi set).
+        # NOT the rejected AE-threshold family: AE swept thresholds at 10 cycles;
+        # this fires only on deep losers held a long time (default 120 cycles). ---
+        if DEEP_RED_ROI is not None and cycles_held >= DEEP_RED_CYCLES and roi <= DEEP_RED_ROI:
+            return p, "deep_red_cut"
+
         # --- 5. hard time exit (bot.py:815, risk_manager.py:218-235) ---
         if cycles_held >= HARD_TIME_CYCLES_LIVE:
             if roi >= 5.0:
@@ -802,6 +851,25 @@ def check_exits_live(
         # --- 6. breakeven + trailing ratchet (bot.py:850-851) ---
         _live_check_breakeven(pos, p)
         _live_update_trailing(pos, p)
+
+        # --- 6b. time-based SL ratchet (research knob, --sl-ratchet "60:0.8,120:0.6"):
+        # after N cycles, tighten the effective RESTING SL to pct% of entry.
+        # Tighten-only (never loosens, never undoes breakeven). The tightened
+        # sl_price participates in the intra-bar resting-order checks above. ---
+        if SL_RATCHET:
+            r_pct = None
+            for r_cycles, r_p in SL_RATCHET:
+                if cycles_held >= r_cycles:
+                    r_pct = r_p
+            if r_pct is not None:
+                if pos.direction == "long":
+                    cand = pos.entry_price * (1 - r_pct / 100)
+                    if cand > pos.sl_price:
+                        pos.sl_price = cand
+                else:
+                    cand = pos.entry_price * (1 + r_pct / 100)
+                    if cand < pos.sl_price:
+                        pos.sl_price = cand
 
         # --- 7. software TP/SL/trailing at cycle price (risk_manager.py:670-691) ---
         if pos.direction == "long":
@@ -1693,6 +1761,67 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_AE_MIN_CYCLES,
         help="Minimum candles held before adverse-exit can fire (matches live ADVERSE_EXIT_CYCLES).",
     )
+    # --- Phase-1 exit-rule A/B knobs (2026-06-12 edge plan). Defaults None =
+    # keep live-parity module constants; research tooling only, live bot reads none.
+    parser.add_argument(
+        "--sl-floor-pct",
+        type=float,
+        default=None,
+        metavar="PCT",
+        help="SL floor as %% of entry (live 1.2). A/B 1: 0.9 / 0.8.",
+    )
+    parser.add_argument(
+        "--tp-cap-pct",
+        type=float,
+        default=None,
+        metavar="PCT",
+        help="Max TP distance as %% of entry (live 1.6).",
+    )
+    parser.add_argument(
+        "--early-exit-min-roi",
+        type=float,
+        default=None,
+        metavar="ROI",
+        help="Min ROI %% before early_exit signals can fire (live 3.0). A/B 4: 6.0.",
+    )
+    parser.add_argument(
+        "--trail-arm-roi",
+        type=float,
+        default=None,
+        metavar="ROI",
+        help="ROI %% at which the tiered trail arms (live 5.0). A/B 5: 8.0.",
+    )
+    parser.add_argument(
+        "--trail-tier1-lock",
+        type=float,
+        default=None,
+        metavar="PCT",
+        help="Tier-1 lock-in ROI %% (live 2.0). Pass -999 to remove the lock floor "
+             "(pure 3%% trail in tier 1).",
+    )
+    parser.add_argument(
+        "--sl-ratchet",
+        type=str,
+        default=None,
+        metavar="C:P,...",
+        help='Time-ratchet the resting SL: "60:0.8,120:0.6" = tighten SL to 0.8%% of '
+             "entry after 60 cycles, 0.6%% after 120. Tighten-only. Off by default.",
+    )
+    parser.add_argument(
+        "--deep-red-roi",
+        type=float,
+        default=None,
+        metavar="ROI",
+        help="Deep-red cut: exit when ROI <= this after --deep-red-cycles (A/B 3: -6.0 "
+             "at 120 cycles). Off by default. Distinct from the rejected 10-cycle AE sweep.",
+    )
+    parser.add_argument(
+        "--deep-red-cycles",
+        type=float,
+        default=None,
+        metavar="N",
+        help="Cycles held before the deep-red cut can fire (default 120).",
+    )
     # --- Phase-3 cohort-gate flags (2026-06-11 edge plan §6). ALL default-off:
     # existing runs / calibration are unaffected unless explicitly passed. The
     # flow-dependent ones (--block-ltbias, --no-whale-boost, --min-conf) only act
@@ -1764,6 +1893,8 @@ def main() -> None:
 
     if args.starting_balance != STARTING_BALANCE:
         globals()["STARTING_BALANCE"] = args.starting_balance
+
+    apply_exit_overrides(args)
 
     print()
     print(SEPARATOR)

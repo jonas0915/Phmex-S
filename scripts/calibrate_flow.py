@@ -27,6 +27,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import backtest
 from backtest import run_backtest
 from flow_replay import FlowIndex
 
@@ -58,7 +59,22 @@ def main():
     ap.add_argument("--ae-cycles", type=int, default=10)
     ap.add_argument("--fee-rt", type=float, default=0.22,
                     help="Round-trip fee+slippage %% of notional (risk_manager paper model).")
+    # Exit-rule A/B knobs (2026-06-12 Phase 1) — mirror backtest.py's CLI.
+    # Defaults None = live-parity module constants in backtest.py.
+    ap.add_argument("--sl-floor-pct", type=float, default=None)
+    ap.add_argument("--tp-cap-pct", type=float, default=None)
+    ap.add_argument("--early-exit-min-roi", type=float, default=None)
+    ap.add_argument("--trail-arm-roi", type=float, default=None)
+    ap.add_argument("--trail-tier1-lock", type=float, default=None)
+    ap.add_argument("--sl-ratchet", type=str, default=None)
+    ap.add_argument("--deep-red-roi", type=float, default=None)
+    ap.add_argument("--deep-red-cycles", type=float, default=None)
     args = ap.parse_args()
+    backtest.apply_exit_overrides(args)
+    knobs = {k: v for k, v in vars(args).items()
+             if v is not None and k not in ("ae_threshold", "ae_cycles", "fee_rt")}
+    if knobs:
+        print(f"exit knobs: {knobs}")
 
     pair_data, htf_data = {}, {}
     for sym in SYMBOLS:

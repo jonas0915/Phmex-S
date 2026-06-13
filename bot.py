@@ -461,6 +461,8 @@ class Phmex2Bot:
         # cycle. Spec: docs/superpowers/specs/2026-06-11-live-exit-watcher-design.md
         self._pos_lock = threading.Lock()
         self._closing: set = set()
+        # First-skip timestamps for the watcher's TP strand guard (symbol -> ts)
+        self._tp_skip_since: dict = {}
         if Config.is_live() and Config.LIVE_EXIT_WATCHER and self._ws_feed:
             threading.Thread(target=self._live_exit_watcher_loop, daemon=True,
                              name="live-exit-watcher").start()
@@ -527,20 +529,29 @@ class Phmex2Bot:
         # Per-slot kills
         for path in _glob.glob(".kill_*"):
             slot_id = path.replace(".kill_", "")
+            _kill_failed = False
             for slot in self.slots:
                 if slot.slot_id == slot_id:
                     slot.enabled = False
                     for sym in list(slot.risk.positions.keys()):
                         pos = slot.risk.positions[sym]
                         if pos.side == "long":
-                            self.exchange.close_long(sym, pos.amount)
+                            order = self.exchange.close_long(sym, pos.amount)
                         else:
-                            self.exchange.close_short(sym, pos.amount)
+                            order = self.exchange.close_short(sym, pos.amount)
+                        if not order:
+                            # Keep the sentinel file so next cycle retries the close —
+                            # deleting it here would strand the position with the slot disabled
+                            _kill_failed = True
+                            logger.error(f"[SENTINEL] Close FAILED for {sym} (slot {slot_id}) — sentinel kept, retrying next cycle")
+                            continue
                         self.exchange.cancel_open_orders(sym)
                         logger.info(f"[SENTINEL] Closing {sym} for killed slot {slot_id}")
                     logger.warning(f"[SENTINEL] Slot '{slot_id}' KILLED")
                     notifier.send(f"🔪 Slot <b>{slot_id}</b> killed via sentinel")
                     break
+            if _kill_failed:
+                continue
             try:
                 os.remove(path)
             except OSError:
@@ -732,10 +743,11 @@ class Phmex2Bot:
                 cycles_held = self.cycle_count - pos.entry_cycle
                 held_min = cycles_held * Config.LOOP_INTERVAL / 60
                 logger.info(f"[FLAT EXIT] {symbol} — {roi:.1f}% ROI after {held_min:.0f}min (no momentum)")
+                # No protective deadline — worth resting a maker limit first
                 if pos.side == "long":
-                    order = self.exchange.close_long(symbol, pos.amount)
+                    order = self.exchange.close_long(symbol, pos.amount, urgent=False)
                 else:
-                    order = self.exchange.close_short(symbol, pos.amount)
+                    order = self.exchange.close_short(symbol, pos.amount, urgent=False)
                 if not order:
                     logger.error(f"[FLAT EXIT] Close order failed for {symbol}")
                     continue
@@ -849,10 +861,11 @@ class Phmex2Bot:
                     held_min = cycles_held * Config.LOOP_INTERVAL / 60
                     exit_type = "hard_time_exit" if is_hard else "time_exit"
                     logger.info(f"[{exit_type.upper()}] {symbol} — {pnl_pct:.1f}% PnL after {held_min:.0f}min (strat={pos.strategy or 'default'})")
+                    # No protective deadline — worth resting a maker limit first
                     if pos.side == "long":
-                        order = self.exchange.close_long(symbol, pos.amount)
+                        order = self.exchange.close_long(symbol, pos.amount, urgent=False)
                     else:
-                        order = self.exchange.close_short(symbol, pos.amount)
+                        order = self.exchange.close_short(symbol, pos.amount, urgent=False)
                     if not order:
                         logger.error(f"[{exit_type.upper()}] Close order failed for {symbol} — position still open on exchange")
                         continue
@@ -923,10 +936,13 @@ class Phmex2Bot:
             if price:
                 pos = self.risk.positions.get(symbol)
                 if pos:
+                    # take_profit is in-the-money with no protective deadline — patient
+                    # maker close; stop_loss/trailing_stop must hit market immediately
+                    urgent = reason != "take_profit"
                     if pos.side == "long":
-                        order = self.exchange.close_long(symbol, pos.amount)
+                        order = self.exchange.close_long(symbol, pos.amount, urgent=urgent)
                     else:
-                        order = self.exchange.close_short(symbol, pos.amount)
+                        order = self.exchange.close_short(symbol, pos.amount, urgent=urgent)
                     if not order:
                         logger.error(f"[SOFTWARE SL/TP] Close order failed for {symbol} — position still open on exchange")
                         continue
@@ -1329,26 +1345,17 @@ class Phmex2Bot:
 
                 # QUIET regime gate — block low-momentum entries
                 # QUIET = 5m ADX 20-25, no EMA stack alignment (0% WR in 48hr audit)
-                # Allow through if flow CVD strongly confirms the trade direction
+                # Flow-confirmation exemption CLOSED 2026-06-12: exempt cohort ran
+                # 44.4% WR / -$5.45 over 18 entries (audit 2026-06-11), and its
+                # criterion (aligned cvd_slope > 0.2) selects the worst-performing
+                # cvd bucket on the live book (-$0.197/trade). QUIET always blocks.
                 _regime_snap = self._classify_regime(df.iloc[-1], df)
-                _quiet_exempt = False
                 if _regime_snap.get("label") == "QUIET":
-                    _flow_confirms = False
-                    if flow and flow.get("trade_count", 0) > 5:
-                        if direction == "long" and flow.get("cvd_slope", 0) > 0.2:
-                            _flow_confirms = True
-                        if direction == "short" and flow.get("cvd_slope", 0) < -0.2:
-                            _flow_confirms = True
-                    if not _flow_confirms:
-                        self._log_gotaway("quiet_regime", symbol, direction, strat_name,
-                                          signal.strength, confidence, price, ob, flow, df)
-                        logger.info(f"[REGIME GATE] {symbol} {direction.upper()} blocked — QUIET regime "
-                                    f"(5m ADX={_regime_snap.get('adx', '?')}) with no flow confirmation")
-                        continue
-                    # Shadow-tag the exemption: this cohort ran 44.4% WR / -$5.45 over
-                    # 60d (audit 2026-06-11). Tagged for the Phase 3 sim decision —
-                    # NOT hard-blocked yet (lessons.md:407: sim before live changes).
-                    _quiet_exempt = True
+                    self._log_gotaway("quiet_regime", symbol, direction, strat_name,
+                                      signal.strength, confidence, price, ob, flow, df)
+                    logger.info(f"[REGIME GATE] {symbol} {direction.upper()} blocked — QUIET regime "
+                                f"(5m ADX={_regime_snap.get('adx', '?')})")
+                    continue
 
                 # Phase 3 shadow gates (2026-06-11): tag-only, NEVER block. Records
                 # what each candidate gate would have done so the forward live book
@@ -1422,7 +1429,7 @@ class Phmex2Bot:
                         self._last_htf_entry_time = time.time()
                     logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${pos.margin:.2f} | Conf: {confidence}/7 | {signal.reason} | Strength: {signal.strength:.2f}")
                     _htf_adx_val = float(htf_df.iloc[-1].get("adx", 0)) if htf_df is not None and len(htf_df) > 0 else None
-                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df, htf_adx=_htf_adx_val, extra_tags={**_shadow_gates, **({"quiet_exempt": True} if _quiet_exempt else {})} or None)
+                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df, htf_adx=_htf_adx_val, extra_tags=_shadow_gates or None)
                     try:
                         self.risk._save_state()
                     except Exception as _e:
@@ -1800,14 +1807,9 @@ class Phmex2Bot:
                         _gate_tags.append("global_cooldown")
                     _regime_snap = self._classify_regime(df.iloc[-1], df)
                     if _regime_snap.get("label") == "QUIET":
-                        _fc = False
-                        if flow and flow.get("trade_count", 0) > 5:
-                            if direction == "long" and flow.get("cvd_slope", 0) > 0.2:
-                                _fc = True
-                            if direction == "short" and flow.get("cvd_slope", 0) < -0.2:
-                                _fc = True
-                        if not _fc:
-                            _gate_tags.append("quiet_regime")
+                        # Mirrors the live gate: QUIET blocks unconditionally since
+                        # 2026-06-12 (flow-confirmation exemption closed)
+                        _gate_tags.append("quiet_regime")
                     if flow and flow.get("divergence"):
                         if direction == "long" and flow["divergence"] == "bearish":
                             _gate_tags.append("divergence_bearish")
@@ -2061,10 +2063,29 @@ class Phmex2Bot:
                     price = lp[0]
                     with self._pos_lock:
                         if symbol in self._closing or symbol not in self.risk.positions:
+                            self._tp_skip_since.pop(symbol, None)
                             continue
                         reason = self.risk.evaluate_exit(symbol, price)
                         if reason is None:
+                            # Breach gone — reset the strand-guard clock so an old
+                            # timestamp can't trigger instant enforcement later
+                            self._tp_skip_since.pop(symbol, None)
                             continue
+                        if reason == "take_profit":
+                            # TP race fix: an exchange limit TP resting at this level
+                            # always wins (maker, already queued) — enforcing here just
+                            # double-closes into 11011. If it filled, the 60s [SYNC]
+                            # reconciles; software-managed TPs still enforced.
+                            # Strand guard: a live limit the market has crossed must
+                            # fill within seconds — if the breach persists 90s the
+                            # order is gone (cancelled/rejected), so enforce anyway.
+                            tp_id = self.risk.positions[symbol].tp_order_id
+                            if tp_id and tp_id != "software":
+                                _first = self._tp_skip_since.setdefault(symbol, time.time())
+                                if time.time() - _first < 90:
+                                    continue
+                                logger.warning(f"[LIVE EXIT] {symbol} TP breach >90s with resting TP unfilled — order presumed gone, enforcing")
+                        self._tp_skip_since.pop(symbol, None)
                         self._closing.add(symbol)
                     try:
                         pos = self.risk.positions.get(symbol)
@@ -2077,6 +2098,12 @@ class Phmex2Bot:
                             order = self.exchange.close_short(symbol, pos.amount)
                         if not order:
                             fail_cooldown[symbol] = time.time() + 30.0
+                            if self.exchange.pop_reduce_only_abort(symbol):
+                                # Phemex 11011/TE_REDUCE_ONLY_ABORT: nothing left to reduce —
+                                # a resting TP/SL or racing close got there first. Not a
+                                # failure; the 60s [SYNC] reconciles. No Telegram noise.
+                                logger.info(f"[LIVE EXIT] {symbol} close aborted (reduceOnly) — position is being closed elsewhere")
+                                continue
                             logger.error(f"[LIVE EXIT] close failed for {symbol} — position intact, cycle will retry")
                             try:
                                 notifier.send(f"⚠️ [LIVE EXIT] close order failed for {symbol} ({reason}) — position intact, 60s cycle is backstop")

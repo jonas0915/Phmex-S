@@ -136,6 +136,7 @@ def watcher_bot(monkeypatch):
     b.running = True
     b._pos_lock = threading.Lock()
     b._closing = set()
+    b._tp_skip_since = {}
 
     pos = _make_position(take_profit=None, trailing_stop_price=104.0,
                          peak_price=105.0, margin=100.0)
@@ -146,6 +147,7 @@ def watcher_bot(monkeypatch):
     b.exchange.close_long.return_value = {"id": "close-1", "symbol": SYMBOL}
     b.exchange.close_short.return_value = {"id": "close-2", "symbol": SYMBOL}
     b.exchange.extract_order_fee.return_value = 0.0123
+    b.exchange.pop_reduce_only_abort.return_value = False  # MagicMock default is truthy
 
     b._ws_feed = MagicMock()
     b._ws_feed.last_price.return_value = (103.9, 2.0)  # fresh breach by default
@@ -260,8 +262,67 @@ def test_failed_close_order_leaves_position_and_releases_claim(watcher_bot):
     b.risk.close_position.assert_not_called()
     b.exchange.cancel_open_orders.assert_not_called()
     bot_module.notifier.notify_exit.assert_not_called()
+    bot_module.notifier.send.assert_called_once()  # genuine failure -> Telegram
     assert SYMBOL in b.risk.positions          # cycle will retry
     assert b._closing == set()                 # claim released in finally
+
+
+def test_reduce_only_abort_close_is_info_no_telegram(watcher_bot):
+    """11011/TE_REDUCE_ONLY_ABORT means the position is being closed elsewhere
+    (resting TP/SL fill or racing close) — INFO, no Telegram, claim released,
+    existing 30s fail-cooldown still applies (cycle [SYNC] reconciles)."""
+    b = watcher_bot
+    b.exchange.close_long.return_value = None
+    b.exchange.pop_reduce_only_abort.return_value = True
+
+    b._live_exit_watcher_loop()
+
+    b.exchange.pop_reduce_only_abort.assert_called_once_with(SYMBOL)
+    b.risk.close_position.assert_not_called()
+    bot_module.notifier.send.assert_not_called()       # no alert noise
+    bot_module.notifier.notify_exit.assert_not_called()
+    assert SYMBOL in b.risk.positions
+    assert b._closing == set()
+
+
+# ---------------------------------------------------------------------------
+# H. TP race: resting exchange TP wins — watcher must not double-close
+# ---------------------------------------------------------------------------
+
+def _tp_breach_bot(b, tp_order_id):
+    """Reconfigure the harness with a take_profit breach (trail never arms)."""
+    pos = _make_position(take_profit=101.6, margin=10000.0,
+                         tp_order_id=tp_order_id)
+    b.risk.positions = {SYMBOL: pos}
+    b._ws_feed.last_price.return_value = (102.0, 1.0)  # >= TP 101.6
+    return pos
+
+
+def test_watcher_skips_tp_when_exchange_tp_resting(watcher_bot):
+    b = watcher_bot
+    _tp_breach_bot(b, tp_order_id="ex-tp-1")
+
+    b._live_exit_watcher_loop()
+
+    # Exchange limit TP at the same level wins the race — zero close calls,
+    # no claim taken; if it filled, the 60s [SYNC] reconciles.
+    b.exchange.close_long.assert_not_called()
+    b.exchange.close_short.assert_not_called()
+    b.risk.close_position.assert_not_called()
+    assert SYMBOL in b.risk.positions
+    assert b._closing == set()
+
+
+@pytest.mark.parametrize("tp_id", ["software", None], ids=["software", "no_tp_order"])
+def test_watcher_enforces_tp_when_software_managed(watcher_bot, tp_id):
+    b = watcher_bot
+    pos = _tp_breach_bot(b, tp_order_id=tp_id)
+
+    b._live_exit_watcher_loop()
+
+    b.exchange.close_long.assert_called_once_with(SYMBOL, pos.amount)
+    b.risk.close_position.assert_called_once_with(
+        SYMBOL, 103.85, "take_profit", fees_usdt=0.0123)
 
 
 # ---------------------------------------------------------------------------

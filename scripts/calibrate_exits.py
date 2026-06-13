@@ -16,7 +16,12 @@ model is held constant and only exit-price fidelity is measured.
 
 Run from repo root:
     python scripts/calibrate_exits.py
+
+Exit-rule A/B knobs (2026-06-12 Phase 1) mirror backtest.py's CLI; defaults are
+live parity, so a no-flag run reproduces the documented baseline (sim net -$9.31,
+-24.6% vs live net). AE stays hardcoded at -999/10 (live parity for the window).
 """
+import argparse
 import json
 import os
 import sys
@@ -28,6 +33,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import backtest
 from backtest import BTPosition, check_exits_live, LEVERAGE
 from flow_replay import FlowIndex
 from indicators import add_all_indicators
@@ -36,8 +42,32 @@ DATA_DIR = "backtest_data_may"
 STRATEGY = "htf_l2_anticipation"
 LO = 1778470812  # flow capture start
 END = int(datetime(2026, 5, 30, 22, 10, tzinfo=timezone.utc).timestamp())
+MID = (LO + END) // 2  # half-split boundary for the period-stability check
 
 SL_PCT, TP_PCT = 1.2, 1.6  # live-window effective SL/TP (risk_manager.py:504-512)
+
+
+def parse_cli():
+    ap = argparse.ArgumentParser(description="Exit-model isolation rig (45 live entries)")
+    ap.add_argument("--sl-floor-pct", type=float, default=None,
+                    help="SL distance %% of entry (live 1.2). Also applied to the rig's per-trade SL.")
+    ap.add_argument("--tp-cap-pct", type=float, default=None,
+                    help="TP distance %% of entry (live 1.6).")
+    ap.add_argument("--early-exit-min-roi", type=float, default=None,
+                    help="Min ROI %% for early_exit (live 3.0).")
+    ap.add_argument("--trail-arm-roi", type=float, default=None,
+                    help="Trail arm ROI %% (live 5.0).")
+    ap.add_argument("--trail-tier1-lock", type=float, default=None,
+                    help="Tier-1 lock-in %% (live 2.0; -999 removes the lock floor).")
+    ap.add_argument("--sl-ratchet", type=str, default=None,
+                    help='Time-ratchet resting SL, e.g. "60:0.8,120:0.6". Off by default.')
+    ap.add_argument("--deep-red-roi", type=float, default=None,
+                    help="Deep-red cut ROI %% (off by default; A/B 3: -6.0).")
+    ap.add_argument("--deep-red-cycles", type=float, default=None,
+                    help="Cycles before deep-red cut can fire (default 120).")
+    ap.add_argument("--dump-json", type=str, default=None,
+                    help="Write per-trade rows to PATH (for variant-vs-baseline diffing).")
+    return ap.parse_args()
 
 
 def load_candles(path):
@@ -48,6 +78,13 @@ def load_candles(path):
 
 
 def main():
+    args = parse_cli()
+    backtest.apply_exit_overrides(args)  # sets module knobs used by check_exits_live
+    sl_pct = args.sl_floor_pct if args.sl_floor_pct is not None else SL_PCT
+    tp_pct = args.tp_cap_pct if args.tp_cap_pct is not None else TP_PCT
+    knobs = {k: v for k, v in vars(args).items() if v is not None and k != "dump_json"}
+    print(f"knobs: {knobs if knobs else 'BASELINE (live parity)'}")
+
     state = json.load(open("trading_state.json"))
     live = [
         t for t in state["closed_trades"]
@@ -79,8 +116,8 @@ def main():
         amount = t["amount"]
         notional = entry_px * amount  # live notional (margin * ~10x)
 
-        sl = entry_px * (1 - SL_PCT / 100) if side == "long" else entry_px * (1 + SL_PCT / 100)
-        tp = entry_px * (1 + TP_PCT / 100) if side == "long" else entry_px * (1 - TP_PCT / 100)
+        sl = entry_px * (1 - sl_pct / 100) if side == "long" else entry_px * (1 + sl_pct / 100)
+        tp = entry_px * (1 + tp_pct / 100) if side == "long" else entry_px * (1 - tp_pct / 100)
         entry_ts = pd.Timestamp(opened, unit="s", tz="UTC")
         e_idx = df.index.searchsorted(entry_ts, side="right") - 1
         if e_idx < 1:
@@ -118,7 +155,7 @@ def main():
         live_gross = t.get("pnl_usdt", 0.0)
         live_fee = t.get("fees_usdt", 0.0)
         rows.append({
-            "sym": sym.split("/")[0], "side": side,
+            "sym": sym.split("/")[0], "side": side, "opened_at": opened,
             "sim_reason": sim_reason, "live_reason": t.get("exit_reason"),
             "sim_gross": sim_gross, "live_gross": live_gross,
             "sim_net": sim_gross - live_fee, "live_net": t.get("net_pnl", live_gross - live_fee),
@@ -153,6 +190,27 @@ def main():
     fb, fl = stats.get("fallback_bars", 0), stats.get("flow_bars", 0)
     print(f"\n  intra-bar price source: {fl} bars flow path, {fb} bars bar-close fallback "
           f"({fb/(fb+fl)*100 if fb+fl else 0:.1f}% fallback)")
+
+    # --- A/B summary stats (sim side, net of live fees) ---
+    wins = [r["sim_net"] for r in rows if r["sim_net"] > 0]
+    losses = [r["sim_net"] for r in rows if r["sim_net"] <= 0]
+    print(f"\n  sim WR: {len(wins)}/{n} ({len(wins)/n*100 if n else 0:.1f}%) | "
+          f"avg win ${sum(wins)/len(wins) if wins else 0:+.3f} | "
+          f"avg loss ${sum(losses)/len(losses) if losses else 0:+.3f}")
+    for label, half in [("first half", [r for r in rows if r["opened_at"] < MID]),
+                        ("second half", [r for r in rows if r["opened_at"] >= MID])]:
+        hs = sum(r["sim_net"] for r in half)
+        hl = sum(r["live_net"] for r in half)
+        hw = sum(1 for r in half if r["sim_net"] > 0)
+        print(f"  {label:<11}: n={len(half):>2} sim net ${hs:+.2f} (live ${hl:+.2f}) "
+              f"sim WR {hw/len(half)*100 if half else 0:.0f}%")
+
+    if args.dump_json:
+        with open(args.dump_json, "w") as fh:
+            json.dump({"knobs": knobs, "rows": rows,
+                       "totals": {"n": n, "sim_gross": sg, "sim_net": sn_,
+                                  "live_gross": lg, "live_net": ln_}}, fh, indent=1)
+        print(f"\n  per-trade dump: {args.dump_json}")
 
 
 if __name__ == "__main__":
