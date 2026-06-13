@@ -900,7 +900,8 @@ def liquidation_cascade_strategy(df, ob, htf_df=None):
 # Live slot's job is to measure REAL maker fills, which backtests can only assume.
 ST2_IMB_MIN = 0.30        # bid-heavy book threshold
 ST2_BR_MIN = 0.60         # heavy buying-into-it threshold
-ST2_MIN_TRADES = 15       # tape must be real for buy_ratio to mean anything
+ST2_MIN_TRADES = 8        # loosened 15->8 (2026-06-13) to fire more often; buy_ratio
+                          # on 8+ trades is still meaningful, below ~5 it's noise
 
 
 def st2_absorption(df: pd.DataFrame, orderbook: dict = None, flow: dict = None) -> TradeSignal:
