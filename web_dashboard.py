@@ -516,7 +516,10 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
 
     if not rows:
         rows = "<tr><td class='dim'>no slot state files found</td></tr>"
-    return f'<div class="ptitle">SLOTS + GUARDRAILS</div><table>{rows}</table>'
+    return ('<div class="ptitle">SLOTS + GUARDRAILS</div>'
+            '<div class="sig-desc">Each strategy slot\'s live/paper status, record and net '
+            'PnL, plus the auto-demote headroom bar (how close it is to the &minus;$5 kill).</div>'
+            f'<table>{rows}</table>')
 
 
 # ── ST2.0 dedicated panel (book×tape absorption short — maker-fill experiment) ──
@@ -570,10 +573,18 @@ def _st2_fill_stats() -> dict:
 #   "st2"   → ST2.0: live unless .demote_ST2.0 flag, plus the maker fill row
 #
 # A .demote_<slot_id> flag file always overrides to DEMOTED (rollback latch).
+# (slot_id, title, one-line description of what the strategy does)
 _SIGNAL_BOXES = [
-    ("5m_scalp",       "5M_SCALP &mdash; CONFLUENCE (MAIN LIVE)"),
-    ("5m_mean_revert", "5M_MEAN_REVERT"),
-    ("ST2.0",          "ST2.0 &mdash; BOOK&times;TAPE ABSORPTION SHORT"),
+    ("5m_scalp",       "5M_SCALP &mdash; CONFLUENCE (MAIN LIVE)",
+     "HTF (1h) trend + VWAP pullback, entry confirmed by live L2 order-book &amp; "
+     "tape rather than a closed candle. The main live bot."),
+    ("5m_mean_revert", "5M_MEAN_REVERT",
+     "Bollinger-Band mean-reversion scalp &mdash; fades lower-BB bounces / upper-BB "
+     "rejections, only in ranging (low-ADX) markets. Paper slot."),
+    ("ST2.0",          "ST2.0 &mdash; BOOK&times;TAPE ABSORPTION SHORT",
+     "Shorts when a bid-heavy book is being aggressively bought into "
+     "(imbalance &ge; 0.30 &amp; buy-ratio &ge; 0.60). ~15-min maker hold; "
+     "live maker-fill experiment."),
 ]
 # 5m_liq_cascade and 5m_narrow boxes removed 2026-06-13 — both hard-KILLED
 # in paper (neg Kelly), no longer tracked. State files kept; they still surface
@@ -603,11 +614,13 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
 
 def _build_signal_card(slot_id: str, title: str, state: dict,
                        live_ids: set, modes: dict,
-                       fill_stats: dict = None) -> str:
+                       fill_stats: dict = None, desc: str = "") -> str:
     """Reusable per-slot tracking box. Renders status, trade count, win rate,
     net PnL (prefers net_pnl), avg win / avg loss, and the current open position
     — all from the slot's own state dict (REAL data, read upstream once).
 
+    desc (optional): one-line plain-English summary of what the strategy does,
+    shown as a small caption under the title.
     fill_stats (optional, ST2.0 only): {fills,misses,total,rate} dict from
     _st2_fill_stats() rendered as a headline MAKER FILL RATE block."""
     st = state or {}
@@ -665,8 +678,10 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
         f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
     )
 
+    desc_html = f'<div class="sig-desc">{desc}</div>' if desc else ""
     return (
         f'<div class="ptitle">{title}</div>'
+        f"{desc_html}"
         f"{fill_block}"
         f"<table>{stats_rows}</table>"
     )
@@ -687,10 +702,11 @@ def _build_signals_section(slot_states: dict = None) -> str:
     modes = _slot_modes()
 
     cards = ""
-    for slot_id, title in _SIGNAL_BOXES:
+    for slot_id, title, desc in _SIGNAL_BOXES:
         state = slot_states.get(slot_id) or {"closed_trades": [], "positions": {}}
         fill_stats = _st2_fill_stats() if slot_id == "ST2.0" else None
-        card = _build_signal_card(slot_id, title, state, live_ids, modes, fill_stats)
+        card = _build_signal_card(slot_id, title, state, live_ids, modes,
+                                  fill_stats, desc)
         cards += f'<div class="panel sig-box" id="sig-{escape(slot_id)}">{card}</div>'
     return f'<div id="signals-grid">{cards}</div>'
 
@@ -1131,7 +1147,10 @@ def _build_positions_panel(lines: list = None, slot_states: dict = None) -> str:
     rec = _reconcile_summary()
     rec_html = ("" if rec.get("ok") else
                 f"<div class='neg' style='margin-top:5px'>&#9888; {escape(rec.get('msg', ''))}</div>")
-    return f'<div class="ptitle">POSITIONS &mdash; MAIN + SLOTS</div>{body}{rec_html}'
+    return ('<div class="ptitle">POSITIONS &mdash; MAIN + SLOTS</div>'
+            '<div class="sig-desc">Positions open right now across the main bot and live '
+            'slots &mdash; entry, unrealized PnL, stop/target, age, and the owning strategy.</div>'
+            f'{body}{rec_html}')
 
 
 def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
@@ -1397,14 +1416,23 @@ def build_content(lines: list = None, slot_states: dict = None, state: dict = No
     </div>
     <div class="panel" id="p-blotter">
         <div class="ptitle">BLOTTER &mdash; CLICK ROW TO DRILL DOWN</div>
+        <div class="sig-desc">Most recent closed trades (main + slots): time, symbol, side,
+        strategy, net PnL and exit reason. Click any row to drill into the full trade.</div>
         {blotter_html}
     </div>
     <div class="panel" id="p-why">
         <div class="ptitle">WHY NO TRADES?</div>
+        <div class="sig-desc">Why the bot is idle: each pair's 1h ADX vs the 25 trend gate,
+        the last signal seen, and which gate rejected the most in the last 24h.<br>
+        <b>1H ADX</b> = trend strength on the 1-hour chart (0&ndash;~100; higher = stronger
+        trend, up or down). <b>GATE 25</b> = the bot needs 1h ADX &ge; 25 to trade
+        (&check; = passes); under 25 the pair is too choppy and is blocked.</div>
         {why_html}
     </div>
     <div class="panel" id="p-gates">
         <div class="ptitle">GATES 24H + WATCHLIST</div>
+        <div class="sig-desc">Last-24h count of which gates blocked entries, plus a live
+        watchlist &mdash; per-symbol volume, spread, and L2 order-book readiness (n/3).</div>
         {gates_html}
     </div>
 </div>
@@ -1452,6 +1480,8 @@ body {{ background:var(--bg); color:var(--txt);
 .panel .ptitle {{ color:var(--amber); letter-spacing:1.5px; font-size:9px;
   text-transform:uppercase; border-bottom:1px solid #1a2412;
   padding-bottom:3px; margin-bottom:5px; }}
+.sig-desc {{ color:var(--dim); font-size:9px; line-height:1.35;
+  margin:-2px 0 6px; }}
 .panel table {{ width:100%; border-collapse:collapse; font-size:10px; }}
 .panel td, .panel th {{ padding:1px 5px 1px 0; text-align:left; }}
 .pos {{ color:var(--pos); }} .neg {{ color:var(--neg); }} .dim {{ color:var(--dim); }}
