@@ -11,7 +11,11 @@ from exchange import Exchange
 from indicators import add_all_indicators
 from risk_manager import RiskManager
 from strategy_slot import StrategySlot
-from strategies import STRATEGIES, Signal, TradeSignal
+from strategies import STRATEGIES, Signal, TradeSignal, st2_absorption
+
+# ST2.0 book×tape absorption short — fixed ~15-min hold (900s / 60s cycle = 15 cycles),
+# matching the backtested exit (docs/2026-06-13-wider-setup-search.md).
+ST2_HOLD_CYCLES = 15
 from scanner import scan_top_gainers, volatility_scan, start_background_scan, get_scan_result
 from logger import setup_logger
 from ws_feed import WSDataFeed
@@ -259,6 +263,20 @@ class Phmex2Bot:
                 max_positions=2,
                 capital_pct=0.0,
                 paper_mode=True,
+            ),
+            # ST2.0 — book×tape absorption short (2026-06-13). LIVE from the start:
+            # its whole purpose is to measure REAL maker fills, which paper can't.
+            # Deliberately bypasses the OB+tape gates (which forbid its setup) and
+            # holds ~15 min. Rails: max 1 position, $10 margin, auto-demote at
+            # −$5 net / negative live Kelly @10 trades (strategy_slot.py). Rollback:
+            # `touch .demote_ST2.0` or flip paper_mode.
+            StrategySlot(
+                slot_id="ST2.0",
+                strategy_name="ST2.0",
+                timeframe="5m",
+                max_positions=1,
+                capital_pct=0.0,
+                paper_mode=False,
             ),
         ]
 
@@ -1576,6 +1594,13 @@ class Phmex2Bot:
                     continue
                 pos = slot.risk.positions[symbol]
 
+                # ST2.0: fixed ~15-min hold (the backtested exit) takes priority
+                if slot.strategy_name == "ST2.0":
+                    _held = self.cycle_count - getattr(pos, "entry_cycle", self.cycle_count)
+                    if _held >= ST2_HOLD_CYCLES:
+                        self._close_slot_position(slot, symbol, pos, price, "st2_hold")
+                        continue
+
                 if slot.paper_mode:
                     # Check SL (paper only — live SL rests on the exchange)
                     if (pos.side == "long" and price <= pos.stop_loss) or \
@@ -1677,6 +1702,10 @@ class Phmex2Bot:
                         except Exception as _narrow_build_err:
                             logger.debug(f"[PAPER] [NARROW] {symbol} candidate build failed: {_narrow_build_err}")
                             continue
+                    elif slot.strategy_name == "ST2.0":
+                        # ST2.0 needs BOTH book (ob) and tape (flow) — the generic
+                        # call path doesn't pass flow, so build the signal directly.
+                        candidate_signals.append(st2_absorption(df, ob, _flow_for_strat))
                     else:
                         try:
                             _s = strategy_fn(df, ob, htf_df=htf_df)
@@ -1736,9 +1765,11 @@ class Phmex2Bot:
                     margin = Config.TRADE_AMOUNT_USDT
                     atr_val = df.iloc[-2].get("atr", 0) if len(df) > 1 else 0
 
-                    # Apply OB + Tape gates to paper slots
+                    # Apply OB + Tape gates to slots. ST2.0 BYPASSES these — its
+                    # whole thesis is to short into the bid-heavy + buying setup that
+                    # these gates exist to block (short blocked if imb>0.25/buy_ratio>0.55).
                     # L2 Orderbook gate
-                    if ob is not None:
+                    if slot.strategy_name != "ST2.0" and ob is not None:
                         ob_imb = ob.get("imbalance", 0.0)
                         ob_bwalls = ob.get("bid_walls", [])
                         ob_awalls = ob.get("ask_walls", [])
@@ -1758,9 +1789,9 @@ class Phmex2Bot:
                         if ob_spread > 0.15:
                             logger.debug(f"[PAPER] [OB GATE] {slot.slot_id} {symbol} blocked — wide spread {ob_spread:.3f}%")
                             continue
-                    # Tape gate
+                    # Tape gate (ST2.0 bypasses — see OB gate note above)
                     flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
-                    if flow and flow.get("trade_count", 0) > 20:
+                    if slot.strategy_name != "ST2.0" and flow and flow.get("trade_count", 0) > 20:
                         buy_ratio = flow.get("buy_ratio", 0.5)
                         cvd_slope = flow.get("cvd_slope", 0.0)
                         divergence = flow.get("divergence")
@@ -2428,8 +2459,11 @@ class Phmex2Bot:
             return True
         try:
             self.exchange.cancel_open_orders(symbol)
-            order = (self.exchange.close_long(symbol, pos.amount) if pos.side == "long"
-                     else self.exchange.close_short(symbol, pos.amount))
+            # ST2.0's edge is maker-only — close patiently (maker) so the round trip
+            # stays maker-maker. Other slots close urgently (taker) as before.
+            _urgent = slot.strategy_name != "ST2.0"
+            order = (self.exchange.close_long(symbol, pos.amount, urgent=_urgent) if pos.side == "long"
+                     else self.exchange.close_short(symbol, pos.amount, urgent=_urgent))
             if not order:
                 logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} {reason} close FAILED — retry next cycle")
                 return False

@@ -147,8 +147,8 @@ def test_demote_slot_closes_position_and_flips_mode(slot, monkeypatch):
     slot.risk.open_position("DOGE/USDT:USDT", 0.08, 10.0, side="long")
     calls = {}
     class _FakeExchange:
-        def close_long(self, s, a):  calls["closed"] = (s, a); return {"average": 0.079}
-        def close_short(self, s, a): calls["closed"] = (s, a); return {"average": 0.079}
+        def close_long(self, s, a, **kw):  calls["closed"] = (s, a); return {"average": 0.079}
+        def close_short(self, s, a, **kw): calls["closed"] = (s, a); return {"average": 0.079}
         def cancel_open_orders(self, s): calls["cancelled"] = s
         def extract_order_fee(self, o, s=None): return 0.0
     monkeypatch.setattr(bot_mod, "notifier", type("N", (), {
@@ -171,8 +171,8 @@ def test_close_slot_position_live_closes_on_exchange(slot, monkeypatch):
     pos = slot.risk.positions["DOGE/USDT:USDT"]
     calls = {}
     class _FakeExchange:
-        def close_long(self, s, a):  calls["closed"] = (s, a); return {"average": 0.0805}
-        def close_short(self, s, a): calls["closed"] = (s, a); return {"average": 0.0805}
+        def close_long(self, s, a, **kw):  calls["closed"] = (s, a); return {"average": 0.0805}
+        def close_short(self, s, a, **kw): calls["closed"] = (s, a); return {"average": 0.0805}
         def cancel_open_orders(self, s): calls["cancelled"] = s
         def extract_order_fee(self, o, s=None): return 0.01
     monkeypatch.setattr(bot_mod, "notifier", type("N", (), {
@@ -199,8 +199,8 @@ def test_live_close_triggers_auto_demote_on_loss_cap(slot, monkeypatch):
     slot.risk.open_position("DOGE/USDT:USDT", 0.08, 10.0, side="long")
     pos = slot.risk.positions["DOGE/USDT:USDT"]
     class _FakeExchange:
-        def close_long(self, s, a):  return {"average": 0.0799}
-        def close_short(self, s, a): return {"average": 0.0799}
+        def close_long(self, s, a, **kw):  return {"average": 0.0799}
+        def close_short(self, s, a, **kw): return {"average": 0.0799}
         def cancel_open_orders(self, s): pass
         def extract_order_fee(self, o, s=None): return 0.0
     monkeypatch.setattr(bot_mod, "notifier", type("N", (), {

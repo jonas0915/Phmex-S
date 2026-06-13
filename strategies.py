@@ -890,6 +890,36 @@ def liquidation_cascade_strategy(df, ob, htf_df=None):
     return TradeSignal(direction, reason, strength)
 
 
+# ── ST2.0 — book×tape absorption short ───────────────────────────────────
+# Discovered 2026-06-13 (docs/2026-06-13-wider-setup-search.md). When the book
+# is strongly bid-heavy AND the tape shows heavy BUYING into it, the buyers are
+# exhausting against passive bids and price reverts DOWN. The bot's normal OB +
+# tape gates BLOCK exactly this setup (short blocked if imb>0.25 or buy_ratio>0.55),
+# which is why it was never traded — ST2.0 deliberately bypasses those gates.
+# Backtest: +6.3 bps gross/trade, maker-only (+4.3 bps net maker, −5.7 taker).
+# Live slot's job is to measure REAL maker fills, which backtests can only assume.
+ST2_IMB_MIN = 0.30        # bid-heavy book threshold
+ST2_BR_MIN = 0.60         # heavy buying-into-it threshold
+ST2_MIN_TRADES = 15       # tape must be real for buy_ratio to mean anything
+
+
+def st2_absorption(df: pd.DataFrame, orderbook: dict = None, flow: dict = None) -> TradeSignal:
+    """Book×tape absorption short. Needs BOTH the order book (imbalance) and the
+    tape (buy_ratio + trade_count) — short when a bid-heavy book is being bought into."""
+    if orderbook is None or flow is None:
+        return TradeSignal(Signal.HOLD, "ST2.0: missing ob/flow", 0.0)
+    imb = orderbook.get("imbalance", 0.0)
+    br = flow.get("buy_ratio", 0.5)
+    tc = flow.get("trade_count", 0)
+    if tc < ST2_MIN_TRADES:
+        return TradeSignal(Signal.HOLD, f"ST2.0: thin tape (tc={tc})", 0.0)
+    if imb >= ST2_IMB_MIN and br >= ST2_BR_MIN:
+        return TradeSignal(Signal.SELL,
+                           f"ST2.0 absorption short (imb={imb:.2f} br={br:.2f} tc={tc})",
+                           0.85)
+    return TradeSignal(Signal.HOLD, f"ST2.0: no absorption (imb={imb:.2f} br={br:.2f})", 0.0)
+
+
 STRATEGIES = {
     "bb_mean_reversion":        bb_mean_reversion_strategy,
     "momentum_continuation":    momentum_continuation_strategy,
@@ -897,4 +927,5 @@ STRATEGIES = {
     "htf_momentum":             htf_momentum_strategy,
     "liq_cascade":              liquidation_cascade_strategy,
     "htf_l2_anticipation":      htf_l2_anticipation,
+    "ST2.0":                    st2_absorption,
 }
