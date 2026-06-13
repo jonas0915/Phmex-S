@@ -1,0 +1,86 @@
+{
+  "BTC": {
+    "symbol": "BTC/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "ETH": {
+    "symbol": "ETH/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "SOL": {
+    "symbol": "SOL/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "BNB": {
+    "symbol": "BNB/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "XRP": {
+    "symbol": "XRP/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "DOGE": {
+    "symbol": "DOGE/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "ADA": {
+    "symbol": "ADA/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "AVAX": {
+    "symbol": "AVAX/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "LINK": {
+    "symbol": "LINK/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "LTC": {
+    "symbol": "LTC/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "TRX": {
+    "symbol": "TRX/USDT:USDT",
+    "bars": 8733,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "DOT": {
+    "symbol": "DOT/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "NEAR": {
+    "symbol": "NEAR/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  },
+  "ATOM": {
+    "symbol": "ATOM/USDT:USDT",
+    "bars": 8759,
+    "start": "2025-06-13 18:00:00",
+    "end": "2026-06-13 16:00:00"
+  }
+}

@@ -75,6 +75,24 @@ recommendation to halt real-money). The ONLY thread not fully killed: passive
 spread-capture on wide-spread alts (INJ/ARB) with a JOINT fill+adverse+directional
 model over more L2 data (needs ~1-2 wks). Expected value of further digging: low.
 
+## 1h VOL-EXPANSION FADE — found then KILLED by independent verification (2026-06-13)
+
+A higher-TF search agent reported a "1h vol-expansion fade" (fade bars with range
+>3×ATR14, hold 12h) at OOS +0.26%/t, Sharpe 3.4, 7/8 months. INDEPENDENT
+re-derivation from scratch (full year, walk-forward) KILLED it: full-sample
+−0.187%/t, Sharpe −2.45, bootstrap CI [−0.333,−0.040] (significantly NEGATIVE);
+honest train→test loses; legs flip sign by regime (noise); walk-forward 1/5 folds
+positive. It was selection bias on one 50/50 split. DO NOT DEPLOY. Lesson: the
+better a backtest headline looks on this single-regime data, the more it needs
+independent re-derivation — every backtest edge this session died under scrutiny.
+
+USEFUL BYPRODUCT: the longer-hold slot architecture is now fully mapped (how to add
+a 12h-hold slot without breaking the scalper's 4h time-exit) — reusable for any
+FORWARD-tested candidate. Plan in agent output / this session.
+
+Funding harvest: RULED OUT (disguised directional bet, single-venue). Phemex has
+NO retail maker rebate (best case maker→0% at $380M vol). Scalping fee-trap confirmed.
+
 ## Recommended next steps (NOT done — pending Jonas)
 1. Do NOT deploy. Marginal, maker-dependent, fill-unproven, possible regime luck.
 2. Re-validate cross-symbol reversion on a fresh OOS window once more flow data accrues (kill/confirm regime-luck).
