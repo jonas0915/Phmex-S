@@ -519,6 +519,180 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
     return f'<div class="ptitle">SLOTS + GUARDRAILS</div><table>{rows}</table>'
 
 
+# ── ST2.0 dedicated panel (book×tape absorption short — maker-fill experiment) ──
+_ST2_FILL_RE = re.compile(r'\[SLOT LIVE\] ST2\.0 ENTRY SHORT')
+_ST2_MISS_RE = re.compile(r'\[SLOT LIVE\] ST2\.0 .*no fill \(PostOnly miss\)')
+
+
+def _st2_fill_stats() -> dict:
+    """Parse logs/bot.log for ST2.0 maker fills vs PostOnly misses.
+
+    Fill  = '[SLOT LIVE] ST2.0 ENTRY SHORT <sym> | Fill: ...'
+    Miss  = '[SLOT LIVE] ST2.0 <sym> short — no fill (PostOnly miss), skipping'
+    Lines are de-duplicated after ANSI-stripping (the same event can appear twice
+    in bot.log — once colorized, once plain), so each event is counted once.
+    Returns {fills, misses, total, rate} where rate is fill % of attempts.
+    """
+    fills = misses = 0
+    seen: set = set()
+    try:
+        with open(LOG_FILE, "r", errors="replace") as f:
+            for raw in f:
+                line = strip_ansi(raw).rstrip("\n")
+                if "ST2.0" not in line:
+                    continue
+                if _ST2_FILL_RE.search(line):
+                    if line not in seen:
+                        seen.add(line)
+                        fills += 1
+                elif _ST2_MISS_RE.search(line):
+                    if line not in seen:
+                        seen.add(line)
+                        misses += 1
+    except FileNotFoundError:
+        pass
+    total = fills + misses
+    rate = (fills / total * 100) if total else 0.0
+    return {"fills": fills, "misses": misses, "total": total, "rate": rate}
+
+
+# ── Per-signal tracking boxes ────────────────────────────────────────────
+# One dedicated box per slot so each signal can be tracked independently.
+# Each slot is defined by (slot_id, display title, status mode).  ST2.0 is the
+# only one carrying the extra maker FILL-RATE headline (special case below).
+#
+# status mode:
+#   "live"  → 5m_scalp (the main confluence bot, always live)
+#   "mode"  → status driven by the _<slot>_mode.json sidecar (paper vs live)
+#             plus the negative-Kelly kill switch (≥50 trades, Kelly<0)
+#   "killed"→ slots that have been hard-killed in paper (5m_liq_cascade,
+#             5m_narrow) — still surfaced via the kill rule, shown KILLED
+#   "st2"   → ST2.0: live unless .demote_ST2.0 flag, plus the maker fill row
+#
+# A .demote_<slot_id> flag file always overrides to DEMOTED (rollback latch).
+_SIGNAL_BOXES = [
+    ("5m_scalp",       "5M_SCALP &mdash; CONFLUENCE (MAIN LIVE)"),
+    ("5m_mean_revert", "5M_MEAN_REVERT"),
+    ("ST2.0",          "ST2.0 &mdash; BOOK&times;TAPE ABSORPTION SHORT"),
+    ("5m_liq_cascade", "5M_LIQ_CASCADE"),
+    ("5m_narrow",      "5M_NARROW"),
+]
+
+
+def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) -> str:
+    """Status badge for one slot box from REAL signals only:
+      DEMOTED  — .demote_<slot_id> rollback flag present (highest priority)
+      LIVE     — slot in _live_slot_ids() (main bot, or promoted mode sidecar)
+      KILLED   — paper slot with ≥50 trades and negative all-trades Kelly
+                 (parity with strategy_slot.is_killed / _build_slots_guardrails)
+      PAPER    — everything else
+    """
+    if os.path.exists(os.path.join(PROJECT_DIR, f".demote_{slot_id}")):
+        return "<span class='neg'>&#9679; DEMOTED</span>"
+    # ST2.0 runs LIVE by default (maker-fill experiment, no mode sidecar) — it
+    # was hardcoded LIVE in the original _build_st2_panel; preserve that here so
+    # it isn't mislabeled PAPER. Any .demote_ST2.0 flag above still wins.
+    if slot_id in live_ids or slot_id == "ST2.0":
+        return "<span class='pos'>&#9679; LIVE</span>"
+    if len(trades) >= 50 and _kelly_wr_rr(trades) < 0:
+        return f"<span class='dim'>&#10013; KILLED @{len(trades)}</span>"
+    return "<span class='amb'>&#9679; PAPER</span>"
+
+
+def _build_signal_card(slot_id: str, title: str, state: dict,
+                       live_ids: set, modes: dict,
+                       fill_stats: dict = None) -> str:
+    """Reusable per-slot tracking box. Renders status, trade count, win rate,
+    net PnL (prefers net_pnl), avg win / avg loss, and the current open position
+    — all from the slot's own state dict (REAL data, read upstream once).
+
+    fill_stats (optional, ST2.0 only): {fills,misses,total,rate} dict from
+    _st2_fill_stats() rendered as a headline MAKER FILL RATE block."""
+    st = state or {}
+    trades = st.get("closed_trades") or []
+    positions = st.get("positions") or {}
+
+    n = len(trades)
+    wins = [_net_pnl(t) for t in trades if _net_pnl(t) > 0]
+    losses = [_net_pnl(t) for t in trades if _net_pnl(t) < 0]
+    wr = len(wins) / n * 100 if n else 0.0
+    net = sum(_net_pnl(t) for t in trades)
+    avg_win = (sum(wins) / len(wins)) if wins else 0.0
+    avg_loss = (sum(losses) / len(losses)) if losses else 0.0
+    net_cls = "pos" if net > 0 else "neg" if net < 0 else "dim"
+
+    status_html = _slot_status_html(slot_id, trades, live_ids, modes)
+
+    # Current open position(s) — side @ entry, else flat.
+    if positions:
+        pos_bits = []
+        for sym, p in positions.items():
+            side = escape(str(p.get("side", "?")))
+            entry = p.get("entry_price", p.get("entry", 0)) or 0
+            short = escape(str(sym).replace("/USDT:USDT", ""))
+            pos_bits.append(f"{short} {side} @ {entry:.6g}" if entry
+                            else f"{short} {side}")
+        open_html = "<span class='amb'>" + " &middot; ".join(pos_bits) + "</span>"
+    else:
+        open_html = "<span class='dim'>flat</span>"
+
+    # ST2.0-only headline: maker FILL RATE block.
+    fill_block = ""
+    if fill_stats is not None:
+        rate_cls = ("pos" if fill_stats["rate"] >= 50
+                    else "amb" if fill_stats["rate"] > 0 else "dim")
+        fill_block = (
+            "<div style='margin:4px 0;text-align:center'>"
+            f"<div class='{rate_cls}' style='font-size:20px;font-weight:bold;line-height:1'>"
+            f"{fill_stats['rate']:.0f}%</div>"
+            "<div class='dim' style='font-size:8px;letter-spacing:1px'>MAKER FILL RATE</div>"
+            f"<div class='dim' style='font-size:9px;margin-top:2px'>"
+            f"<span class='pos'>{fill_stats['fills']} fill</span> &middot; "
+            f"<span class='neg'>{fill_stats['misses']} miss</span> &middot; "
+            f"{fill_stats['total']} attempts</div>"
+            "</div>"
+        )
+
+    stats_rows = (
+        f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
+        f"<tr><td class='dim'>trades</td><td>{n}</td></tr>"
+        f"<tr><td class='dim'>win rate</td><td>{wr:.0f}%</td></tr>"
+        f"<tr><td class='dim'>net PnL</td><td class='{net_cls}'>${net:+.2f}</td></tr>"
+        f"<tr><td class='dim'>avg win</td><td class='pos'>${avg_win:+.2f}</td></tr>"
+        f"<tr><td class='dim'>avg loss</td><td class='neg'>${avg_loss:+.2f}</td></tr>"
+        f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
+    )
+
+    return (
+        f'<div class="ptitle">{title}</div>'
+        f"{fill_block}"
+        f"<table>{stats_rows}</table>"
+    )
+
+
+def _build_signals_section(slot_states: dict = None) -> str:
+    """SIGNALS section: one dedicated tracking box per slot (5m_scalp,
+    5m_mean_revert, ST2.0, 5m_liq_cascade, 5m_narrow).
+
+    Reads slot states once (read_all_slot_states maps 5m_scalp → the main
+    trading_state.json, so it is NOT double-counted against any sidecar — there
+    is no trading_state_5m_scalp.json on disk). ST2.0 has no state file yet, so
+    it renders 0 trades but still shows its maker fill-rate from bot.log.
+    Read-only: no order/state writes, no bot imports."""
+    if slot_states is None:
+        slot_states = read_all_slot_states()
+    live_ids = _live_slot_ids()
+    modes = _slot_modes()
+
+    cards = ""
+    for slot_id, title in _SIGNAL_BOXES:
+        state = slot_states.get(slot_id) or {"closed_trades": [], "positions": {}}
+        fill_stats = _st2_fill_stats() if slot_id == "ST2.0" else None
+        card = _build_signal_card(slot_id, title, state, live_ids, modes, fill_stats)
+        cards += f'<div class="panel sig-box" id="sig-{escape(slot_id)}">{card}</div>'
+    return f'<div id="signals-grid">{cards}</div>'
+
+
 # ── Equity series (JSON for the client-side uPlot chart) ────────────────
 def build_equity_series(era: str = "sentinel") -> dict:
     """Cumulative NET PnL series for /api/equity — rendered client-side by uPlot.
@@ -1209,6 +1383,9 @@ def build_content(lines: list = None, slot_states: dict = None, state: dict = No
     # Panel 5 — GATES + WATCHLIST: 24h gate counts, pair table, L2 readiness
     gates_html = _build_gates_watchlist(lines)
 
+    # Panel 6 — SIGNALS: one dedicated tracking box per slot (incl. ST2.0 maker fill-rate)
+    signals_html = _build_signals_section(slot_states)
+
     return f"""<div id="grid">
     <div class="panel" id="p-positions">
         {positions_html}
@@ -1228,11 +1405,9 @@ def build_content(lines: list = None, slot_states: dict = None, state: dict = No
         <div class="ptitle">GATES 24H + WATCHLIST</div>
         {gates_html}
     </div>
-    <div class="panel" id="p-reserved">
-        <div class="ptitle">RESERVED</div>
-        <div class="dim">equity chart renders below the grid</div>
-    </div>
-</div>"""
+</div>
+<div class="sig-header">SIGNALS &mdash; PER-SLOT TRACKING</div>
+{signals_html}"""
 
 
 def build_html() -> str:
@@ -1267,6 +1442,11 @@ body {{ background:var(--bg); color:var(--txt);
 #grid {{ display:grid; grid-template-columns:repeat(3,1fr); gap:3px; padding:3px; }}
 .panel {{ background:var(--panel); border:1px solid var(--border); padding:6px;
   min-height:120px; overflow-y:auto; max-height:46vh; }}
+.sig-header {{ color:var(--amber); letter-spacing:2px; font-size:10px;
+  text-transform:uppercase; padding:6px 3px 2px; }}
+#signals-grid {{ display:grid; grid-template-columns:repeat(5,1fr); gap:3px;
+  padding:0 3px 3px; }}
+.sig-box {{ min-height:0; max-height:none; }}
 .panel .ptitle {{ color:var(--amber); letter-spacing:1.5px; font-size:9px;
   text-transform:uppercase; border-bottom:1px solid #1a2412;
   padding-bottom:3px; margin-bottom:5px; }}
@@ -1290,11 +1470,15 @@ body {{ background:var(--bg); color:var(--txt);
   padding:3px 6px; font-size:10px; white-space:nowrap; }}
 @media (max-width:700px){{
   #grid {{ grid-template-columns:1fr; }}
+  #signals-grid {{ grid-template-columns:1fr; }}
   .panel {{ max-height:none; }}
   #ticker {{ white-space:normal; font-size:11px; }}
   #p-slots{{order:1}} #p-positions{{order:2}} #p-blotter{{order:3}}
   #p-why{{order:4}} #p-gates{{order:5}}
   #p-blotter tr:nth-child(n+12){{display:none}}
+}}
+@media (max-width:1100px) and (min-width:701px){{
+  #signals-grid {{ grid-template-columns:repeat(2,1fr); }}
 }}
 </style>
 </head>
