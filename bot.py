@@ -547,8 +547,12 @@ class Phmex2Bot:
                             continue
                         self.exchange.cancel_open_orders(sym)
                         logger.info(f"[SENTINEL] Closing {sym} for killed slot {slot_id}")
-                    logger.warning(f"[SENTINEL] Slot '{slot_id}' KILLED")
-                    notifier.send(f"🔪 Slot <b>{slot_id}</b> killed via sentinel")
+                    if _kill_failed:
+                        logger.warning(f"[SENTINEL] Slot '{slot_id}' disabled but a position close FAILED — retrying next cycle")
+                        notifier.send(f"⚠️ Slot <b>{slot_id}</b> kill: position close FAILED — retrying next cycle, verify manually")
+                    else:
+                        logger.warning(f"[SENTINEL] Slot '{slot_id}' KILLED")
+                        notifier.send(f"🔪 Slot <b>{slot_id}</b> killed via sentinel")
                     break
             if _kill_failed:
                 continue
