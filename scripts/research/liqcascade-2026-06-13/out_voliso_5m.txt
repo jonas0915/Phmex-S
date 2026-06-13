@@ -1,0 +1,25 @@
+### TF=5m hold=48 k=3.0  total big-bar reversion trades n=193646
+### volratio distribution: p50=5.47 p75=15.33 p90=47.65
+
+--- ALL big-bar reversion, bucketed by volume ratio ---
+  vol<1.0x (BELOW avg)                       n=28449 mean=-0.0759% WR=47.3% CI[-0.1030,-0.0474] CI<0
+  vol 1.0-1.5x                               n=11002 mean=-0.1080% WR=47.1% CI[-0.1523,-0.0616] CI<0
+  vol 1.5-2.0x                               n= 9772 mean=-0.0991% WR=46.9% CI[-0.1569,-0.0412] CI<0
+  vol 2.0-3.0x                               n=17018 mean=-0.0961% WR=47.3% CI[-0.1322,-0.0579] CI<0
+  vol 3.0-5.0x                               n=25830 mean=-0.0708% WR=49.0% CI[-0.1023,-0.0397] CI<0
+  vol >5x (extreme spike)                    n=101575 mean=-0.0917% WR=48.8% CI[-0.1058,-0.0778] CI<0
+
+--- DOWN-cascade BOUNCE (long) by volume bucket ---
+  long vol<1.5x                              n=20450 mean=-0.0341% WR=47.8% CI[-0.0684,+0.0032] ~0
+  long vol1.5-3x                             n=13911 mean=-0.0105% WR=48.4% CI[-0.0549,+0.0358] ~0
+  long vol>3x                                n=66370 mean=-0.0393% WR=49.7% CI[-0.0559,-0.0230] CI<0
+
+--- UP-cascade FADE (short) by volume bucket ---
+  short vol<1.5x                             n=19001 mean=-0.1394% WR=46.6% CI[-0.1691,-0.1083] CI<0
+  short vol1.5-3x                            n=12879 mean=-0.1908% WR=45.8% CI[-0.2356,-0.1458] CI<0
+  short vol>3x                               n=61035 mean=-0.1398% WR=47.9% CI[-0.1588,-0.1211] CI<0
+
+--- VERDICT NUMBERS: high-vol minus low-vol mean (per leg) ---
+  LONG : high(>3x)=-0.0393%  low(<1.5x)=-0.0341%  delta=-0.0052%
+  SHORT: high(>3x)=-0.1398%  low(<1.5x)=-0.1394%  delta=-0.0004%
+DONE 5m

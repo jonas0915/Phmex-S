@@ -1,0 +1,61 @@
+### TIMEFRAME=5m  symbols(15)=['ADA', 'ATOM', 'AVAX', 'BCH', 'BNB', 'BTC', 'DOGE', 'DOT', 'ETH', 'LINK', 'LTC', 'MATIC', 'SOL', 'UNI', 'XRP']
+### span 2021-01-01 00:00:00 -> 2026-06-13 18:15:00  (572825 bars)
+
+==============================================================================
+PART 1 — DOES VOLUME CONDITIONING BEAT PLAIN BIG-BAR? (full-sample, hold=4h-equiv, no stop)
+  A bigbar only (k=3) ALL            n=196704 mean=-0.0867% WR=48.3% sh=-16.16 CI[-0.0973,-0.0761] CI<0
+     down-cascade BOUNCE(long)       n=102267 mean=-0.0333% WR=49.1% sh=-4.50 CI[-0.0483,-0.0189] CI<0
+     up-cascade FADE(short)          n=94437 mean=-0.1446% WR=47.4% sh=-18.57 CI[-0.1602,-0.1283] CI<0
+  B +volume (k=3,m=2) ALL            n=144422 mean=-0.0885% WR=48.7% sh=-14.30 CI[-0.1011,-0.0764] CI<0
+     down-cascade BOUNCE(long)       n=75195 mean=-0.0351% WR=49.6% sh=-4.23 CI[-0.0515,-0.0195] CI<0
+     up-cascade FADE(short)          n=69227 mean=-0.1464% WR=47.7% sh=-15.84 CI[-0.1646,-0.1282] CI<0
+  B +volume (k=3,m=3) ALL            n=127405 mean=-0.0874% WR=48.8% sh=-13.39 CI[-0.0998,-0.0744] CI<0
+     down-cascade BOUNCE(long)       n=66370 mean=-0.0393% WR=49.7% sh=-4.52 CI[-0.0559,-0.0230] CI<0
+     up-cascade FADE(short)          n=61035 mean=-0.1398% WR=47.9% sh=-14.23 CI[-0.1588,-0.1211] CI<0
+  C +vol+dir (k=3,m=2,d=0.6) ALL     n=100971 mean=-0.0817% WR=49.0% sh=-11.35 CI[-0.0961,-0.0673] CI<0
+     down-cascade BOUNCE(long)       n=53248 mean=-0.0409% WR=49.8% sh=-4.29 CI[-0.0594,-0.0221] CI<0
+     up-cascade FADE(short)          n=47723 mean=-0.1271% WR=48.2% sh=-11.70 CI[-0.1493,-0.1058] CI<0
+  C +vol+dir (k=3,m=3,d=0.6) ALL     n=88394 mean=-0.0804% WR=49.3% sh=-10.52 CI[-0.0953,-0.0658] CI<0
+     down-cascade BOUNCE(long)       n=46668 mean=-0.0434% WR=50.0% sh=-4.30 CI[-0.0643,-0.0237] CI<0
+     up-cascade FADE(short)          n=41726 mean=-0.1217% WR=48.5% sh=-10.47 CI[-0.1450,-0.0986] CI<0
+  C strong (k=4,m=3,d=0.6) ALL       n=54276 mean=-0.0731% WR=49.5% sh=-7.29 CI[-0.0923,-0.0531] CI<0
+     down-cascade BOUNCE(long)       n=28855 mean=-0.0342% WR=50.3% sh=-2.64 CI[-0.0587,-0.0088] CI<0
+     up-cascade FADE(short)          n=25421 mean=-0.1172% WR=48.7% sh=-7.56 CI[-0.1494,-0.0887] CI<0
+
+==============================================================================
+PART 2 — FULL CASCADE C(k=3,m=3,d=0.6): hold x stop sweep (full-sample, per leg)
+  hold=1h  stop=none ALL n=88399 -0.1023% CI[-0.1116,-0.0928] | LONG n=46670 -0.0683% | SHORT n=41729 -0.1403%
+  hold=1h  stop=0.02 ALL n=88399 -0.1067% CI[-0.1142,-0.0993] | LONG n=46670 -0.0904% | SHORT n=41729 -0.1250%
+  hold=1h  stop=0.03 ALL n=88399 -0.1125% CI[-0.1207,-0.1047] | LONG n=46670 -0.0942% | SHORT n=41729 -0.1330%
+  hold=4h  stop=none ALL n=88394 -0.0804% CI[-0.0953,-0.0658] | LONG n=46668 -0.0434% | SHORT n=41726 -0.1217%
+  hold=4h  stop=0.02 ALL n=88394 -0.0804% CI[-0.0918,-0.0693] | LONG n=46668 -0.0700% | SHORT n=41726 -0.0920%
+  hold=4h  stop=0.03 ALL n=88394 -0.0915% CI[-0.1042,-0.0791] | LONG n=46668 -0.0792% | SHORT n=41726 -0.1052%
+  hold=12h stop=none ALL n=88369 -0.0929% CI[-0.1183,-0.0687] | LONG n=46664 -0.0284% | SHORT n=41705 -0.1651%
+  hold=12h stop=0.02 ALL n=88369 -0.0776% CI[-0.0944,-0.0614] | LONG n=46664 -0.0824% | SHORT n=41705 -0.0724%
+  hold=12h stop=0.03 ALL n=88369 -0.0946% CI[-0.1132,-0.0774] | LONG n=46664 -0.0972% | SHORT n=41705 -0.0916%
+  hold=24h stop=none ALL n=88354 -0.1446% CI[-0.1985,-0.0964] | LONG n=46657 +0.0139% | SHORT n=41697 -0.3219%
+  hold=24h stop=0.02 ALL n=88354 -0.0674% CI[-0.0881,-0.0464] | LONG n=46657 -0.0833% | SHORT n=41697 -0.0497%
+  hold=24h stop=0.03 ALL n=88354 -0.0969% CI[-0.1202,-0.0728] | LONG n=46657 -0.1148% | SHORT n=41697 -0.0767%
+
+==============================================================================
+PART 3 — REGIME DECOMP C(k=3,m=3,d=0.6) hold=4h stop=3% (this is what killed vol-fade)
+  BULL ALL n=35926 -0.1058% | LONG n=18475 -0.0117% | SHORT n=17451 -0.2055%
+  CHOP ALL n=25241 -0.0723% | LONG n=13645 -0.0633% | SHORT n=11596 -0.0830%
+  BEAR ALL n=27227 -0.0904% | LONG n=14548 -0.1800% | SHORT n=12679 +0.0125%
+
+==============================================================================
+PART 4 — WALK-FORWARD 5 folds (tune k,m,hold,stop on past; test OOS). full cascade family.
+  fold1: train<2021-11-28 pick k=4.0 m=2.0 h=12 stop=None | OOS [2021-11-28..2022-10-26] n=10051 mean=-0.0679% sh=-4.63
+  fold2: train<2022-10-26 pick k=4.0 m=3.0 h=48 stop=None | OOS [2022-10-26..2023-09-23] n=12402 mean=-0.0845% sh=-5.09
+  fold3: train<2023-09-23 pick k=3.0 m=3.0 h=48 stop=None | OOS [2023-09-23..2024-08-19] n=16586 mean=-0.0942% sh=-5.78
+  fold4: train<2024-08-19 pick k=4.0 m=3.0 h=144 stop=None | OOS [2024-08-19..2025-07-17] n=9254 mean=-0.1890% sh=-5.11
+  fold5: train<2025-07-17 pick k=4.0 m=3.0 h=48 stop=None | OOS [2025-07-17..2026-06-13] n=10112 mean=-0.0383% sh=-1.82
+  WF OOS mean-of-folds=-0.0948%  positive folds: 0/5
+
+==============================================================================
+PART 5 — COST STRESS C(k=3,m=3,d=0.6) hold=4h stop=3% (full-sample)
+  0.066% one-way (taker)    : n=88394 mean=-0.0915% total=-8088.0% CI[-0.1042,-0.0791]
+  0.12% RT + 0.06% slip     : n=88394 mean=-0.1995% total=-17634.5% CI[-0.2122,-0.1871]
+  0.12% RT + 0.10% slip     : n=88394 mean=-0.2795% total=-24706.1% CI[-0.2922,-0.2671]
+
+DONE 5m
