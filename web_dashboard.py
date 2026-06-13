@@ -565,8 +565,8 @@ def _st2_fill_stats() -> dict:
 #   "live"  → 5m_scalp (the main confluence bot, always live)
 #   "mode"  → status driven by the _<slot>_mode.json sidecar (paper vs live)
 #             plus the negative-Kelly kill switch (≥50 trades, Kelly<0)
-#   "killed"→ slots that have been hard-killed in paper (5m_liq_cascade,
-#             5m_narrow) — still surfaced via the kill rule, shown KILLED
+#   "killed"→ generic: any paper slot with >=50 trades and negative Kelly is
+#             shown KILLED by _slot_status_html (no dedicated box anymore)
 #   "st2"   → ST2.0: live unless .demote_ST2.0 flag, plus the maker fill row
 #
 # A .demote_<slot_id> flag file always overrides to DEMOTED (rollback latch).
@@ -574,9 +574,11 @@ _SIGNAL_BOXES = [
     ("5m_scalp",       "5M_SCALP &mdash; CONFLUENCE (MAIN LIVE)"),
     ("5m_mean_revert", "5M_MEAN_REVERT"),
     ("ST2.0",          "ST2.0 &mdash; BOOK&times;TAPE ABSORPTION SHORT"),
-    ("5m_liq_cascade", "5M_LIQ_CASCADE"),
-    ("5m_narrow",      "5M_NARROW"),
 ]
+# 5m_liq_cascade and 5m_narrow boxes removed 2026-06-13 — both hard-KILLED
+# in paper (neg Kelly), no longer tracked. State files kept; they still surface
+# as one-line rows in the SLOTS + GUARDRAILS panel. The generic KILLED status in
+# _slot_status_html stays for any future paper slot.
 
 
 def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) -> str:
@@ -671,8 +673,8 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
 
 
 def _build_signals_section(slot_states: dict = None) -> str:
-    """SIGNALS section: one dedicated tracking box per slot (5m_scalp,
-    5m_mean_revert, ST2.0, 5m_liq_cascade, 5m_narrow).
+    """SIGNALS section: one dedicated tracking box per active slot (5m_scalp,
+    5m_mean_revert, ST2.0).
 
     Reads slot states once (read_all_slot_states maps 5m_scalp → the main
     trading_state.json, so it is NOT double-counted against any sidecar — there
@@ -1444,7 +1446,7 @@ body {{ background:var(--bg); color:var(--txt);
   min-height:120px; overflow-y:auto; max-height:46vh; }}
 .sig-header {{ color:var(--amber); letter-spacing:2px; font-size:10px;
   text-transform:uppercase; padding:6px 3px 2px; }}
-#signals-grid {{ display:grid; grid-template-columns:repeat(5,1fr); gap:3px;
+#signals-grid {{ display:grid; grid-template-columns:repeat(3,1fr); gap:3px;
   padding:0 3px 3px; }}
 .sig-box {{ min-height:0; max-height:none; }}
 .panel .ptitle {{ color:var(--amber); letter-spacing:1.5px; font-size:9px;
