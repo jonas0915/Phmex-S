@@ -223,6 +223,11 @@ class Phmex2Bot:
         self._funding_cache: dict[str, tuple] = {}  # symbol -> (data, fetch_timestamp) for funding rates
         self._divergence_cooldown: dict[str, dict] = {}  # symbol -> {"blocked_at": float, "clean_cycles": int}
         self._ob_depth_cache: dict[str, dict] = {}  # symbol -> depth data, populated by main loop, read by live writer thread
+        # symbol -> (intended_reason, ts): set when a slot maker-exit fills but the
+        # close races to a reduceOnly abort (the order never returns), so the next
+        # [SYNC] reconcile can attribute the real reason (e.g. st2_hold) instead of
+        # the generic exchange_close. Short-lived; consumed by _sync_exchange_closes.
+        self._slot_pending_exit_reason: dict[str, tuple] = {}
 
         # Strategy slots framework — independent trading units (additive, main loop still uses self.risk)
         self.slots = [
@@ -2390,10 +2395,21 @@ class Phmex2Bot:
                         # Live-slot position — no durable-SL ratchet tag (slots have no ratchet).
                         # _set_cooldown_if_loss intentionally omitted: that's the MAIN bot's
                         # per-pair cooldown; slot cooldown semantics live in the slot.
-                        logger.info(f"[SYNC] {symbol} closed on exchange (slot {slot.slot_id} SL/TP triggered) — removing from slot tracker")
+                        # If a slot maker-exit just filled-then-aborted, attribute the real
+                        # reason (e.g. st2_hold) instead of the generic exchange_close.
+                        # TTL 300s comfortably covers the 1-cycle gap (sync runs the
+                        # cycle AFTER the abort; a cycle can stretch to the 180s
+                        # watchdog) while staying far below a slot's 15-min hold, so a
+                        # later unrelated close can't inherit a stale reason.
+                        _pending = self._slot_pending_exit_reason.pop(symbol, None)
+                        slot_reason = (_pending[0] if _pending and time.time() - _pending[1] <= 300
+                                       else "exchange_close")
+                        _trig = "maker exit reconciled" if slot_reason != "exchange_close" else "SL/TP triggered"
+                        logger.info(f"[SYNC] {symbol} closed on exchange (slot {slot.slot_id} {_trig}) "
+                                    f"— removing from slot tracker (reason={slot_reason})")
                         self.exchange.cancel_open_orders(symbol)
-                        notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), f"exchange_close [slot {slot.slot_id}]")
-                        owner_risk.close_position(symbol, exit_price, "exchange_close", fees_usdt=sync_fee, mode="live")
+                        notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), f"{slot_reason} [slot {slot.slot_id}]")
+                        owner_risk.close_position(symbol, exit_price, slot_reason, fees_usdt=sync_fee, mode="live")
                         self._maybe_auto_demote(slot)
         except Exception as e:
             logger.warning(f"[SYNC] (A) close-detection path failed: {e} — continuing to orphan scan")
@@ -2465,6 +2481,19 @@ class Phmex2Bot:
             order = (self.exchange.close_long(symbol, pos.amount, urgent=_urgent) if pos.side == "long"
                      else self.exchange.close_short(symbol, pos.amount, urgent=_urgent))
             if not order:
+                if self.exchange.pop_reduce_only_abort(symbol):
+                    # Phemex 11011/reduceOnly abort: the patient maker exit already
+                    # filled (cancel raced the fill → OM_ORDER_NOT_FOUND → market
+                    # fallback found nothing left to reduce). The position is
+                    # closing, not stuck — the per-cycle [SYNC] reconciles the real
+                    # fill. Mirrors the main live-exit path (bot.py LIVE EXIT) so a
+                    # successful maker exit is no longer mislogged as a failure.
+                    # Stash the intended reason so [SYNC] tags the real fill as
+                    # e.g. st2_hold (maker exit) instead of the generic exchange_close.
+                    self._slot_pending_exit_reason[symbol] = (reason, time.time())
+                    logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} {reason} close aborted "
+                                f"(reduceOnly) — maker exit filled / closing elsewhere, sync reconciles")
+                    return False
                 logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} {reason} close FAILED — retry next cycle")
                 return False
             fill = self._extract_fill_price(order, price, is_exit=True)
