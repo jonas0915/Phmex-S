@@ -34,7 +34,7 @@ DEFAULTS = {
 # ── the ST2.0 config genome the loop evolves ────────────────────────────
 DEFAULT_CHAMPION = {
     "params": {
-        "imb_min": 0.30,      # bid-heavy book threshold
+        "imb_min": 0.35,      # bid-heavy book threshold (mirrors LIVE ST2.0; recursion climbs from here)
         "br_min": 0.60,       # heavy buying-into-it threshold
         "min_trades": 8,      # tape must be real
         "hold_secs": 900,     # ~15 min fixed maker hold

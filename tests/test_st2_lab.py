@@ -314,11 +314,11 @@ def test_measured_fill_stats_missing_log():
 def test_champion_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(C, "LAB_DIR", str(tmp_path))
     monkeypatch.setattr(C, "CHAMPION_FILE", str(tmp_path / "champion.json"))
-    champ = champ_store.load()           # seeds default
-    assert champ["params"]["imb_min"] == 0.30
-    champ["params"]["imb_min"] = 0.35
-    champ_store.append_lineage(champ, "imb_min 0.30 -> 0.35", {"net": 1.0, "trades": 20, "wr": 0.5}, 1)
+    champ = champ_store.load()           # seeds default (mirrors live baseline)
+    assert champ["params"]["imb_min"] == 0.35
+    champ["params"]["imb_min"] = 0.40
+    champ_store.append_lineage(champ, "imb_min 0.35 -> 0.40", {"net": 1.0, "trades": 20, "wr": 0.5}, 1)
     champ_store.save(champ)
     reloaded = champ_store.load()
-    assert reloaded["params"]["imb_min"] == 0.35
-    assert reloaded["lineage"][-1]["change"] == "imb_min 0.30 -> 0.35"
+    assert reloaded["params"]["imb_min"] == 0.40
+    assert reloaded["lineage"][-1]["change"] == "imb_min 0.35 -> 0.40"
