@@ -644,14 +644,38 @@ def check_unrealized_drawdown() -> CheckResult:
             if contracts <= 0:
                 continue
             total_open += 1
-            unrealized = p.get("unrealizedPnl")
+            raw_unrealized = p.get("unrealizedPnl")
             initial_margin = p.get("initialMargin") or p.get("collateral") or 0
             try:
-                unrealized = float(unrealized) if unrealized is not None else None
+                raw_unrealized = float(raw_unrealized) if raw_unrealized is not None else None
                 initial_margin = float(initial_margin) if initial_margin else 0.0
+                entry_f = float(p.get("entryPrice")) if p.get("entryPrice") is not None else None
+                mark_f = float(p.get("markPrice")) if p.get("markPrice") is not None else None
             except (TypeError, ValueError):
                 continue
-            if unrealized is None or initial_margin <= 0:
+            if initial_margin <= 0:
+                continue
+            # Phemex's raw `unrealizedPnl` is unreliable and has caused real-money
+            # FALSE ALARMS (2026-06-13: raw -$27.93 vs real -$0.22; 2026-06-15: raw
+            # -$7.16 vs real -$1.02). Recompute from price truth — linear USDT-perp
+            # uPnL = contracts*(mark-entry) for longs, contracts*(entry-mark) for
+            # shorts — and TRUST that. Fall back to raw only when entry/mark missing.
+            pos_side = (p.get("side") or "").lower()
+            recomputed = None
+            if entry_f is not None and mark_f is not None and entry_f > 0:
+                recomputed = (contracts * (mark_f - entry_f) if pos_side == "long"
+                              else contracts * (entry_f - mark_f))
+            if recomputed is not None:
+                if (raw_unrealized is not None
+                        and abs(raw_unrealized) > 3 * max(abs(recomputed), 0.01)):
+                    logger.warning(
+                        f"{p.get('symbol','?')} raw uPnL ${raw_unrealized:.2f} distrusted "
+                        f"(>3x off) — using recomputed ${recomputed:.2f} from contracts*(mark-entry)"
+                    )
+                unrealized = recomputed
+            elif raw_unrealized is not None:
+                unrealized = raw_unrealized
+            else:
                 continue
             roi_on_margin = unrealized / initial_margin
             symbol = p.get("symbol", "?")

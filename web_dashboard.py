@@ -602,10 +602,13 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
     """
     if os.path.exists(os.path.join(PROJECT_DIR, f".demote_{slot_id}")):
         return "<span class='neg'>&#9679; DEMOTED</span>"
-    # ST2.0 runs LIVE by default (maker-fill experiment, no mode sidecar) — it
-    # was hardcoded LIVE in the original _build_st2_panel; preserve that here so
-    # it isn't mislabeled PAPER. Any .demote_ST2.0 flag above still wins.
-    if slot_id in live_ids or slot_id == "ST2.0":
+    # Status is driven by the mode sidecar (trading_state_<slot>_mode.json) via
+    # _live_slot_ids(): LIVE only while the sidecar has paper_mode=False. ST2.0
+    # follows the same rule — it was previously hardcoded LIVE here, which
+    # mislabeled it after the negative-Kelly auto-demote flipped it to paper (the
+    # demote writes the sidecar, not a .demote flag). Fixed 2026-06-15. Any
+    # .demote_<slot> rollback flag above still wins.
+    if slot_id in live_ids:
         return "<span class='pos'>&#9679; LIVE</span>"
     if len(trades) >= 50 and _kelly_wr_rr(trades) < 0:
         return f"<span class='dim'>&#10013; KILLED @{len(trades)}</span>"
@@ -668,15 +671,43 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             "</div>"
         )
 
-    stats_rows = (
-        f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
-        f"<tr><td class='dim'>trades</td><td>{n}</td></tr>"
-        f"<tr><td class='dim'>win rate</td><td>{wr:.0f}%</td></tr>"
-        f"<tr><td class='dim'>net PnL</td><td class='{net_cls}'>${net:+.2f}</td></tr>"
-        f"<tr><td class='dim'>avg win</td><td class='pos'>${avg_win:+.2f}</td></tr>"
-        f"<tr><td class='dim'>avg loss</td><td class='neg'>${avg_loss:+.2f}</td></tr>"
-        f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
-    )
+    # Actual wins/losses counts (real records, not just a win-rate %).
+    w_all, l_all = len(wins), len(losses)
+    n_live = sum(1 for t in trades if t.get("mode") == "live")
+    if 0 < n_live < n:
+        # Slot has BOTH real (live) and simulated (paper) history — e.g. a slot
+        # that traded live then auto-demoted to paper. Never conflate real money
+        # with sim: split the actual W/L record and PnL by mode (2026-06-15).
+        def _wl(ts):
+            w = sum(1 for t in ts if _net_pnl(t) > 0)
+            l = sum(1 for t in ts if _net_pnl(t) < 0)
+            return w, l, sum(_net_pnl(t) for t in ts)
+        lw, ll, lnet = _wl([t for t in trades if t.get("mode") == "live"])
+        pw, pl, pnet = _wl([t for t in trades if t.get("mode") != "live"])
+        lcls = "pos" if lnet > 0 else "neg" if lnet < 0 else "dim"
+        pcls = "pos" if pnet > 0 else "neg" if pnet < 0 else "dim"
+        stats_rows = (
+            f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
+            f"<tr><td class='dim'>trades</td><td>{n}</td></tr>"
+            f"<tr><td class='dim'>live (real)</td><td>"
+            f"<span class='pos'>{lw}W</span> / <span class='neg'>{ll}L</span> "
+            f"&middot; <span class='{lcls}'>${lnet:+.2f}</span></td></tr>"
+            f"<tr><td class='dim'>paper (sim)</td><td>"
+            f"{pw}W / {pl}L &middot; <span class='{pcls}'>${pnet:+.2f}</span></td></tr>"
+            f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
+        )
+    else:
+        stats_rows = (
+            f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
+            f"<tr><td class='dim'>trades</td><td>{n}</td></tr>"
+            f"<tr><td class='dim'>record</td><td>"
+            f"<span class='pos'>{w_all}W</span> / <span class='neg'>{l_all}L</span> "
+            f"&middot; {wr:.0f}%</td></tr>"
+            f"<tr><td class='dim'>net PnL</td><td class='{net_cls}'>${net:+.2f}</td></tr>"
+            f"<tr><td class='dim'>avg win</td><td class='pos'>${avg_win:+.2f}</td></tr>"
+            f"<tr><td class='dim'>avg loss</td><td class='neg'>${avg_loss:+.2f}</td></tr>"
+            f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
+        )
 
     desc_html = f'<div class="sig-desc">{desc}</div>' if desc else ""
     return (
