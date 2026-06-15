@@ -32,6 +32,9 @@ class StrategySlot:
     capital_pct: float = 0.5  # fraction of total balance allocated to this slot
     enabled: bool = True
     paper_mode: bool = False  # if True, track signals but don't place real orders
+    trade_amount_usdt: float = None  # per-slot margin override; None = Config.TRADE_AMOUNT_USDT
+    loss_cap_usdt: float = LIVE_LOSS_CAP_USDT  # per-slot auto-demote loss cap
+    kelly_min_trades: int = LIVE_KELLY_MIN_TRADES  # per-slot: live trades before neg-Kelly demote arms
 
     def __post_init__(self):
         # Each slot gets its own RiskManager (separate positions, P&L, Kelly)
@@ -103,7 +106,10 @@ class StrategySlot:
             with open(tmp, "w") as f:
                 json.dump({"paper_mode": self.paper_mode,
                            "capital_pct": self.capital_pct,
-                           "promoted_at": self.promoted_at}, f)
+                           "promoted_at": self.promoted_at,
+                           "loss_cap_usdt": self.loss_cap_usdt,
+                           "trade_amount_usdt": self.trade_amount_usdt,
+                           "kelly_min_trades": self.kelly_min_trades}, f)
             os.replace(tmp, self._mode_sidecar)
         except Exception as e:
             logger.warning(f"[SLOT] {self.slot_id} mode sidecar save failed: {e}")
@@ -132,9 +138,9 @@ class StrategySlot:
         """(demote: bool, reason: str). Checked after every live close."""
         trades = self.live_trades()
         pnl = sum(_trade_net(t) for t in trades)
-        if pnl <= LIVE_LOSS_CAP_USDT:
-            return True, f"live loss cap: ${pnl:.2f} <= ${LIVE_LOSS_CAP_USDT:.2f}"
-        if len(trades) >= LIVE_KELLY_MIN_TRADES:
+        if pnl <= self.loss_cap_usdt:
+            return True, f"live loss cap: ${pnl:.2f} <= ${self.loss_cap_usdt:.2f}"
+        if len(trades) >= self.kelly_min_trades:
             wins = [_trade_net(t) for t in trades if _trade_net(t) > 0]
             losses = [abs(_trade_net(t)) for t in trades if _trade_net(t) < 0]
             if losses and wins:

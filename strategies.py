@@ -898,7 +898,7 @@ def liquidation_cascade_strategy(df, ob, htf_df=None):
 # which is why it was never traded — ST2.0 deliberately bypasses those gates.
 # Backtest: +6.3 bps gross/trade, maker-only (+4.3 bps net maker, −5.7 taker).
 # Live slot's job is to measure REAL maker fills, which backtests can only assume.
-ST2_IMB_MIN = 0.30        # bid-heavy book threshold
+ST2_IMB_MIN = 0.35        # bid-heavy book threshold (0.30->0.35: OOS-positive in st2_lab 2026-06-15)
 ST2_BR_MIN = 0.60         # heavy buying-into-it threshold
 ST2_MIN_TRADES = 8        # loosened 15->8 (2026-06-13) to fire more often; buy_ratio
                           # on 8+ trades is still meaningful, below ~5 it's noise

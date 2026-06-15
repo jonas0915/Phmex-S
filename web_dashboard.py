@@ -496,15 +496,18 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
                 # Promoted slot — render the auto-demote guardrail state.
                 live_trades = [t for t in trades if t.get("mode") == "live"]
                 live_net = sum(_net_pnl(t) for t in live_trades)
-                hdrm = 5.0 + live_net
-                width = min(100.0, max(0.0, hdrm / 5.0 * 100))
+                # per-slot loss cap from the mode sidecar (default -$5); ST2.0 runs -$10
+                cap = abs(float(mode.get("loss_cap_usdt") or -5.0))
+                kmt = int(mode.get("kelly_min_trades") or 10)
+                hdrm = cap + live_net
+                width = min(100.0, max(0.0, hdrm / cap * 100)) if cap else 0.0
                 rows += (
                     "<tr><td colspan='3'>"
                     "<div class='dim' style='margin:3px 0 2px'>demote headroom</div>"
                     "<div style='height:7px;background:var(--bg);border:1px solid var(--border)'>"
                     f"<div style='width:{width:.0f}%;height:100%;"
                     "background:linear-gradient(90deg,#4af626,#f0a500)'></div></div>"
-                    f"<div class='dim'>${hdrm:.2f} of $5.00 &middot; neg-Kelly @10 live trades "
+                    f"<div class='dim'>${hdrm:.2f} of ${cap:.2f} &middot; neg-Kelly @{kmt} live trades "
                     f"({len(live_trades)} so far)</div>"
                     "</td></tr>")
         elif n >= 50 and _kelly_wr_rr(trades) < 0:

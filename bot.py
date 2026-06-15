@@ -269,19 +269,22 @@ class Phmex2Bot:
                 capital_pct=0.0,
                 paper_mode=True,
             ),
-            # ST2.0 — book×tape absorption short (2026-06-13). LIVE from the start:
-            # its whole purpose is to measure REAL maker fills, which paper can't.
-            # Deliberately bypasses the OB+tape gates (which forbid its setup) and
-            # holds ~15 min. Rails: max 1 position, $10 margin, auto-demote at
-            # −$5 net / negative live Kelly @10 trades (strategy_slot.py). Rollback:
-            # `touch .demote_ST2.0` or flip paper_mode.
+            # ST2.0 — book×tape absorption short. BOUNDED LIVE EXPERIMENT (2026-06-15):
+            # measure REAL maker fills + feed real outcomes to scripts/st2_lab. Negative
+            # out-of-sample as-is, so deliberately capped. Rails: max 2 positions, $5
+            # margin/trade, auto-demote at -$10 total (budget) OR negative live Kelly @10
+            # trades (strategy_slot.py). Runs the OOS-positive imb_min=0.35 (strategies.py).
+            # Bypasses OB+tape gates by design; ~15 min hold. Rollback: `touch .demote_ST2.0`.
             StrategySlot(
                 slot_id="ST2.0",
                 strategy_name="ST2.0",
                 timeframe="5m",
-                max_positions=1,
+                max_positions=2,
                 capital_pct=0.0,
                 paper_mode=False,
+                trade_amount_usdt=5.0,   # bounded live experiment: $5 margin/trade
+                loss_cap_usdt=-10.0,     # hard budget: auto-demote at -$10 total net
+                kelly_min_trades=40,     # let the -$10 budget govern; neg-Kelly arms at 40 (not 10)
             ),
         ]
 
@@ -1767,7 +1770,8 @@ class Phmex2Bot:
                         except Exception as _ne:
                             logger.debug(f"[PAPER] [NARROW FILTER] {symbol} filter error (skipping signal): {_ne}")
                             continue
-                    margin = Config.TRADE_AMOUNT_USDT
+                    margin = (slot.trade_amount_usdt if slot.trade_amount_usdt is not None
+                              else Config.TRADE_AMOUNT_USDT)
                     atr_val = df.iloc[-2].get("atr", 0) if len(df) > 1 else 0
 
                     # Apply OB + Tape gates to slots. ST2.0 BYPASSES these — its
@@ -1900,7 +1904,9 @@ class Phmex2Bot:
                             live_pos = slot.risk.positions[symbol]
                             fill_amount = self._extract_fill_amount(order, live_pos.amount)
                             actual_margin = (fill_amount * fill_price) / Config.LEVERAGE
-                            _min_margin = float(os.getenv("MIN_TRADE_MARGIN", "10.0")) * 0.5
+                            _slot_amt = (slot.trade_amount_usdt if slot.trade_amount_usdt is not None
+                                         else float(os.getenv("MIN_TRADE_MARGIN", "10.0")))
+                            _min_margin = _slot_amt * 0.5
                             if actual_margin < _min_margin:
                                 logger.warning(f"[SLOT LIVE] {slot.slot_id} {symbol} partial fill ${actual_margin:.4f} < ${_min_margin:.2f} — closing crumb")
                                 self.exchange.cancel_open_orders(symbol)
