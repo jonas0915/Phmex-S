@@ -12,6 +12,7 @@ Test: python -m scripts.st2_lab.loop --iterations 3 --limit 40000 --dry-run
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import logging
@@ -21,8 +22,9 @@ from . import config as C
 from . import champion as champ_store
 from . import dataset as ds
 from . import fills as fills_mod
-from .proposer import propose
-from .evaluator import evaluate
+from . import diagnostics
+from .proposer import propose, _filter_entry
+from .evaluator import evaluate, evaluate_with_trades
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,12 +82,27 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
     fr = fstats["rate"]
     logger.info("FILL TRUTH | %s", fills_mod.format_report(fstats).replace("\n", " | "))
 
-    champ_m = evaluate(champ, by_symbol, loop_cfg)
+    champ_m, champ_trades = evaluate_with_trades(champ, by_symbol, loop_cfg)
     logger.info("champion: exp=%+.4f/trade  net(UB)=%+.2f  fillAdj~%+.2f  trades=%d wr=%.0f%% kelly=%.2f rankable=%s",
                 champ_m.expectancy, champ_m.net, champ_m.fill_adjusted_net(fr),
                 champ_m.trades, champ_m.wr * 100, champ_m.kelly, champ_m.rankable)
 
-    cands = propose(champ, loop_cfg["candidates_per_iter"], iteration)
+    # SIGNAL diagnostics: learn where the absorption signal loses (all symbols) and
+    # propose targeted entry-filters for those loss clusters.
+    existing = {f.get("code") for f in champ.get("filters", []) if isinstance(f, dict)}
+    diag = diagnostics.propose_filter_codes(champ_trades, existing, loop_cfg.get("diag_filters", 4))
+    diag_cands = []
+    for d in diag:
+        c = copy.deepcopy(champ)
+        c.pop("_change", None)
+        c["_change"] = f"+diag-filter: {d['code']} (loss cluster exp {d['vetoed_exp']:+.3f}, n={d['vetoed_n']})"
+        c["filters"] = list(champ.get("filters", [])) + [_filter_entry(d["code"])]
+        diag_cands.append(c)
+    if diag:
+        logger.info("DIAGNOSTICS | %d loss-cluster filter(s): %s", len(diag),
+                    "; ".join(f"{d['code']} (Δexp {d['improvement']:+.3f})" for d in diag))
+
+    cands = propose(champ, loop_cfg["candidates_per_iter"], iteration) + diag_cands
     scored = []
     for c in cands:
         m = evaluate(c, by_symbol, loop_cfg)

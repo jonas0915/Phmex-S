@@ -13,6 +13,8 @@ from st2_lab.evaluator import evaluate     # noqa: E402
 from st2_lab.proposer import propose, FILTER_LIBRARY  # noqa: E402
 from st2_lab import champion as champ_store  # noqa: E402
 from st2_lab import fills as fills_mod        # noqa: E402
+from st2_lab import diagnostics               # noqa: E402
+from st2_lab.evaluator import evaluate_with_trades  # noqa: E402
 
 
 # ── safe_exec ────────────────────────────────────────────────────────────
@@ -93,6 +95,20 @@ def test_evaluator_no_entry_when_gates_fail():
     assert m.trades == 0
 
 
+def test_evaluator_symbol_restriction():
+    # two symbols both with valid entries; restricting to ETH counts ETH only
+    eth = [dict(_rec(0, 100.0), symbol="ETH/USDT:USDT"),
+           dict(_rec(100, 97.0), symbol="ETH/USDT:USDT")]
+    btc = [dict(_rec(0, 100.0), symbol="BTC/USDT:USDT"),
+           dict(_rec(100, 97.0), symbol="BTC/USDT:USDT")]
+    data = {"ETH/USDT:USDT": eth, "BTC/USDT:USDT": btc}
+    allm = evaluate({"params": dict(C.DEFAULT_CHAMPION["params"]), "symbols": None},
+                    data, {"min_trades_eval": 1})
+    ethm = evaluate({"params": dict(C.DEFAULT_CHAMPION["params"]),
+                     "symbols": ["ETH/USDT:USDT"]}, data, {"min_trades_eval": 1})
+    assert allm.trades == 2 and ethm.trades == 1
+
+
 def test_evaluator_filter_vetoes_entry():
     cfg = {"params": dict(C.DEFAULT_CHAMPION["params"]),
            "filters": [{"id": "t", "code": "not divergence_bullish", "hash": "t"}]}
@@ -126,6 +142,54 @@ def test_proposer_rotation_differs_by_iteration():
 def test_filter_library_all_compile():
     for code in FILTER_LIBRARY:
         compile_filter(code)
+
+
+# ── failure diagnostics ────────────────────────────────────────────────────
+def _trade(net, **feat):
+    base = {"imbalance": 0.4, "buy_ratio": 0.7, "trade_count": 20, "cvd_slope": 0.0,
+            "large_trade_bias": 0.0, "spread_pct": 0.01, "divergence_bullish": False,
+            "divergence_bearish": False, "hour": 12}
+    base.update(feat)
+    base["net"] = net
+    return base
+
+
+def test_diagnostics_finds_losing_cluster():
+    # winners have low cvd_slope, losers have high cvd_slope -> propose cvd_slope <= cut
+    trades = ([_trade(+1.0, cvd_slope=0.2) for _ in range(30)] +
+              [_trade(-1.0, cvd_slope=0.9) for _ in range(15)])
+    cands = diagnostics.analyze_failures(trades)
+    assert cands, "should find a loss cluster"
+    top = cands[0]
+    assert top["feature"] == "cvd_slope"
+    assert top["code"].startswith("cvd_slope <=")
+    assert top["improvement"] > 0
+    compile_filter(top["code"])  # must be safe
+
+
+def test_diagnostics_finds_bool_cluster():
+    trades = ([_trade(+1.0, divergence_bullish=False) for _ in range(30)] +
+              [_trade(-1.0, divergence_bullish=True) for _ in range(15)])
+    codes = [c["code"] for c in diagnostics.analyze_failures(trades)]
+    assert "not divergence_bullish" in codes
+
+
+def test_diagnostics_too_few_trades_returns_empty():
+    assert diagnostics.analyze_failures([_trade(1.0) for _ in range(5)]) == []
+
+
+def test_diagnostics_no_cluster_when_uniform():
+    # net unrelated to features -> nothing worth vetoing
+    trades = [_trade((-1.0 if i % 2 else 1.0)) for i in range(60)]
+    # all features identical, so no split separates winners/losers
+    assert diagnostics.analyze_failures(trades) == []
+
+
+def test_evaluate_with_trades_returns_records():
+    data = {"X/USDT:USDT": [_rec(0, 100.0), _rec(100, 97.0)]}
+    m, trades = evaluate_with_trades(C.DEFAULT_CHAMPION, data, {"min_trades_eval": 1})
+    assert m.trades == 1 and len(trades) == 1
+    assert "cvd_slope" in trades[0] and "net" in trades[0]
 
 
 # ── champion store ────────────────────────────────────────────────────────

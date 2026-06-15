@@ -37,35 +37,37 @@ def _entry_ok(rec: dict, p: dict, filters) -> bool:
     return True
 
 
-def evaluate(cfg: dict, by_symbol: dict[str, list], loop_cfg: dict = None) -> C.Metrics:
-    """Replay cfg over the dataset and return relative-ranking Metrics."""
-    loop_cfg = loop_cfg or C.DEFAULTS
-    p = cfg["params"]
-    try:
-        filters = _build_filters(cfg)
-    except Rejection:
-        return C.Metrics()  # invalid config -> unrankable, score -inf
+# entry-context features recorded per trade (for failure diagnostics)
+_FEATURES = ("imbalance", "buy_ratio", "trade_count", "cvd_slope",
+             "large_trade_bias", "spread_pct", "divergence_bullish",
+             "divergence_bearish", "hour")
 
+
+def _replay(cfg: dict, by_symbol: dict[str, list]) -> list[dict]:
+    """Replay cfg and return per-trade records: {<entry features>, net}.
+    Raises Rejection if a filter is unsafe."""
+    p = cfg["params"]
+    filters = _build_filters(cfg)
     sl_frac = p["sl_pct"] / 100.0
     tp_frac = p["tp_pct"] / 100.0
     notional = C.MARGIN_USDT * C.LEVERAGE
     fee = C.FEE_RT_PCT / 100.0 * notional
 
-    nets: list[float] = []
-    for sym, recs in by_symbol.items():
-        pos = None  # {entry_ts, entry, sl, tp}
+    syms = cfg.get("symbols")
+    items = (by_symbol.items() if not syms
+             else [(s, by_symbol[s]) for s in syms if s in by_symbol])
+
+    trades: list[dict] = []
+    for sym, recs in items:
+        pos = None
         for rec in recs:
             price = rec["price"]
             if pos is None:
                 if _entry_ok(rec, p, filters):
-                    pos = {
-                        "entry_ts": rec["ts"],
-                        "entry": price,
-                        "sl": price * (1 + sl_frac),   # short: stop above entry
-                        "tp": price * (1 - tp_frac),   # short: target below entry
-                    }
+                    pos = {"entry_ts": rec["ts"], "entry": price,
+                           "sl": price * (1 + sl_frac), "tp": price * (1 - tp_frac),
+                           "feat": {k: rec.get(k, 0) for k in _FEATURES}}
                 continue
-            # in a short position: decide exit (SL > TP priority; then time)
             exit_price = None
             if price >= pos["sl"]:
                 exit_price = pos["sl"]
@@ -74,16 +76,33 @@ def evaluate(cfg: dict, by_symbol: dict[str, list], loop_cfg: dict = None) -> C.
             elif rec["ts"] - pos["entry_ts"] >= p["hold_secs"]:
                 exit_price = price
             if exit_price is not None:
-                move = (pos["entry"] - exit_price) / pos["entry"]  # short
-                nets.append(move * notional - fee)
+                move = (pos["entry"] - exit_price) / pos["entry"]
+                trades.append({**pos["feat"], "net": move * notional - fee})
                 pos = None
-        # close any dangling position at the last seen price
         if pos is not None and recs:
-            last = recs[-1]["price"]
-            move = (pos["entry"] - last) / pos["entry"]
-            nets.append(move * notional - fee)
+            move = (pos["entry"] - recs[-1]["price"]) / pos["entry"]
+            trades.append({**pos["feat"], "net": move * notional - fee})
+    return trades
 
-    return _metrics(nets, loop_cfg)
+
+def evaluate(cfg: dict, by_symbol: dict[str, list], loop_cfg: dict = None) -> C.Metrics:
+    """Replay cfg over the dataset and return relative-ranking Metrics."""
+    loop_cfg = loop_cfg or C.DEFAULTS
+    try:
+        trades = _replay(cfg, by_symbol)
+    except Rejection:
+        return C.Metrics()  # invalid config -> unrankable, score -inf
+    return _metrics([t["net"] for t in trades], loop_cfg)
+
+
+def evaluate_with_trades(cfg: dict, by_symbol: dict[str, list], loop_cfg: dict = None):
+    """Like evaluate() but also returns the per-trade records (for diagnostics)."""
+    loop_cfg = loop_cfg or C.DEFAULTS
+    try:
+        trades = _replay(cfg, by_symbol)
+    except Rejection:
+        return C.Metrics(), []
+    return _metrics([t["net"] for t in trades], loop_cfg), trades
 
 
 def _metrics(nets: list[float], loop_cfg: dict) -> C.Metrics:

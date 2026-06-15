@@ -23,7 +23,8 @@ FEE_RT_PCT = 0.04
 
 # ── loop tuning (override in champion.json["loop"]) ─────────────────────
 DEFAULTS = {
-    "candidates_per_iter": 6,   # K mutations proposed each iteration
+    "candidates_per_iter": 6,   # K param/curated mutations proposed each iteration
+    "diag_filters": 4,          # max diagnostic (loss-cluster) filters proposed per iter
     "improve_margin": 0.10,     # winner must beat champion score by this fraction
     "min_trades_eval": 15,      # a config needs >= this many sim trades to be rankable
     "confirm_sample": 30,       # paper-confirm trades before a live proposal
@@ -40,6 +41,7 @@ DEFAULT_CHAMPION = {
         "tp_pct": 1.6,        # take-profit (short: below entry)
     },
     "filters": [],            # list of {id, code, hash} pure entry-veto fns (Phase 2)
+    "symbols": None,          # None = all symbols; or a list e.g. ["ETH/USDT:USDT"]
     "metrics": {},            # last sandbox metrics
     "lineage": [],            # [{iter, parent, change, score}]
     "loop": dict(DEFAULTS),
