@@ -1620,6 +1620,46 @@ async function drill(tr, id, sym){{
 
 // ── Equity chart (uPlot, vendored at /static/, refreshed every 30s) ──
 let plot=null, era='sentinel', eqMeta=[];
+// Zoom state, preserved across the 30s rebuild so a zoomed view doesn't reset.
+let eqZoomed=false, eqXMin=null, eqXMax=null;
+// uPlot plugin: wheel-zoom at cursor, shift+wheel pan, dbl-click reset.
+// (Drag-select zoom is uPlot-native via cursor.drag below.)
+function wheelZoomPlugin(){{
+  const factor=0.9;
+  return {{ hooks:{{
+    ready:(u)=>{{
+      const over=u.over;
+      over.addEventListener('wheel', (e)=>{{
+        e.preventDefault();
+        const xMin=u.scales.x.min, xMax=u.scales.x.max, xRange=xMax-xMin;
+        if(!isFinite(xRange)||xRange<=0) return;
+        if(e.shiftKey){{
+          const dval=(e.deltaY<0?-1:1)*xRange*0.12;
+          eqZoomed=true; eqXMin=xMin+dval; eqXMax=xMax+dval;
+          u.setScale('x', {{min:eqXMin, max:eqXMax}}); return;
+        }}
+        const cLeft=u.cursor.left;
+        if(cLeft==null||cLeft<0) return;
+        const xVal=u.posToVal(cLeft,'x');
+        const nf=e.deltaY<0?factor:1/factor;
+        const newRange=xRange*nf, leftPct=(xVal-xMin)/xRange;
+        eqZoomed=true; eqXMin=xVal-leftPct*newRange; eqXMax=eqXMin+newRange;
+        u.setScale('x', {{min:eqXMin, max:eqXMax}});
+      }}, {{passive:false}});
+      over.addEventListener('dblclick', ()=>{{
+        eqZoomed=false; eqXMin=null; eqXMax=null;
+        const xs=u.data[0];
+        if(xs&&xs.length){{ u.setScale('x', {{min:xs[0], max:xs[xs.length-1]}}); }}
+      }});
+    }},
+    setSelect:(u)=>{{
+      if(u.select.width>0){{
+        eqZoomed=true;
+        setTimeout(()=>{{ eqXMin=u.scales.x.min; eqXMax=u.scales.x.max; }},0);
+      }}
+    }},
+  }} }};
+}}
 async function loadEquity(){{
   const title=document.getElementById('eq-title');
   try{{
@@ -1633,10 +1673,13 @@ async function loadEquity(){{
         points:{{show:true, size:5,
           fill:(u,si,i)=> eqMeta[i] && eqMeta[i].win ? '#4af626' : '#ff5555'}}}}],
       axes:[{{stroke:'#5a6b5a',grid:{{stroke:'#1a2412'}}}},{{stroke:'#5a6b5a',grid:{{stroke:'#1a2412'}}}}],
-      cursor:{{}}, legend:{{show:false}}}};
+      cursor:{{drag:{{x:true,y:false}}}}, legend:{{show:false}},
+      plugins:[wheelZoomPlugin()]}};
     if(plot){{ plot.destroy(); plot=null; }}
     node.innerHTML='';
     plot=new uPlot(opts,[d.t,d.v],node);
+    // Preserve a user's zoom window across the 30s rebuild.
+    if(eqZoomed && eqXMin!=null){{ plot.setScale('x', {{min:eqXMin, max:eqXMax}}); }}
     // tooltip: absolutely-positioned div fed from meta at the cursor's idx
     const tip=document.createElement('div'); tip.id='eqtip'; node.appendChild(tip);
     plot.over.addEventListener('mousemove', ()=>{{
