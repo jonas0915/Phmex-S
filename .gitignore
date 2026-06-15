@@ -14,3 +14,9 @@ l2_snapshot.json
 .vscode/
 .superpowers/
 *.pid
+
+# ST2.0 lab runtime artifacts (state/logs/generated proposals)
+scripts/st2_lab/champion.json
+scripts/st2_lab/.halt
+logs/st2_lab*.log
+docs/fix-proposals/st2-lab-*.md
