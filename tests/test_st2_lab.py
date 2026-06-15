@@ -16,6 +16,8 @@ from st2_lab import fills as fills_mod        # noqa: E402
 from st2_lab import diagnostics               # noqa: E402
 from st2_lab.evaluator import evaluate_with_trades  # noqa: E402
 from st2_lab import dataset as ds               # noqa: E402
+from st2_lab import real_trades                  # noqa: E402
+import json as _json                             # noqa: E402
 
 
 # ── safe_exec ────────────────────────────────────────────────────────────
@@ -210,6 +212,58 @@ def test_chronological_split_no_lookahead():
 def test_chronological_split_empty():
     train, test = ds.chronological_split({}, 0.7)
     assert train == {} and test == {}
+
+
+# ── real-trade ingestion ───────────────────────────────────────────────────
+def _live_trade(net, **flow):
+    f = {"buy_ratio": 0.7, "cvd_slope": -0.5, "divergence": "bearish",
+         "large_trade_bias": -0.1, "trade_count": 100}
+    f.update(flow)
+    return {"mode": "live", "net_pnl": net, "pnl_usdt": net,
+            "entry_snapshot": {"ob": {"imbalance": 0.4, "spread_pct": 0.01},
+                               "flow": f, "ts": 1781551344}}
+
+
+def test_load_real_trades_filters_live_and_shape(tmp_path):
+    state = tmp_path / "trading_state_ST2.0.json"
+    paper = dict(_live_trade(1.0)); paper["mode"] = "paper"
+    no_snap = {"mode": "live", "net_pnl": 0.5}  # no entry_snapshot -> skipped
+    state.write_text(_json.dumps({"closed_trades": [_live_trade(1.0), paper, no_snap,
+                                                    _live_trade(-0.6)]}))
+    recs = real_trades.load_real_trades(str(state))
+    assert len(recs) == 2  # only the 2 live trades WITH entry_snapshot
+    r = recs[0]
+    assert r["imbalance"] == 0.4 and r["buy_ratio"] == 0.7
+    assert r["divergence_bearish"] is True and r["divergence_bullish"] is False
+    assert r["net"] == 1.0
+
+
+def test_real_summary():
+    recs = [{"net": 1.0}, {"net": -0.6}, {"net": 0.4}]
+    s = real_trades.real_summary(recs)
+    assert s["trades"] == 3 and s["wins"] == 2 and s["losses"] == 1
+    assert s["net"] == pytest.approx(0.8, abs=1e-4)
+    assert s["expectancy"] == pytest.approx(0.8 / 3, abs=1e-3)  # code rounds to 4dp
+
+
+def test_load_real_trades_missing_file():
+    assert real_trades.load_real_trades("/nonexistent/x.json") == []
+
+
+def test_real_records_feed_diagnostics():
+    # real records are the same shape diagnostics consume
+    recs = ([_rec_to_diag(+1.0, cvd_slope=-0.8) for _ in range(30)] +
+            [_rec_to_diag(-1.0, cvd_slope=0.8) for _ in range(15)])
+    cands = diagnostics.analyze_failures(recs)
+    assert cands and cands[0]["feature"] == "cvd_slope"
+
+
+def _rec_to_diag(net, **f):
+    base = {"imbalance": 0.4, "buy_ratio": 0.7, "trade_count": 100, "cvd_slope": 0.0,
+            "large_trade_bias": 0.0, "spread_pct": 0.01, "divergence_bullish": False,
+            "divergence_bearish": False, "hour": 12, "net": net}
+    base.update(f)
+    return base
 
 
 # ── champion store ────────────────────────────────────────────────────────

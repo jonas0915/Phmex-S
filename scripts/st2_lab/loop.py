@@ -23,6 +23,7 @@ from . import champion as champ_store
 from . import dataset as ds
 from . import fills as fills_mod
 from . import diagnostics
+from . import real_trades
 from .proposer import propose, _filter_entry
 from .evaluator import evaluate, evaluate_with_trades
 
@@ -95,8 +96,31 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
                 champ_tr.expectancy, champ_te.expectancy, champ_full.net,
                 champ_full.fill_adjusted_net(fr), champ_full.trades, champ_full.kelly)
 
-    # SIGNAL diagnostics on TRAIN ONLY (no peeking at the test slice).
     existing = {f.get("code") for f in champ.get("filters", []) if isinstance(f, dict)}
+
+    # REAL-TRADE INGESTION — the honest scoreboard + loss clusters from LIVE outcomes
+    # (not idealized replay). This is the live->improve loop closing: real fills +
+    # real PnL feed the improver. Real-derived filters are higher-trust than sandbox.
+    real_recs = real_trades.load_real_trades()
+    logger.info("REAL TRADES | %s", real_trades.format_report(real_trades.real_summary(real_recs)))
+    real_diag_cands = []
+    need = diagnostics.MIN_SUPPORT + diagnostics.MIN_VETOED
+    if len(real_recs) >= need:
+        rd = diagnostics.propose_filter_codes(real_recs, existing, loop_cfg.get("diag_filters", 4))
+        for d in rd:
+            c = copy.deepcopy(champ)
+            c.pop("_change", None)
+            c["_change"] = f"+REAL-diag-filter: {d['code']} (LIVE loss cluster exp {d['vetoed_exp']:+.3f}, n={d['vetoed_n']})"
+            c["filters"] = list(champ.get("filters", [])) + [_filter_entry(d["code"])]
+            real_diag_cands.append(c)
+        if rd:
+            logger.info("REAL DIAGNOSTICS | %d loss-cluster filter(s) from LIVE trades: %s",
+                        len(rd), "; ".join(d["code"] for d in rd))
+    else:
+        logger.info("REAL DIAGNOSTICS | %d live trades — need %d to mine real loss clusters (collecting)",
+                    len(real_recs), need)
+
+    # SIGNAL diagnostics on TRAIN ONLY (sandbox; no peeking at the test slice).
     diag = diagnostics.propose_filter_codes(champ_tr_trades, existing, loop_cfg.get("diag_filters", 4))
     diag_cands = []
     for d in diag:
@@ -109,7 +133,7 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
         logger.info("DIAGNOSTICS (train) | %d loss-cluster filter(s): %s", len(diag),
                     "; ".join(f"{d['code']} (Δexp {d['improvement']:+.3f})" for d in diag))
 
-    cands = propose(champ, loop_cfg["candidates_per_iter"], iteration) + diag_cands
+    cands = propose(champ, loop_cfg["candidates_per_iter"], iteration) + diag_cands + real_diag_cands
     margin = loop_cfg["improve_margin"]
     passed = []   # (cfg, train_metrics, test_metrics) — beat champion on BOTH
     for c in cands:
