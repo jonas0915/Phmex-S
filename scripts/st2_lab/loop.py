@@ -20,6 +20,7 @@ import os
 from . import config as C
 from . import champion as champ_store
 from . import dataset as ds
+from . import fills as fills_mod
 from .proposer import propose
 from .evaluator import evaluate
 
@@ -50,13 +51,16 @@ def _config_hash(cfg: dict) -> str:
 
 
 def _improved(best, champ_metrics, margin: float) -> bool:
-    """A candidate improves if it's rankable and beats the champion's net by the
-    margin (absolute floor so we don't churn on noise near zero)."""
+    """A candidate improves if it's rankable and beats the champion's per-trade
+    EXPECTANCY by the margin (absolute floor so we don't churn on noise). Expectancy
+    (not total net) is the objective so 'fires more often' never wins on its own."""
     if not best.rankable:
         return False
-    base = champ_metrics.net if champ_metrics.rankable else float("-inf")
-    floor = max(0.02, abs(base) * margin) if base != float("-inf") else 0.0
-    return best.net > base + floor
+    if not champ_metrics.rankable:
+        return True
+    base = champ_metrics.expectancy
+    floor = max(0.005, abs(base) * margin)
+    return best.expectancy > base + floor
 
 
 def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
@@ -70,17 +74,24 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
         by_symbol = ds.load_dataset()
     logger.info("iter %d | dataset: %s", iteration, ds.dataset_summary(by_symbol))
 
+    # REAL fill truth — measured from live logs, leads every iteration. The sandbox
+    # net below is a 100%-fill UPPER BOUND; this is what actually happens.
+    fstats = fills_mod.measured_fill_stats()
+    fr = fstats["rate"]
+    logger.info("FILL TRUTH | %s", fills_mod.format_report(fstats).replace("\n", " | "))
+
     champ_m = evaluate(champ, by_symbol, loop_cfg)
-    logger.info("champion: net=%+.2f trades=%d wr=%.0f%% kelly=%.2f rankable=%s",
-                champ_m.net, champ_m.trades, champ_m.wr * 100, champ_m.kelly, champ_m.rankable)
+    logger.info("champion: exp=%+.4f/trade  net(UB)=%+.2f  fillAdj~%+.2f  trades=%d wr=%.0f%% kelly=%.2f rankable=%s",
+                champ_m.expectancy, champ_m.net, champ_m.fill_adjusted_net(fr),
+                champ_m.trades, champ_m.wr * 100, champ_m.kelly, champ_m.rankable)
 
     cands = propose(champ, loop_cfg["candidates_per_iter"], iteration)
     scored = []
     for c in cands:
         m = evaluate(c, by_symbol, loop_cfg)
         scored.append((c, m))
-        logger.info("  cand [%s] net=%+.2f trades=%d wr=%.0f%% kelly=%.2f%s",
-                    c["_change"], m.net, m.trades, m.wr * 100, m.kelly,
+        logger.info("  cand [%s] exp=%+.4f net(UB)=%+.2f trades=%d wr=%.0f%% kelly=%.2f%s",
+                    c["_change"], m.expectancy, m.net, m.trades, m.wr * 100, m.kelly,
                     "" if m.rankable else " (unrankable)")
 
     scored.sort(key=lambda cm: cm[1].score(), reverse=True)
@@ -97,10 +108,10 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
         champ_store.append_lineage(best_cfg, change, best_m.to_dict(), iteration)
         if not dry_run:
             champ_store.save(best_cfg)
-        logger.info("ACCEPTED new champion via [%s]: net %+.2f -> %+.2f",
-                    change, champ_m.net, best_m.net)
-        result["accepted"] = {"change": change, "net": best_m.net}
-        proposal = maybe_emit_promotion(best_cfg, best_m, dry_run)
+        logger.info("ACCEPTED new champion via [%s]: expectancy %+.4f -> %+.4f /trade (net UB %+.2f)",
+                    change, champ_m.expectancy, best_m.expectancy, best_m.net)
+        result["accepted"] = {"change": change, "expectancy": best_m.expectancy, "net": best_m.net}
+        proposal = maybe_emit_promotion(best_cfg, best_m, dry_run, fr)
         if proposal:
             result["promotion_proposal"] = proposal
     else:
@@ -109,7 +120,7 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
     return result
 
 
-def maybe_emit_promotion(champ: dict, m, dry_run=False) -> str | None:
+def maybe_emit_promotion(champ: dict, m, dry_run=False, fill_rate: float = 0.43) -> str | None:
     """If the champion clears the sandbox bar, write a human-gated PAPER-CONFIRM
     proposal into docs/fix-proposals/ (proposals-digest verifies + Telegrams it).
 
@@ -137,7 +148,10 @@ def maybe_emit_promotion(champ: dict, m, dry_run=False) -> str | None:
     body = (
         f"# ST2.0 LAB — PAPER-CONFIRM CANDIDATE ({h})\n\n"
         f"**Sandbox metrics (OPTIMISTIC, relative-ranking only — NOT truth):** "
-        f"net {m.net:+.2f}, {m.trades} trades, WR {m.wr*100:.0f}%, Kelly {m.kelly:.2f}.\n\n"
+        f"expectancy {m.expectancy:+.4f}/trade, net(UB) {m.net:+.2f}, {m.trades} trades, "
+        f"WR {m.wr*100:.0f}%, Kelly {m.kelly:.2f}.\n\n"
+        f"**Fill-adjusted at the measured {fill_rate*100:.0f}% live fill rate:** "
+        f"net ~{m.fill_adjusted_net(fill_rate):+.2f} (crude — which signals fill is unknown).\n\n"
         "> ⚠️ The sandbox fills every signal; live ST2.0 fills ~43%. Positive sandbox "
         "PnL does NOT mean a live edge — it usually doesn't. This is a candidate to "
         "**forward-confirm in PAPER**, not a recommendation to go live.\n\n"

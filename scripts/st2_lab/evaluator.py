@@ -95,6 +95,7 @@ def _metrics(nets: list[float], loop_cfg: dict) -> C.Metrics:
     losses = [x for x in nets if x < 0]
     m.wins, m.losses = len(wins), len(losses)
     m.net = round(sum(nets), 4)
+    m.expectancy = round(sum(nets) / n, 4)
     m.wr = round(len(wins) / n, 4)
     m.avg_win = round(sum(wins) / len(wins), 4) if wins else 0.0
     m.avg_loss = round(sum(losses) / len(losses), 4) if losses else 0.0

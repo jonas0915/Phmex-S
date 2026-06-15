@@ -62,19 +62,28 @@ class Metrics:
     trades: int = 0
     wins: int = 0
     losses: int = 0
-    net: float = 0.0
+    net: float = 0.0              # sandbox total, 100%-fill UPPER BOUND
+    expectancy: float = 0.0       # net / trades — the ranking objective
     wr: float = 0.0
     kelly: float = 0.0
     avg_win: float = 0.0
     avg_loss: float = 0.0
-    rankable: bool = False   # met min_trades_eval
+    rankable: bool = False        # met min_trades_eval
 
     def score(self) -> float:
-        """Single comparable score for ranking. Net PnL is the primary objective;
-        unrankable (too few trades) sorts to the bottom."""
+        """Rank by PER-TRADE EXPECTANCY, not total net. Ranking by total net
+        rewards configs that simply fire more often — which is meaningless (worse,
+        actively misleading) for a maker strategy that only fills ~43% of signals.
+        Expectancy is fill-robust: firing more does not inflate it. Unrankable
+        (too few sim trades) sorts to the bottom."""
         if not self.rankable:
             return float("-inf")
-        return self.net
+        return self.expectancy
+
+    def fill_adjusted_net(self, fill_rate: float) -> float:
+        """Crude lower-ish estimate of real net if only fill_rate of signals filled.
+        Approximate (which trades fill is unknown) — for honest framing, not truth."""
+        return round(self.net * fill_rate, 4)
 
     def to_dict(self) -> dict:
         return asdict(self)

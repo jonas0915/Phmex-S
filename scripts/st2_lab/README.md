@@ -31,8 +31,21 @@ touch st2_lab/.halt                                    # kill switch
 | `safe_exec.py` | AST-interpreted filter compiler (no eval/exec; whitelist only) |
 | `evaluator.py` | replay a config → relative metrics (net/WR/Kelly) |
 | `proposer.py` | deterministic param + curated-filter mutations |
+| `fills.py` | **REAL** maker fill/miss rate from live logs (ground truth, deduped) |
 | `champion.py` | recursive state store (`champion.json` + lineage) |
 | `loop.py` | orchestrator: propose → eval → rank → accept → paper-confirm proposal |
+
+## Honesty model (why the numbers won't lie to you)
+- **Ranking objective is per-trade EXPECTANCY, not total net** — so "fire more often"
+  never wins on its own (meaningless for a strategy that fills ~43% of signals).
+- **Sandbox net is an explicit UPPER BOUND** (assumes 100% fill); every readout shows
+  the measured real fill rate beside it plus a fill-adjusted estimate.
+- **Fill rate is MEASURED, never simulated.** It is the binding constraint and cannot
+  be backtested to truth (queue position is not in any recorded data). `fills.py`
+  reports it by symbol — e.g. fills vary wildly (ETH ~80% vs BTC ~33%), which is a
+  far more grounded lever than any threshold tweak.
+- A perfectly accurate maker backtest is **not achievable** from available data; this
+  lab produces honest *relative* hypotheses, never a profitability guarantee.
 
 ## Output
 - `champion.json` — current best config + lineage (recursive state).
