@@ -69,6 +69,25 @@ def load_dataset(path: str = None, limit: int | None = None) -> dict[str, list]:
     return by_symbol
 
 
+def chronological_split(by_symbol: dict[str, list], train_frac: float = 0.7):
+    """Split CHRONOLOGICALLY by global timestamp (no lookahead): train = oldest
+    train_frac of records, test = the rest. Returns (train, test) as the same
+    {symbol: [records]} shape, dropping symbols with no records on a side."""
+    all_ts = sorted(r["ts"] for recs in by_symbol.values() for r in recs)
+    if not all_ts:
+        return {}, {}
+    cut = all_ts[min(len(all_ts) - 1, int(train_frac * len(all_ts)))]
+    train, test = {}, {}
+    for sym, recs in by_symbol.items():
+        tr = [r for r in recs if r["ts"] <= cut]
+        te = [r for r in recs if r["ts"] > cut]
+        if tr:
+            train[sym] = tr
+        if te:
+            test[sym] = te
+    return train, test
+
+
 def dataset_summary(by_symbol: dict[str, list]) -> str:
     parts = []
     for sym, recs in sorted(by_symbol.items(), key=lambda kv: -len(kv[1]))[:8]:

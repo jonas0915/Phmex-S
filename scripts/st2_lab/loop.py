@@ -82,57 +82,74 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
     fr = fstats["rate"]
     logger.info("FILL TRUTH | %s", fills_mod.format_report(fstats).replace("\n", " | "))
 
-    champ_m, champ_trades = evaluate_with_trades(champ, by_symbol, loop_cfg)
-    logger.info("champion: exp=%+.4f/trade  net(UB)=%+.2f  fillAdj~%+.2f  trades=%d wr=%.0f%% kelly=%.2f rankable=%s",
-                champ_m.expectancy, champ_m.net, champ_m.fill_adjusted_net(fr),
-                champ_m.trades, champ_m.wr * 100, champ_m.kelly, champ_m.rankable)
+    # Chronological train/test split. Diagnostics + selection happen on TRAIN; a
+    # candidate is only accepted if it ALSO beats the champion OUT-OF-SAMPLE on TEST.
+    # This is the overfit guard — in-sample-only "wins" (e.g. spread artifacts) die here.
+    train, test = ds.chronological_split(by_symbol, loop_cfg.get("train_frac", 0.7))
+    logger.info("split | train %s | test %s", ds.dataset_summary(train), ds.dataset_summary(test))
 
-    # SIGNAL diagnostics: learn where the absorption signal loses (all symbols) and
-    # propose targeted entry-filters for those loss clusters.
+    champ_tr, champ_tr_trades = evaluate_with_trades(champ, train, loop_cfg)
+    champ_te = evaluate(champ, test, loop_cfg)
+    champ_full = evaluate(champ, by_symbol, loop_cfg)
+    logger.info("champion: train exp=%+.4f | test(OOS) exp=%+.4f | full net(UB)=%+.2f fillAdj~%+.2f trades=%d kelly=%.2f",
+                champ_tr.expectancy, champ_te.expectancy, champ_full.net,
+                champ_full.fill_adjusted_net(fr), champ_full.trades, champ_full.kelly)
+
+    # SIGNAL diagnostics on TRAIN ONLY (no peeking at the test slice).
     existing = {f.get("code") for f in champ.get("filters", []) if isinstance(f, dict)}
-    diag = diagnostics.propose_filter_codes(champ_trades, existing, loop_cfg.get("diag_filters", 4))
+    diag = diagnostics.propose_filter_codes(champ_tr_trades, existing, loop_cfg.get("diag_filters", 4))
     diag_cands = []
     for d in diag:
         c = copy.deepcopy(champ)
         c.pop("_change", None)
-        c["_change"] = f"+diag-filter: {d['code']} (loss cluster exp {d['vetoed_exp']:+.3f}, n={d['vetoed_n']})"
+        c["_change"] = f"+diag-filter: {d['code']} (train loss cluster exp {d['vetoed_exp']:+.3f}, n={d['vetoed_n']})"
         c["filters"] = list(champ.get("filters", [])) + [_filter_entry(d["code"])]
         diag_cands.append(c)
     if diag:
-        logger.info("DIAGNOSTICS | %d loss-cluster filter(s): %s", len(diag),
+        logger.info("DIAGNOSTICS (train) | %d loss-cluster filter(s): %s", len(diag),
                     "; ".join(f"{d['code']} (Δexp {d['improvement']:+.3f})" for d in diag))
 
     cands = propose(champ, loop_cfg["candidates_per_iter"], iteration) + diag_cands
-    scored = []
+    margin = loop_cfg["improve_margin"]
+    passed = []   # (cfg, train_metrics, test_metrics) — beat champion on BOTH
     for c in cands:
-        m = evaluate(c, by_symbol, loop_cfg)
-        scored.append((c, m))
-        logger.info("  cand [%s] exp=%+.4f net(UB)=%+.2f trades=%d wr=%.0f%% kelly=%.2f%s",
-                    c["_change"], m.expectancy, m.net, m.trades, m.wr * 100, m.kelly,
-                    "" if m.rankable else " (unrankable)")
+        tr = evaluate(c, train, loop_cfg)
+        te = evaluate(c, test, loop_cfg)
+        holds = _improved(tr, champ_tr, margin) and _improved(te, champ_te, margin)
+        logger.info("  cand [%s] train exp=%+.4f test exp=%+.4f%s%s",
+                    c["_change"], tr.expectancy, te.expectancy,
+                    "" if (tr.rankable and te.rankable) else " (unrankable)",
+                    "  ✓OOS-HOLDS" if holds else "")
+        if holds:
+            passed.append((c, tr, te))
 
-    scored.sort(key=lambda cm: cm[1].score(), reverse=True)
-    result = {"iteration": iteration, "champion_net": champ_m.net,
-              "candidates": len(scored), "accepted": None}
+    result = {"iteration": iteration, "champion_net": champ_full.net,
+              "candidates": len(cands), "oos_passed": len(passed), "accepted": None}
 
-    if scored and _improved(scored[0][1], champ_m, loop_cfg["improve_margin"]):
-        best_cfg, best_m = scored[0]
+    if passed:
+        # rank survivors by OUT-OF-SAMPLE (test) expectancy — the honest objective
+        passed.sort(key=lambda x: x[2].score(), reverse=True)
+        best_cfg, best_tr, best_te = passed[0]
         change = best_cfg.pop("_change")
-        best_cfg["metrics"] = best_m.to_dict()
+        best_full = evaluate(best_cfg, by_symbol, loop_cfg)
+        best_cfg["metrics"] = best_full.to_dict()
+        best_cfg["test_metrics"] = best_te.to_dict()
         best_cfg["lineage"] = champ.get("lineage", [])
         best_cfg["loop"] = loop_cfg
         best_cfg["last_proposed_hash"] = champ.get("last_proposed_hash")
-        champ_store.append_lineage(best_cfg, change, best_m.to_dict(), iteration)
+        champ_store.append_lineage(best_cfg, change, best_te.to_dict(), iteration)
         if not dry_run:
             champ_store.save(best_cfg)
-        logger.info("ACCEPTED new champion via [%s]: expectancy %+.4f -> %+.4f /trade (net UB %+.2f)",
-                    change, champ_m.expectancy, best_m.expectancy, best_m.net)
-        result["accepted"] = {"change": change, "expectancy": best_m.expectancy, "net": best_m.net}
-        proposal = maybe_emit_promotion(best_cfg, best_m, dry_run, fr)
+        logger.info("ACCEPTED (OOS-validated) [%s]: test exp %+.4f -> %+.4f  (train %+.4f -> %+.4f)",
+                    change, champ_te.expectancy, best_te.expectancy, champ_tr.expectancy, best_tr.expectancy)
+        result["accepted"] = {"change": change, "test_expectancy": best_te.expectancy,
+                              "train_expectancy": best_tr.expectancy}
+        proposal = maybe_emit_promotion(best_cfg, best_te, dry_run, fr)  # promote on OOS metrics
         if proposal:
             result["promotion_proposal"] = proposal
     else:
-        logger.info("no improvement found this iteration — champion unchanged")
+        logger.info("no OUT-OF-SAMPLE improvement — champion unchanged (%d candidates, all failed test or overfit)",
+                    len(cands))
 
     return result
 
@@ -164,7 +181,8 @@ def maybe_emit_promotion(champ: dict, m, dry_run=False, fill_rate: float = 0.43)
     filt = [f.get("code") for f in champ.get("filters", [])]
     body = (
         f"# ST2.0 LAB — PAPER-CONFIRM CANDIDATE ({h})\n\n"
-        f"**Sandbox metrics (OPTIMISTIC, relative-ranking only — NOT truth):** "
+        f"**Out-of-sample (held-out TEST) metrics — beat the champion on BOTH train and "
+        f"test, so not pure overfit. Still OPTIMISTIC (100%-fill) and relative-only, NOT truth:** "
         f"expectancy {m.expectancy:+.4f}/trade, net(UB) {m.net:+.2f}, {m.trades} trades, "
         f"WR {m.wr*100:.0f}%, Kelly {m.kelly:.2f}.\n\n"
         f"**Fill-adjusted at the measured {fill_rate*100:.0f}% live fill rate:** "

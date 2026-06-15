@@ -25,6 +25,7 @@ FEE_RT_PCT = 0.04
 DEFAULTS = {
     "candidates_per_iter": 6,   # K param/curated mutations proposed each iteration
     "diag_filters": 4,          # max diagnostic (loss-cluster) filters proposed per iter
+    "train_frac": 0.7,          # chronological train fraction; rest is out-of-sample test
     "improve_margin": 0.10,     # winner must beat champion score by this fraction
     "min_trades_eval": 15,      # a config needs >= this many sim trades to be rankable
     "confirm_sample": 30,       # paper-confirm trades before a live proposal

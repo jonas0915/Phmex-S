@@ -15,6 +15,7 @@ from st2_lab import champion as champ_store  # noqa: E402
 from st2_lab import fills as fills_mod        # noqa: E402
 from st2_lab import diagnostics               # noqa: E402
 from st2_lab.evaluator import evaluate_with_trades  # noqa: E402
+from st2_lab import dataset as ds               # noqa: E402
 
 
 # ── safe_exec ────────────────────────────────────────────────────────────
@@ -190,6 +191,25 @@ def test_evaluate_with_trades_returns_records():
     m, trades = evaluate_with_trades(C.DEFAULT_CHAMPION, data, {"min_trades_eval": 1})
     assert m.trades == 1 and len(trades) == 1
     assert "cvd_slope" in trades[0] and "net" in trades[0]
+
+
+# ── chronological train/test split ─────────────────────────────────────────
+def test_chronological_split_no_lookahead():
+    data = {
+        "A/USDT:USDT": [_rec(0, 1), _rec(10, 1), _rec(20, 1), _rec(30, 1)],
+        "B/USDT:USDT": [_rec(5, 1), _rec(15, 1)],
+    }
+    train, test = ds.chronological_split(data, train_frac=0.7)
+    train_ts = [r["ts"] for recs in train.values() for r in recs]
+    test_ts = [r["ts"] for recs in test.values() for r in recs]
+    assert train_ts and test_ts
+    assert max(train_ts) <= min(test_ts)        # strictly chronological, no leak
+    assert len(train_ts) + len(test_ts) == 6    # no records lost
+
+
+def test_chronological_split_empty():
+    train, test = ds.chronological_split({}, 0.7)
+    assert train == {} and test == {}
 
 
 # ── champion store ────────────────────────────────────────────────────────
