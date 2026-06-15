@@ -20,3 +20,6 @@ scripts/st2_lab/champion.json
 scripts/st2_lab/.halt
 logs/st2_lab*.log
 docs/fix-proposals/st2-lab-*.md
+
+# ST2.0 watcher dedup cache (logs/ already ignored above)
+.st2_watch_state.json
