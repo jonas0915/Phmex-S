@@ -17,6 +17,9 @@ PROPOSALS_DIR = os.path.join(BOT_DIR, "docs", "fix-proposals")
 # Each iteration records every candidate it evaluated (accepted AND rejected) so
 # the loop has a durable memory of what it already tried — its mistakes included.
 HISTORY_CAP = 500
+# how many distinct config fingerprints to remember as already-tried (so the loop
+# skips re-testing known dead-ends). Reset when the dataset grows (new evidence).
+TRIED_CAP = 5000
 
 # ── live ST2.0 economics (mirrors live for relative fidelity) ───────────
 LEVERAGE = 10
@@ -52,6 +55,8 @@ DEFAULT_CHAMPION = {
     "lineage": [],            # accepted transitions only [{iter, change, score, ...}]
     "history": [],            # EVERY candidate evaluated (incl. rejected) — learning memory
     "run_count": 0,           # iterations executed; advances exploration every run
+    "tried": [],              # config fingerprints already evaluated (skip dead-ends)
+    "data_epoch": 0,          # max ts of the dataset last explored; grows -> reset tried
     "loop": dict(DEFAULTS),
 }
 

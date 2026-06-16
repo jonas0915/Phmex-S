@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import argparse
 import copy
-import hashlib
-import json
 import logging
 import os
 
@@ -24,7 +22,7 @@ from . import dataset as ds
 from . import fills as fills_mod
 from . import diagnostics
 from . import real_trades
-from .proposer import propose, _filter_entry
+from .proposer import propose, _filter_entry, config_hash
 from .evaluator import evaluate, evaluate_with_trades
 
 logging.basicConfig(
@@ -43,14 +41,6 @@ def _halted() -> bool:
         logger.warning("halt flag present (%s) — skipping iteration", C.HALT_FLAG)
         return True
     return False
-
-
-def _config_hash(cfg: dict) -> str:
-    payload = json.dumps(
-        {"params": cfg.get("params"), "filters": [f.get("code") for f in cfg.get("filters", [])]},
-        sort_keys=True,
-    )
-    return hashlib.sha1(payload.encode()).hexdigest()[:12]
 
 
 def _improved(best, champ_metrics, margin: float) -> bool:
@@ -137,10 +127,25 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
         logger.info("DIAGNOSTICS (train) | %d loss-cluster filter(s): %s", len(diag),
                     "; ".join(f"{d['code']} (Δexp {d['improvement']:+.3f})" for d in diag))
 
-    cands = propose(champ, loop_cfg["candidates_per_iter"], iteration) + diag_cands + real_diag_cands
+    # LEARN FROM MISTAKES: skip configs already evaluated. Reset that memory when the
+    # dataset grows (new evidence) so a stale rejection never permanently blocks a config.
+    tried = set(champ.get("tried", []))
+    cur_epoch = max((r["ts"] for recs in by_symbol.values() for r in recs), default=0)
+    if cur_epoch > champ.get("data_epoch", 0) and tried:
+        logger.info("dataset grew (epoch %s -> %s) — clearing %d tried configs to re-explore",
+                    champ.get("data_epoch", 0), cur_epoch, len(tried))
+        tried = set()
+
+    cands = propose(champ, loop_cfg["candidates_per_iter"], iteration, tried) + diag_cands + real_diag_cands
+    # drop anything already tried (diag candidates can repeat across runs too)
+    cands = [c for c in cands if config_hash(c) not in tried]
     margin = loop_cfg["improve_margin"]
     passed = []   # (cfg, train_metrics, test_metrics) — beat champion on BOTH
     history_entries = []   # memory of EVERY candidate tried this run (incl. failures)
+    if not cands:
+        logger.info("no NEW candidates — single + compound neighbourhood exhausted on "
+                    "this data (%d already tried); will re-explore when the dataset grows",
+                    len(tried))
     for c in cands:
         tr = evaluate(c, train, loop_cfg)
         te = evaluate(c, test, loop_cfg)
@@ -149,8 +154,10 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
                     c["_change"], tr.expectancy, te.expectancy,
                     "" if (tr.rankable and te.rankable) else " (unrankable)",
                     "  ✓OOS-HOLDS" if holds else "")
+        h = config_hash(c)
+        tried.add(h)
         history_entries.append({
-            "run": run_count, "change": c["_change"], "hash": _config_hash(c),
+            "run": run_count, "change": c["_change"], "hash": h,
             "train_exp": round(tr.expectancy, 4), "test_exp": round(te.expectancy, 4),
             "rankable": bool(tr.rankable and te.rankable), "accepted": bool(holds),
         })
@@ -193,8 +200,11 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
     # persisted nothing: no history, no advancing counter, frozen exploration.
     champ_store.append_history(new_champ, history_entries)
     new_champ["run_count"] = run_count + 1
+    new_champ["tried"] = sorted(tried)[:C.TRIED_CAP]   # memory of dead-ends (bounded)
+    new_champ["data_epoch"] = cur_epoch
     result["run_count"] = new_champ["run_count"]
     result["history_size"] = len(new_champ.get("history", []))
+    result["tried_size"] = len(new_champ["tried"])
     if not dry_run:
         champ_store.save(new_champ)
 
@@ -216,7 +226,7 @@ def maybe_emit_promotion(champ: dict, m, dry_run=False, fill_rate: float = 0.43)
                  and m.trades >= loop_cfg.get("confirm_sample", 30))
     if not qualifies:
         return None
-    h = _config_hash(champ)
+    h = config_hash(champ)
     if champ.get("last_proposed_hash") == h:
         return None  # already proposed this exact config
     if champ["params"] == LIVE_PARAMS and not champ.get("filters"):

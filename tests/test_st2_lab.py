@@ -387,3 +387,66 @@ def test_loop_dry_run_does_not_advance_state(tmp_path, monkeypatch):
     loop.run_iteration(by_symbol=data, dry_run=True)
     champ = champ_store.load()  # only the load()-seed default should exist
     assert champ["run_count"] == 0 and champ["history"] == []
+
+
+# ── learn-from-mistakes: skip tried dead-ends, escalate, re-explore on new data ──
+from st2_lab.proposer import config_hash, _single_step_candidates  # noqa: E402
+
+
+def test_config_hash_order_independent():
+    from st2_lab.proposer import _filter_entry as fe
+    a = {"params": {"x": 1}, "filters": [fe("cvd_slope <= 0.5"), fe("buy_ratio <= 0.85")]}
+    b = {"params": {"x": 1}, "filters": [fe("buy_ratio <= 0.85"), fe("cvd_slope <= 0.5")]}
+    assert config_hash(a) == config_hash(b)
+
+
+def test_proposer_skips_tried_configs():
+    champ = {"params": dict(C.DEFAULT_CHAMPION["params"]), "filters": []}
+    tried = {config_hash(c) for c in _single_step_candidates(champ)}  # mark ALL singles tried
+    cands = propose(champ, k=6, iteration=0, tried=tried)
+    assert cands, "must still propose (compound) candidates, not go inert"
+    assert all(config_hash(c) not in tried for c in cands)  # never re-test a dead-end
+
+
+def test_proposer_escalates_to_compound_when_exhausted():
+    champ = {"params": dict(C.DEFAULT_CHAMPION["params"]), "filters": []}
+    tried = {config_hash(c) for c in _single_step_candidates(champ)}
+    cands = propose(champ, k=4, iteration=0, tried=tried)
+    assert cands
+    assert any(" + " in c["_change"] for c in cands)  # two-change (compound) candidate
+    # compound candidates remain valid: params in bounds, filters compile
+    for c in cands:
+        for name, (lo, hi, _) in C.PARAM_BOUNDS.items():
+            assert lo <= c["params"][name] <= hi
+        for f in c.get("filters", []):
+            compile_filter(f["code"])
+
+
+def test_loop_no_repeat_within_fixed_dataset(tmp_path, monkeypatch):
+    _isolate_lab(tmp_path, monkeypatch)
+    monkeypatch.setattr(loop, "_improved", lambda *a, **k: False)
+    data = {"X/USDT:USDT": [_rec(i * 100, 100.0) for i in range(6)]}  # fixed epoch
+    loop.run_iteration(by_symbol=data, dry_run=False)
+    loop.run_iteration(by_symbol=data, dry_run=False)  # same epoch -> tried persists
+    champ = champ_store.load()
+    h0 = {e["hash"] for e in champ["history"] if e["run"] == 0}
+    h1 = {e["hash"] for e in champ["history"] if e["run"] == 1}
+    assert h0 and h1
+    assert h0.isdisjoint(h1), "run 2 must not re-test configs already tried in run 1"
+    assert len(champ["tried"]) >= len(h0 | h1)
+
+
+def test_loop_resets_tried_on_data_growth(tmp_path, monkeypatch):
+    _isolate_lab(tmp_path, monkeypatch)
+    monkeypatch.setattr(loop, "_improved", lambda *a, **k: False)
+    d1 = {"X/USDT:USDT": [_rec(i * 100, 100.0) for i in range(6)]}          # max ts 500
+    loop.run_iteration(by_symbol=d1, dry_run=False)
+    c1 = champ_store.load()
+    assert c1["data_epoch"] == 500
+    h_run0 = {e["hash"] for e in c1["history"] if e["run"] == 0}
+    d2 = {"X/USDT:USDT": [_rec(10000 + i * 100, 100.0) for i in range(6)]}  # max ts 10500
+    loop.run_iteration(by_symbol=d2, dry_run=False)
+    c2 = champ_store.load()
+    assert c2["data_epoch"] == 10500                  # epoch advanced
+    h_run1 = {e["hash"] for e in c2["history"] if e["run"] == 1}
+    assert h_run0 & h_run1, "growing data must reset tried so configs get re-explored"
