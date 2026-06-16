@@ -585,9 +585,9 @@ _SIGNAL_BOXES = [
      "Bollinger-Band mean-reversion scalp &mdash; fades lower-BB bounces / upper-BB "
      "rejections, only in ranging (low-ADX) markets. Paper slot."),
     ("ST2.0",          "ST2.0 &mdash; BOOK&times;TAPE ABSORPTION SHORT",
-     "Shorts when a bid-heavy book is being aggressively bought into "
-     "(imbalance &ge; 0.30 &amp; buy-ratio &ge; 0.60). ~15-min maker hold; "
-     "live maker-fill experiment."),
+     "Shorts a bid-heavy book being aggressively bought into (imbalance &ge; 0.35 &amp; "
+     "buy-ratio 0.60&ndash;0.85), filtered by cvd_slope &le; &minus;0.374, spread &ge; 0.039, "
+     "trade-count &ge; 24 (live promotion 2026-06-16). ~20-min maker hold; live."),
 ]
 # 5m_liq_cascade and 5m_narrow boxes removed 2026-06-13 — both hard-KILLED
 # in paper (neg Kelly), no longer tracked. State files kept; they still surface

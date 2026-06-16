@@ -16,6 +16,9 @@ from strategies import STRATEGIES, Signal, TradeSignal, st2_absorption
 # ST2.0 book×tape absorption short — fixed ~15-min hold (900s / 60s cycle = 15 cycles),
 # matching the backtested exit (docs/2026-06-13-wider-setup-search.md).
 ST2_HOLD_CYCLES = 15
+# Per-slot hold overrides (cycles). ST2.0 holds ~20 min (1200s) since the 2026-06-16
+# LIVE promotion (proposal 8df1250186dd); falls back to ST2_HOLD_CYCLES otherwise.
+ST2_HOLD_CYCLES_BY_SLOT = {"ST2.0": 20}
 from scanner import scan_top_gainers, volatility_scan, start_background_scan, get_scan_result
 from logger import setup_logger
 from ws_feed import WSDataFeed
@@ -1602,10 +1605,12 @@ class Phmex2Bot:
                     continue
                 pos = slot.risk.positions[symbol]
 
-                # ST2.0: fixed ~15-min hold (the backtested exit) takes priority
+                # ST2.0: fixed-time hold (the backtested exit) takes priority. Hold is
+                # per-slot via ST2_HOLD_CYCLES_BY_SLOT (ST2.0 = 20 cycles since 2026-06-16).
                 if slot.strategy_name == "ST2.0":
+                    _hold_cycles = ST2_HOLD_CYCLES_BY_SLOT.get(slot.slot_id, ST2_HOLD_CYCLES)
                     _held = self.cycle_count - getattr(pos, "entry_cycle", self.cycle_count)
-                    if _held >= ST2_HOLD_CYCLES:
+                    if _held >= _hold_cycles:
                         self._close_slot_position(slot, symbol, pos, price, "st2_hold")
                         continue
 
@@ -1770,6 +1775,24 @@ class Phmex2Bot:
                         except Exception as _ne:
                             logger.debug(f"[PAPER] [NARROW FILTER] {symbol} filter error (skipping signal): {_ne}")
                             continue
+
+                    # --- ST2.0 LIVE entry filters (promoted 2026-06-16, proposal
+                    # 8df1250186dd, owner-approved): extra gates on top of the base
+                    # absorption signal. These now GATE REAL-MONEY entries. NOTE
+                    # spread_pct>=0.039 is artifact-suspect (wide spread -> worse real
+                    # fills) — deployed live per explicit owner approval; being watched. ---
+                    if slot.slot_id == "ST2.0":
+                        _f = _flow_for_strat or {}
+                        _cvd = _f.get("cvd_slope", 0.0)
+                        _br = _f.get("buy_ratio", 0.5)
+                        _tc = _f.get("trade_count", 0)
+                        _spread = (ob or {}).get("spread_pct", 0.0)
+                        if not (_cvd <= -0.374 and _spread >= 0.039 and _br <= 0.85 and _tc >= 24):
+                            slot.bump_blocked("st2_filter")
+                            logger.debug(f"[SLOT] [ST2.0 FILTER] {symbol} blocked "
+                                         f"(cvd={_cvd:.3f} spread={_spread:.4f} br={_br:.2f} tc={_tc})")
+                            continue
+
                     margin = (slot.trade_amount_usdt if slot.trade_amount_usdt is not None
                               else Config.TRADE_AMOUNT_USDT)
                     atr_val = df.iloc[-2].get("atr", 0) if len(df) > 1 else 0
