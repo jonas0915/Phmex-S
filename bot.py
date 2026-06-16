@@ -2369,7 +2369,13 @@ class Phmex2Bot:
         # Owner map covers main bot AND live-slot positions (paper slots excluded);
         # it is materialized up front, so close_position calls inside the loop are safe.
         try:
-            for symbol, (owner_risk, slot) in _build_position_owners(self.risk, self.slots).items():
+            _owners = _build_position_owners(self.risk, self.slots)
+        except Exception as e:
+            logger.error(f"[SYNC] (A) owner-map build failed: {e} — skipping close-detection "
+                         f"this cycle, continuing to orphan scan", exc_info=True)
+            _owners = {}
+        for symbol, (owner_risk, slot) in _owners.items():
+            try:
                 # _closing is only populated by the live-exit watcher, which iterates
                 # self.risk.positions (main bot) only — slot positions can never be
                 # mid-watcher-close, so the guard applies to main-owned symbols only.
@@ -2440,8 +2446,21 @@ class Phmex2Bot:
                         notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), f"{slot_reason} [slot {slot.slot_id}]")
                         owner_risk.close_position(symbol, exit_price, slot_reason, fees_usdt=sync_fee, mode="live")
                         self._maybe_auto_demote(slot)
-        except Exception as e:
-            logger.warning(f"[SYNC] (A) close-detection path failed: {e} — continuing to orphan scan")
+            except Exception as e:
+                # A tracked position may be closed on the exchange but unrecorded locally
+                # (stale state, real-money relevant) — log LOUD with a full traceback instead
+                # of burying it as a warning. Isolated per-symbol: other tracked symbols and
+                # the (B) orphan scan still run, preserving the (A)⊥(B) invariant below. This
+                # replaced a broad warning-level except that silently hid a real AttributeError
+                # for days (missing _slot_pending_exit_reason; see memory/lessons.md 2026-06-16).
+                # exc_info on a *persistent* per-symbol fault repeats the traceback each 60s
+                # cycle — accepted on purpose: it's an incident you want loud, it's bounded by
+                # the RotatingFileHandler (10MB×5) and surfaced at ERROR for overwatch/code-health
+                # to catch and fix fast. Per-cycle throttle state was rejected to avoid the
+                # __init__-attribute drift trap documented in lessons.md.
+                logger.error(f"[SYNC] (A) close-detection failed for {symbol}: {e} "
+                             f"— other symbols + orphan scan unaffected", exc_info=True)
+                continue
 
         # --- (B) Orphans: open on exchange but not tracked locally ---
         # Snapshotted after (A) so any positions just closed locally are excluded.

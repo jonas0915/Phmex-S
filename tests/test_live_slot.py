@@ -128,6 +128,60 @@ def test_sync_records_slot_close_into_slot_risk(slot, monkeypatch):
     assert slot.risk.closed_trades[-1]["mode"] == "live"
     assert slot.risk.closed_trades[-1]["exit_reason"] == "exchange_close"
 
+def test_sync_close_isolates_one_failing_symbol(slot, monkeypatch, caplog):
+    """Regression for the broad-except gap (2026-06-16): a failure closing ONE tracked
+    symbol must not block reconciling the others, and must surface as ERROR (not a buried
+    warning). Previously a single exception aborted the whole (A) close-detection loop and
+    was logged only at warning level."""
+    import logging
+    import bot as bot_mod
+
+    slot.set_live()
+    # Two live-slot positions, both gone from the exchange. AAA's close will raise; BBB must
+    # still close. (max_positions is an entry gate, not a storage cap — open_position records both.)
+    slot.risk.open_position("AAA/USDT:USDT", 1.0, 10.0, side="long")
+    slot.risk.open_position("BBB/USDT:USDT", 2.0, 10.0, side="long")
+
+    class _FakeExchange:
+        def get_open_positions(self):
+            return []  # exchange flat — both are gone
+        def cancel_open_orders(self, symbol):
+            if symbol == "AAA/USDT:USDT":
+                raise RuntimeError("boom cancelling AAA")
+        class client:
+            @staticmethod
+            def fetch_my_trades(symbol, limit=10):
+                return []
+
+    class _MainRisk:
+        positions = {}
+        def close_position(self, *a, **k):
+            raise AssertionError("main risk must not record slot close")
+
+    b = bot_mod.Phmex2Bot.__new__(bot_mod.Phmex2Bot)
+    b.exchange = _FakeExchange()
+    b.risk = _MainRisk()
+    b.slots = [slot]
+    b._closing = set()
+    b._slot_pending_exit_reason = {}
+
+    monkeypatch.setattr(bot_mod, "notifier", type("N", (), {
+        "notify_exit": staticmethod(lambda *a, **k: None),
+        "send": staticmethod(lambda *a, **k: None),
+    })())
+
+    with caplog.at_level(logging.ERROR, logger="DegenCryt"):
+        b._sync_exchange_closes(prices={"AAA/USDT:USDT": 1.0, "BBB/USDT:USDT": 2.0})
+
+    # BBB reconciled despite AAA (iterated first) blowing up — isolation works.
+    assert "BBB/USDT:USDT" not in slot.risk.positions
+    assert slot.risk.closed_trades[-1]["mode"] == "live"
+    # AAA's close failed → isolated, still tracked (not silently dropped), retried next cycle.
+    assert "AAA/USDT:USDT" in slot.risk.positions
+    # The failure surfaced LOUD at ERROR with the symbol — not buried as a warning.
+    assert any(r.levelno == logging.ERROR and "AAA/USDT:USDT" in r.getMessage()
+               and "close-detection failed" in r.getMessage() for r in caplog.records)
+
 def test_owner_map_includes_live_slots(slot):
     from bot import _build_position_owners
     class _MainRisk:

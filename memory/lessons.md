@@ -541,10 +541,15 @@ to the manual setup, mirroring `__init__`.
 makes it look like a generic warning, not a missing-attr.
 
 **How to apply:** (1) when adding an attribute to `Phmex2Bot.__init__` that the sync/close path
-reads, grep tests for `Phmex2Bot.__new__` and add the same attr to those fixtures. (2) Separately
-flagged (NOT fixed, needs /pre-restart-audit): the `except Exception` at bot.py:2443-2444 swallows
-ANY close-detection error as a warning and falls through to orphan scan — a real slot-close bug
-would hide identically. Consider narrowing it or re-raising on unexpected exception types.
+reads, grep tests for `Phmex2Bot.__new__` and add the same attr to those fixtures. (2) FIXED
+2026-06-16 (takes effect on next restart): the broad `except` in `_sync_exchange_closes` was
+replaced with per-symbol try/except — one bad symbol no longer aborts close-detection for the
+rest, the owner-map build is guarded separately, and failures log at ERROR with `exc_info=True`
+instead of a buried warning. The (A)⊥(B) invariant (close-detection failure must never block the
+orphan scan) is preserved. Regression test `test_sync_close_isolates_one_failing_symbol` proves it
+(verified: fails on the old broad-except code, passes on new). NOTE: re-raising was the WRONG fix
+here — it would block the (B) orphan scan that catches naked positions running to −45%. NOT yet
+live: the running bot keeps the old in-memory code until a /pre-restart-audit'd restart.
 
 **Also:** the handoff "2 stale tests" was itself stale — `test_dashboard_v2.py::test_trade_detail_endpoint`
 already passes. Verify the actual failing set with `pytest tests/ -q` before trusting a carried-over count.
