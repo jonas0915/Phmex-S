@@ -1787,7 +1787,7 @@ class Phmex2Bot:
                         _br = _f.get("buy_ratio", 0.5)
                         _tc = _f.get("trade_count", 0)
                         _spread = (ob or {}).get("spread_pct", 0.0)
-                        if not (_cvd <= -0.374 and _spread >= 0.039 and _br <= 0.85 and _tc >= 24):
+                        if not (_cvd <= -0.374 and _spread >= 0.039 and _br <= 0.85):  # trade_count>=24 dropped 2026-06-16 to match approved proposal 8df1250186dd
                             slot.bump_blocked("st2_filter")
                             logger.debug(f"[SLOT] [ST2.0 FILTER] {symbol} blocked "
                                          f"(cvd={_cvd:.3f} spread={_spread:.4f} br={_br:.2f} tc={_tc})")
