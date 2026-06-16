@@ -1562,7 +1562,7 @@ body {{ background:var(--bg); color:var(--txt);
     </div><div id="equity-chart"></div>
 </div>
 <div id="feed" class="panel">{feed}</div>
-<div class="footer">Auto-refresh 3s &middot; Equity 30s &middot; Read-only &middot; Zero API calls &middot; NET basis</div>
+<div class="footer">Auto-refresh 3s &middot; Equity 30s &middot; Read-only &middot; Zero API calls &middot; NET basis<span id="upd"></span></div>
 <script>
 async function poll(){{
   try{{
@@ -1570,6 +1570,9 @@ async function poll(){{
     document.getElementById('ticker').innerHTML = j.ticker;
     document.getElementById('content').innerHTML = j.content;
     document.getElementById('feed').innerHTML = j.feed;
+    // live heartbeat: ticks every successful poll so static trade counts don't
+    // read as "frozen". A stale time = the poll loop or server actually stopped.
+    document.getElementById('upd').textContent = ' · updated ' + new Date().toLocaleTimeString();
   }}catch(e){{}}
 }}
 setInterval(poll, 3000); poll();
