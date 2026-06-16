@@ -17,6 +17,7 @@ from st2_lab import diagnostics               # noqa: E402
 from st2_lab.evaluator import evaluate_with_trades  # noqa: E402
 from st2_lab import dataset as ds               # noqa: E402
 from st2_lab import real_trades                  # noqa: E402
+from st2_lab import loop                          # noqa: E402
 import json as _json                             # noqa: E402
 
 
@@ -322,3 +323,67 @@ def test_champion_roundtrip(tmp_path, monkeypatch):
     reloaded = champ_store.load()
     assert reloaded["params"]["imb_min"] == 0.40
     assert reloaded["lineage"][-1]["change"] == "imb_min 0.35 -> 0.40"
+
+
+# ── recursive learning: per-run persistence + history ───────────────────────
+# Regression for the amnesiac loop: save() was only reached inside the accept
+# branch, so a no-accept run (the steady state) persisted NOTHING — no history,
+# no advancing counter, frozen exploration, perpetually empty lineage.
+def _isolate_lab(tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "LAB_DIR", str(tmp_path))
+    monkeypatch.setattr(C, "CHAMPION_FILE", str(tmp_path / "champion.json"))
+    monkeypatch.setattr(C, "PROPOSALS_DIR", str(tmp_path / "proposals"))
+    # keep the loop off real live files (deterministic, no side effects)
+    monkeypatch.setattr(loop.real_trades, "load_real_trades", lambda *a, **k: [])
+    monkeypatch.setattr(loop.fills_mod, "measured_fill_stats",
+                        lambda *a, **k: {"rate": 0.0, "fills": 0, "misses": 0,
+                                         "attempts": 0, "by_symbol": {}, "fill_conditions": []})
+    monkeypatch.setattr(loop.fills_mod, "format_report", lambda *a, **k: "fill: n/a")
+
+
+def test_default_champion_has_learning_fields(tmp_path, monkeypatch):
+    monkeypatch.setattr(C, "LAB_DIR", str(tmp_path))
+    monkeypatch.setattr(C, "CHAMPION_FILE", str(tmp_path / "champion.json"))
+    champ = champ_store.load()  # seeds default
+    assert champ["run_count"] == 0
+    assert champ["history"] == []
+
+
+def test_append_history_bounded():
+    champ = {"history": []}
+    entries = [{"run": i, "change": "x", "hash": str(i), "train_exp": 0.0,
+                "test_exp": 0.0, "accepted": False} for i in range(C.HISTORY_CAP + 25)]
+    champ_store.append_history(champ, entries)
+    assert len(champ["history"]) == C.HISTORY_CAP
+    assert champ["history"][-1]["run"] == C.HISTORY_CAP + 24   # newest retained
+    assert champ["history"][0]["run"] == 25                    # oldest dropped
+
+
+def test_loop_persists_run_count_and_history_without_acceptance(tmp_path, monkeypatch):
+    _isolate_lab(tmp_path, monkeypatch)
+    monkeypatch.setattr(loop, "_improved", lambda *a, **k: False)  # force no acceptance
+    data = {"X/USDT:USDT": [_rec(i * 100, 100.0) for i in range(6)]}
+
+    r1 = loop.run_iteration(by_symbol=data, dry_run=False)
+    champ = champ_store.load()
+    assert champ["run_count"] == 1, "run_count must advance even with no acceptance"
+    assert champ["lineage"] == []                      # nothing accepted
+    assert len(champ["history"]) >= 1                  # but attempts ARE remembered
+    assert all("accepted" in h and "change" in h for h in champ["history"])
+    assert r1["run_count"] == 1
+
+    r2 = loop.run_iteration(by_symbol=data, dry_run=False)
+    champ2 = champ_store.load()
+    assert champ2["run_count"] == 2                    # advances again
+    assert len(champ2["history"]) >= len(champ["history"])  # memory accumulates
+    assert champ2["metrics"] != {}                     # current metrics refreshed each run
+    assert r2["run_count"] == 2
+
+
+def test_loop_dry_run_does_not_advance_state(tmp_path, monkeypatch):
+    _isolate_lab(tmp_path, monkeypatch)
+    monkeypatch.setattr(loop, "_improved", lambda *a, **k: False)
+    data = {"X/USDT:USDT": [_rec(i * 100, 100.0) for i in range(6)]}
+    loop.run_iteration(by_symbol=data, dry_run=True)
+    champ = champ_store.load()  # only the load()-seed default should exist
+    assert champ["run_count"] == 0 and champ["history"] == []

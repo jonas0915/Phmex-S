@@ -13,6 +13,11 @@ DIGEST_LOG = os.path.join(BOT_DIR, "logs", "st2_lab.log")
 HALT_FLAG = os.path.join(LAB_DIR, ".halt")
 PROPOSALS_DIR = os.path.join(BOT_DIR, "docs", "fix-proposals")
 
+# recursive-learning memory: how many attempt records to retain in champion.json.
+# Each iteration records every candidate it evaluated (accepted AND rejected) so
+# the loop has a durable memory of what it already tried — its mistakes included.
+HISTORY_CAP = 500
+
 # ── live ST2.0 economics (mirrors live for relative fidelity) ───────────
 LEVERAGE = 10
 MARGIN_USDT = 10.0
@@ -43,8 +48,10 @@ DEFAULT_CHAMPION = {
     },
     "filters": [],            # list of {id, code, hash} pure entry-veto fns (Phase 2)
     "symbols": None,          # None = all symbols; or a list e.g. ["ETH/USDT:USDT"]
-    "metrics": {},            # last sandbox metrics
-    "lineage": [],            # [{iter, parent, change, score}]
+    "metrics": {},            # last sandbox metrics (refreshed EVERY run)
+    "lineage": [],            # accepted transitions only [{iter, change, score, ...}]
+    "history": [],            # EVERY candidate evaluated (incl. rejected) — learning memory
+    "run_count": 0,           # iterations executed; advances exploration every run
     "loop": dict(DEFAULTS),
 }
 

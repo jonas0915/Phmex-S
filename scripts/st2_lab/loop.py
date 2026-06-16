@@ -71,8 +71,12 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
         return {"halted": True}
     champ = champ_store.load()
     loop_cfg = champ.get("loop", C.DEFAULTS)
+    run_count = champ.get("run_count", 0)
     if iteration is None:
-        iteration = len(champ.get("lineage", []))
+        # Drive exploration by run_count, NOT lineage length. Tying it to lineage
+        # froze the proposer at iteration 0 whenever nothing was accepted, so every
+        # run re-offered the same candidates and the loop never explored new ground.
+        iteration = run_count
     if by_symbol is None:
         by_symbol = ds.load_dataset()
     logger.info("iter %d | dataset: %s", iteration, ds.dataset_summary(by_symbol))
@@ -136,6 +140,7 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
     cands = propose(champ, loop_cfg["candidates_per_iter"], iteration) + diag_cands + real_diag_cands
     margin = loop_cfg["improve_margin"]
     passed = []   # (cfg, train_metrics, test_metrics) — beat champion on BOTH
+    history_entries = []   # memory of EVERY candidate tried this run (incl. failures)
     for c in cands:
         tr = evaluate(c, train, loop_cfg)
         te = evaluate(c, test, loop_cfg)
@@ -144,6 +149,11 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
                     c["_change"], tr.expectancy, te.expectancy,
                     "" if (tr.rankable and te.rankable) else " (unrankable)",
                     "  ✓OOS-HOLDS" if holds else "")
+        history_entries.append({
+            "run": run_count, "change": c["_change"], "hash": _config_hash(c),
+            "train_exp": round(tr.expectancy, 4), "test_exp": round(te.expectancy, 4),
+            "rankable": bool(tr.rankable and te.rankable), "accepted": bool(holds),
+        })
         if holds:
             passed.append((c, tr, te))
 
@@ -161,19 +171,32 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
         best_cfg["lineage"] = champ.get("lineage", [])
         best_cfg["loop"] = loop_cfg
         best_cfg["last_proposed_hash"] = champ.get("last_proposed_hash")
-        champ_store.append_lineage(best_cfg, change, best_te.to_dict(), iteration)
-        if not dry_run:
-            champ_store.save(best_cfg)
+        champ_store.append_lineage(best_cfg, change, best_te.to_dict(), run_count)
         logger.info("ACCEPTED (OOS-validated) [%s]: test exp %+.4f -> %+.4f  (train %+.4f -> %+.4f)",
                     change, champ_te.expectancy, best_te.expectancy, champ_tr.expectancy, best_tr.expectancy)
         result["accepted"] = {"change": change, "test_expectancy": best_te.expectancy,
                               "train_expectancy": best_tr.expectancy}
+        new_champ = best_cfg
         proposal = maybe_emit_promotion(best_cfg, best_te, dry_run, fr)  # promote on OOS metrics
         if proposal:
             result["promotion_proposal"] = proposal
     else:
         logger.info("no OUT-OF-SAMPLE improvement — champion unchanged (%d candidates, all failed test or overfit)",
                     len(cands))
+        champ["metrics"] = champ_full.to_dict()   # refresh current champion metrics each run
+        new_champ = champ
+
+    # Persist EVERY run (the core fix): record this run's attempts + advance the
+    # run counter so the loop accumulates durable learning — and explores new
+    # candidates next run — even when nothing was accepted. Previously save() was
+    # only reached inside the accept branch, so a no-accept run (the steady state)
+    # persisted nothing: no history, no advancing counter, frozen exploration.
+    champ_store.append_history(new_champ, history_entries)
+    new_champ["run_count"] = run_count + 1
+    result["run_count"] = new_champ["run_count"]
+    result["history_size"] = len(new_champ.get("history", []))
+    if not dry_run:
+        champ_store.save(new_champ)
 
     return result
 

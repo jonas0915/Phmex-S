@@ -42,3 +42,16 @@ def append_lineage(champ: dict, change: str, metrics: dict, iteration: int) -> N
     })
     # keep lineage bounded
     champ["lineage"] = champ["lineage"][-200:]
+
+
+def append_history(champ: dict, entries: list[dict], cap: int = None) -> None:
+    """Record EVERY candidate the loop evaluated this run (accepted or rejected).
+
+    This is the loop's durable memory of what it has already tried — including its
+    mistakes. Without it the loop is amnesiac: it re-proposes and re-tests the same
+    dead-ends each run and can never demonstrably learn. Bounded to `cap` newest."""
+    if not entries:
+        return
+    cap = C.HISTORY_CAP if cap is None else cap
+    champ.setdefault("history", []).extend(entries)
+    champ["history"] = champ["history"][-cap:]
