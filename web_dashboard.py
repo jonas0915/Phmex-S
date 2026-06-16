@@ -687,6 +687,8 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             return w, l, sum(_net_pnl(t) for t in ts)
         lw, ll, lnet = _wl([t for t in trades if t.get("mode") == "live"])
         pw, pl, pnet = _wl([t for t in trades if t.get("mode") != "live"])
+        lwr = lw / (lw + ll) * 100 if (lw + ll) else 0.0   # win rate excludes scratches
+        pwr = pw / (pw + pl) * 100 if (pw + pl) else 0.0
         lcls = "pos" if lnet > 0 else "neg" if lnet < 0 else "dim"
         pcls = "pos" if pnet > 0 else "neg" if pnet < 0 else "dim"
         stats_rows = (
@@ -694,9 +696,9 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"<tr><td class='dim'>trades</td><td>{n}</td></tr>"
             f"<tr><td class='dim'>live (real)</td><td>"
             f"<span class='pos'>{lw}W</span> / <span class='neg'>{ll}L</span> "
-            f"&middot; <span class='{lcls}'>${lnet:+.2f}</span></td></tr>"
+            f"&middot; {lwr:.0f}% WR &middot; <span class='{lcls}'>${lnet:+.2f}</span></td></tr>"
             f"<tr><td class='dim'>paper (sim)</td><td>"
-            f"{pw}W / {pl}L &middot; <span class='{pcls}'>${pnet:+.2f}</span></td></tr>"
+            f"{pw}W / {pl}L &middot; {pwr:.0f}% WR &middot; <span class='{pcls}'>${pnet:+.2f}</span></td></tr>"
             f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
         )
     else:
