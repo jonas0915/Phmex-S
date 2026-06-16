@@ -115,6 +115,7 @@ def test_sync_records_slot_close_into_slot_risk(slot, monkeypatch):
     b.risk = _MainRisk()
     b.slots = [slot]
     b._closing = set()
+    b._slot_pending_exit_reason = {}  # mirrors __init__ state (st2_hold reason map); __new__ skips __init__
 
     monkeypatch.setattr(bot_mod, "notifier", type("N", (), {
         "notify_exit": staticmethod(lambda *a, **k: None),

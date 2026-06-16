@@ -524,3 +524,27 @@ logger.py honors it (live default unchanged). When grepping bot.log history BEFO
 2026-06-11 20:10, ignore blocks where many order lines share one timestamp with
 round prices — those are today's pre-fix test runs. Never run pytest with that env
 var unset removed.
+
+### Tests that build the bot via `Phmex2Bot.__new__` drift whenever `__init__` gains an attribute the sync path reads
+2026-06-16: `test_live_slot.py::test_sync_records_slot_close_into_slot_risk` was the lone
+code-health RED for days. Root cause: the test uses `Phmex2Bot.__new__(...)` to skip the real
+`__init__` (which opens exchange connections), then hand-sets only `exchange/risk/slots/_closing`.
+The `st2_hold` close-reason fix added `self._slot_pending_exit_reason = {}` to `__init__`
+(bot.py:233); `_sync_exchange_closes` pops it at bot.py:2433. The `__new__`-built bot lacked the
+attr → `AttributeError` → swallowed by the broad `except Exception` at bot.py:2443-2444 (logged
+only as "[SYNC] (A) close-detection path failed") → `close_position` (bot.py:2441) never ran →
+position not recorded → assertion failed. Fix was test-only: add `b._slot_pending_exit_reason = {}`
+to the manual setup, mirroring `__init__`.
+
+**Why:** any new `__init__` attribute consumed inside `_sync_exchange_closes` (or other paths the
+`__new__` tests exercise) will silently re-break these tests the same way, and the broad except
+makes it look like a generic warning, not a missing-attr.
+
+**How to apply:** (1) when adding an attribute to `Phmex2Bot.__init__` that the sync/close path
+reads, grep tests for `Phmex2Bot.__new__` and add the same attr to those fixtures. (2) Separately
+flagged (NOT fixed, needs /pre-restart-audit): the `except Exception` at bot.py:2443-2444 swallows
+ANY close-detection error as a warning and falls through to orphan scan — a real slot-close bug
+would hide identically. Consider narrowing it or re-raising on unexpected exception types.
+
+**Also:** the handoff "2 stale tests" was itself stale — `test_dashboard_v2.py::test_trade_detail_endpoint`
+already passes. Verify the actual failing set with `pytest tests/ -q` before trusting a carried-over count.
