@@ -1,3 +1,40 @@
+# ST2.0 maker-first active exit — 2026-06-15
+
+Goal: add an active exit to ST2.0 (today: fixed ~15-min maker hold + passive
+resting SL/TP, no trail/early-exit). MUST stay maker-first (+4.3bps maker /
+−5.7bps taker). Approved: maker-first + both-sided replay BEFORE any live change.
+
+## Step 1 — sandbox both-sided replay  ✅ DONE
+- [x] Built `scripts/st2_lab/exit_replay.py` — reuses backtest.py's validated
+      price-only trail fns (`_live_update_trailing`/`_live_check_breakeven`/
+      `_effective_stop`) over the flow_capture price path. Maker/taker fee model.
+      Both-sided: $saved-on-losers vs $clipped-off-winners (lessons.md:366).
+- [x] Ran on REAL live ST2.0 (n=15, grew from 11 this session) + SIM (n=1016).
+
+### Result (REAL set, n=15 — the truth set)
+- Standard trail (arm @+5% ROI, also @+2%): **NET DELTA $0.000 — never engages.**
+  No live ST2.0 trade reached even +2% ROI (live ROI min/median/max = −13.1 / −2.5
+  / **+1.8%**). The trail is irrelevant to this trade population.
+- Only an aggressive early-lock (arm @+1% ROI = +0.1% price @10x) engages: 7 trades
+  armed → −$0.225 → −$0.155/trade, WR 33%→47%, both-sided +$1.05 (saved $0.87 on
+  losers, +$0.17 on winners, no clipping). DIRECTIONAL on n=15, and at +0.1% price
+  it's at the edge of the ~76-95s flow sampling resolution → fragile.
+- SIM set (n=1016, fill-all, rosy baseline +$37): trail mildly +$5.08 (+0.005/trade),
+  saved $14.2 > clipped $9.1. Sign agrees but baseline unrepresentative.
+
+### Verdict
+Do NOT deploy the standard trail — inert on real data. The real ST2.0 problem is
+the SIGNAL (trades barely move favorably, max +1.8% ROI), not winners giving back
+gains. No exit rule manufactures edge. The marginal early-lock variant is too thin
+(n=15) + too fragile (sub-sample-resolution) to arm live now.
+
+## Step 2/3 — HOLD (gated)
+- [ ] Re-run when ST2.0 has ~30 real trades (st2-watch tracks it). If the early-lock
+      both-sided edge holds on a healthier sample → audit → arm maker-only on approval.
+- [ ] Bigger lever is entry signal, not exit — feed st2_lab, not exit tuning.
+
+---
+
 # Edge Construction Plan — 2026-06-12 deep dive
 
 (Previous v7.0 Confluence plan superseded; in git history at 57f4051.)
