@@ -29,6 +29,21 @@ MARGIN_USDT = 10.0
 # an absolute-PnL forecaster (see spec; backtesting this data only makes artifacts).
 FEE_RT_PCT = 0.04
 
+# ── adverse-selection maker-fill model (research: arxiv 2407.16527, "The Negative
+# Drift of a Limit Order Fill") ─────────────────────────────────────────
+# The naive replay fills EVERY passing signal at the benign snapshot price — the
+# "100%-fill UPPER BOUND" the Metrics docstring already flags. In reality a maker
+# SHORT only fills when an uptick lifts its offer (adverse selection); the favorable
+# cases where price drops away from the offer never fill, yet the naive model keeps
+# them — inflating the edge. This opt-in model requires fills to be adversely
+# selected. Data is coarse (~74s snapshots), so this is a DIRECTIONAL STRESS TEST
+# ("does the edge survive realistic fills?"), not a tick-precise forecaster.
+ADVERSE_FILL = {
+    "enabled": False,
+    "fill_window_snaps": 1,   # forward snapshots the resting maker order may fill within
+    "maker_edge_pct": 0.0,    # maker price improvement: short posts its sell this % above signal
+}
+
 # ── loop tuning (override in champion.json["loop"]) ─────────────────────
 DEFAULTS = {
     "candidates_per_iter": 6,   # K param/curated mutations proposed each iteration
