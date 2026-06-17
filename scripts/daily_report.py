@@ -14,7 +14,7 @@ BOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE_FILE = os.path.join(BOT_DIR, "trading_state.json")
 LOG_FILE = os.path.join(BOT_DIR, "logs", "bot.log")
 REPORT_DIR = os.path.join(BOT_DIR, "reports")
-LIVE_LOSS_CAP = -5.0  # promoted slot auto-demotes when live PnL hits this
+LIVE_LOSS_CAP = -10.0  # promoted slot auto-demotes when live PnL hits this (matches bot.py:289 loss_cap_usdt=-10.0)
 
 os.makedirs(REPORT_DIR, exist_ok=True)
 

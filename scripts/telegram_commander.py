@@ -144,10 +144,26 @@ async def cmd_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not trades:
                 msg += f"\n{slot_name}: 0 trades"
                 continue
-            wins = sum(1 for t in trades if t.get("pnl_usdt", 0) > 0)
-            pnl = sum(t.get("pnl_usdt", 0) for t in trades)
-            wr = wins / len(trades) * 100
-            msg += f"\n{slot_name}: {len(trades)} trades | {wr:.0f}% WR | ${pnl:+.2f}"
+            # Live-canonical to match the dashboard: if the slot has live (real-money)
+            # history, report the LIVE count + net PnL + WR (paper noted separately).
+            # Paper-only slots fall back to gross pnl_usdt. _net = net_pnl, fallback gross.
+            def _net(t):
+                v = t.get("net_pnl")
+                return (v if v is not None else t.get("pnl_usdt", 0)) or 0
+            live_ts = [t for t in trades if t.get("mode") == "live"]
+            if live_ts:
+                lw = sum(1 for t in live_ts if _net(t) > 0)
+                ll = sum(1 for t in live_ts if _net(t) < 0)
+                lnet = sum(_net(t) for t in live_ts)
+                lwr = lw / (lw + ll) * 100 if (lw + ll) else 0.0  # WR excludes break-evens
+                n_paper = len(trades) - len(live_ts)
+                paper_note = f" (+{n_paper} paper)" if n_paper else ""
+                msg += f"\n{slot_name}: {len(live_ts)} live | {lwr:.0f}% WR | ${lnet:+.2f}{paper_note}"
+            else:
+                wins = sum(1 for t in trades if t.get("pnl_usdt", 0) > 0)
+                pnl = sum(t.get("pnl_usdt", 0) for t in trades)
+                wr = wins / len(trades) * 100
+                msg += f"\n{slot_name}: {len(trades)} trades | {wr:.0f}% WR | ${pnl:+.2f}"
         # If narrow file doesn't exist yet, still surface a zeroed line.
         if not os.path.exists(narrow_path):
             msg += "\n🧪 NARROW (paper) | 0 trades | blocked: sym=0 hr=0 ens=0 (no state file yet)"
