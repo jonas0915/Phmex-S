@@ -10,6 +10,7 @@ import glob as _glob
 import json
 import os
 import re
+import secrets
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -28,12 +29,33 @@ def _from_ts(ts):
 from collections import defaultdict
 from html import escape
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from http.cookies import SimpleCookie
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
 HOST = "0.0.0.0"  # bind all interfaces so phones on the same LAN can reach it (read-only dashboard)
 PORT = 8050
+
+# Access token — gates every request so the read-only dashboard (balance/PnL/positions)
+# isn't exposed unauthenticated on untrusted networks the laptop may join (0.0.0.0 binds
+# every interface, not just home WiFi). Persisted in a gitignored file so it survives
+# restarts and is never committed. Auto-generated on first run.
+TOKEN_FILE = os.path.join(PROJECT_DIR, ".dashboard_token")
+def _load_or_create_token():
+    try:
+        with open(TOKEN_FILE) as _f:
+            _t = _f.read().strip()
+            if _t:
+                return _t
+    except FileNotFoundError:
+        pass
+    _t = secrets.token_urlsafe(24)
+    with open(TOKEN_FILE, "w") as _f:
+        _f.write(_t)
+    os.chmod(TOKEN_FILE, 0o600)
+    return _t
+DASHBOARD_TOKEN = _load_or_create_token()
 ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
 
 # ── Static assets (vendored uPlot — the ONLY files /static/ will serve) ──
@@ -1725,13 +1747,40 @@ loadEquity(); setInterval(loadEquity, 30000);
 
 # ── HTTP handler ─────────────────────────────────────────────────────────
 class DashboardHandler(BaseHTTPRequestHandler):
+    def _authed(self):
+        """Token via ?key= (first load) or dash_token cookie (subsequent XHRs).
+        Returns 'query' / 'cookie' / None. Constant-time compare."""
+        key = (parse_qs(urlparse(self.path).query).get("key") or [None])[0]
+        if key and secrets.compare_digest(key, DASHBOARD_TOKEN):
+            return "query"
+        raw = self.headers.get("Cookie")
+        if raw:
+            jar = SimpleCookie()
+            jar.load(raw)
+            if "dash_token" in jar and secrets.compare_digest(jar["dash_token"].value, DASHBOARD_TOKEN):
+                return "cookie"
+        return None
+
     def do_GET(self):
-        if self.path == "/" or self.path == "/index.html":
+        auth = self._authed()
+        if not auth:
+            body = b"401 Unauthorized - append ?key=YOUR_TOKEN to the URL"
+            self.send_response(401)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        _route = urlparse(self.path).path  # ignore ?key= so the token'd page load still routes to "/"
+        if _route == "/" or _route == "/index.html":
             html = build_html()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(html.encode())))
             self.send_header("Cache-Control", "no-store")
+            # Set the cookie on page load so same-origin XHRs (3s/30s polls) authenticate
+            # without the token in every URL. HttpOnly + SameSite=Strict; no Secure (no TLS).
+            self.send_header("Set-Cookie", f"dash_token={DASHBOARD_TOKEN}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Strict")
             self.end_headers()
             self.wfile.write(html.encode())
         elif self.path == "/api/content":
