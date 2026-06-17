@@ -450,3 +450,36 @@ def test_loop_resets_tried_on_data_growth(tmp_path, monkeypatch):
     assert c2["data_epoch"] == 10500                  # epoch advanced
     h_run1 = {e["hash"] for e in c2["history"] if e["run"] == 1}
     assert h_run0 & h_run1, "growing data must reset tried so configs get re-explored"
+
+
+# ── adverse-selection maker-fill model (research: arxiv 2407.16527) ────────
+def test_adverse_fill_drops_favorable_unfilled_short():
+    # Signal, then price immediately DROPS (favorable for a short). The naive 100%-fill
+    # replay books a (fake) TP win; the adverse model DROPS it — a resting sell above a
+    # falling market never gets lifted, so the favorable case is correctly never filled.
+    data = {"X/USDT:USDT": [_rec(0, 100.0), _rec(100, 97.0, imb=0.1),
+                            _rec(200, 96.0, imb=0.1)]}
+    naive = evaluate(C.DEFAULT_CHAMPION, data, {"min_trades_eval": 1})
+    adv = evaluate(C.DEFAULT_CHAMPION, data, {"min_trades_eval": 1},
+                   adverse={"enabled": True, "fill_window_snaps": 1})
+    assert naive.trades == 1 and naive.wins == 1   # naive keeps the missed favorable
+    assert adv.trades == 0                          # adverse: no fill -> correctly dropped
+
+
+def test_adverse_fill_keeps_adverse_selected_short():
+    # Signal, then price RISES into the offer (adverse fill) and hits SL. Both models
+    # take the trade; it loses — short filled into a rising market.
+    data = {"X/USDT:USDT": [_rec(0, 100.0), _rec(100, 103.0, imb=0.1),
+                            _rec(200, 104.0, imb=0.1)]}
+    adv = evaluate(C.DEFAULT_CHAMPION, data, {"min_trades_eval": 1},
+                   adverse={"enabled": True, "fill_window_snaps": 1})
+    assert adv.trades == 1 and adv.losses == 1
+
+
+def test_adverse_fill_default_off_matches_naive():
+    # adverse=None (default) must be byte-identical to the naive replay (no regression).
+    data = {"X/USDT:USDT": [_rec(0, 100.0), _rec(100, 103.0), _rec(200, 99.0)]}
+    base = evaluate(C.DEFAULT_CHAMPION, data, {"min_trades_eval": 1})
+    same = evaluate(C.DEFAULT_CHAMPION, data, {"min_trades_eval": 1},
+                    adverse={"enabled": False})
+    assert base.trades == same.trades and base.net == same.net
