@@ -32,7 +32,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
-HOST = "127.0.0.1"
+HOST = "0.0.0.0"  # bind all interfaces so phones on the same LAN can reach it (read-only dashboard)
 PORT = 8050
 ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
 
