@@ -46,6 +46,14 @@ class Config:
     # by setting back to 0. See docs/2026-06-19-partial-tp-scaleout.md.
     PARTIAL_TP_ROI = float(os.getenv("PARTIAL_TP_ROI", "0.0"))
 
+    # Runner take-profit after a partial scale-out: the remaining half aims for this
+    # margin-ROI % (its existing trailing stop stays as the downside floor). 0 = the
+    # runner keeps the standard TAKE_PROFIT_PERCENT target. Deployed at 25% (Jonas):
+    # bank half at +PARTIAL_TP_ROI, let the runner reach for a big move. The stale
+    # entry-time exchange TP is cancelled and this target is enforced software-side
+    # (cycle + 1Hz watcher, patient maker close).
+    PARTIAL_RUNNER_TP_ROI = float(os.getenv("PARTIAL_RUNNER_TP_ROI", "0.0"))
+
     # Phase 2b — Pullback regime filter flags (shadow-log by default; hard-block only when explicitly true)
     PULLBACK_SESSION_GATE = os.getenv("PULLBACK_SESSION_GATE", "false").lower() == "true"
     PULLBACK_VOLATILE_GATE = os.getenv("PULLBACK_VOLATILE_GATE", "false").lower() == "true"

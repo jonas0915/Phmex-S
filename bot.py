@@ -780,6 +780,18 @@ class Phmex2Bot:
                     if result:
                         pnl, pnl_pct = result
                         logger.info(f"[PARTIAL TP] {symbol} scaled out half @ {fill_price:.4f} (+{pos.pnl_percent(fill_price):.1f}% ROI) — runner continues")
+                        # Runner TP: partial_close_position lifted pos.take_profit to the
+                        # runner target. Cancel the stale entry-time exchange TP (resting
+                        # at the original level) and let the software/watcher enforce the
+                        # new target. Only flip to "software" on a CONFIRMED cancel — a
+                        # failed cancel leaves the old TP resting (runner caps at the old
+                        # level) rather than risking two live TPs.
+                        if Config.PARTIAL_RUNNER_TP_ROI > 0 and pos.tp_order_id and pos.tp_order_id != "software":
+                            if self.exchange.cancel_order_by_id(symbol, pos.tp_order_id):
+                                pos.tp_order_id = "software"
+                                logger.info(f"[PARTIAL TP] {symbol} runner TP -> {pos.take_profit:.4f} (+{Config.PARTIAL_RUNNER_TP_ROI:.0f}% ROI, software-enforced)")
+                            else:
+                                logger.warning(f"[PARTIAL TP] {symbol} could not cancel stale exchange TP — runner keeps original TP level")
                         try:
                             notifier.notify_partial_tp(symbol, pos.side, fill_price, pnl, pnl_pct)
                         except Exception as ne:

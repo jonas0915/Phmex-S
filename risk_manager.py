@@ -577,6 +577,11 @@ class RiskManager:
             # the remaining half). Without this, the partial-TP block re-fires on the
             # runner and closes a quarter of the original at a needless taker fee.
             preserved_scaled_out = getattr(existing, "scaled_out", False) if existing else False
+            # Preserve a scaled-out runner's LIFTED take_profit: without this, sync
+            # recomputes TP from TAKE_PROFIT_PERCENT (the entry-time level) and the
+            # startup place_sl_tp re-pins the runner's exchange TP back to ~+16%,
+            # silently undoing the +25% runner target after a restart.
+            preserved_take_profit = (existing.take_profit if existing and preserved_scaled_out else None)
 
             if side == "long":
                 stop_loss   = entry_price * (1 - Config.STOP_LOSS_PERCENT / 100)
@@ -584,6 +589,8 @@ class RiskManager:
             else:
                 stop_loss   = entry_price * (1 + Config.STOP_LOSS_PERCENT / 100)
                 take_profit = entry_price * (1 - Config.TAKE_PROFIT_PERCENT / 100)
+            if preserved_take_profit is not None:
+                take_profit = preserved_take_profit  # keep the lifted runner TP across restart
 
             position = Position(
                 symbol=symbol,
@@ -793,12 +800,22 @@ class RiskManager:
             trade["fees_pending"] = True
         self.closed_trades.append(trade)
 
-        # Shrink the live position to the runner half; leave stop_loss / take_profit /
-        # trailing_stop_price / peak_price untouched so the existing exit machinery
-        # manages the runner exactly like any half-size winner.
+        # Shrink the live position to the runner half. Leave stop_loss /
+        # trailing_stop_price / peak_price untouched so the existing trail keeps
+        # protecting the runner as the downside floor.
         pos.amount -= half_amount
         pos.margin -= half_margin
         pos.scaled_out = True
+        # Runner take-profit: reach for a bigger move if configured. The trail (already
+        # armed at the scale-out ROI) remains the floor; this only lifts the upside
+        # target. Caller cancels the stale entry-time exchange TP and re-enforces this
+        # software-side. 0 = keep the standard take_profit.
+        if Config.PARTIAL_RUNNER_TP_ROI > 0 and Config.LEVERAGE > 0:
+            move = Config.PARTIAL_RUNNER_TP_ROI / 100 / Config.LEVERAGE
+            if pos.side == "long":
+                pos.take_profit = pos.entry_price * (1 + move)
+            else:
+                pos.take_profit = pos.entry_price * (1 - move)
         self._save_state()
 
         sign = "+" if pnl >= 0 else ""

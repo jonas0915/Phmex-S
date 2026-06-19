@@ -928,6 +928,23 @@ class Exchange:
             logger.warning(f"Could not verify SL order for {symbol}: {e}")
             return True  # assume OK if we can't check
 
+    def cancel_order_by_id(self, symbol: str, order_id: str) -> bool:
+        """Cancel a single resting order by id (e.g. move a runner's TP off its
+        entry-time level without touching the SL). Returns True only on confirmed
+        cancel — callers gate on this so a failed cancel degrades gracefully (the
+        old order stays resting) instead of leaving two live TPs."""
+        if not Config.is_live():
+            return True  # paper: nothing resting
+        if not order_id or order_id == "software":
+            return False
+        try:
+            self.client.cancel_order(order_id, symbol)
+            logger.info(f"Cancelled order {order_id} for {symbol}")
+            return True
+        except Exception as e:
+            logger.warning(f"Could not cancel order {order_id} for {symbol}: {e}")
+            return False
+
     def cancel_open_orders(self, symbol: str):
         """Cancel all open orders for a symbol — cleans up orphaned SL/TP after close."""
         if not Config.is_live():

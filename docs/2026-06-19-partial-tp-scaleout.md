@@ -37,6 +37,21 @@ peaked ≥10% and only ~1 in 10 reached ≥12%. +10% catches the runner cohort t
 clearly broke out without firing on the modest-winner crowd (which Jonas wanted left
 alone), and without being so rare it's inert.
 
+### Runner take-profit (Jonas: +25%)
+After the half is banked at +10%, the **runner half reaches for +25% ROI**
+(`PARTIAL_RUNNER_TP_ROI=25`, = 2.5% price at 10x):
+- `partial_close_position` lifts the runner's `take_profit` to the +25% level.
+- The bot cancels the **stale entry-time exchange TP** (which rests at the original
+  +16% level and would otherwise cap the runner) via `exchange.cancel_order_by_id`,
+  and sets `tp_order_id="software"` **only on a confirmed cancel**. A failed cancel
+  degrades gracefully — the old TP stays resting and the runner caps at the old level
+  rather than risking two live TPs.
+- The +25% target is then enforced software-side (60s cycle + 1Hz watcher), which use
+  a **patient maker close** for take-profit, so maker fees are preserved.
+- The runner's existing **trailing stop stays as the downside floor** (armed at the
+  +10% scale-out point, locking ≥+6%). So the runner exits at +25% TP on a continued
+  move, or trails out above +6% on a pullback — it cannot become a loss from here.
+
 - Resting exchange SL/TP are `reduceOnly`, so they auto-cap to the remaining half.
 - Effect: **lock +6% on half** (gains the trail currently gives back); the runner
   still rides. Helps small/medium winners (the bulk); slightly caps the rare big
