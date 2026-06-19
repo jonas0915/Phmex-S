@@ -40,6 +40,10 @@ class Position:
     confidence: int = 0
     ensemble_layers: str = ""
     entry_snapshot: dict = field(default_factory=dict)
+    # True once half the position has been scaled out by the partial-TP block
+    # (bot.py). Prevents a second scale-out; the runner half stays under normal
+    # trail/TP management.
+    scaled_out: bool = False
 
     def update_trailing_stop(self, current_price: float):
         """Tiered trailing stop — the bigger the winner, the tighter the trail.
@@ -302,6 +306,7 @@ class RiskManager:
                     pos.shadow_hour_pt = pd.get("shadow_hour_pt", None)
                     pos.exchange_sl_price = pd.get("exchange_sl_price")  # absent in old state files
                     pos.sl_ratcheted = pd.get("sl_ratcheted", False)
+                    pos.scaled_out = pd.get("scaled_out", False)  # absent in old state files
                     self.positions[sym] = pos
                 if pos_data:
                     logger.info(f"Restored {len(pos_data)} open positions from state")
@@ -326,6 +331,7 @@ class RiskManager:
                     "entry_snapshot": getattr(pos, "entry_snapshot", {}),
                     "exchange_sl_price": pos.exchange_sl_price,
                     "sl_ratcheted": pos.sl_ratcheted,
+                    "scaled_out": getattr(pos, "scaled_out", False),
                 }
             with open(self.state_file, "w") as f:
                 json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades, "trade_results": self.trade_results, "positions": pos_data}, f)
@@ -655,6 +661,11 @@ class RiskManager:
             "entry_snapshot": getattr(pos, "entry_snapshot", {}),
             "duration_s": time.time() - pos.opened_at,
             "gate_tags": getattr(pos, "gate_tags", None),
+            # Max-favorable-excursion proxy: the high-water mark the trailing stop
+            # tracked. Persisted on every close so MFE/runner analysis no longer
+            # needs log archaeology (2026-06-19 audit gap). 0.0 if never updated.
+            "peak_price": getattr(pos, "peak_price", 0.0),
+            "scaled_out": getattr(pos, "scaled_out", False),
         }
         if fees_pending:
             trade["fees_pending"] = True
@@ -711,32 +722,85 @@ class RiskManager:
             return "stop_loss"
         return None
 
-    def partial_close_position(self, symbol: str, exit_price: float):
-        """Close half the position, move SL to breakeven + fees, let remainder run."""
+    def partial_close_position(self, symbol: str, exit_price: float, fees_usdt: float = None):
+        """Scale out half the position at exit_price and record it as a 'partial_tp'
+        closed_trades entry. The runner half stays in self.positions under the
+        existing trail/TP/durable-SL machinery (we deliberately do NOT null the
+        trail or move the stop — the runner is just a normal, half-size winning
+        position). Sets scaled_out so it can only fire once. Returns
+        (pnl_usdt, pnl_pct) for the closed half, or None if the symbol isn't open.
+
+        Fee/PnL handling mirrors close_position: live keeps pnl_usdt GROSS for
+        backward-compat (net_pnl carries the fee-adjusted value); paper nets fees
+        into pnl_usdt."""
         if symbol not in self.positions:
             return None
         pos = self.positions[symbol]
         half_amount = pos.amount / 2
-        pos.amount = half_amount
-        pos.margin = pos.margin / 2
-        # SL at entry + 0.15% fee buffer to avoid micro-losses on remainder
-        if pos.side == "long":
-            pos.stop_loss = pos.entry_price * 1.0015
-        else:
-            pos.stop_loss = pos.entry_price * 0.9985
-        pos.take_profit = None
-        pos.trailing_stop_price = None
-        pos.peak_price = exit_price
+        half_margin = pos.margin / 2
 
-        pnl = (exit_price - pos.entry_price) * half_amount if pos.side == "long" else (pos.entry_price - exit_price) * half_amount
-        half_margin = pos.margin  # margin was already halved above (line 379)
+        gross = ((exit_price - pos.entry_price) * half_amount if pos.side == "long"
+                 else (pos.entry_price - exit_price) * half_amount)
+        fees_pending = False
+        if fees_usdt is None:
+            if self.is_paper:
+                notional = pos.entry_price * half_amount
+                fees_usdt = notional * (Config.TAKER_FEE_PERCENT + Config.SLIPPAGE_PERCENT) * 2 / 100
+            else:
+                fees_usdt = 0.0
+                fees_pending = True
+        elif (not self.is_paper) and fees_usdt == 0:
+            fees_pending = True
+        net_pnl = gross - fees_usdt
+        pnl = (gross - fees_usdt) if self.is_paper else gross
         pnl_pct = pnl / half_margin * 100 if half_margin > 0 else 0.0
+
+        trade = {
+            "symbol":   symbol,
+            "side":     pos.side,
+            "entry":    pos.entry_price,
+            "exit":     exit_price,
+            "entry_price": pos.entry_price,
+            "exit_price":  exit_price,
+            "amount":   half_amount,
+            "margin":   half_margin,
+            "pnl_usdt": pnl,
+            "pnl_pct":  pnl_pct,
+            "fees_usdt": fees_usdt,
+            "funding_usdt": 0.0,
+            "net_pnl":  net_pnl,
+            "reason":   "partial_tp",
+            "exit_reason": "partial_tp",
+            "strategy": pos.strategy,
+            "opened_at": pos.opened_at,
+            "closed_at": time.time(),
+            "entry_strength": pos.entry_strength,
+            "confidence": pos.confidence,
+            "ensemble_layers": pos.ensemble_layers,
+            "entry_snapshot": getattr(pos, "entry_snapshot", {}),
+            "duration_s": time.time() - pos.opened_at,
+            "gate_tags": getattr(pos, "gate_tags", None),
+            "peak_price": getattr(pos, "peak_price", 0.0),
+            "scaled_out": True,
+        }
+        if fees_pending:
+            trade["fees_pending"] = True
+        self.closed_trades.append(trade)
+
+        # Shrink the live position to the runner half; leave stop_loss / take_profit /
+        # trailing_stop_price / peak_price untouched so the existing exit machinery
+        # manages the runner exactly like any half-size winner.
+        pos.amount -= half_amount
+        pos.margin -= half_margin
+        pos.scaled_out = True
+        self._save_state()
+
         sign = "+" if pnl >= 0 else ""
         logger.info(
-            f"[PARTIAL TP] {pos.side.upper()} {symbol} | Closed half @ {exit_price:.4f} | "
-            f"PnL on half: {sign}{pnl:.2f} USDT ({sign}{pnl_pct:.2f}%) | Remainder running with SL @ entry"
+            f"{self._log_prefix}[PARTIAL TP] {pos.side.upper()} {symbol} | Scaled out half @ {exit_price:.4f} | "
+            f"PnL on half: {sign}{pnl:.2f} USDT ({sign}{pnl_pct:.2f}%) | Runner ({pos.amount:.6f}) continues under trail/TP"
         )
-        return half_amount
+        return (pnl, pnl_pct)
 
     def _soft_dd_tier_pause_seconds(self, current_balance: float) -> int:
         """8% soft drawdown tier — 15min pause, early warning before 20% hard tier."""

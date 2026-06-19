@@ -1,0 +1,118 @@
+"""Partial take-profit scale-out (2026-06-19 loss-asymmetry fix).
+
+Covers RiskManager.partial_close_position: it must close HALF the position,
+record a 'partial_tp' closed_trades entry, leave the runner half open under the
+existing trail/TP machinery (stop_loss / take_profit / trailing_stop_price /
+peak_price untouched), and flag the position scaled_out so it can only fire once.
+"""
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import Config
+from risk_manager import Position, RiskManager
+
+SYMBOL = "BTC/USDT:USDT"
+
+
+def _make_position(**overrides):
+    base = dict(
+        symbol=SYMBOL, side="long", entry_price=100.0, amount=1.0,
+        margin=10.0, stop_loss=98.8, take_profit=101.6,
+        trailing_stop_price=100.6, peak_price=100.7,
+    )
+    base.update(overrides)
+    return Position(**base)
+
+
+def _rm_with(pos):
+    rm = RiskManager.__new__(RiskManager)  # no state-file I/O
+    rm.positions = {pos.symbol: pos}
+    rm.closed_trades = []
+    rm.is_paper = False
+    rm._log_prefix = ""
+    rm._save_state = lambda: None  # stub persistence
+    return rm
+
+
+def test_partial_close_halves_position_and_keeps_runner():
+    pos = _make_position(amount=1.0, margin=10.0)
+    rm = _rm_with(pos)
+
+    result = rm.partial_close_position(SYMBOL, exit_price=100.6, fees_usdt=0.0)
+
+    # Runner half stays open
+    assert SYMBOL in rm.positions
+    runner = rm.positions[SYMBOL]
+    assert abs(runner.amount - 0.5) < 1e-9
+    assert abs(runner.margin - 5.0) < 1e-9
+    assert runner.scaled_out is True
+    # Runner exit levels are untouched — managed by the existing machinery
+    assert runner.stop_loss == 98.8
+    assert runner.take_profit == 101.6
+    assert runner.trailing_stop_price == 100.6
+    assert runner.peak_price == 100.7
+    # Returns (pnl, pnl_pct) for the closed half
+    assert result is not None
+    pnl, pnl_pct = result
+    # long, entry 100, exit 100.6, half 0.5 -> gross 0.30 USDT on 5 USDT margin = +6%
+    assert abs(pnl - 0.30) < 1e-9
+    assert abs(pnl_pct - 6.0) < 1e-6
+
+
+def test_partial_close_records_partial_tp_trade():
+    pos = _make_position(amount=1.0, margin=10.0)
+    rm = _rm_with(pos)
+    rm.partial_close_position(SYMBOL, exit_price=100.6, fees_usdt=0.01)
+
+    assert len(rm.closed_trades) == 1
+    t = rm.closed_trades[0]
+    assert t["exit_reason"] == "partial_tp"
+    assert t["reason"] == "partial_tp"
+    assert abs(t["amount"] - 0.5) < 1e-9
+    assert abs(t["margin"] - 5.0) < 1e-9
+    # live mode: pnl_usdt is GROSS, net_pnl carries the fee deduction
+    assert abs(t["pnl_usdt"] - 0.30) < 1e-9
+    assert abs(t["net_pnl"] - (0.30 - 0.01)) < 1e-9
+    assert "peak_price" in t
+
+
+def test_partial_close_short_side():
+    pos = _make_position(side="short", entry_price=100.0, amount=1.0, margin=10.0,
+                         stop_loss=101.2, take_profit=98.4,
+                         trailing_stop_price=99.4, peak_price=99.3)
+    rm = _rm_with(pos)
+    # short profit: price below entry. exit 99.4 -> gross (100-99.4)*0.5 = 0.30
+    pnl, pnl_pct = rm.partial_close_position(SYMBOL, exit_price=99.4, fees_usdt=0.0)
+    assert abs(pnl - 0.30) < 1e-9
+    assert abs(pnl_pct - 6.0) < 1e-6
+    assert rm.positions[SYMBOL].scaled_out is True
+
+
+def test_partial_close_fires_only_once_via_flag():
+    pos = _make_position(amount=1.0, margin=10.0)
+    rm = _rm_with(pos)
+    rm.partial_close_position(SYMBOL, exit_price=100.6, fees_usdt=0.0)
+    assert rm.positions[SYMBOL].scaled_out is True
+    # A second call still halves whatever is open, but the bot.py gate checks
+    # scaled_out before ever calling this — assert the flag is the guard.
+    assert getattr(rm.positions[SYMBOL], "scaled_out", False) is True
+
+
+def test_partial_close_missing_symbol_returns_none():
+    rm = RiskManager.__new__(RiskManager)
+    rm.positions = {}
+    rm.closed_trades = []
+    rm.is_paper = False
+    rm._log_prefix = ""
+    rm._save_state = lambda: None
+    assert rm.partial_close_position("NOPE/USDT:USDT", 100.0) is None
+
+
+def test_paper_mode_nets_fees_into_pnl():
+    pos = _make_position(amount=1.0, margin=10.0)
+    rm = _rm_with(pos)
+    rm.is_paper = True
+    pnl, _ = rm.partial_close_position(SYMBOL, exit_price=100.6)  # fees auto-simulated
+    # paper: pnl_usdt is net of simulated round-trip fees, so strictly below gross 0.30
+    assert pnl < 0.30
+    assert rm.closed_trades[0]["pnl_usdt"] == pnl

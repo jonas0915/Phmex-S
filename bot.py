@@ -745,6 +745,51 @@ class Phmex2Bot:
             return
         self._empty_price_cycles = 0
 
+        # Partial take-profit — scale out half at +PARTIAL_TP_ROI margin-ROI, then let
+        # the runner half continue under the existing trail/TP/durable-SL machinery.
+        # Banks gains the trail currently gives back (2026-06-19 audit: winners peak
+        # +6-10% ROI but trail out ~+2.9%). Flag-gated (PARTIAL_TP_ROI=0 disables).
+        # Does NOT cancel resting orders: the exchange SL/TP are reduceOnly and
+        # auto-cap to the remaining half. Main-bot positions only.
+        if Config.PARTIAL_TP_ROI > 0:
+            for symbol, pos in list(self.risk.positions.items()):
+                price = prices.get(symbol)
+                if not price or getattr(pos, "scaled_out", False):
+                    continue
+                if pos.pnl_percent(price) < Config.PARTIAL_TP_ROI:
+                    continue
+                with self._pos_lock:
+                    if symbol in self._closing or symbol not in self.risk.positions:
+                        continue  # watcher mid-close / already gone
+                    self._closing.add(symbol)
+                try:
+                    half = pos.amount / 2
+                    if pos.side == "long":
+                        order = self.exchange.close_long(symbol, half)
+                    else:
+                        order = self.exchange.close_short(symbol, half)
+                    if not order:
+                        if self.exchange.pop_reduce_only_abort(symbol):
+                            logger.info(f"[PARTIAL TP] {symbol} half-close aborted (reduceOnly) — position closing elsewhere")
+                        else:
+                            logger.error(f"[PARTIAL TP] half-close order failed for {symbol} — position unchanged")
+                        continue
+                    fill_price = self._extract_fill_price(order, price, is_exit=True)
+                    fee = self.exchange.extract_order_fee(order, symbol)
+                    result = self.risk.partial_close_position(symbol, fill_price, fees_usdt=fee)
+                    if result:
+                        pnl, pnl_pct = result
+                        logger.info(f"[PARTIAL TP] {symbol} scaled out half @ {fill_price:.4f} (+{pos.pnl_percent(fill_price):.1f}% ROI) — runner continues")
+                        try:
+                            notifier.notify_partial_tp(symbol, pos.side, fill_price, pnl, pnl_pct)
+                        except Exception as ne:
+                            logger.warning(f"[PARTIAL TP] Telegram notify failed for {symbol}: {ne}")
+                except Exception as e:
+                    logger.error(f"[PARTIAL TP] scale-out failed for {symbol}: {e}")
+                finally:
+                    with self._pos_lock:
+                        self._closing.discard(symbol)
+
         # Early exit check — momentum reversal while in profit
         for symbol, pos in list(self.risk.positions.items()):
             if symbol in self._closing:

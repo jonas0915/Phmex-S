@@ -38,6 +38,14 @@ class Config:
     # 1.0-1.5) — software tiers still exit first; this caps inter-cycle reversals.
     DURABLE_TRAIL_BAND_PCT = float(os.getenv("DURABLE_TRAIL_BAND_PCT", "1.2"))
 
+    # Partial take-profit (scale-out): when an open position reaches this margin-ROI
+    # %, close half at market and let the runner half continue under normal trail/TP.
+    # 0 = disabled. Rationale (2026-06-19 trade audit): winners peak at +6-10% ROI but
+    # trail out at ~+2.9%, giving back ~4pts every time. Banking half near the peak
+    # locks gains the trail currently surrenders. Main-bot positions only; reversible
+    # by setting back to 0. See docs/2026-06-19-partial-tp-scaleout.md.
+    PARTIAL_TP_ROI = float(os.getenv("PARTIAL_TP_ROI", "0.0"))
+
     # Phase 2b — Pullback regime filter flags (shadow-log by default; hard-block only when explicitly true)
     PULLBACK_SESSION_GATE = os.getenv("PULLBACK_SESSION_GATE", "false").lower() == "true"
     PULLBACK_VOLATILE_GATE = os.getenv("PULLBACK_VOLATILE_GATE", "false").lower() == "true"
