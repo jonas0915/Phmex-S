@@ -26,9 +26,16 @@ the winners.**
 
 ## The change (conservative ship)
 When an open **main-bot** position reaches **+`PARTIAL_TP_ROI`% margin-ROI**
-(default 6%), close **half** at market and let the **runner half** continue under
-the *existing* trail / TP / durable-SL machinery — no nulling of stops, no
-breakeven surgery, no order cancel/replace.
+(deployed at **10%** — Jonas's call: scale out only on genuine runners, leave
+modest +6-9% winners to run untouched; bump to 12 for more selectivity), close
+**half** at market and let the **runner half** continue under the *existing*
+trail / TP / durable-SL machinery — no nulling of stops, no breakeven surgery, no
+order cancel/replace.
+
+Why +10% and not +6%: winners peak +6-10% ROI; in the reconstructed sample ~1 in 5
+peaked ≥10% and only ~1 in 10 reached ≥12%. +10% catches the runner cohort that
+clearly broke out without firing on the modest-winner crowd (which Jonas wanted left
+alone), and without being so rare it's inert.
 
 - Resting exchange SL/TP are `reduceOnly`, so they auto-cap to the remaining half.
 - Effect: **lock +6% on half** (gains the trail currently gives back); the runner
