@@ -25,7 +25,7 @@ Current version: **Sentinel (v11)** — deployed 2026-04-01.
 | Max open trades | 3 | .env: MAX_OPEN_TRADES |
 | Stop loss | 1.2% | .env: STOP_LOSS_PERCENT |
 | Take profit | 1.6% | .env: TAKE_PROFIT_PERCENT |
-| Adverse exit | **-3% ROI after 10 cycles (10 min)** | .env: ADVERSE_EXIT_THRESHOLD/CYCLES |
+| Adverse exit | **DISABLED** (ADVERSE_EXIT_THRESHOLD=-999.0 since 2026-05-07; CYCLES=10 moot) — losers ride to the full -1.2% SL with no early cut. Re-enable only after both-sides replay (see loss-asymmetry note). | .env: ADVERSE_EXIT_THRESHOLD/CYCLES |
 | Candle lookback | 500 (Phemex requires value in {5,10,50,100,500,1000}) | .env: CANDLE_LOOKBACK |
 | Per-pair cooldown | 10 min after loss | bot.py:1032 |
 | Global cooldown | 120s between entries | bot.py |
