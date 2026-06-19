@@ -231,6 +231,14 @@ class Phmex2Bot:
         # [SYNC] reconcile can attribute the real reason (e.g. st2_hold) instead of
         # the generic exchange_close. Short-lived; consumed by _sync_exchange_closes.
         self._slot_pending_exit_reason: dict[str, tuple] = {}
+        # Shadow adverse-exit: dedup state {(symbol, entry_cycle): set(thresholds logged)}
+        # and the sidecar path. LOGGING ONLY — records what a deep-red loser-cut WOULD do
+        # without changing live exits (which run at ADVERSE_EXIT_THRESHOLD=-999). The old
+        # shadow lived inside should_adverse_exit() which never fires at -999, so it emitted
+        # nothing; this records crossings independently (fixed 2026-06-19).
+        self._shadow_ae_seen: dict = {}
+        self._shadow_ae_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "logs", "shadow_adverse.jsonl")
 
         # Strategy slots framework — independent trading units (additive, main loop still uses self.risk)
         self.slots = [
@@ -829,12 +837,6 @@ class Phmex2Bot:
                 cycles_held = self.cycle_count - pos.entry_cycle
                 held_min = cycles_held * Config.LOOP_INTERVAL / 60
                 roi = pos.pnl_percent(price)
-                # Shadow log: would wider thresholds have held this trade?
-                for alt in [-4.0, -5.0, -6.0]:
-                    if roi > alt:
-                        logger.info(f"[SHADOW ADVERSE] {symbol} — ROI {roi:.1f}% > {alt}% — would HOLD at threshold {alt}%")
-                    else:
-                        logger.info(f"[SHADOW ADVERSE] {symbol} — ROI {roi:.1f}% <= {alt}% — would STILL EXIT at threshold {alt}%")
                 logger.info(f"[ADVERSE EXIT] {symbol} — {roi:.1f}% ROI after {held_min:.0f}min")
                 if pos.side == "long":
                     order = self.exchange.close_long(symbol, pos.amount)
@@ -849,6 +851,9 @@ class Phmex2Bot:
                 self.exchange.cancel_open_orders(symbol)
                 notifier.notify_exit(symbol, pos.side, pos.entry_price, fill_price, pos.pnl_usdt(fill_price), pos.pnl_percent(fill_price), "adverse_exit")
                 continue
+
+        # Shadow adverse-exit logging (logging only; never closes a position).
+        self._log_shadow_adverse_triggers(prices)
 
         # Bidirectional exchange sync — detect (A) closed-on-exchange positions AND
         # (B) untracked orphan positions. Must run even when self.risk.positions is empty,
@@ -2342,6 +2347,62 @@ class Phmex2Bot:
         """Sync rolling trade results to risk manager for persistence."""
         self.risk.trade_results = list(self._trade_results)
         self.risk._save_state()
+
+    # Shadow ROI thresholds to record (a deep-red loser-cut at each WOULD exit here).
+    _SHADOW_AE_THRESHOLDS = (-4.0, -5.0, -6.0, -8.0, -10.0)
+
+    def _log_shadow_adverse_triggers(self, prices: dict):
+        """LOGGING ONLY — never closes a position. For each open position past
+        ADVERSE_EXIT_CYCLES, record (once per threshold) the first time its ROI crosses a
+        shadow threshold, i.e. where a deep-red loser-cut would have exited. Live exits are
+        unchanged (ADVERSE_EXIT_THRESHOLD=-999). Triggers are matched to real closes offline
+        for both-sides PnL. The old shadow lived inside should_adverse_exit() which never
+        fires at -999, so it emitted nothing (fixed 2026-06-19)."""
+        for symbol, pos in list(self.risk.positions.items()):
+            if symbol in self._closing:
+                continue
+            price = prices.get(symbol)
+            if not price:
+                continue
+            if (self.cycle_count - pos.entry_cycle) < Config.ADVERSE_EXIT_CYCLES:
+                continue
+            roi = pos.pnl_percent(price)
+            if roi > self._SHADOW_AE_THRESHOLDS[0]:
+                continue  # hasn't crossed the shallowest threshold yet
+            seen = self._shadow_ae_seen.setdefault((symbol, pos.entry_cycle), set())
+            for thr in self._SHADOW_AE_THRESHOLDS:
+                if roi <= thr and thr not in seen:
+                    seen.add(thr)
+                    self._record_shadow_adverse(symbol, pos, roi, price, thr)
+        # Prune dedup state for positions no longer open.
+        if self._shadow_ae_seen:
+            _open = {(s, p.entry_cycle) for s, p in self.risk.positions.items()}
+            for _k in [k for k in self._shadow_ae_seen if k not in _open]:
+                del self._shadow_ae_seen[_k]
+
+    def _record_shadow_adverse(self, symbol, pos, roi, price, threshold):
+        """Append a shadow adverse-exit TRIGGER to logs/shadow_adverse.jsonl (logging only).
+
+        A trigger means the open trade first reached roi <= `threshold` after
+        ADVERSE_EXIT_CYCLES — i.e. a deep-red loser-cut at `threshold` WOULD have exited
+        here. Does NOT close the position. Each record carries (symbol, opened_at) so it can
+        be joined to the trade's real close in trading_state.json to compute both-sides PnL
+        (losers the cut would save vs winners it would clip)."""
+        cycles_held = self.cycle_count - pos.entry_cycle
+        held_min = round(cycles_held * Config.LOOP_INTERVAL / 60, 1)
+        rec = {
+            "ts": time.time(), "symbol": symbol, "side": pos.side,
+            "entry_price": pos.entry_price, "opened_at": pos.opened_at,  # join key
+            "trigger_price": price, "trigger_roi": round(roi, 2),
+            "threshold": threshold, "cycles_held": cycles_held, "held_min": held_min,
+        }
+        try:
+            with open(self._shadow_ae_path, "a") as f:
+                f.write(json.dumps(rec) + "\n")
+        except Exception as e:
+            logger.warning(f"[SHADOW ADVERSE] sidecar write failed: {e}")
+        logger.info(f"[SHADOW ADVERSE] {symbol} {pos.side} ROI {roi:.1f}% <= {threshold:.0f}% "
+                    f"after {held_min:.0f}min — deep-red cut would exit here (logging only)")
 
     def _sync_exchange_closes(self, prices: dict):
         """Bidirectional per-cycle position reconciliation against the exchange:

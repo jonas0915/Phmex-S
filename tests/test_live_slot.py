@@ -282,3 +282,53 @@ def test_mode_reload_restores_risk_semantics(slot):
                       timeframe="5m", max_positions=1, capital_pct=0.2, paper_mode=True)
     assert s2.paper_mode is False
     assert s2.risk.is_paper is False
+
+
+# ── shadow adverse-exit logging (fixed 2026-06-19; was dead inside should_adverse_exit) ──
+def _shadow_bot(tmp_path, rm, cycle):
+    import bot as bot_mod
+    b = bot_mod.Phmex2Bot.__new__(bot_mod.Phmex2Bot)
+    b.risk = rm
+    b._closing = set()
+    b.cycle_count = cycle
+    b._shadow_ae_seen = {}
+    b._shadow_ae_path = str(tmp_path / "shadow_adverse.jsonl")
+    return b
+
+
+def test_shadow_adverse_records_triggers_without_closing(tmp_path, monkeypatch):
+    # A deeply-red position past ADVERSE_EXIT_CYCLES records each crossed shadow threshold
+    # to the sidecar, but the position is NEVER closed (logging only; live exits run at -999).
+    monkeypatch.chdir(tmp_path)
+    from risk_manager import RiskManager
+    rm = RiskManager(state_file=str(tmp_path / "state.json"))
+    rm.open_position("DOGE/USDT:USDT", 0.10, 10.0, side="short", cycle=0)
+    pos = rm.positions["DOGE/USDT:USDT"]
+    b = _shadow_bot(tmp_path, rm, cycle=20)  # cycles_held = 20 >= 10
+
+    price = 0.10 * 1.009                      # short: price up 0.9% -> ~ -9% ROI on 10x
+    roi = pos.pnl_percent(price)
+    assert -10.0 < roi <= -8.0, f"setup roi={roi}"
+
+    b._log_shadow_adverse_triggers({"DOGE/USDT:USDT": price})
+
+    assert "DOGE/USDT:USDT" in rm.positions          # NOT closed — logging only
+    recs = [json.loads(l) for l in open(b._shadow_ae_path)]
+    expected = {t for t in (-4.0, -5.0, -6.0, -8.0, -10.0) if roi <= t}
+    assert {r["threshold"] for r in recs} == expected   # only thresholds the ROI crossed
+    assert all(r["opened_at"] == pos.opened_at for r in recs)  # join key present
+
+    # re-run same cycle: dedup -> no new records
+    b._log_shadow_adverse_triggers({"DOGE/USDT:USDT": price})
+    assert len([1 for _ in open(b._shadow_ae_path)]) == len(recs)
+
+
+def test_shadow_adverse_skips_before_min_cycles(tmp_path, monkeypatch):
+    # Deeply red but held < ADVERSE_EXIT_CYCLES -> no shadow record (matches AE cycle gate).
+    monkeypatch.chdir(tmp_path)
+    from risk_manager import RiskManager
+    rm = RiskManager(state_file=str(tmp_path / "s.json"))
+    rm.open_position("DOGE/USDT:USDT", 0.10, 10.0, side="short", cycle=0)
+    b = _shadow_bot(tmp_path, rm, cycle=3)   # cycles_held = 3 < 10
+    b._log_shadow_adverse_triggers({"DOGE/USDT:USDT": 0.11})  # deep red but too early
+    assert not os.path.exists(b._shadow_ae_path)
