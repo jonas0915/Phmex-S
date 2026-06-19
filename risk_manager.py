@@ -572,6 +572,11 @@ class RiskManager:
             # so sync from exchange doesn't wipe attribution data captured at entry time.
             existing = self.positions.get(symbol)
             preserved_snapshot = getattr(existing, "entry_snapshot", {}) if existing else {}
+            # Preserve scaled_out: a runner whose half was already partial-TP'd must
+            # NOT be scaled out a second time after a restart (the exchange only shows
+            # the remaining half). Without this, the partial-TP block re-fires on the
+            # runner and closes a quarter of the original at a needless taker fee.
+            preserved_scaled_out = getattr(existing, "scaled_out", False) if existing else False
 
             if side == "long":
                 stop_loss   = entry_price * (1 - Config.STOP_LOSS_PERCENT / 100)
@@ -594,6 +599,7 @@ class RiskManager:
                 opened_at=time.time(),
                 strategy="synced",
                 entry_snapshot=preserved_snapshot,
+                scaled_out=preserved_scaled_out,
             )
             self.positions[symbol] = position
             logger.info(

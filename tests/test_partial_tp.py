@@ -108,6 +108,31 @@ def test_partial_close_missing_symbol_returns_none():
     assert rm.partial_close_position("NOPE/USDT:USDT", 100.0) is None
 
 
+def test_sync_positions_preserves_scaled_out(monkeypatch):
+    """Regression (review 2026-06-19): a scaled-out runner restored from disk must
+    keep scaled_out=True after sync_positions rebuilds it from the exchange — else
+    the partial-TP block re-fires on the runner half."""
+    monkeypatch.setattr(Config, "MODE", "live")
+    rm = RiskManager.__new__(RiskManager)
+    rm.positions = {}
+    rm.closed_trades = []
+    rm.is_paper = False
+    rm._log_prefix = ""
+    rm._save_state = lambda: None
+    # Disk-restored runner: half size, already scaled out, with an entry_snapshot
+    disk = _make_position(amount=0.5, margin=5.0)
+    disk.scaled_out = True
+    disk.entry_snapshot = {"foo": "bar"}
+    rm.positions[SYMBOL] = disk
+    # Exchange reports the remaining half on restart
+    exch = [{"symbol": SYMBOL, "side": "long", "entry_price": 100.0,
+             "amount": 0.5, "margin": 5.0}]
+    rm.sync_positions(exch, current_cycle=1)
+    synced = rm.positions[SYMBOL]
+    assert synced.scaled_out is True, "scaled_out must survive restart/sync"
+    assert synced.entry_snapshot == {"foo": "bar"}
+
+
 def test_paper_mode_nets_fees_into_pnl():
     pos = _make_position(amount=1.0, margin=10.0)
     rm = _rm_with(pos)
