@@ -483,3 +483,18 @@ def test_adverse_fill_default_off_matches_naive():
     same = evaluate(C.DEFAULT_CHAMPION, data, {"min_trades_eval": 1},
                     adverse={"enabled": False})
     assert base.trades == same.trades and base.net == same.net
+
+
+def test_loop_ranks_champion_on_adverse_fills_not_naive(tmp_path, monkeypatch):
+    # Phase 1: the loop must rank on REALISTIC (adverse) fills, not the 100%-fill
+    # fiction. On a favorable-move short, naive books a fake win while the adverse
+    # model drops the unfilled signal. run_iteration's reported champion must reflect
+    # the adverse evaluation (net 0, no fill), not the naive win.
+    _isolate_lab(tmp_path, monkeypatch)
+    data = {"X/USDT:USDT": [_rec(0, 100.0), _rec(100, 97.0, imb=0.1),
+                            _rec(200, 96.0, imb=0.1)]}
+    naive = evaluate(C.DEFAULT_CHAMPION, data, {"min_trades_eval": 1})
+    assert naive.trades == 1 and naive.net > 0      # sanity: naive books the fake win
+    r = loop.run_iteration(by_symbol=data, dry_run=True)
+    assert r["champion_net"] == 0.0, "loop must rank the champion on adverse fills (dropped), not naive"
+    assert r["champion_trades"] == 0                 # observable: adverse dropped the fill

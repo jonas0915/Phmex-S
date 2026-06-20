@@ -2035,7 +2035,10 @@ class Phmex2Bot:
                     slot.total_entries += 1
                     _entered_this_symbol = True
                     entry_px = price if slot.paper_mode else fill_price
-                    snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, _entry_strategy_name, signal.strength, entry_px, 0, None, flow, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None)
+                    # ob (fetched at the top of this symbol loop, used by the OB gate +
+                    # confidence calc) MUST be passed here — a hardcoded None was the
+                    # ob:null bug that blinded the ST2.0 lab (Phase 0 fix 2026-06-19).
+                    snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, _entry_strategy_name, signal.strength, entry_px, 0, ob, flow, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None)
                     if symbol in slot.risk.positions:
                         slot.risk.positions[symbol].entry_snapshot = snap
                         slot.risk.positions[symbol].gate_tags = _tag_str

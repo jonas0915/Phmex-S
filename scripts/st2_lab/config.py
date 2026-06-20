@@ -52,6 +52,13 @@ DEFAULTS = {
     "improve_margin": 0.10,     # winner must beat champion score by this fraction
     "min_trades_eval": 15,      # a config needs >= this many sim trades to be rankable
     "confirm_sample": 30,       # paper-confirm trades before a live proposal
+    # Phase 1 walk-forward + deflated-Sharpe acceptance gate (on top of the
+    # single-split OOS check). A candidate must win across a MAJORITY of windows and
+    # clear the deflated-Sharpe bar that rises with the number of candidates tried.
+    "wf_windows": 5,            # expanding walk-forward windows
+    "wf_embargo_secs": 900,     # purge gap (~15-min label horizon) at each boundary
+    "wf_min_trades": 8,         # per-window rank bar (< single-split's; ST2.0 fires rarely)
+    "dsr_min": 0.90,            # deflated-Sharpe floor for acceptance
 }
 
 # ── the ST2.0 config genome the loop evolves ────────────────────────────
