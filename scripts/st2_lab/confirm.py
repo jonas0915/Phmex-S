@@ -12,6 +12,7 @@ from __future__ import annotations
 from . import config as C
 from . import features as feat
 from . import proposer
+from . import safe_exec
 from . import walkforward as wf
 from . import stats
 from .evaluator import evaluate_with_trades
@@ -152,3 +153,62 @@ def screen_verdict(hyp: dict, by_symbol: dict, loop_cfg: dict) -> dict:
     s["deflated_sharpe"] = round(dsr, 6)
     s["status"] = "pass" if (majority_pos and dsr >= dsr_min) else "fail"
     return s
+
+
+_ENTRY = ("imb_min", "br_min", "min_trades")
+
+
+def _entry_ok(rec: dict, p: dict) -> bool:
+    return (rec.get("imbalance", 0.0) >= p.get("imb_min", 0.0)
+            and rec.get("buy_ratio", 0.0) >= p.get("br_min", 0.0)
+            and rec.get("trade_count", 0) >= p.get("min_trades", 0))
+
+
+def _passes_candidate(rec: dict, cfg: dict, filter_fns) -> bool:
+    if not _entry_ok(rec, cfg.get("params", {})):
+        return False
+    for fn in filter_fns:
+        if not fn(rec):
+            return False
+    return True
+
+
+def truth_verdict(hyp: dict, real_records: list, live_config: dict | None,
+                  loop_cfg: dict) -> dict:
+    """Real-fill verdict. LIVE -> all real trades. Filter-kind -> the kept subset
+    (entry + raw filters applied to each real trade's recorded conditions). Base /
+    ineligible -> applicable False, stays accruing. Self-closes at >= confirm_sample
+    kept: confirm (CI lower > 0) / reject (CI upper < 0) / else accruing."""
+    t = hyp["truth"]
+    need = loop_cfg.get("confirm_sample", C.DEFAULTS["confirm_sample"])
+    t["considered"] = len(real_records)
+
+    if hyp["id"] == "LIVE":
+        kept = list(real_records)
+    elif hyp.get("truth", {}).get("applicable") and truth_eligible(hyp["config"], live_config):
+        try:
+            fns = [safe_exec.compile_filter(f.get("code") if isinstance(f, dict) else f)
+                   for f in hyp["config"].get("filters", []) or []]
+        except safe_exec.Rejection:
+            t["applicable"] = False
+            t["status"] = "accruing"
+            return t
+        kept = [r for r in real_records if _passes_candidate(r, hyp["config"], fns)]
+    else:
+        t["applicable"] = False
+        t["status"] = "accruing"
+        return t
+
+    t["applicable"] = True
+    t["kept"] = len(kept)
+    t["dropped"] = len(real_records) - len(kept)
+    nets = [float(r.get("net", 0.0)) for r in kept]
+    t["expectancy"] = sum(nets) / len(nets) if nets else 0.0
+    if len(kept) < need or not nets:
+        t["status"] = "accruing"
+        t["ci"] = [0.0, 0.0]
+        return t
+    lo, hi = stats.bootstrap_diff_ci(nets, [0.0], seed=0)
+    t["ci"] = [round(lo, 6), round(hi, 6)]
+    t["status"] = "confirm" if lo > 0 else ("reject" if hi < 0 else "accruing")
+    return t

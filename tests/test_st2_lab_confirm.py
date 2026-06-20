@@ -105,3 +105,67 @@ def test_screen_accruing_below_threshold():
         truth_applicable=True)
     s = CF.screen_verdict(hyp, by, _loop_cfg(screen_min_trades=999))
     assert s["status"] == "accruing"
+
+
+def _real(imb, br, net, tc=20, cvd=-0.5):
+    return {"imbalance": imb, "spread_pct": 0.05, "buy_ratio": br, "trade_count": tc,
+            "cvd_slope": cvd, "large_trade_bias": 0.0, "divergence_bullish": False,
+            "divergence_bearish": False, "hour": 12, "net": net}
+
+
+def test_truth_live_uses_all_real_trades():
+    champ = {"live_config": LIVE}
+    CF.ensure_live_entry(champ, registered_ts=0)
+    hyp = champ["confirm_registry"][0]
+    reals = [_real(0.4, 0.7, +1.0), _real(0.4, 0.7, -0.5), _real(0.4, 0.7, +2.0)]
+    t = CF.truth_verdict(hyp, reals, LIVE, _loop_cfg(confirm_sample=2))
+    assert t["applicable"] is True
+    assert t["kept"] == 3 and t["dropped"] == 0
+    assert abs(t["expectancy"] - (1.0 - 0.5 + 2.0) / 3) < 1e-9
+
+
+def test_truth_filter_judges_kept_subset_only():
+    # candidate adds a raw filter cvd_slope <= -0.4; only trades passing it are kept
+    cfg = _cfg(imb=0.35, filters=[{"code": "cvd_slope <= -0.4"}])
+    hyp = CF._new_hypothesis(CF.proposer.config_hash(cfg), cfg, "filter",
+                             registered_ts=0, run_count=1, truth_applicable=True)
+    reals = [_real(0.4, 0.7, +3.0, cvd=-0.5),   # kept (cvd -0.5 <= -0.4)
+             _real(0.4, 0.7, -9.0, cvd=-0.1),   # dropped (cvd -0.1 > -0.4)
+             _real(0.4, 0.7, +1.0, cvd=-0.6)]   # kept
+    t = CF.truth_verdict(hyp, reals, LIVE, _loop_cfg(confirm_sample=2))
+    assert t["kept"] == 2 and t["dropped"] == 1
+    assert abs(t["expectancy"] - (3.0 + 1.0) / 2) < 1e-9   # the -9.0 loser is excluded
+
+
+def test_truth_accruing_below_confirm_sample():
+    champ = {"live_config": LIVE}; CF.ensure_live_entry(champ, 0)
+    hyp = champ["confirm_registry"][0]
+    t = CF.truth_verdict(hyp, [_real(0.4, 0.7, +1.0)], LIVE, _loop_cfg(confirm_sample=5))
+    assert t["status"] == "accruing"
+
+
+def test_truth_confirm_when_ci_above_zero():
+    champ = {"live_config": LIVE}; CF.ensure_live_entry(champ, 0)
+    hyp = champ["confirm_registry"][0]
+    reals = [_real(0.4, 0.7, +1.0) for _ in range(40)]   # all winners -> CI lower bound > 0
+    t = CF.truth_verdict(hyp, reals, LIVE, _loop_cfg(confirm_sample=10))
+    assert t["status"] == "confirm"
+    assert t["ci"][0] > 0
+
+
+def test_truth_reject_when_ci_below_zero():
+    champ = {"live_config": LIVE}; CF.ensure_live_entry(champ, 0)
+    hyp = champ["confirm_registry"][0]
+    reals = [_real(0.4, 0.7, -1.0) for _ in range(40)]   # all losers -> CI upper bound < 0
+    t = CF.truth_verdict(hyp, reals, LIVE, _loop_cfg(confirm_sample=10))
+    assert t["status"] == "reject"
+    assert t["ci"][1] < 0
+
+
+def test_truth_inapplicable_for_base_candidate():
+    cfg = _cfg(imb=0.25)   # looser -> base -> not TRUTH-judgeable
+    hyp = CF._new_hypothesis("b1", cfg, "base", registered_ts=0, run_count=1,
+                             truth_applicable=False)
+    t = CF.truth_verdict(hyp, [_real(0.4, 0.7, +1.0) for _ in range(40)], LIVE, _loop_cfg())
+    assert t["applicable"] is False
+    assert t["status"] == "accruing"   # never closes on real fills
