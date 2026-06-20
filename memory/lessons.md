@@ -551,5 +551,25 @@ orphan scan) is preserved. Regression test `test_sync_close_isolates_one_failing
 here — it would block the (B) orphan scan that catches naked positions running to −45%. NOT yet
 live: the running bot keeps the old in-memory code until a /pre-restart-audit'd restart.
 
-**Also:** the handoff "2 stale tests" was itself stale — `test_dashboard_v2.py::test_trade_detail_endpoint`
-already passes. Verify the actual failing set with `pytest tests/ -q` before trusting a carried-over count.
+**Also:** the handoff "2 stale tests" was itself stale — verify the actual failing set with
+`pytest tests/ -q` before trusting a carried-over count.
+
+### Phmex-S Dashboard: blotter drill-down broke for dotted slot ids ("ST2.0") (2026-06-20)
+- Symptom: daily 7:30 AM code-health fired a Telegram CRITICAL ("pytest 1 failed") because
+  `test_dashboard_v2.py::test_trade_detail_endpoint` failed — but only INTERMITTENTLY (a
+  prior lesson wrongly recorded it as "already passes"). It's data-dependent: it asserts on
+  `collect_blotter_rows(limit=5)[0]`, so it fails ONLY when the newest blotter row is an
+  ST2.0 trade.
+- Root cause (a REAL dashboard bug, not a test bug): blotter id = `"owner:index"` and the live
+  slot id is `"ST2.0"` (has a DOT). `build_trade_detail` (web_dashboard.py:917) validated owner
+  with `re.fullmatch(r"[A-Za-z0-9_]+", owner)` — the dot fails → `{"error":"not found"}`. So
+  clicking ANY ST2.0 trade in the dashboard drill-down returned "not found".
+- Fix: charset widened to `[A-Za-z0-9_.]+`. The path separator stays disallowed, so the
+  filename interpolation `trading_state_{owner}.json` still can't traverse. Two deterministic
+  regression tests added (dotted-id resolves + traversal stays rejected); replaces reliance on
+  the flaky live-data endpoint test. Full suite 225 pass / 0 fail.
+- web_dashboard.py is the :8050 monitor process, NOT main.py — no bot restart / pre-restart-audit
+  needed; code-health re-runs pytest from disk so it greens on the next run.
+- **Rule:** any id that embeds a slot_id and is later validated/filename-interpolated must allow
+  every char a real slot_id can contain (the dot in "ST2.0"). When a "known failing" test is
+  flaky, find the data-dependent branch — don't record it as "passes".

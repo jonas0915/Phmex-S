@@ -61,6 +61,32 @@ def test_trade_detail_endpoint():
         assert "snapshot" in d  # dict or the string "no snapshot recorded"
 
 
+def test_trade_detail_resolves_dotted_slot_id(tmp_path, monkeypatch):
+    # Slot ids can contain a dot (live example: "ST2.0"). The blotter id is
+    # "owner:index", so the drill-down must resolve "ST2.0:0". Regression: the
+    # owner-validation regex used to reject the dot, so EVERY ST2.0 trade detail
+    # returned {"error": "not found"} (and the flaky endpoint test failed whenever
+    # the newest blotter row was an ST2.0 trade).
+    import json
+    import web_dashboard as wd
+    state = {"closed_trades": [{"symbol": "ETH/USDT:USDT", "side": "short",
+             "strategy": "ST2.0", "entry_snapshot": {"ob": {"imbalance": 0.4}}}]}
+    (tmp_path / "trading_state_ST2.0.json").write_text(json.dumps(state))
+    monkeypatch.setattr(wd, "PROJECT_DIR", str(tmp_path))
+    d = wd.build_trade_detail("ST2.0:0")
+    assert "error" not in d
+    assert "snapshot" in d
+    assert d["trade"]["owner"] == "ST2.0"
+
+
+def test_trade_detail_rejects_path_traversal_owner():
+    # owner is interpolated into a filename — a slash / traversal must stay rejected
+    # even though the dot is now an allowed owner character.
+    import web_dashboard as wd
+    assert wd.build_trade_detail("../secret:0") == {"error": "not found"}
+    assert wd.build_trade_detail("a/b:0") == {"error": "not found"}
+
+
 SAMPLE_LOG = """
 2026-06-12 09:52:08 [DEBUG] [HOLD] ZEC/USDT:USDT — No confluence signal (1h ADX=15.3)
 2026-06-12 09:52:09 [DEBUG] [STRAT] l2_anticipation: 1h ADX 23.2 < 25

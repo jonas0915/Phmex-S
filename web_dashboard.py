@@ -913,8 +913,10 @@ def build_trade_detail(trade_id: str, sym: str = None) -> dict:
     try:
         owner, idx_s = str(trade_id).split(":", 1)
         idx = int(idx_s)
-        # owner becomes part of a filename — allow only safe slot-id chars.
-        if idx < 0 or not re.fullmatch(r"[A-Za-z0-9_]+", owner):
+        # owner becomes part of a filename — allow only safe slot-id chars. The dot
+        # is permitted because live slot ids contain it (e.g. "ST2.0"); the path
+        # separator stays disallowed, so no traversal is possible.
+        if idx < 0 or not re.fullmatch(r"[A-Za-z0-9_.]+", owner):
             return {"error": "not found"}
         path = STATE_FILE if owner == "main" else os.path.join(
             PROJECT_DIR, f"trading_state_{owner}.json")
