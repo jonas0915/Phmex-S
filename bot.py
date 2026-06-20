@@ -776,10 +776,13 @@ class Phmex2Bot:
                         continue
                     fill_price = self._extract_fill_price(order, price, is_exit=True)
                     fee = self.exchange.extract_order_fee(order, symbol)
+                    # Capture the trigger ROI BEFORE partial_close_position halves
+                    # pos.margin (else the logged ROI reads ~2x the real trigger).
+                    trigger_roi = pos.pnl_percent(fill_price)
                     result = self.risk.partial_close_position(symbol, fill_price, fees_usdt=fee)
                     if result:
                         pnl, pnl_pct = result
-                        logger.info(f"[PARTIAL TP] {symbol} scaled out half @ {fill_price:.4f} (+{pos.pnl_percent(fill_price):.1f}% ROI) — runner continues")
+                        logger.info(f"[PARTIAL TP] {symbol} scaled out half @ {fill_price:.4f} (+{trigger_roi:.1f}% ROI) — runner continues")
                         # Runner TP: partial_close_position lifted pos.take_profit to the
                         # runner target. Cancel the stale entry-time exchange TP (resting
                         # at the original level) and let the software/watcher enforce the
