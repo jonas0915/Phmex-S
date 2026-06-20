@@ -140,7 +140,7 @@ def screen_verdict(hyp: dict, by_symbol: dict, loop_cfg: dict) -> dict:
     s["trades"] = total_trades
     s["expectancy"] = round(sum(win_exps) / len(win_exps), 6) if win_exps else 0.0
     s["updated_ts"] = max([hyp["registered_ts"]] +
-                          [r["ts"] for recs in fwd.values() for r in recs[-1:]])
+                          [r["ts"] for recs in fwd.values() for r in recs])
     if total_trades < need or not win_exps:
         s["status"] = "accruing"
         return s

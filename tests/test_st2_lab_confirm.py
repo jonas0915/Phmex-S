@@ -93,6 +93,8 @@ def test_screen_uses_only_forward_rows():
     # every trade the screen scored must come from ts > 5000 (no leakage from search window)
     assert s["status"] in ("accruing", "pass", "fail")
     assert s["updated_ts"] >= 5000
+    assert s["updated_ts"] == 200 * 75 - 75    # last forward row's ts (14925) — boundary pinned
+    assert s["trades"] > 0                       # post-registration rows produced evaluable signal
 
 
 def test_screen_accruing_below_threshold():
