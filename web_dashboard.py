@@ -1598,6 +1598,9 @@ body {{ background:var(--bg); color:var(--txt);
 <div class="panel" id="equity-root" style="margin:0 3px;">
     <div class="ptitle"><span id="eq-title">EQUITY &mdash; loading&hellip;</span>
         <span style="float:right">
+            <button class="era-btn" onclick="eqZoom(0.7)" title="Zoom in (or scroll-wheel up on chart)">+</button>
+            <button class="era-btn" onclick="eqZoom(1.43)" title="Zoom out (or scroll-wheel down on chart)">&minus;</button>
+            <button class="era-btn" onclick="eqZoomReset()" title="Reset zoom (or double-click chart)">&#8635;</button>
             <button class="era-btn active" id="era-sentinel" onclick="setEra('sentinel')">SENTINEL</button>
             <button class="era-btn" id="era-all" onclick="setEra('all')">ALL</button>
         </span>
@@ -1706,6 +1709,21 @@ function wheelZoomPlugin(){{
       }}
     }},
   }} }};
+}}
+// Visible zoom controls (+ / - / reset) — drive the SAME zoom state as wheel/drag.
+function eqZoom(nf){{  // nf<1 = zoom in, nf>1 = zoom out, centered on the current view
+  if(!plot) return;
+  const xMin=plot.scales.x.min, xMax=plot.scales.x.max, xRange=xMax-xMin;
+  if(!isFinite(xRange)||xRange<=0) return;
+  const c=(xMin+xMax)/2, nr=xRange*nf;
+  eqZoomed=true; eqXMin=c-nr/2; eqXMax=c+nr/2;
+  plot.setScale('x', {{min:eqXMin, max:eqXMax}});
+}}
+function eqZoomReset(){{
+  if(!plot) return;
+  eqZoomed=false; eqXMin=null; eqXMax=null;
+  const xs=plot.data[0];
+  if(xs&&xs.length){{ plot.setScale('x', {{min:xs[0], max:xs[xs.length-1]}}); }}
 }}
 async function loadEquity(){{
   const title=document.getElementById('eq-title');

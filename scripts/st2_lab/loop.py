@@ -19,6 +19,7 @@ import os
 from . import config as C
 from . import champion as champ_store
 from . import confirm
+from . import notify
 from . import dataset as ds
 from . import fills as fills_mod
 from . import diagnostics
@@ -315,6 +316,12 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
             (logger.warning if tr["alert"] else logger.info)("[CONFIRM] %s", tr["msg"])
             champ_store.append_lineage(new_champ, f"confirm:{tr['id']}:{tr['to']}",
                                        {"verdict": tr["to"]}, run_count)
+            # LIVE truth_reject (alert=True) is the load-bearing signal: the live
+            # ST2.0 config is failing REAL-fill confirmation. Push it to Telegram
+            # (best-effort; never raises). Other transitions stay log-only.
+            if tr["alert"] and not dry_run:
+                notify.telegram_alert(
+                    f"🚨 ST2.0 LAB — LIVE config failing REAL confirmation\n{tr['msg']}")
         result["confirm_transitions"] = [t["msg"] for t in transitions]
     except Exception as e:                       # confirm must never break the search loop
         logger.error("[CONFIRM] tick failed (non-fatal): %s", e, exc_info=True)
