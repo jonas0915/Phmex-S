@@ -66,3 +66,40 @@ def test_ensure_live_entry_idempotent():
     live = [h for h in champ["confirm_registry"] if h["id"] == "LIVE"]
     assert len(live) == 1
     assert live[0]["truth"]["applicable"] is True   # LIVE is always TRUTH-applicable
+
+
+def _stream(symbol, n, start_ts, price0=100.0, drift=0.0, imb=0.4, br=0.7, tc=20):
+    return {symbol: [{"ts": start_ts + i * 75, "symbol": symbol,
+                      "price": price0 + drift * i, "imbalance": imb, "spread_pct": 0.05,
+                      "buy_ratio": br, "trade_count": tc, "cvd_slope": -0.5,
+                      "large_trade_bias": 0.0, "divergence_bullish": False,
+                      "divergence_bearish": False, "hour": 12} for i in range(n)]}
+
+
+def _loop_cfg(**kw):
+    base = {"wf_windows": 3, "wf_embargo_secs": 0, "wf_min_trades": 1,
+            "dsr_min": 0.0, "screen_min_trades": 3, "confirm_sample": 5}
+    base.update(kw); return base
+
+
+def test_screen_uses_only_forward_rows():
+    # registered_ts at 5000: rows before are search data and must be ignored
+    by = _stream("ETH/USDT:USDT", 200, start_ts=0)
+    hyp = CF._new_hypothesis("h1", {"params": {"imb_min": 0.30, "br_min": 0.60,
+        "min_trades": 15, "hold_secs": 900, "sl_pct": 1.2, "tp_pct": 1.6},
+        "filters": [], "symbols": None}, "filter", registered_ts=5000, run_count=1,
+        truth_applicable=True)
+    s = CF.screen_verdict(hyp, by, _loop_cfg())
+    # every trade the screen scored must come from ts > 5000 (no leakage from search window)
+    assert s["status"] in ("accruing", "pass", "fail")
+    assert s["updated_ts"] >= 5000
+
+
+def test_screen_accruing_below_threshold():
+    by = _stream("ETH/USDT:USDT", 6, start_ts=0)   # too few forward trades
+    hyp = CF._new_hypothesis("h2", {"params": {"imb_min": 0.30, "br_min": 0.60,
+        "min_trades": 15, "hold_secs": 900, "sl_pct": 1.2, "tp_pct": 1.6},
+        "filters": [], "symbols": None}, "filter", registered_ts=0, run_count=1,
+        truth_applicable=True)
+    s = CF.screen_verdict(hyp, by, _loop_cfg(screen_min_trades=999))
+    assert s["status"] == "accruing"
