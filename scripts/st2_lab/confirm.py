@@ -209,3 +209,36 @@ def truth_verdict(hyp: dict, real_records: list, live_config: dict | None,
     t["ci"] = [round(lo, 6), round(hi, 6)]
     t["status"] = "confirm" if lo > 0 else ("reject" if hi < 0 else "accruing")
     return t
+
+
+def _verdict_for(hyp: dict) -> str:
+    t, s = hyp["truth"], hyp["screen"]
+    if t.get("applicable") and t["status"] in ("confirm", "reject"):
+        return "truth_" + t["status"]
+    if s["status"] in ("pass", "fail"):
+        return "screen_" + s["status"]
+    return "accruing"
+
+
+def tick(champ: dict, by_symbol: dict, real_records: list) -> list:
+    """Advance SCREEN + TRUTH for every registered hypothesis; set verdict; return
+    NEW verdict transitions (deduped on change). TRUTH is authoritative over SCREEN."""
+    loop_cfg = champ.get("loop", dict(C.DEFAULTS))
+    live_config = champ.get("live_config")
+    transitions = []
+    for hyp in champ.setdefault("confirm_registry", []):
+        screen_verdict(hyp, by_symbol, loop_cfg)
+        truth_verdict(hyp, real_records, live_config, loop_cfg)
+        new_v = _verdict_for(hyp)
+        old_v = hyp.get("verdict", "accruing")
+        hyp["verdict"] = new_v
+        if new_v != old_v and new_v != "accruing":
+            is_live_reject = (hyp["id"] == "LIVE" and new_v == "truth_reject")
+            transitions.append({
+                "id": hyp["id"], "from": old_v, "to": new_v, "kind": hyp["kind"],
+                "alert": is_live_reject,
+                "msg": (f"ST2.0 confirm: {hyp['id']} {old_v} -> {new_v} "
+                        f"(truth kept={hyp['truth']['kept']} exp={hyp['truth']['expectancy']:+.4f} "
+                        f"ci={hyp['truth']['ci']}; screen={hyp['screen']['status']})"),
+            })
+    return transitions

@@ -169,3 +169,25 @@ def test_truth_inapplicable_for_base_candidate():
     t = CF.truth_verdict(hyp, [_real(0.4, 0.7, +1.0) for _ in range(40)], LIVE, _loop_cfg())
     assert t["applicable"] is False
     assert t["status"] == "accruing"   # never closes on real fills
+
+
+def test_tick_sets_verdict_and_returns_transition_once():
+    champ = {"live_config": LIVE, "run_count": 1, "loop": _loop_cfg(confirm_sample=10)}
+    CF.ensure_live_entry(champ, registered_ts=0)
+    reals = [_real(0.4, 0.7, -1.0) for _ in range(40)]   # LIVE failing real confirmation
+    by = {}                                              # no forward snapshots this fixture
+    trans = CF.tick(champ, by, reals)
+    live = [h for h in champ["confirm_registry"] if h["id"] == "LIVE"][0]
+    assert live["verdict"] == "truth_reject"
+    assert len(trans) == 1 and trans[0]["id"] == "LIVE" and trans[0]["alert"] is True
+    # second identical tick emits NO new transition (dedup on unchanged verdict)
+    assert CF.tick(champ, by, reals) == []
+
+
+def test_tick_truth_authoritative_over_screen():
+    champ = {"live_config": LIVE, "run_count": 1, "loop": _loop_cfg(confirm_sample=10)}
+    CF.ensure_live_entry(champ, 0)
+    reals = [_real(0.4, 0.7, +1.0) for _ in range(40)]
+    CF.tick(champ, {}, reals)
+    live = [h for h in champ["confirm_registry"] if h["id"] == "LIVE"][0]
+    assert live["verdict"] == "truth_confirm"   # real-fill verdict wins
