@@ -59,6 +59,9 @@ DEFAULTS = {
     "wf_embargo_secs": 900,     # purge gap (~15-min label horizon) at each boundary
     "wf_min_trades": 8,         # per-window rank bar (< single-split's; ST2.0 fires rarely)
     "dsr_min": 0.90,            # deflated-Sharpe floor for acceptance
+    # Phase 2 self-closing confirm
+    "screen_min_trades": 40,    # forward-OOS replay trades before SCREEN self-closes
+    "registry_cap": 50,         # max non-LIVE hypotheses retained in confirm_registry
 }
 
 # ── the ST2.0 config genome the loop evolves ────────────────────────────
@@ -80,6 +83,8 @@ DEFAULT_CHAMPION = {
     "tried": [],              # config fingerprints already evaluated (skip dead-ends)
     "data_epoch": 0,          # max ts of the dataset last explored; grows -> reset tried
     "loop": dict(DEFAULTS),
+    "live_config": None,        # the live ST2.0 config (params+filters+exits); human-set at deploy
+    "confirm_registry": [],     # Phase 2: hypotheses under forward adjudication
 }
 
 # parameter search bounds the deterministic mutator stays within
