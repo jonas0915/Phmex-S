@@ -18,6 +18,7 @@ import os
 
 from . import config as C
 from . import champion as champ_store
+from . import confirm
 from . import dataset as ds
 from . import fills as fills_mod
 from . import diagnostics
@@ -304,6 +305,20 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
     result["run_count"] = new_champ["run_count"]
     result["history_size"] = len(new_champ.get("history", []))
     result["tried_size"] = len(new_champ["tried"])
+    # Phase 2 — self-closing confirm: register Step-1 survivors + LIVE, advance verdicts.
+    try:
+        confirm.ensure_live_entry(new_champ, cur_epoch)
+        for c, _tr, _te in passed:
+            confirm.register_if_survivor(new_champ, c, cur_epoch, run_count)
+        transitions = confirm.tick(new_champ, by_symbol, real_trades.load_real_trades())
+        for tr in transitions:
+            (logger.warning if tr["alert"] else logger.info)("[CONFIRM] %s", tr["msg"])
+            champ_store.append_lineage(new_champ, f"confirm:{tr['id']}:{tr['to']}",
+                                       {"verdict": tr["to"]}, run_count)
+        result["confirm_transitions"] = [t["msg"] for t in transitions]
+    except Exception as e:                       # confirm must never break the search loop
+        logger.error("[CONFIRM] tick failed (non-fatal): %s", e, exc_info=True)
+
     if not dry_run:
         champ_store.save(new_champ)
 
