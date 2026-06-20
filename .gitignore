@@ -24,3 +24,6 @@ docs/fix-proposals/st2-lab-*.md
 # ST2.0 watcher dedup cache (logs/ already ignored above)
 .st2_watch_state.json
 .dashboard_token
+
+# worktrees created by EnterWorktree (do not track — auto-backup was committing them as gitlinks)
+.claude/worktrees/
