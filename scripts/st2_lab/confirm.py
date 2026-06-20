@@ -155,9 +155,6 @@ def screen_verdict(hyp: dict, by_symbol: dict, loop_cfg: dict) -> dict:
     return s
 
 
-_ENTRY = ("imb_min", "br_min", "min_trades")
-
-
 def _entry_ok(rec: dict, p: dict) -> bool:
     return (rec.get("imbalance", 0.0) >= p.get("imb_min", 0.0)
             and rec.get("buy_ratio", 0.0) >= p.get("br_min", 0.0)
@@ -185,7 +182,7 @@ def truth_verdict(hyp: dict, real_records: list, live_config: dict | None,
 
     if hyp["id"] == "LIVE":
         kept = list(real_records)
-    elif hyp.get("truth", {}).get("applicable") and truth_eligible(hyp["config"], live_config):
+    elif t.get("applicable") and truth_eligible(hyp["config"], live_config):
         try:
             fns = [safe_exec.compile_filter(f.get("code") if isinstance(f, dict) else f)
                    for f in hyp["config"].get("filters", []) or []]
