@@ -1982,7 +1982,11 @@ class Phmex2Bot:
                                      if direction == "long"
                                      else self.exchange.open_short(symbol, margin, price))
                             if not order:
-                                logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} {direction} — no fill (PostOnly miss), skipping")
+                                # Log the entry conditions present at a MISS (mirrors the fill
+                                # line below, whose {signal.reason} carries imb/br/tc for ST2.0)
+                                # so fill-vs-miss can finally be compared — the instrumentation
+                                # gap that blocked the 2026-06-20 execution analysis.
+                                logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} {direction} — no fill (PostOnly miss), skipping | {signal.reason}")
                                 continue
                             fill_price = self._extract_fill_price(order, price)
                             slot.risk.open_position(symbol, fill_price, margin, side=direction,
