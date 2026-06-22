@@ -71,11 +71,21 @@ def _new_hypothesis(hid: str, cfg: dict, kind: str, registered_ts: int,
 
 
 def ensure_live_entry(champ: dict, registered_ts: int) -> None:
-    """Guarantee a permanent id=='LIVE' registry entry (TRUTH = all real trades)."""
+    """Guarantee a permanent id=='LIVE' registry entry (TRUTH = all real trades), and
+    keep its config in sync with champ['live_config']. The sync matters because LIVE
+    can be registered (in an early run) BEFORE a human sets live_config — leaving it
+    with empty params that crash the SCREEN evaluator (KeyError sl_pct). Re-syncing
+    self-heals that stale entry and tracks any later live_config change."""
     reg = champ.setdefault("confirm_registry", [])
-    if any(h["id"] == "LIVE" for h in reg):
-        return
     live_cfg = champ.get("live_config") or {"params": {}, "filters": [], "symbols": None}
+    synced = {"params": dict(live_cfg.get("params", {})),
+              "filters": list(live_cfg.get("filters", []) or []),
+              "symbols": live_cfg.get("symbols")}
+    existing = next((h for h in reg if h["id"] == "LIVE"), None)
+    if existing is not None:
+        if existing.get("config") != synced:
+            existing["config"] = synced
+        return
     reg.append(_new_hypothesis("LIVE", live_cfg, "live", registered_ts,
                                champ.get("run_count", 0), truth_applicable=True))
 
