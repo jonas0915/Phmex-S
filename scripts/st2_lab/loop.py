@@ -22,6 +22,7 @@ from . import confirm
 from . import notify
 from . import dataset as ds
 from . import fills as fills_mod
+from . import drift as drift_mod
 from . import diagnostics
 from . import real_trades
 from .proposer import propose, _filter_entry, config_hash
@@ -133,6 +134,15 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
     fstats = fills_mod.measured_fill_stats()
     fr = fstats["rate"]
     logger.info("FILL TRUTH | %s", fills_mod.format_report(fstats).replace("\n", " | "))
+
+    # Post-fill adverse-drift — the negative-drift thesis (arxiv 2407.16527) measured
+    # on real money: 30s post-fill mark vs fill price. Positive bps = adverse. Offline,
+    # log-only; covers only the L2-recorded symbols (BTC/ETH/INJ/ARB). Never raises.
+    try:
+        dstats = drift_mod.drift_summary(drift_mod.load_drifts())
+        logger.info("ADVERSE DRIFT | %s", drift_mod.format_report(dstats).replace("\n", " | "))
+    except Exception as e:
+        logger.error("[DRIFT] diagnostic failed (non-fatal): %s", e, exc_info=True)
 
     # Chronological train/test split. Diagnostics + selection happen on TRAIN; a
     # candidate is only accepted if it ALSO beats the champion OUT-OF-SAMPLE on TEST.
