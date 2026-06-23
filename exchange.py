@@ -888,13 +888,18 @@ class Exchange:
                 last_err = RuntimeError("amend verify failed — order not in open orders")
             except Exception as e:
                 last_err = e
-                logger.warning(f"[SL-MOVE] amend attempt {attempt+1}/3 failed for {symbol}: {e}")
+                # Log the exception CLASS + repr, not just str(): ccxt wraps the raw
+                # Phemex code/JSON (e.g. ExchangeError vs InvalidOrder vs NotSupported)
+                # which str() drops — that detail is what diagnoses a recurring reject.
+                logger.warning(f"[SL-MOVE] amend attempt {attempt+1}/3 failed for {symbol}: "
+                               f"{type(e).__name__}: {e!r}")
             if attempt < 2:
                 time.sleep(1 + attempt)
 
         # Fallback — place-then-cancel. If the duplicate reduce-only SL is rejected
         # (Merged-mode acceptance unknown, Appendix A), we raise with the old SL intact.
-        logger.warning(f"[SL-MOVE] amend exhausted for {symbol} ({last_err}) — fallback place-then-cancel")
+        logger.warning(f"[SL-MOVE] amend exhausted for {symbol} "
+                       f"({type(last_err).__name__}: {last_err}) — fallback place-then-cancel")
         new_id = None
         for attempt in range(3):
             try:
@@ -905,11 +910,13 @@ class Exchange:
                 new_id = None
             except Exception as e:
                 last_err = e
-                logger.warning(f"[SL-MOVE] fallback place attempt {attempt+1}/3 failed for {symbol}: {e}")
+                logger.warning(f"[SL-MOVE] fallback place attempt {attempt+1}/3 failed for {symbol}: "
+                               f"{type(e).__name__}: {e!r}")
             if attempt < 2:
                 time.sleep(1 + attempt)
         if not new_id:
-            raise RuntimeError(f"move_stop_loss failed for {symbol}: old SL {sl_order_id} left in place ({last_err})")
+            raise RuntimeError(f"move_stop_loss failed for {symbol}: old SL {sl_order_id} "
+                               f"left in place ({type(last_err).__name__}: {last_err})")
         try:
             self.client.cancel_order(sl_order_id, symbol)
         except Exception as e:
