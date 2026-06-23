@@ -169,7 +169,10 @@ class StrategySlot:
             return False
         kelly = self.risk.calculate_kelly_raw()
         if kelly < 0:
-            logger.warning(f"[KILL SWITCH] Slot '{self.slot_id}' disabled — negative Kelly ({kelly:.3f}) after {len(self.risk.closed_trades)} trades")
+            # DEBUG not WARNING: this property is evaluated every cycle, so a killed
+            # slot spammed ~1.6k WARNING lines/day (46% of all warnings, 2026-06-23 audit).
+            # The actual auto-demote/disable is handled once at bot.py:_check_slot_demote.
+            logger.debug(f"[KILL SWITCH] Slot '{self.slot_id}' disabled — negative Kelly ({kelly:.3f}) after {len(self.risk.closed_trades)} trades")
             return True
         return False
 

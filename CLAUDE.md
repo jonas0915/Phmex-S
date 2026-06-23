@@ -32,8 +32,8 @@ Current version: **Sentinel (v11)** — deployed 2026-04-01.
 | Daily symbol cap | 3 trades/symbol (enforced 2026-06-11 — was log-only) | bot.py:~966 |
 | ADX threshold | 25 | strategies.py |
 | Ensemble confidence | 4/7 minimum | bot.py |
-| OB imbalance gate | ±0.25 | strategies.py:139 |
-| Tape buy_ratio gate | 0.45/0.55 | bot.py:~789 |
+| OB imbalance gate | ±0.25 | bot.py:1433,1883 |
+| Tape buy_ratio gate | 0.45/0.55 | bot.py:1295,1905 |
 | Pullback session gate | `false` (shadow-only, Phase 2b Gate A) — blocks UTC {5,8,13,14,16} when `true` | .env: PULLBACK_SESSION_GATE |
 | Pullback volatile gate | `false` (reserved, Gate B shadow-only) | .env: PULLBACK_VOLATILE_GATE |
 

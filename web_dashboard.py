@@ -19,7 +19,13 @@ from urllib.parse import urlparse, parse_qs
 from zoneinfo import ZoneInfo
 
 CA_TZ = ZoneInfo("America/Los_Angeles")
-NY_TZ = ZoneInfo("America/New_York")  # bot.log timestamps are local Eastern
+# CA_TZ is the DISPLAY zone (Jonas is California-based, thinks in PT).
+# bot.log writes NAIVE timestamps in the Mac's LOCAL time — and that zone TRAVELS:
+# the Mac auto-sets TZ by location (Eastern while travelling East, Pacific at home).
+# Pinning the parse to a fixed zone mislabels by the travel delta (was pinned to
+# America/New_York → 3h off once back in CA, fixed 2026-06-23). So parse bot.log
+# times with .astimezone() (interpret naive as the CURRENT system-local zone) —
+# self-corrects wherever the host is. See memory/reference_mac_timezone.md.
 
 def _now_ca():
     return datetime.now(CA_TZ)
@@ -98,7 +104,7 @@ def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
     ):
         return _gate_stats_cache["v"]
 
-    cutoff = datetime.now(NY_TZ) - timedelta(hours=max_age_hours)
+    cutoff = datetime.now(CA_TZ) - timedelta(hours=max_age_hours)
     counts = {}
     label_map = [
         ("Tape gate",      "[TAPE GATE]"),
@@ -121,7 +127,7 @@ def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
                 ts_match = _re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
                 if ts_match:
                     try:
-                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=NY_TZ)
+                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").astimezone()
                         if ts < cutoff:
                             continue
                     except ValueError:
@@ -149,7 +155,7 @@ def _reconcile_status(max_age_hours: int = 24) -> dict:
     from datetime import datetime, timedelta
     import os as _os
     rec_log = _os.path.expanduser("~/Library/Logs/Phmex-S/reconcile.log")
-    cutoff = datetime.now(NY_TZ) - timedelta(hours=max_age_hours)
+    cutoff = datetime.now(CA_TZ) - timedelta(hours=max_age_hours)
     results = []
     try:
         with open(rec_log, "r", errors="replace") as fh:
@@ -159,7 +165,7 @@ def _reconcile_status(max_age_hours: int = 24) -> dict:
                 ts_match = _re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
                 if ts_match:
                     try:
-                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=NY_TZ)
+                        ts = datetime.strptime(ts_match.group(1), "%Y-%m-%d %H:%M:%S").astimezone()
                         if ts >= cutoff:
                             results.append(line.strip())
                     except ValueError:
@@ -1307,7 +1313,7 @@ def _build_why_no_trades(lines: list = None) -> str:
             m = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})', line)
             if m:
                 try:
-                    ts = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=NY_TZ)
+                    ts = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S").astimezone()
                     ts_pt = ts.astimezone(CA_TZ)
                     mins = max(0, int((datetime.now(CA_TZ) - ts_pt).total_seconds() // 60))
                     ago = f"{mins}m ago" if mins < 120 else f"{mins // 60}h {mins % 60}m ago"
