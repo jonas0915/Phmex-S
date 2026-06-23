@@ -35,6 +35,9 @@ class StrategySlot:
     trade_amount_usdt: float = None  # per-slot margin override; None = Config.TRADE_AMOUNT_USDT
     loss_cap_usdt: float = LIVE_LOSS_CAP_USDT  # per-slot auto-demote loss cap
     kelly_min_trades: int = LIVE_KELLY_MIN_TRADES  # per-slot: live trades before neg-Kelly demote arms
+    adverse_exit_roi: float = None   # per-slot adverse-exit ROI threshold (e.g. ST2.0 -6.0 loss-cut);
+                                     # None = global Config.ADVERSE_EXIT_THRESHOLD (-999 = disabled)
+    adverse_exit_cycles: int = None  # cycles before the per-slot adverse-exit arms; None = Config default
 
     def __post_init__(self):
         # Each slot gets its own RiskManager (separate positions, P&L, Kelly)

@@ -208,14 +208,22 @@ class Position:
             return 0.0
         return self.pnl_usdt(current_price) / self.margin * 100
 
-    def should_adverse_exit(self, current_cycle: int, current_price: float) -> bool:
+    def should_adverse_exit(self, current_cycle: int, current_price: float,
+                            threshold: float = None, cycles: int = None) -> bool:
         """Exit early if trade is going wrong direction after N cycles.
-        Catches bad entries before they bleed to time_exit."""
+        Catches bad entries before they bleed to time_exit.
+
+        threshold/cycles override the global Config for per-slot use (e.g. ST2.0's
+        -6% loss-cut, validated by the 2026-06-23 both-sided replay). None = inherit
+        the global Config (ADVERSE_EXIT_THRESHOLD = -999 = disabled), so the main bot
+        and every other slot are unaffected."""
+        cyc = Config.ADVERSE_EXIT_CYCLES if cycles is None else cycles
         cycles_held = current_cycle - self.entry_cycle
-        if cycles_held < Config.ADVERSE_EXIT_CYCLES:
+        if cycles_held < cyc:
             return False
+        thr = Config.ADVERSE_EXIT_THRESHOLD if threshold is None else threshold
         roi = self.pnl_percent(current_price)
-        if roi <= Config.ADVERSE_EXIT_THRESHOLD:
+        if roi <= thr:
             return True
         return False
 

@@ -296,6 +296,11 @@ class Phmex2Bot:
                 trade_amount_usdt=5.0,   # bounded live experiment: $5 margin/trade
                 loss_cap_usdt=-10.0,     # hard budget: auto-demote at -$10 total net
                 kelly_min_trades=40,     # let the -$10 budget govern; neg-Kelly arms at 40 (not 10)
+                adverse_exit_roi=-6.0,   # loss-cut: dump a losing short at -6% ROI (taker) instead
+                                         # of riding to the -12% SL. 2026-06-23 both-sided replay on
+                                         # 30 real trades: -$3.44->-$1.73, all 4 big losers cut, ~1
+                                         # winner clipped (losers go straight down, winners rarely dip <-6%).
+                adverse_exit_cycles=2,   # arm ~2 cycles (~2 min) after entry
             ),
         ]
 
@@ -1703,8 +1708,12 @@ class Phmex2Bot:
                         self._close_slot_position(slot, symbol, pos, price, flip_reason)
                         continue
 
-                # Check adverse exit
-                if pos.should_adverse_exit(self.cycle_count, price):
+                # Check adverse exit — per-slot threshold (ST2.0 = -6% loss-cut; other
+                # slots pass None and inherit the global -999/off). The loss-cut MUST
+                # fill, so _close_slot_position forces a taker exit for "adverse_exit".
+                if pos.should_adverse_exit(self.cycle_count, price,
+                                           threshold=slot.adverse_exit_roi,
+                                           cycles=slot.adverse_exit_cycles):
                     self._close_slot_position(slot, symbol, pos, price, "adverse_exit")
                     continue
 
@@ -2653,7 +2662,9 @@ class Phmex2Bot:
             self.exchange.cancel_open_orders(symbol)
             # ST2.0's edge is maker-only — close patiently (maker) so the round trip
             # stays maker-maker. Other slots close urgently (taker) as before.
-            _urgent = slot.strategy_name != "ST2.0"
+            # EXCEPTION: an adverse-exit loss-cut MUST fill now — a patient maker cut
+            # would just ride to the -12% SL — so force taker regardless of slot.
+            _urgent = slot.strategy_name != "ST2.0" or reason == "adverse_exit"
             order = (self.exchange.close_long(symbol, pos.amount, urgent=_urgent) if pos.side == "long"
                      else self.exchange.close_short(symbol, pos.amount, urgent=_urgent))
             if not order:
