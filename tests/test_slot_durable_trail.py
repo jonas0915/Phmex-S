@@ -139,6 +139,16 @@ def test_ratchet_noop_when_symbol_closing(monkeypatch):
     b.exchange.move_stop_loss.assert_not_called()
 
 
+def test_ratchet_noop_when_trailing_stop_globally_disabled(monkeypatch):
+    # With TRAILING_STOP off, update_trailing_stop never arms -> no durable floor ->
+    # target == stop_loss -> zero improvement -> no amend.
+    monkeypatch.setattr(Config, "TRAILING_STOP", False)
+    b, slot, pos = _bot(), _slot(), _armed_short()
+    b._ratchet_slot_durable_sl(slot, SYMBOL, pos, 99.0)
+    b.exchange.move_stop_loss.assert_not_called()
+    assert pos.sl_ratcheted is False
+
+
 def test_ratchet_survives_amend_failure_without_corrupting_state(monkeypatch):
     monkeypatch.setattr(Config, "TRAILING_STOP", True)
     b, slot, pos = _bot(), _slot(), _armed_short()

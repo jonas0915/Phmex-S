@@ -42,6 +42,18 @@
 
 ## Operational Lessons
 
+### Phmex-S Bot: macOS sleep suspends the WHOLE bot — exchange SL protects, software exits don't (2026-06-24)
+- macOS sleep (esp. **clamshell/lid-close on battery**) suspends the entire process; all threads freeze and resume on wake. `signal.alarm`/`time.sleep` are wall-clock timers the kernel pauses, so the 180s watchdog CANNOT catch a suspend (zero `[WATCHDOG]`/ban-mode lines despite a 13–26 min cycle gap). `caffeinate` does NOT prevent clamshell-sleep-on-battery.
+- Real cost: a 5m_mean_revert XLM SHORT held ~4.5h while the Mac slept; `peak_price` frozen at entry (never saw +7%), lost order tracking, round-tripped to **−$1.42 (−14.2%)**, exited `exchange_close`. Only the exchange-resting SL fired. All bot-side exits paused.
+- Diagnose a main-loop gap with NO watchdog/ban lines via `pmset -g log` (look for `Clamshell Sleep`/`DarkWake`) BEFORE assuming a code bug.
+- Rule: keep the host on **AC + lid open** while live. Exchange SL/TP are the only sleep-proof protection; trailing/partial-TP/adverse/durable-trail all need the process awake.
+
+### Phmex-S Bot: LIVE slots had NO trailing — only the main bot did (fixed 2026-06-24)
+- Trailing/breakeven/durable-SL ran ONLY in the main-bot exit loop (bot.py:987-1032 over `self.risk.positions`). The slot loop `_evaluate_slots` (over `slot.risk.positions`) had only static entry SL/TP + ST2.0-hold/adverse/time/trend-flip — no `check_breakeven`/`update_trailing_stop`/`move_stop_loss`. A winning slot trade could ride back to the stop.
+- Ported the durable trail to live slots via per-slot `durable_trail_enabled` flag + `_ratchet_slot_durable_sl` (mirror of the main block). Enabled on 5m_mean_revert; **ST2.0 excluded** (fixed maker hold; trail inert per reference_st2_exit_replay). See project_slot_durable_trail memory.
+- `5m_scalp` is NOT an independent trader — it's a LABEL for the main bot (`self.risk`), so it already had trailing. Only 5m_mean_revert / ST2.0 place their own slot orders.
+- Both-sides rule held: OHLCV-replayed the trail on live slot history (saved AND clipped) → −$3.33→−$0.85, rescues 4 / caps 1; thin sample, tail-concentrated. Did NOT repeat April's net-negative naive-breakeven because the +5% arm rarely fires on small winners.
+
 ### Stats: bootstrap CI of a DIFFERENCE of means — never sort before subtracting
 - To get a bootstrap 95% CI for mean(A) − mean(B): resample A and B INDEPENDENTLY each iteration, take the difference of the two draw-order means, collect, THEN sort the differences for quantiles.
 - DO NOT sort each bootstrap-mean array first and subtract order-statistic by order-statistic. That comonotonic coupling cancels variance → CI ~2.4× too narrow → manufactures false significance.

@@ -2714,7 +2714,12 @@ class Phmex2Bot:
             pos.sl_order_id = new_id
             pos.exchange_sl_price = target
             pos.sl_ratcheted = True
-            # Persist immediately: a host sleep / restart must see the moved SL.
+            # Persist immediately so exchange_sl_price/sl_ratcheted survive (correct
+            # durable_sl tagging + the ratcheted level on record). NOTE: sl_order_id is
+            # not in the state schema, so after a full RESTART the ratchet pauses until a
+            # new SL id is populated — but the ratcheted SL itself keeps resting on Phemex
+            # and protecting the position. Across a SLEEP (process suspended, not killed)
+            # the in-memory id is retained and ratcheting resumes normally on wake.
             slot.risk._save_state()
             logger.info(
                 f"[SLOT DURABLE SL] {slot.slot_id} {symbol} exchange SL ratcheted to {target:.4f} "
