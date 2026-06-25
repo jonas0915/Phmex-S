@@ -259,7 +259,12 @@ class Phmex2Bot:
                 timeframe="5m",
                 max_positions=1,      # conservative — mean reversion is riskier
                 capital_pct=0.3,      # 30% allocation (less than momentum/scalp)
-                paper_mode=True,      # Paper mode first
+                paper_mode=True,      # Paper mode first (promoted live via mode sidecar)
+                durable_trail_enabled=True,  # 2026-06-24: ratchet the resting exchange SL up
+                                             # as the trail arms (+5% ROI). Closes the gap that
+                                             # let an XLM short round-trip +7% -> -14.2% with only
+                                             # a static SL. OHLCV replay on live history: -$3.33
+                                             # -> -$0.85 (rescues 4 losers, caps 1 winner). Per-slot.
             ),
             StrategySlot(
                 slot_id="5m_liq_cascade",
@@ -301,6 +306,12 @@ class Phmex2Bot:
                                          # 30 real trades: -$3.44->-$1.73, all 4 big losers cut, ~1
                                          # winner clipped (losers go straight down, winners rarely dip <-6%).
                 adverse_exit_cycles=2,   # arm ~2 cycles (~2 min) after entry
+                durable_trail_enabled=False,  # EXCLUDED by design: ST2.0 is a fixed ~20-min
+                                              # maker hold (the backtested exit), and a trail is
+                                              # INERT on it (reference_st2_exit_replay 2026-06-15:
+                                              # ST2.0 trades never clear +2% ROI, max +1.8%). A
+                                              # taker trail would also corrupt the maker-fill
+                                              # measurement that is the whole point of ST2.0.
             ),
         ]
 
@@ -1724,6 +1735,12 @@ class Phmex2Bot:
                     self._close_slot_position(slot, symbol, pos, price, reason)
                     continue
 
+                # Durable trail ratchet — LIVE opt-in slots only (no-op otherwise).
+                # Runs AFTER the exit checks above: if any fired it already `continue`d,
+                # so this never amends an SL on a position being closed this cycle. The
+                # amend rests on the exchange, so the profit-lock survives a host sleep.
+                self._ratchet_slot_durable_sl(slot, symbol, pos, price)
+
             # --- Paper entries ---
             if not slot.is_active:
                 continue  # killed slots close out open positions above but never re-enter
@@ -2564,7 +2581,9 @@ class Phmex2Bot:
                         notifier.notify_exit(symbol, pos.side, pos.entry_price, exit_price, pos.pnl_usdt(exit_price), pos.pnl_percent(exit_price), close_reason)
                         self.risk.close_position(symbol, exit_price, close_reason, fees_usdt=sync_fee)
                     else:
-                        # Live-slot position — no durable-SL ratchet tag (slots have no ratchet).
+                        # Live-slot position. durable_trail_enabled slots CAN ratchet now
+                        # (2026-06-24) — a fill near the ratcheted level is tagged durable_sl
+                        # below so it doesn't pollute the exchange_close (rode-to-disaster) bucket.
                         # _set_cooldown_if_loss intentionally omitted: that's the MAIN bot's
                         # per-pair cooldown; slot cooldown semantics live in the slot.
                         # If a slot maker-exit just filled-then-aborted, attribute the real
@@ -2576,6 +2595,12 @@ class Phmex2Bot:
                         _pending = self._slot_pending_exit_reason.pop(symbol, None)
                         slot_reason = (_pending[0] if _pending and time.time() - _pending[1] <= 300
                                        else "exchange_close")
+                        # A ratcheted slot SL that fills near its level is a durable_sl
+                        # profit-protect, not a rode-to-disaster exchange_close.
+                        if (slot_reason == "exchange_close" and getattr(pos, "sl_ratcheted", False)
+                                and pos.exchange_sl_price
+                                and abs(exit_price - pos.exchange_sl_price) / pos.exchange_sl_price <= 0.005):
+                            slot_reason = "durable_sl"
                         _trig = "maker exit reconciled" if slot_reason != "exchange_close" else "SL/TP triggered"
                         logger.info(f"[SYNC] {symbol} closed on exchange (slot {slot.slot_id} {_trig}) "
                                     f"— removing from slot tracker (reason={slot_reason})")
@@ -2648,6 +2673,61 @@ class Phmex2Bot:
             notifier.send(f"⬇️ Slot <b>{slot.slot_id}</b> demoted to paper — {reason}")
         except Exception:
             pass
+
+    def _ratchet_slot_durable_sl(self, slot, symbol, pos, price):
+        """Durable trailing-stop ratchet for a LIVE slot position — mirror of the
+        main-bot [DURABLE SL] block (bot.py:987-1032) on slot.risk positions.
+
+        As the trail arms (+5% ROI), amend the resting exchange SL up toward the
+        breakeven lock / wide durable band. The amend rests on Phemex, so the
+        profit-lock survives a host sleep — which is exactly the gap that let the
+        XLM 5m_mean_revert short round-trip +7% -> -14.2% on 2026-06-24.
+
+        No-op for paper slots, slots without durable_trail_enabled, software-managed
+        SLs, or positions mid-close this cycle. Ratchet-only + 0.1% throttle (same
+        guardrails as the main block — avoid amend spam). Per-slot opt-in.
+        """
+        if slot.paper_mode or not getattr(slot, "durable_trail_enabled", False):
+            return
+        if symbol in self._closing:
+            return  # a close is already in flight this cycle
+        if not pos.sl_order_id or pos.sl_order_id == "software":
+            return  # software-managed SL — nothing resting on the exchange to amend
+        old_sl = pos.stop_loss
+        pos.check_breakeven(price)
+        pos.update_trailing_stop(price)
+        # Durable backstop: wide band from peak once the trail is armed (+5% ROI).
+        band = Config.DURABLE_TRAIL_BAND_PCT / 100.0
+        durable_floor = None
+        if pos.trailing_stop_price is not None and pos.peak_price > 0:
+            durable_floor = pos.peak_price * (1 - band) if pos.side == "long" else pos.peak_price * (1 + band)
+        # Q2 coordination: resting order never looser than the breakeven lock.
+        candidates = [v for v in (pos.stop_loss, durable_floor) if v is not None]
+        target = max(candidates) if pos.side == "long" else min(candidates)
+        current_resting = pos.exchange_sl_price if pos.exchange_sl_price is not None else old_sl
+        # Ratchet-only + >=0.1% throttle (mirror of bot.py:1011-1014).
+        improvement = (target - current_resting) if pos.side == "long" else (current_resting - target)
+        if improvement <= 0 or improvement / price < 0.001:
+            return
+        try:
+            new_id = self.exchange.move_stop_loss(symbol, pos.side, pos.amount, target, pos.sl_order_id)
+            pos.sl_order_id = new_id
+            pos.exchange_sl_price = target
+            pos.sl_ratcheted = True
+            # Persist immediately: a host sleep / restart must see the moved SL.
+            slot.risk._save_state()
+            logger.info(
+                f"[SLOT DURABLE SL] {slot.slot_id} {symbol} exchange SL ratcheted to {target:.4f} "
+                f"(breakeven={pos.stop_loss:.4f}, durable_floor={round(durable_floor, 4) if durable_floor is not None else None})"
+            )
+        except Exception as e:
+            # Old SL is still resting (move_stop_loss guarantees it) — alert loudly,
+            # do NOT downgrade to software: that would lie about the protection state.
+            logger.error(f"[SLOT SL-MOVE-FAIL] {slot.slot_id} {symbol} could not move exchange SL to {target:.4f}: {e} — old SL still resting at {current_resting:.4f}")
+            try:
+                notifier.notify_sl_move_fail(symbol, target, current_resting, str(e))
+            except Exception as ne:
+                logger.warning(f"[SLOT SL-MOVE-FAIL] Telegram alert failed for {symbol}: {ne}")
 
     def _close_slot_position(self, slot, symbol, pos, price, reason):
         """Close a slot position — simulated for paper, real market order for live.
