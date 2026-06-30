@@ -1,16 +1,16 @@
 {
  "maker": {
   "label": "MAKER fill-all (optimistic upper bound)",
-  "n": 308,
-  "net": 7.313786939101706,
-  "exp": 0.023746061490589956,
+  "n": 309,
+  "net": 7.83356718416284,
+  "exp": 0.02535135011055935,
   "ci": [
-   -0.061636549419424834,
-   0.10714367590372158
+   -0.05117745670554369,
+   0.10421564586029151
   ],
-  "wins": 211,
+  "wins": 212,
   "exit_mix": {
-   "trailing_stop": 178,
+   "trailing_stop": 179,
    "stop_loss": 53,
    "st2_hold": 66,
    "take_profit": 11
@@ -18,35 +18,26 @@
  },
  "taker": {
   "label": "TAKER fill-all (realistic aggressive)",
-  "n": 308,
-  "net": -24.528214057513274,
-  "exp": -0.07963705862828985,
+  "n": 309,
+  "net": -24.215390752011455,
+  "exp": -0.07836696036249662,
   "ci": [
-   -0.1669111840585295,
-   0.005281576890762111
+   -0.15738441374340909,
+   0.0021465745294329225
   ],
-  "wins": 192,
+  "wins": 193,
   "exit_mix": {
-   "trailing_stop": 164,
    "st2_hold": 76,
    "stop_loss": 57,
+   "trailing_stop": 165,
    "take_profit": 11
   }
  },
  "diff_ci": [
-  -0.2202762744423888,
-  0.013299226327499004
+  -0.21539351549352337,
+  0.013077824970565515
  ],
  "rows": [
-  {
-   "sym": "BTC",
-   "side": "short",
-   "ts": 1775079000,
-   "maker_net": 0.16656046504148447,
-   "taker_net": 0.17360876683273962,
-   "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
-  },
   {
    "sym": "BTC",
    "side": "long",
@@ -54,7 +45,12 @@
    "maker_net": 0.13020811289950449,
    "taker_net": -0.5186237096711972,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 25.012949509641956,
+   "vol_mult": 1.5742946345975948,
+   "adx": 22.545670666980936,
+   "bb_width_pct": 0.8986828436199092,
+   "hour_pt": 11
   },
   {
    "sym": "BTC",
@@ -63,7 +59,12 @@
    "maker_net": -1.2699999999999951,
    "taker_net": -1.3200000000000027,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 70.8863968109064,
+   "vol_mult": 1.8076434554721288,
+   "adx": 15.138386003840393,
+   "bb_width_pct": 0.3513004769371254,
+   "hour_pt": 4
   },
   {
    "sym": "BTC",
@@ -72,7 +73,12 @@
    "maker_net": -0.6536051974923853,
    "taker_net": -0.753263565709527,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 22.406643891941812,
+   "vol_mult": 1.492604541642711,
+   "adx": 24.769292687588617,
+   "bb_width_pct": 1.430768872464742,
+   "hour_pt": 10
   },
   {
    "sym": "BTC",
@@ -81,7 +87,12 @@
    "maker_net": 0.33242539614447164,
    "taker_net": 0.23260169699297967,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 74.47386655409292,
+   "vol_mult": 2.1340841274424873,
+   "adx": 14.984879013537425,
+   "bb_width_pct": 0.3942896635198455,
+   "hour_pt": 21
   },
   {
    "sym": "BTC",
@@ -90,7 +101,12 @@
    "maker_net": -0.04772807996250107,
    "taker_net": -0.14768923534481593,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 28.715135602941515,
+   "vol_mult": 1.3362105328591283,
+   "adx": 20.034997125531664,
+   "bb_width_pct": 0.6089757517101492,
+   "hour_pt": 19
   },
   {
    "sym": "BTC",
@@ -99,7 +115,12 @@
    "maker_net": -0.03109978187638692,
    "taker_net": -0.13113034704990678,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 76.45561338616147,
+   "vol_mult": 2.5022890977902574,
+   "adx": 19.231455655854166,
+   "bb_width_pct": 0.25523759191022083,
+   "hour_pt": 18
   },
   {
    "sym": "BTC",
@@ -108,7 +129,12 @@
    "maker_net": 0.8392388195877709,
    "taker_net": 0.7388094148803441,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 25.97852256157782,
+   "vol_mult": 3.481828919898912,
+   "adx": 26.682289271632353,
+   "bb_width_pct": 0.6672333649774866,
+   "hour_pt": 16
   },
   {
    "sym": "BTC",
@@ -117,7 +143,12 @@
    "maker_net": 0.10054707536922088,
    "taker_net": 0.0005118194594897294,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 29.417773379954625,
+   "vol_mult": 3.3315000916620843,
+   "adx": 14.0568882492367,
+   "bb_width_pct": 0.19381757386719048,
+   "hour_pt": 16
   },
   {
    "sym": "BTC",
@@ -126,7 +157,12 @@
    "maker_net": -0.4414870051728959,
    "taker_net": -0.5412513794831562,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 28.256260885648743,
+   "vol_mult": 1.4316772687011836,
+   "adx": 14.866100168910998,
+   "bb_width_pct": 0.41147779502757653,
+   "hour_pt": 17
   },
   {
    "sym": "BTC",
@@ -135,7 +171,12 @@
    "maker_net": -0.27913182370697154,
    "taker_net": -0.37928646694042806,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 70.82047352850677,
+   "vol_mult": 1.3649232721360878,
+   "adx": 16.787207757773835,
+   "bb_width_pct": 0.5892905285908955,
+   "hour_pt": 9
   },
   {
    "sym": "BTC",
@@ -144,7 +185,12 @@
    "maker_net": 0.1302762966679049,
    "taker_net": 0.13327283400361684,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.895782540208387,
+   "vol_mult": 1.4116982517581271,
+   "adx": 22.197802935601924,
+   "bb_width_pct": 0.4134427270266517,
+   "hour_pt": 4
   },
   {
    "sym": "BTC",
@@ -153,7 +199,12 @@
    "maker_net": -0.43838793723278596,
    "taker_net": -0.5381538603026211,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 22.612211012600966,
+   "vol_mult": 1.4385761978113851,
+   "adx": 28.205082379692442,
+   "bb_width_pct": 0.3376255414509326,
+   "hour_pt": 21
   },
   {
    "sym": "BTC",
@@ -162,7 +213,12 @@
    "maker_net": -0.6954384676890794,
    "taker_net": -0.7958013683732688,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 79.54702421905384,
+   "vol_mult": 1.3976479917123363,
+   "adx": 22.737050566826877,
+   "bb_width_pct": 0.4575686290043147,
+   "hour_pt": 6
   },
   {
    "sym": "BTC",
@@ -171,7 +227,12 @@
    "maker_net": -0.11522126414802243,
    "taker_net": -0.21529391110357018,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 77.43972329666073,
+   "vol_mult": 1.6155256026869886,
+   "adx": 17.74392912900262,
+   "bb_width_pct": 0.3647028135825261,
+   "hour_pt": 23
   },
   {
    "sym": "BTC",
@@ -180,7 +241,12 @@
    "maker_net": -0.32106142410439753,
    "taker_net": -0.4212370426256999,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 73.75810769161544,
+   "vol_mult": 1.3328657522859517,
+   "adx": 19.879794207292832,
+   "bb_width_pct": 0.30010152964769254,
+   "hour_pt": 17
   },
   {
    "sym": "BTC",
@@ -189,7 +255,12 @@
    "maker_net": -0.19983061899804794,
    "taker_net": -0.29971576111748427,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 24.034618829386773,
+   "vol_mult": 2.0559500603360257,
+   "adx": 15.124466015897982,
+   "bb_width_pct": 0.16464248921933788,
+   "hour_pt": 22
   },
   {
    "sym": "BTC",
@@ -198,7 +269,12 @@
    "maker_net": 0.14928854787260676,
    "taker_net": 0.34790176895888086,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 75.62342343455168,
+   "vol_mult": 1.5484808454425363,
+   "adx": 21.435404812657648,
+   "bb_width_pct": 0.6032545350328452,
+   "hour_pt": 23
   },
   {
    "sym": "BTC",
@@ -207,7 +283,12 @@
    "maker_net": 0.45115401534700167,
    "taker_net": 0.35138971020210996,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.98005789743812,
+   "vol_mult": 1.546538760694841,
+   "adx": 28.79571794834298,
+   "bb_width_pct": 0.6015604193043206,
+   "hour_pt": 4
   },
   {
    "sym": "BTC",
@@ -216,7 +297,12 @@
    "maker_net": -0.5932750634132652,
    "taker_net": -0.6935868568416785,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 72.34855991359957,
+   "vol_mult": 1.4424242424242422,
+   "adx": 14.974006063089496,
+   "bb_width_pct": 0.40571567430058547,
+   "hour_pt": 14
   },
   {
    "sym": "BTC",
@@ -225,7 +311,12 @@
    "maker_net": -0.6831409534658843,
    "taker_net": -0.7834977023170346,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 73.32308682989608,
+   "vol_mult": 5.42342388871673,
+   "adx": 15.436075445012854,
+   "bb_width_pct": 0.3138285361096198,
+   "hour_pt": 6
   },
   {
    "sym": "ETH",
@@ -234,7 +325,12 @@
    "maker_net": 0.30921110299491583,
    "taker_net": 0.20937579089036268,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.38358888277872,
+   "vol_mult": 2.1741329236163622,
+   "adx": 16.849644067725052,
+   "bb_width_pct": 0.8099485837798568,
+   "hour_pt": 15
   },
   {
    "sym": "ETH",
@@ -243,7 +339,12 @@
    "maker_net": -1.2700000000000085,
    "taker_net": -1.3199999999999985,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 84.94297706927703,
+   "vol_mult": 1.356027251792724,
+   "adx": 20.51098528852252,
+   "bb_width_pct": 0.6422991366047497,
+   "hour_pt": 0
   },
   {
    "sym": "ETH",
@@ -252,7 +353,12 @@
    "maker_net": -0.0650700032251989,
    "taker_net": -0.1650224919792066,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 26.729822567101436,
+   "vol_mult": 1.787078038432229,
+   "adx": 18.3724359054336,
+   "bb_width_pct": 0.970370007152791,
+   "hour_pt": 16
   },
   {
    "sym": "ETH",
@@ -261,7 +367,12 @@
    "maker_net": -0.4582458567540781,
    "taker_net": -0.5580018558261652,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 27.622119421659093,
+   "vol_mult": 2.559784068980679,
+   "adx": 13.652300760719983,
+   "bb_width_pct": 0.3538252098365069,
+   "hour_pt": 20
   },
   {
    "sym": "ETH",
@@ -270,7 +381,12 @@
    "maker_net": -0.5193763247646964,
    "taker_net": -0.6196511503398567,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 74.49034856779457,
+   "vol_mult": 3.1658722228592335,
+   "adx": 13.302381342952577,
+   "bb_width_pct": 0.5759752833101027,
+   "hour_pt": 13
   },
   {
    "sym": "ETH",
@@ -279,7 +395,12 @@
    "maker_net": 0.38091456853884864,
    "taker_net": 0.2807142114331376,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.232806123794603,
+   "vol_mult": 1.456618008856815,
+   "adx": 23.15637569077759,
+   "bb_width_pct": 0.7313943531852608,
+   "hour_pt": 23
   },
   {
    "sym": "ETH",
@@ -288,7 +409,12 @@
    "maker_net": 0.26709984639015993,
    "taker_net": 0.16695636820605853,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.318580342581015,
+   "vol_mult": 1.38408188000808,
+   "adx": 16.177465090975844,
+   "bb_width_pct": 0.3590662009051347,
+   "hour_pt": 22
   },
   {
    "sym": "ETH",
@@ -297,7 +423,12 @@
    "maker_net": 0.4689151953495459,
    "taker_net": 0.3691347627309216,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 72.9600513236459,
+   "vol_mult": 1.3726772423015599,
+   "adx": 15.802249555307954,
+   "bb_width_pct": 0.6639649079953576,
+   "hour_pt": 17
   },
   {
    "sym": "ETH",
@@ -306,7 +437,12 @@
    "maker_net": 0.22927661605464306,
    "taker_net": 0.12915204003462785,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 28.853237756021286,
+   "vol_mult": 1.7687127825845623,
+   "adx": 26.276070013584217,
+   "bb_width_pct": 0.8421102873286715,
+   "hour_pt": 13
   },
   {
    "sym": "ETH",
@@ -315,7 +451,12 @@
    "maker_net": 0.4069491910696398,
    "taker_net": 0.3067608106643117,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 26.969849317705197,
+   "vol_mult": 1.5995857560491484,
+   "adx": 21.61203036565467,
+   "bb_width_pct": 0.4058116426761558,
+   "hour_pt": 15
   },
   {
    "sym": "ETH",
@@ -324,7 +465,12 @@
    "maker_net": 0.1628405362452636,
    "taker_net": 0.15617751252332335,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 75.28502318836651,
+   "vol_mult": 1.6419284638134035,
+   "adx": 16.33082159426344,
+   "bb_width_pct": 0.7269469014363334,
+   "hour_pt": 14
   },
   {
    "sym": "ETH",
@@ -333,7 +479,12 @@
    "maker_net": 0.2201912975969516,
    "taker_net": 0.12007126196597975,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.193552314511322,
+   "vol_mult": 2.5935683643041636,
+   "adx": 29.56185323359345,
+   "bb_width_pct": 1.3447365557823028,
+   "hour_pt": 5
   },
   {
    "sym": "ETH",
@@ -342,7 +493,12 @@
    "maker_net": -1.2700000000000045,
    "taker_net": -1.3200000000000005,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 29.594731317894727,
+   "vol_mult": 1.5726798956655,
+   "adx": 28.36339215489474,
+   "bb_width_pct": 0.5815367288868225,
+   "hour_pt": 2
   },
   {
    "sym": "ETH",
@@ -351,7 +507,12 @@
    "maker_net": 0.16329712423533713,
    "taker_net": 0.18705835006706417,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 80.3148004284973,
+   "vol_mult": 2.8846082500999626,
+   "adx": 17.500690556904026,
+   "bb_width_pct": 1.2024724694705418,
+   "hour_pt": 14
   },
   {
    "sym": "SOL",
@@ -360,7 +521,12 @@
    "maker_net": -0.44115694289607754,
    "taker_net": -0.540921482154993,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 28.213911650755364,
+   "vol_mult": 1.5474920762311069,
+   "adx": 20.484106952025908,
+   "bb_width_pct": 0.4179013064803693,
+   "hour_pt": 16
   },
   {
    "sym": "SOL",
@@ -369,7 +535,12 @@
    "maker_net": 0.17613511868532025,
    "taker_net": -0.09564147019612065,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 20.82779220525056,
+   "vol_mult": 1.5255778745116007,
+   "adx": 16.232047134908772,
+   "bb_width_pct": 0.6691248487525168,
+   "hour_pt": 4
   },
   {
    "sym": "SOL",
@@ -378,7 +549,12 @@
    "maker_net": 0.18966995132376196,
    "taker_net": 0.08977483874313891,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.57543214608765,
+   "vol_mult": 1.9561896962429282,
+   "adx": 28.51662903069179,
+   "bb_width_pct": 0.4720790177154521,
+   "hour_pt": 0
   },
   {
    "sym": "SOL",
@@ -387,7 +563,12 @@
    "maker_net": 1.5799999999999952,
    "taker_net": 1.5300000000000027,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 24.354941421184634,
+   "vol_mult": 2.498768763847416,
+   "adx": 19.59839982096703,
+   "bb_width_pct": 1.23706574196889,
+   "hour_pt": 11
   },
   {
    "sym": "SOL",
@@ -396,7 +577,12 @@
    "maker_net": -1.0044970012447714,
    "taker_net": -1.1039800112391507,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 29.455837070372525,
+   "vol_mult": 1.744668053186727,
+   "adx": 17.438389528622306,
+   "bb_width_pct": 0.9215268189286443,
+   "hour_pt": 18
   },
   {
    "sym": "SOL",
@@ -405,7 +591,12 @@
    "maker_net": -1.2700000000000016,
    "taker_net": -1.3200000000000045,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 78.91883127997863,
+   "vol_mult": 1.478000999166505,
+   "adx": 26.19173598703622,
+   "bb_width_pct": 1.291294678163309,
+   "hour_pt": 4
   },
   {
    "sym": "SOL",
@@ -414,7 +605,12 @@
    "maker_net": 1.580000000000002,
    "taker_net": 1.5300000000000014,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 80.99207378727199,
+   "vol_mult": 1.5688695187452233,
+   "adx": 23.906249704080903,
+   "bb_width_pct": 0.6147969699237169,
+   "hour_pt": 14
   },
   {
    "sym": "SOL",
@@ -423,7 +619,12 @@
    "maker_net": 0.22322446143154243,
    "taker_net": 0.12312789748281348,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 23.12939555107937,
+   "vol_mult": 3.232299602411184,
+   "adx": 21.91310088006574,
+   "bb_width_pct": 0.4433980579702527,
+   "hour_pt": 4
   },
   {
    "sym": "SOL",
@@ -432,7 +633,12 @@
    "maker_net": -0.04326663564449772,
    "taker_net": -0.14330328728814182,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 76.38247661319332,
+   "vol_mult": 3.283613539020111,
+   "adx": 28.1881191769141,
+   "bb_width_pct": 0.6281865600579694,
+   "hour_pt": 14
   },
   {
    "sym": "SOL",
@@ -441,7 +647,12 @@
    "maker_net": -0.11553379508000751,
    "taker_net": -0.21560659837918367,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 73.11926926519219,
+   "vol_mult": 1.5679260396295795,
+   "adx": 18.45143303578648,
+   "bb_width_pct": 0.26122707124309813,
+   "hour_pt": 0
   },
   {
    "sym": "SOL",
@@ -450,7 +661,12 @@
    "maker_net": 0.147144221585483,
    "taker_net": 0.047085678746119596,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 25.805093951629686,
+   "vol_mult": 1.8289813185293298,
+   "adx": 28.145611698958056,
+   "bb_width_pct": 0.29267963431685257,
+   "hour_pt": 4
   },
   {
    "sym": "SOL",
@@ -459,7 +675,12 @@
    "maker_net": 0.1527671167969761,
    "taker_net": -0.5585290311585569,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 70.62440031832274,
+   "vol_mult": 2.248642398874812,
+   "adx": 17.51009152511616,
+   "bb_width_pct": 0.8860989466658151,
+   "hour_pt": 7
   },
   {
    "sym": "SOL",
@@ -468,7 +689,12 @@
    "maker_net": 0.49402926280248355,
    "taker_net": 0.39377237661418807,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.010098601410405,
+   "vol_mult": 2.6674247451489084,
+   "adx": 23.31142691456979,
+   "bb_width_pct": 0.9977160498045204,
+   "hour_pt": 3
   },
   {
    "sym": "SOL",
@@ -477,7 +703,12 @@
    "maker_net": 0.2985951352580025,
    "taker_net": 0.19843591729936,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 23.90872226047462,
+   "vol_mult": 4.090795885239987,
+   "adx": 12.82599386294587,
+   "bb_width_pct": 0.4371706888463832,
+   "hour_pt": 23
   },
   {
    "sym": "SOL",
@@ -486,7 +717,12 @@
    "maker_net": 0.44128500823723416,
    "taker_net": 0.3414907536140436,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 83.91850592798289,
+   "vol_mult": 2.1144727293651484,
+   "adx": 27.46024009342466,
+   "bb_width_pct": 1.2735961806554665,
+   "hour_pt": 22
   },
   {
    "sym": "SOL",
@@ -495,7 +731,12 @@
    "maker_net": 0.16306956419039942,
    "taker_net": 0.09267139120524308,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 74.59811252451438,
+   "vol_mult": 1.527940417759802,
+   "adx": 13.767932213548287,
+   "bb_width_pct": 0.8218421002221963,
+   "hour_pt": 9
   },
   {
    "sym": "SOL",
@@ -504,7 +745,12 @@
    "maker_net": -0.05484725287489969,
    "taker_net": -0.15480485044966583,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 27.434751361529223,
+   "vol_mult": 1.3377931179576676,
+   "adx": 22.201728030896042,
+   "bb_width_pct": 1.027897690772498,
+   "hour_pt": 11
   },
   {
    "sym": "SOL",
@@ -513,7 +759,12 @@
    "maker_net": 0.39106870229009316,
    "taker_net": 0.2908632706547727,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.33352041357874,
+   "vol_mult": 2.4594772358176225,
+   "adx": 29.196842797437846,
+   "bb_width_pct": 0.8836880523897934,
+   "hour_pt": 22
   },
   {
    "sym": "SOL",
@@ -522,7 +773,12 @@
    "maker_net": 0.04902899217671683,
    "taker_net": -0.050980517564496376,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 27.435667994026673,
+   "vol_mult": 2.1529396717773173,
+   "adx": 16.525327637469776,
+   "bb_width_pct": 0.5061742018280844,
+   "hour_pt": 17
   },
   {
    "sym": "SOL",
@@ -531,7 +787,12 @@
    "maker_net": 0.015553448684523742,
    "taker_net": -0.08445377820456769,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 77.45803679776839,
+   "vol_mult": 3.736970120744423,
+   "adx": 24.837300105338386,
+   "bb_width_pct": 0.7794236891426002,
+   "hour_pt": 21
   },
   {
    "sym": "SOL",
@@ -540,7 +801,12 @@
    "maker_net": -0.3364556962025206,
    "taker_net": -0.43627255992255176,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 21.72487162469885,
+   "vol_mult": 2.4831552724415236,
+   "adx": 15.075130115921688,
+   "bb_width_pct": 0.6504854947719092,
+   "hour_pt": 15
   },
   {
    "sym": "SOL",
@@ -549,7 +815,12 @@
    "maker_net": 0.15070660522273943,
    "taker_net": 0.14246477375752192,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.444760731440056,
+   "vol_mult": 2.0394244769539687,
+   "adx": 25.918887200657803,
+   "bb_width_pct": 1.4180284123540983,
+   "hour_pt": 5
   },
   {
    "sym": "SOL",
@@ -558,7 +829,12 @@
    "maker_net": -0.4726869158878537,
    "taker_net": -0.5724356980388299,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 25.07099691232311,
+   "vol_mult": 1.4204677863781017,
+   "adx": 18.594741060587047,
+   "bb_width_pct": 0.9286205060971048,
+   "hour_pt": 22
   },
   {
    "sym": "SOL",
@@ -567,7 +843,12 @@
    "maker_net": 1.5800000000000056,
    "taker_net": 1.530000000000007,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 28.057237409773094,
+   "vol_mult": 3.3566999048659314,
+   "adx": 19.86689252016354,
+   "bb_width_pct": 0.7745279265895552,
+   "hour_pt": 1
   },
   {
    "sym": "SOL",
@@ -576,7 +857,12 @@
    "maker_net": -1.2700000000000007,
    "taker_net": -1.3199999999999923,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 72.07226181817617,
+   "vol_mult": 1.7741696788625123,
+   "adx": 19.790509866879727,
+   "bb_width_pct": 1.9176372171831795,
+   "hour_pt": 6
   },
   {
    "sym": "SOL",
@@ -585,7 +871,12 @@
    "maker_net": 0.39586144661946543,
    "taker_net": 0.29606948136015665,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.60377994976946,
+   "vol_mult": 2.6169192671603265,
+   "adx": 19.558081874628517,
+   "bb_width_pct": 1.0567630013264673,
+   "hour_pt": 19
   },
   {
    "sym": "XRP",
@@ -594,7 +885,12 @@
    "maker_net": 0.6198766355140137,
    "taker_net": 0.5201967338809546,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 76.79448617708348,
+   "vol_mult": 1.5908058161736596,
+   "adx": 19.998290281460267,
+   "bb_width_pct": 0.45804538016850316,
+   "hour_pt": 3
   },
   {
    "sym": "XRP",
@@ -603,7 +899,12 @@
    "maker_net": 0.53910846953938,
    "taker_net": 0.43938816362119626,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 72.09187091891297,
+   "vol_mult": 2.170864845981283,
+   "adx": 13.239976990523655,
+   "bb_width_pct": 0.4721472209330508,
+   "hour_pt": 22
   },
   {
    "sym": "XRP",
@@ -612,7 +913,12 @@
    "maker_net": 0.6134363924289241,
    "taker_net": 0.5131448200189148,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 29.336725973586496,
+   "vol_mult": 1.3909500169351772,
+   "adx": 17.197512737425573,
+   "bb_width_pct": 0.5142289509925606,
+   "hour_pt": 19
   },
   {
    "sym": "XRP",
@@ -621,7 +927,12 @@
    "maker_net": 0.22733872091402663,
    "taker_net": 0.12721511335736047,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.476609896078898,
+   "vol_mult": 2.0347686891861336,
+   "adx": 15.378039219341712,
+   "bb_width_pct": 0.7568619451071354,
+   "hour_pt": 5
   },
   {
    "sym": "XRP",
@@ -630,7 +941,12 @@
    "maker_net": 0.8797130057399016,
    "taker_net": 0.6813596606507257,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 72.19801890586876,
+   "vol_mult": 1.3585873393742778,
+   "adx": 18.231354986408817,
+   "bb_width_pct": 0.7717004143929679,
+   "hour_pt": 12
   },
   {
    "sym": "XRP",
@@ -639,7 +955,12 @@
    "maker_net": -0.24990107287167904,
    "taker_net": -0.3497611922755288,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 26.682984942169853,
+   "vol_mult": 1.56936279700012,
+   "adx": 11.419491081362077,
+   "bb_width_pct": 0.35221040177580254,
+   "hour_pt": 13
   },
   {
    "sym": "XRP",
@@ -648,7 +969,12 @@
    "maker_net": 0.17666399592103754,
    "taker_net": 0.07659070057075991,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 26.590425176586578,
+   "vol_mult": 2.371088996152845,
+   "adx": 17.856435695586345,
+   "bb_width_pct": 0.4379320646596238,
+   "hour_pt": 0
   },
   {
    "sym": "XRP",
@@ -657,7 +983,12 @@
    "maker_net": -0.6853088934148018,
    "taker_net": -1.3200000000000063,
    "maker_reason": "st2_hold",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 29.380432951015138,
+   "vol_mult": 1.631109251639238,
+   "adx": 24.98599494547019,
+   "bb_width_pct": 0.7588901703378347,
+   "hour_pt": 18
   },
   {
    "sym": "XRP",
@@ -666,7 +997,12 @@
    "maker_net": 0.7124135291251876,
    "taker_net": 0.6120475053725065,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.390177106415678,
+   "vol_mult": 1.3035214701757978,
+   "adx": 16.445668688113923,
+   "bb_width_pct": 0.4837797168987938,
+   "hour_pt": 16
   },
   {
    "sym": "XRP",
@@ -675,7 +1011,12 @@
    "maker_net": 0.38292617156186076,
    "taker_net": 0.2831277354295841,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 73.14208865458671,
+   "vol_mult": 1.518942722459476,
+   "adx": 15.315268076083145,
+   "bb_width_pct": 0.7546306935828598,
+   "hour_pt": 10
   },
   {
    "sym": "XRP",
@@ -684,7 +1025,12 @@
    "maker_net": -1.2700000000000082,
    "taker_net": -1.3200000000000043,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 28.31283377257766,
+   "vol_mult": 1.3763581569084284,
+   "adx": 26.540856907884827,
+   "bb_width_pct": 0.771746120655032,
+   "hour_pt": 2
   },
   {
    "sym": "XRP",
@@ -693,7 +1039,12 @@
    "maker_net": 0.8085687210977157,
    "taker_net": 0.7089832127040712,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 70.63215441950516,
+   "vol_mult": 2.1872915506982245,
+   "adx": 19.754922416817386,
+   "bb_width_pct": 0.5569024648730497,
+   "hour_pt": 17
   },
   {
    "sym": "XRP",
@@ -702,7 +1053,12 @@
    "maker_net": 0.16860381861577345,
    "taker_net": -0.38119378304904383,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 77.26031003984407,
+   "vol_mult": 1.5147957852101437,
+   "adx": 25.11768699309526,
+   "bb_width_pct": 0.4870351822868714,
+   "hour_pt": 2
   },
   {
    "sym": "XRP",
@@ -711,7 +1067,12 @@
    "maker_net": 0.3650378633661691,
    "taker_net": 0.26523047860546917,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 73.43244826320259,
+   "vol_mult": 1.6145741586583664,
+   "adx": 14.147629884760873,
+   "bb_width_pct": 1.5549661957218013,
+   "hour_pt": 10
   },
   {
    "sym": "XRP",
@@ -720,7 +1081,12 @@
    "maker_net": 0.04833518407791354,
    "taker_net": -0.051655643743952366,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 74.35124026088013,
+   "vol_mult": 1.4408321465305878,
+   "adx": 28.262943906686942,
+   "bb_width_pct": 0.7118155927195515,
+   "hour_pt": 0
   },
   {
    "sym": "XRP",
@@ -729,7 +1095,12 @@
    "maker_net": 0.16304582679910667,
    "taker_net": 0.17634202447101158,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 71.13779914507663,
+   "vol_mult": 1.4156986625269115,
+   "adx": 25.15408907834057,
+   "bb_width_pct": 1.3377636647143505,
+   "hour_pt": 13
   },
   {
    "sym": "XRP",
@@ -738,7 +1109,12 @@
    "maker_net": 0.43943692710608145,
    "taker_net": 0.3392073234443681,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.802283350107032,
+   "vol_mult": 2.061121140480932,
+   "adx": 13.688801498430141,
+   "bb_width_pct": 0.36604823153580446,
+   "hour_pt": 6
   },
   {
    "sym": "XRP",
@@ -747,7 +1123,12 @@
    "maker_net": -1.2700000000000005,
    "taker_net": -1.3199999999999932,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 81.96746347059978,
+   "vol_mult": 1.4386429765312891,
+   "adx": 23.316311067970517,
+   "bb_width_pct": 1.6633643420600566,
+   "hour_pt": 13
   },
   {
    "sym": "XRP",
@@ -756,7 +1137,12 @@
    "maker_net": 0.22627960494776111,
    "taker_net": 0.12640280635094395,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 79.54766979681854,
+   "vol_mult": 1.9976283771833572,
+   "adx": 19.983189858677527,
+   "bb_width_pct": 1.4685537260619221,
+   "hour_pt": 15
   },
   {
    "sym": "ADA",
@@ -765,7 +1151,12 @@
    "maker_net": 0.3437295939723852,
    "taker_net": 0.24391154974726165,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 77.85198547278078,
+   "vol_mult": 2.351873484036866,
+   "adx": 11.69241823935326,
+   "bb_width_pct": 0.8166259674702367,
+   "hour_pt": 1
   },
   {
    "sym": "ADA",
@@ -774,7 +1165,12 @@
    "maker_net": -0.6255712555510704,
    "taker_net": -0.7252436337341956,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 27.2640071104276,
+   "vol_mult": 1.8928216117454195,
+   "adx": 27.929128819052053,
+   "bb_width_pct": 0.7862247547864625,
+   "hour_pt": 11
   },
   {
    "sym": "ADA",
@@ -783,7 +1179,12 @@
    "maker_net": 0.2758299595141698,
    "taker_net": 0.17568211845494286,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 25.630419601868596,
+   "vol_mult": 1.5612182972282787,
+   "adx": 16.407275534289017,
+   "bb_width_pct": 0.5917182289954761,
+   "hour_pt": 14
   },
   {
    "sym": "ADA",
@@ -792,7 +1193,12 @@
    "maker_net": 0.5516540151818048,
    "taker_net": 0.45193998517440664,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.98384262980295,
+   "vol_mult": 2.5097016324623342,
+   "adx": 18.290334330497434,
+   "bb_width_pct": 0.5986742404482542,
+   "hour_pt": 16
   },
   {
    "sym": "ADA",
@@ -801,7 +1207,12 @@
    "maker_net": 0.5594520547945272,
    "taker_net": 0.36061903635137765,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.47841547506908,
+   "vol_mult": 1.4020974228862644,
+   "adx": 22.890707043303646,
+   "bb_width_pct": 0.9593233109319586,
+   "hour_pt": 7
   },
   {
    "sym": "ADA",
@@ -810,7 +1221,12 @@
    "maker_net": 0.5031388329979862,
    "taker_net": 0.40337552075836836,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 70.81556022038228,
+   "vol_mult": 1.8720037240653438,
+   "adx": 19.91867768036452,
+   "bb_width_pct": 0.4356082246287758,
+   "hour_pt": 18
   },
   {
    "sym": "ADA",
@@ -819,7 +1235,12 @@
    "maker_net": -1.2699999999999965,
    "taker_net": -1.3200000000000023,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 26.000802771992,
+   "vol_mult": 3.724328934836225,
+   "adx": 28.34217825724447,
+   "bb_width_pct": 2.2328530677310563,
+   "hour_pt": 6
   },
   {
    "sym": "ADA",
@@ -828,7 +1249,12 @@
    "maker_net": 0.4848295454545523,
    "taker_net": 0.3850820864978024,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 74.45146039415681,
+   "vol_mult": 1.6151068604144871,
+   "adx": 19.643616027529344,
+   "bb_width_pct": 0.7794166733826304,
+   "hour_pt": 13
   },
   {
    "sym": "ADA",
@@ -837,7 +1263,12 @@
    "maker_net": 0.3624279147513475,
    "taker_net": 0.3630221746627629,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 25.80618798722378,
+   "vol_mult": 1.8701951161987116,
+   "adx": 19.502019013311536,
+   "bb_width_pct": 0.7895682027165853,
+   "hour_pt": 2
   },
   {
    "sym": "ADA",
@@ -846,7 +1277,12 @@
    "maker_net": 0.445509944985184,
    "taker_net": 0.3453022938382719,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 23.558688451175414,
+   "vol_mult": 2.6537589109434454,
+   "adx": 29.724459338092238,
+   "bb_width_pct": 0.9991956380282487,
+   "hour_pt": 15
   },
   {
    "sym": "ADA",
@@ -855,7 +1291,12 @@
    "maker_net": 0.33960854092527487,
    "taker_net": 0.2394288265120298,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.601574449429748,
+   "vol_mult": 1.4041091171998434,
+   "adx": 22.700061706772928,
+   "bb_width_pct": 1.3630638170276612,
+   "hour_pt": 1
   },
   {
    "sym": "ADA",
@@ -864,7 +1305,12 @@
    "maker_net": 0.264664351851838,
    "taker_net": 0.1645220908064426,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.364950366938075,
+   "vol_mult": 1.4240919733740431,
+   "adx": 29.938402250594432,
+   "bb_width_pct": 1.8374242671091803,
+   "hour_pt": 9
   },
   {
    "sym": "ADA",
@@ -873,7 +1319,12 @@
    "maker_net": -0.48538685282140503,
    "taker_net": -0.5851292881773171,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 22.69508706265026,
+   "vol_mult": 1.6572491614135725,
+   "adx": 18.349230798186785,
+   "bb_width_pct": 0.8940957585802388,
+   "hour_pt": 21
   },
   {
    "sym": "ADA",
@@ -882,7 +1333,12 @@
    "maker_net": 0.5617757009345714,
    "taker_net": 0.4614849584553414,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.962777997467825,
+   "vol_mult": 1.33615218316636,
+   "adx": 18.394132776461863,
+   "bb_width_pct": 1.354987643844121,
+   "hour_pt": 10
   },
   {
    "sym": "ADA",
@@ -891,7 +1347,12 @@
    "maker_net": 0.1886014851485141,
    "taker_net": 0.08870583806755286,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 78.03257327889781,
+   "vol_mult": 1.5698281164993675,
+   "adx": 18.234581319492715,
+   "bb_width_pct": 0.9944610412605032,
+   "hour_pt": 2
   },
   {
    "sym": "ADA",
@@ -900,7 +1361,12 @@
    "maker_net": -1.2699999999999991,
    "taker_net": -1.319999999999999,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 75.45954385984702,
+   "vol_mult": 1.3349946019775885,
+   "adx": 17.492206395103654,
+   "bb_width_pct": 1.36259298006028,
+   "hour_pt": 22
   },
   {
    "sym": "ADA",
@@ -909,7 +1375,12 @@
    "maker_net": -1.2700000000000051,
    "taker_net": -1.320000000000008,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 25.49737536319489,
+   "vol_mult": 2.9407391240943572,
+   "adx": 18.784801799347928,
+   "bb_width_pct": 1.084317723500154,
+   "hour_pt": 21
   },
   {
    "sym": "ADA",
@@ -918,7 +1389,12 @@
    "maker_net": 1.0267550593161208,
    "taker_net": 0.9272536861592153,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 71.96852352598474,
+   "vol_mult": 1.3161401274173092,
+   "adx": 26.414655268918874,
+   "bb_width_pct": 2.1116892238894347,
+   "hour_pt": 14
   },
   {
    "sym": "AVAX",
@@ -927,7 +1403,12 @@
    "maker_net": -0.9977872249973485,
    "taker_net": -1.0972735882032365,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 18.928930135846016,
+   "vol_mult": 1.371751728063541,
+   "adx": 17.18260508733148,
+   "bb_width_pct": 0.7005223720262838,
+   "hour_pt": 6
   },
   {
    "sym": "AVAX",
@@ -936,7 +1417,12 @@
    "maker_net": 0.509730452454833,
    "taker_net": 0.40999545017992145,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 72.19972805123277,
+   "vol_mult": 1.4449089978370155,
+   "adx": 11.956034813734583,
+   "bb_width_pct": 0.7672877036073461,
+   "hour_pt": 21
   },
   {
    "sym": "AVAX",
@@ -945,7 +1431,12 @@
    "maker_net": -1.2700000000000087,
    "taker_net": -1.3200000000000056,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 26.484734288966052,
+   "vol_mult": 1.3329424959216964,
+   "adx": 18.564323597848084,
+   "bb_width_pct": 1.1385349668185862,
+   "hour_pt": 15
   },
   {
    "sym": "AVAX",
@@ -954,7 +1445,12 @@
    "maker_net": 0.35654992386337764,
    "taker_net": 0.25636174299189673,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.160537869329985,
+   "vol_mult": 1.3177261260473805,
+   "adx": 19.57691588017408,
+   "bb_width_pct": 1.9569095675846915,
+   "hour_pt": 11
   },
   {
    "sym": "AVAX",
@@ -963,7 +1459,12 @@
    "maker_net": 0.21101421122582453,
    "taker_net": 0.11089876184490075,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 28.586426733371,
+   "vol_mult": 1.83299982905811,
+   "adx": 25.168292169073403,
+   "bb_width_pct": 2.3206514550942017,
+   "hour_pt": 8
   },
   {
    "sym": "AVAX",
@@ -972,7 +1473,12 @@
    "maker_net": 0.055018754688668674,
    "taker_net": -0.04496872967616692,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 77.20272208549835,
+   "vol_mult": 1.510037234903675,
+   "adx": 18.840573248579155,
+   "bb_width_pct": 0.4983880869109581,
+   "hour_pt": 14
   },
   {
    "sym": "AVAX",
@@ -981,7 +1487,12 @@
    "maker_net": 0.023797218876596513,
    "taker_net": -0.076205884065428,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 77.13007957513686,
+   "vol_mult": 1.3340422290013974,
+   "adx": 16.60159476350316,
+   "bb_width_pct": 0.7664615720306522,
+   "hour_pt": 0
   },
   {
    "sym": "AVAX",
@@ -990,7 +1501,12 @@
    "maker_net": -0.02,
    "taker_net": -0.1200250125062537,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 77.57409181043883,
+   "vol_mult": 2.040123312936539,
+   "adx": 13.702112556604364,
+   "bb_width_pct": 0.25880796671989403,
+   "hour_pt": 2
   },
   {
    "sym": "AVAX",
@@ -999,7 +1515,12 @@
    "maker_net": -1.270000000000005,
    "taker_net": -1.3200000000000072,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 73.12468515836161,
+   "vol_mult": 1.7050115828847134,
+   "adx": 20.852863405722566,
+   "bb_width_pct": 1.0014915145979786,
+   "hour_pt": 21
   },
   {
    "sym": "AVAX",
@@ -1008,7 +1529,12 @@
    "maker_net": -0.582983814215333,
    "taker_net": -0.6826774754775959,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 28.383482096596836,
+   "vol_mult": 1.9225947141685549,
+   "adx": 18.521824553561697,
+   "bb_width_pct": 0.7628826729562604,
+   "hour_pt": 23
   },
   {
    "sym": "AVAX",
@@ -1017,7 +1543,12 @@
    "maker_net": 0.6325907792737873,
    "taker_net": 0.5329172378927385,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 74.76928707900402,
+   "vol_mult": 1.551567672216348,
+   "adx": 19.679451047252876,
+   "bb_width_pct": 0.8610413969022133,
+   "hour_pt": 11
   },
   {
    "sym": "AVAX",
@@ -1026,7 +1557,12 @@
    "maker_net": 0.14441393311252212,
    "taker_net": -0.0024322915812080067,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 73.88697867153118,
+   "vol_mult": 1.4215259119405514,
+   "adx": 16.04715524718179,
+   "bb_width_pct": 0.49694686437874386,
+   "hour_pt": 0
   },
   {
    "sym": "AVAX",
@@ -1035,7 +1571,12 @@
    "maker_net": 1.0680208900010841,
    "taker_net": 0.9675021389316307,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 29.501699947371407,
+   "vol_mult": 1.3138677262178153,
+   "adx": 17.541011624329176,
+   "bb_width_pct": 0.5205698118244596,
+   "hour_pt": 18
   },
   {
    "sym": "AVAX",
@@ -1044,7 +1585,12 @@
    "maker_net": 0.8208286232270363,
    "taker_net": 0.720408419017524,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.758939525086774,
+   "vol_mult": 1.5575442577403302,
+   "adx": 26.277381543855896,
+   "bb_width_pct": 0.5541933767437138,
+   "hour_pt": 5
   },
   {
    "sym": "AVAX",
@@ -1053,7 +1599,12 @@
    "maker_net": 0.4166666666666757,
    "taker_net": 0.3168851092212829,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.12958378811233,
+   "vol_mult": 1.7769652371135594,
+   "adx": 15.24274836521521,
+   "bb_width_pct": 0.6172155678395725,
+   "hour_pt": 18
   },
   {
    "sym": "AVAX",
@@ -1062,7 +1613,12 @@
    "maker_net": 0.13089315619068706,
    "taker_net": 0.5383984913873294,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 26.470178601210122,
+   "vol_mult": 1.398628613787991,
+   "adx": 21.398765884302072,
+   "bb_width_pct": 0.7911158518963483,
+   "hour_pt": 15
   },
   {
    "sym": "AVAX",
@@ -1071,7 +1627,12 @@
    "maker_net": 0.4515506284423361,
    "taker_net": 0.3517865217031916,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 70.31591415325511,
+   "vol_mult": 1.4072017555526002,
+   "adx": 22.916289487566992,
+   "bb_width_pct": 4.275598357666129,
+   "hour_pt": 10
   },
   {
    "sym": "AVAX",
@@ -1080,7 +1641,12 @@
    "maker_net": 0.18881644330674402,
    "taker_net": 0.08892090375862244,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 79.2094504035569,
+   "vol_mult": 1.5960661052216067,
+   "adx": 17.133235367718907,
+   "bb_width_pct": 1.148371294309,
+   "hour_pt": 14
   },
   {
    "sym": "AVAX",
@@ -1089,7 +1655,12 @@
    "maker_net": 0.9276366322009018,
    "taker_net": 0.8271630506755676,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.999725843594703,
+   "vol_mult": 1.35974623462028,
+   "adx": 16.745052916354098,
+   "bb_width_pct": 1.1695903212782033,
+   "hour_pt": 13
   },
   {
    "sym": "AVAX",
@@ -1098,7 +1669,12 @@
    "maker_net": 0.44412369575078886,
    "taker_net": 0.3438917498758528,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.96805506185507,
+   "vol_mult": 2.036012480153361,
+   "adx": 19.77193570121355,
+   "bb_width_pct": 0.8305499915902008,
+   "hour_pt": 18
   },
   {
    "sym": "AVAX",
@@ -1107,7 +1683,12 @@
    "maker_net": 1.5800000000000025,
    "taker_net": 1.530000000000002,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 28.179754777558358,
+   "vol_mult": 1.4370046566773873,
+   "adx": 18.60437259529859,
+   "bb_width_pct": 0.8688628601534419,
+   "hour_pt": 22
   },
   {
    "sym": "AVAX",
@@ -1116,7 +1697,12 @@
    "maker_net": -1.270000000000005,
    "taker_net": -1.3199999999999963,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 75.14217441375503,
+   "vol_mult": 1.347753019813019,
+   "adx": 29.351195763624997,
+   "bb_width_pct": 1.6935217789812675,
+   "hour_pt": 17
   },
   {
    "sym": "AVAX",
@@ -1125,7 +1711,12 @@
    "maker_net": -1.2699999999999985,
    "taker_net": -1.3199999999999965,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 21.94739402671523,
+   "vol_mult": 1.3958311952770113,
+   "adx": 19.937474176033568,
+   "bb_width_pct": 1.0942540459217858,
+   "hour_pt": 18
   },
   {
    "sym": "LTC",
@@ -1134,7 +1725,12 @@
    "maker_net": 0.2856673114119824,
    "taker_net": 0.18551455413491819,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.528308646004675,
+   "vol_mult": 1.358991190330695,
+   "adx": 19.321575479906972,
+   "bb_width_pct": 1.1612223904439478,
+   "hour_pt": 10
   },
   {
    "sym": "LTC",
@@ -1143,7 +1739,12 @@
    "maker_net": -0.40766845117223716,
    "taker_net": -0.5074497263090818,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 23.036422254525476,
+   "vol_mult": 1.953902831147671,
+   "adx": 19.687713172107077,
+   "bb_width_pct": 0.41656057718498796,
+   "hour_pt": 6
   },
   {
    "sym": "LTC",
@@ -1152,7 +1753,12 @@
    "maker_net": 0.016744442403092273,
    "taker_net": -0.08324893313033926,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 29.42328507364188,
+   "vol_mult": 1.5846040097296483,
+   "adx": 14.424911658968576,
+   "bb_width_pct": 0.48717034982618873,
+   "hour_pt": 0
   },
   {
    "sym": "LTC",
@@ -1161,7 +1767,12 @@
    "maker_net": 0.3097727272727223,
    "taker_net": 0.2096079233110757,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 21.18158334604253,
+   "vol_mult": 1.42075876963101,
+   "adx": 19.526573357515925,
+   "bb_width_pct": 1.1014344017618194,
+   "hour_pt": 9
   },
   {
    "sym": "LTC",
@@ -1170,7 +1781,12 @@
    "maker_net": 0.2696883593033878,
    "taker_net": 0.16954358750964044,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 28.226509609396416,
+   "vol_mult": 1.944478826797111,
+   "adx": 23.272213794310513,
+   "bb_width_pct": 1.3219674042487255,
+   "hour_pt": 8
   },
   {
    "sym": "LTC",
@@ -1179,7 +1795,12 @@
    "maker_net": -0.08890611541775409,
    "taker_net": -0.1889655982168577,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 74.28175917930207,
+   "vol_mult": 2.108695081737792,
+   "adx": 23.125615205546026,
+   "bb_width_pct": 0.7121227998715335,
+   "hour_pt": 10
   },
   {
    "sym": "LTC",
@@ -1188,7 +1809,12 @@
    "maker_net": -0.9588038942976341,
    "taker_net": -1.0592985435694158,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 71.18708176940495,
+   "vol_mult": 1.338875367239881,
+   "adx": 18.151311328086926,
+   "bb_width_pct": 0.8357587458584592,
+   "hour_pt": 10
   },
   {
    "sym": "LTC",
@@ -1197,7 +1823,12 @@
    "maker_net": 0.4158262108262148,
    "taker_net": 0.3160442329426938,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.76778204840502,
+   "vol_mult": 1.3341025018217147,
+   "adx": 25.45914952180823,
+   "bb_width_pct": 0.310118633586369,
+   "hour_pt": 16
   },
   {
    "sym": "LTC",
@@ -1206,7 +1837,12 @@
    "maker_net": 0.8356416140753473,
    "taker_net": 0.7360696488997978,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.85901019532137,
+   "vol_mult": 1.5020842772995016,
+   "adx": 21.332858776121,
+   "bb_width_pct": 0.5327960286384043,
+   "hour_pt": 11
   },
   {
    "sym": "LTC",
@@ -1215,7 +1851,12 @@
    "maker_net": 1.5800000000000014,
    "taker_net": 1.5300000000000082,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 25.97975010786824,
+   "vol_mult": 1.4621470796167324,
+   "adx": 17.569337005242232,
+   "bb_width_pct": 2.228209179035897,
+   "hour_pt": 16
   },
   {
    "sym": "LTC",
@@ -1224,7 +1865,12 @@
    "maker_net": 1.5800000000000076,
    "taker_net": 1.5299999999999987,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 71.61061537605269,
+   "vol_mult": 1.5736319976694781,
+   "adx": 29.75058270408532,
+   "bb_width_pct": 2.7401041244552298,
+   "hour_pt": 14
   },
   {
    "sym": "LTC",
@@ -1233,7 +1879,12 @@
    "maker_net": -1.035931655506806,
    "taker_net": -1.136464887950771,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 74.80636112134317,
+   "vol_mult": 3.328354488187987,
+   "adx": 19.891989772197604,
+   "bb_width_pct": 0.5353336011147903,
+   "hour_pt": 0
   },
   {
    "sym": "LTC",
@@ -1242,7 +1893,12 @@
    "maker_net": 0.12999999999999978,
    "taker_net": -0.07446042916611811,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 29.78019296308605,
+   "vol_mult": 3.922183173687676,
+   "adx": 19.044058813326078,
+   "bb_width_pct": 0.722264022054218,
+   "hour_pt": 12
   },
   {
    "sym": "LTC",
@@ -1251,7 +1907,12 @@
    "maker_net": -1.2700000000000014,
    "taker_net": -1.3200000000000016,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 29.84704741079328,
+   "vol_mult": 1.3823790324473255,
+   "adx": 17.057508789440227,
+   "bb_width_pct": 0.6252017543572247,
+   "hour_pt": 3
   },
   {
    "sym": "LTC",
@@ -1260,7 +1921,12 @@
    "maker_net": 0.16439757632253738,
    "taker_net": 0.08752848930931292,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.35804767436396,
+   "vol_mult": 1.8191679158249237,
+   "adx": 24.229441235946037,
+   "bb_width_pct": 1.01885350856063,
+   "hour_pt": 6
   },
   {
    "sym": "XLM",
@@ -1269,7 +1935,12 @@
    "maker_net": 0.3091887011479562,
    "taker_net": 0.20935337783687963,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 70.49323427329284,
+   "vol_mult": 1.7655436012012546,
+   "adx": 16.224362724138608,
+   "bb_width_pct": 1.0529689440382695,
+   "hour_pt": 10
   },
   {
    "sym": "XLM",
@@ -1278,7 +1949,12 @@
    "maker_net": 0.43174345417926346,
    "taker_net": 0.33196943889872144,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 72.78123075429143,
+   "vol_mult": 1.7545711281184697,
+   "adx": 23.60301509907407,
+   "bb_width_pct": 0.831152346528285,
+   "hour_pt": 14
   },
   {
    "sym": "XLM",
@@ -1287,7 +1963,12 @@
    "maker_net": 0.3254545454545624,
    "taker_net": 0.225627359134128,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 70.09661647274132,
+   "vol_mult": 1.863727905490263,
+   "adx": 17.163969851265474,
+   "bb_width_pct": 0.8349039105207042,
+   "hour_pt": 22
   },
   {
    "sym": "XLM",
@@ -1296,7 +1977,12 @@
    "maker_net": -1.270000000000002,
    "taker_net": -1.319999999999999,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 74.14516027945515,
+   "vol_mult": 1.4140546381327976,
+   "adx": 19.153943189942762,
+   "bb_width_pct": 1.2312763584015003,
+   "hour_pt": 23
   },
   {
    "sym": "XLM",
@@ -1305,7 +1991,12 @@
    "maker_net": 0.14194012731548936,
    "taker_net": 0.10532628934184987,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.97192986914902,
+   "vol_mult": 1.3434430291419213,
+   "adx": 16.439392265870115,
+   "bb_width_pct": 0.9871936966070832,
+   "hour_pt": 19
   },
   {
    "sym": "XLM",
@@ -1314,7 +2005,12 @@
    "maker_net": 0.36022385520854755,
    "taker_net": 0.26041406223967806,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 78.04973493383865,
+   "vol_mult": 2.2030653857584013,
+   "adx": 28.79704284370453,
+   "bb_width_pct": 1.8427467735148348,
+   "hour_pt": 12
   },
   {
    "sym": "XLM",
@@ -1323,7 +2019,12 @@
    "maker_net": 0.16043269230771895,
    "taker_net": 0.09498386555919006,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 77.5126259169218,
+   "vol_mult": 1.6402718449016647,
+   "adx": 17.685634876840552,
+   "bb_width_pct": 1.0138628703063692,
+   "hour_pt": 10
   },
   {
    "sym": "XLM",
@@ -1332,7 +2033,12 @@
    "maker_net": 0.35138896402487757,
    "taker_net": 0.25120336234370944,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 28.308227019162572,
+   "vol_mult": 1.532563191730968,
+   "adx": 22.627191738224184,
+   "bb_width_pct": 1.2104975979696728,
+   "hour_pt": 19
   },
   {
    "sym": "XLM",
@@ -1341,7 +2047,12 @@
    "maker_net": 0.05953340402969844,
    "taker_net": -0.040481355292643434,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 16.312783626733633,
+   "vol_mult": 1.928820200516728,
+   "adx": 19.827858048267718,
+   "bb_width_pct": 1.4954965771409061,
+   "hour_pt": 5
   },
   {
    "sym": "XLM",
@@ -1350,7 +2061,12 @@
    "maker_net": 0.317032435699425,
    "taker_net": 0.21720103621753312,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 80.9423268940966,
+   "vol_mult": 1.3448951836740743,
+   "adx": 20.082645609640092,
+   "bb_width_pct": 1.108119949203564,
+   "hour_pt": 22
   },
   {
    "sym": "XLM",
@@ -1359,7 +2075,12 @@
    "maker_net": 0.5057720190651851,
    "taker_net": 0.40603503658348095,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 78.46826805606052,
+   "vol_mult": 1.6789581923840333,
+   "adx": 19.90317605548539,
+   "bb_width_pct": 3.259480058978691,
+   "hour_pt": 14
   },
   {
    "sym": "XLM",
@@ -1368,7 +2089,12 @@
    "maker_net": -1.2700000000000007,
    "taker_net": -1.3200000000000056,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 27.58056742906372,
+   "vol_mult": 1.3640317569289915,
+   "adx": 27.53188074672057,
+   "bb_width_pct": 2.8795580971041423,
+   "hour_pt": 3
   },
   {
    "sym": "XLM",
@@ -1377,7 +2103,12 @@
    "maker_net": 0.680227435958813,
    "taker_net": 0.48000000000000026,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 28.83192263534798,
+   "vol_mult": 1.557635977255758,
+   "adx": 14.672761377637004,
+   "bb_width_pct": 2.328709312886505,
+   "hour_pt": 23
   },
   {
    "sym": "XLM",
@@ -1386,7 +2117,12 @@
    "maker_net": -1.2700000000000036,
    "taker_net": -1.3200000000000076,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 26.527664868998883,
+   "vol_mult": 1.7344647851159307,
+   "adx": 19.243357957405685,
+   "bb_width_pct": 2.4510417684740613,
+   "hour_pt": 18
   },
   {
    "sym": "XLM",
@@ -1395,7 +2131,12 @@
    "maker_net": 0.2471998811410428,
    "taker_net": 0.14706634796706752,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 20.35378007107532,
+   "vol_mult": 2.478758750586653,
+   "adx": 17.697478921047324,
+   "bb_width_pct": 2.934602814514179,
+   "hour_pt": 16
   },
   {
    "sym": "XLM",
@@ -1404,7 +2145,12 @@
    "maker_net": 0.131509054325954,
    "taker_net": 0.10002659583055043,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 16.60159395143195,
+   "vol_mult": 1.3284956141622428,
+   "adx": 16.37287259793351,
+   "bb_width_pct": 1.75874086051175,
+   "hour_pt": 2
   },
   {
    "sym": "XLM",
@@ -1413,7 +2159,12 @@
    "maker_net": 0.3608618703529065,
    "taker_net": 0.26067153458562636,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.571411064858154,
+   "vol_mult": 2.6404195818338505,
+   "adx": 15.760045173802324,
+   "bb_width_pct": 1.0591312144035903,
+   "hour_pt": 16
   },
   {
    "sym": "XLM",
@@ -1422,7 +2173,12 @@
    "maker_net": -0.1701743094663462,
    "taker_net": -0.27007427233018233,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 23.672377827066143,
+   "vol_mult": 1.8424948325345638,
+   "adx": 18.27996409293861,
+   "bb_width_pct": 1.729279285944369,
+   "hour_pt": 20
   },
   {
    "sym": "XLM",
@@ -1431,7 +2187,12 @@
    "maker_net": 0.5128066914498306,
    "taker_net": 0.41307322806386926,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 72.414190778624,
+   "vol_mult": 1.3226217721710938,
+   "adx": 20.510807707600744,
+   "bb_width_pct": 1.0918174187792413,
+   "hour_pt": 9
   },
   {
    "sym": "XLM",
@@ -1440,7 +2201,12 @@
    "maker_net": 0.2406128753805108,
    "taker_net": 0.1407432470040138,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 74.94504213994435,
+   "vol_mult": 1.4628434457696966,
+   "adx": 23.42884547426173,
+   "bb_width_pct": 3.244444922473836,
+   "hour_pt": 6
   },
   {
    "sym": "XLM",
@@ -1449,7 +2215,12 @@
    "maker_net": -1.2699999999999954,
    "taker_net": -1.3200000000000045,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 70.93054091778829,
+   "vol_mult": 2.6545105926437977,
+   "adx": 25.645264478753813,
+   "bb_width_pct": 0.9214537187814851,
+   "hour_pt": 4
   },
   {
    "sym": "XLM",
@@ -1458,7 +2229,12 @@
    "maker_net": 0.2151056997591579,
    "taker_net": 0.11522331141487585,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 83.77036100841623,
+   "vol_mult": 1.477228810326926,
+   "adx": 26.14076319272796,
+   "bb_width_pct": 2.654011012719308,
+   "hour_pt": 13
   },
   {
    "sym": "XLM",
@@ -1467,7 +2243,12 @@
    "maker_net": -1.2700000000000078,
    "taker_net": -1.3200000000000023,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 13.120062906701548,
+   "vol_mult": 1.5916774241855296,
+   "adx": 18.946882781963687,
+   "bb_width_pct": 1.6966542163965894,
+   "hour_pt": 18
   },
   {
    "sym": "XLM",
@@ -1476,7 +2257,12 @@
    "maker_net": 0.3603675048356019,
    "taker_net": 0.26055778372747734,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 73.81515737924327,
+   "vol_mult": 2.0557426192407147,
+   "adx": 23.08628164866419,
+   "bb_width_pct": 1.6897414195990181,
+   "hour_pt": 21
   },
   {
    "sym": "XLM",
@@ -1485,7 +2271,12 @@
    "maker_net": 0.6799884326200252,
    "taker_net": 0.5803386019209926,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.26255021966952,
+   "vol_mult": 3.436521224410426,
+   "adx": 26.152273882779433,
+   "bb_width_pct": 1.432679636585369,
+   "hour_pt": 1
   },
   {
    "sym": "XLM",
@@ -1494,7 +2285,26 @@
    "maker_net": 0.13334364241116728,
    "taker_net": 0.472602422469346,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 76.63855711843206,
+   "vol_mult": 1.593071972263927,
+   "adx": 25.804559045628302,
+   "bb_width_pct": 1.7231396362756688,
+   "hour_pt": 12
+  },
+  {
+   "sym": "XLM",
+   "side": "long",
+   "ts": 1782804900,
+   "maker_net": 0.2519897311323333,
+   "taker_net": 0.15185380423022543,
+   "maker_reason": "trailing_stop",
+   "taker_reason": "trailing_stop",
+   "rsi": 14.463619860253047,
+   "vol_mult": 1.3505508908978083,
+   "adx": 18.93054649709402,
+   "bb_width_pct": 3.684543486825234,
+   "hour_pt": 0
   },
   {
    "sym": "ARB",
@@ -1503,7 +2313,12 @@
    "maker_net": 0.35158273381295446,
    "taker_net": 0.3420115813302585,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 72.717506487659,
+   "vol_mult": 3.1520105952227753,
+   "adx": 10.020955111995491,
+   "bb_width_pct": 0.8235286565199362,
+   "hour_pt": 4
   },
   {
    "sym": "ARB",
@@ -1512,7 +2327,12 @@
    "maker_net": 0.16153084539223053,
    "taker_net": 0.21323018612553168,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 25.08025493958033,
+   "vol_mult": 1.457894739306761,
+   "adx": 24.378441390296683,
+   "bb_width_pct": 3.796114893332571,
+   "hour_pt": 8
   },
   {
    "sym": "ARB",
@@ -1521,7 +2341,12 @@
    "maker_net": 0.6502660406885903,
    "taker_net": 0.5506013413592656,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 84.46744565350393,
+   "vol_mult": 1.422406191237402,
+   "adx": 26.314547446893414,
+   "bb_width_pct": 1.494734677335945,
+   "hour_pt": 14
   },
   {
    "sym": "ARB",
@@ -1530,7 +2355,12 @@
    "maker_net": 0.252152886115442,
    "taker_net": 0.15201687767661654,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.481896356112742,
+   "vol_mult": 1.3034432287384465,
+   "adx": 24.51326730834065,
+   "bb_width_pct": 0.8636399304514462,
+   "hour_pt": 12
   },
   {
    "sym": "ARB",
@@ -1539,7 +2369,12 @@
    "maker_net": 0.23014958863130047,
    "taker_net": 0.13027472599431306,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 83.55893106919748,
+   "vol_mult": 1.3938292567628265,
+   "adx": 19.442654284658456,
+   "bb_width_pct": 1.4060218359529661,
+   "hour_pt": 11
   },
   {
    "sym": "ARB",
@@ -1548,7 +2383,12 @@
    "maker_net": 0.3123129251700895,
    "taker_net": 0.21247916475247552,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 72.50905574679167,
+   "vol_mult": 1.5236593247321026,
+   "adx": 17.056906982255303,
+   "bb_width_pct": 0.6085492995063108,
+   "hour_pt": 17
   },
   {
    "sym": "ARB",
@@ -1557,7 +2397,12 @@
    "maker_net": 0.2965711556828937,
    "taker_net": 0.19641294920829655,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.721676971541882,
+   "vol_mult": 1.4021483137764597,
+   "adx": 19.13250031181772,
+   "bb_width_pct": 1.0411339205973036,
+   "hour_pt": 8
   },
   {
    "sym": "ARB",
@@ -1566,7 +2411,12 @@
    "maker_net": 0.5795857988165902,
    "taker_net": 0.4798857416874414,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 72.25512996033099,
+   "vol_mult": 2.4917375808127344,
+   "adx": 21.02371959438301,
+   "bb_width_pct": 2.6178531323657226,
+   "hour_pt": 2
   },
   {
    "sym": "ARB",
@@ -1575,7 +2425,12 @@
    "maker_net": 0.25066831683169816,
    "taker_net": 0.15080371869104864,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 72.36220019174854,
+   "vol_mult": 1.658814499330649,
+   "adx": 29.240581421236637,
+   "bb_width_pct": 1.0126846743349058,
+   "hour_pt": 5
   },
   {
    "sym": "ARB",
@@ -1584,7 +2439,12 @@
    "maker_net": 0.25923462986197743,
    "taker_net": 0.1593743170204951,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 73.87907858784834,
+   "vol_mult": 1.8058499364137346,
+   "adx": 19.57926448007361,
+   "bb_width_pct": 0.8157030009923367,
+   "hour_pt": 0
   },
   {
    "sym": "ARB",
@@ -1593,7 +2453,12 @@
    "maker_net": -1.2700000000000047,
    "taker_net": -1.3199999999999987,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 70.4687643211264,
+   "vol_mult": 1.6768326741848738,
+   "adx": 23.992987064222266,
+   "bb_width_pct": 2.5593928374658916,
+   "hour_pt": 5
   },
   {
    "sym": "ARB",
@@ -1602,7 +2467,12 @@
    "maker_net": -0.3696503496503435,
    "taker_net": -0.46945062433817264,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 21.444259200547876,
+   "vol_mult": 2.313820047222816,
+   "adx": 24.77091987702032,
+   "bb_width_pct": 1.3041774218819842,
+   "hour_pt": 9
   },
   {
    "sym": "ARB",
@@ -1611,7 +2481,12 @@
    "maker_net": 0.4266894977169038,
    "taker_net": 0.32646626458461536,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.388619515762173,
+   "vol_mult": 1.6566689102400802,
+   "adx": 11.73631835147584,
+   "bb_width_pct": 1.2590213853609071,
+   "hour_pt": 23
   },
   {
    "sym": "ARB",
@@ -1620,7 +2495,12 @@
    "maker_net": 0.7107588075880744,
    "taker_net": 0.6103936107826933,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.866401958715457,
+   "vol_mult": 1.3400439930643173,
+   "adx": 14.892934034600966,
+   "bb_width_pct": 1.3817890261465884,
+   "hour_pt": 12
   },
   {
    "sym": "ARB",
@@ -1629,7 +2509,12 @@
    "maker_net": 0.7495918367346979,
    "taker_net": 0.7503811359626162,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.756770635580338,
+   "vol_mult": 3.0452527024622924,
+   "adx": 14.024488034359152,
+   "bb_width_pct": 0.6649860919789415,
+   "hour_pt": 22
   },
   {
    "sym": "ARB",
@@ -1638,7 +2523,12 @@
    "maker_net": -1.2699999999999931,
    "taker_net": -1.3199999999999992,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 29.687193667479548,
+   "vol_mult": 1.4067780650322066,
+   "adx": 13.55891190717176,
+   "bb_width_pct": 0.4587213871885157,
+   "hour_pt": 16
   },
   {
    "sym": "AAVE",
@@ -1647,7 +2537,12 @@
    "maker_net": 0.5319578827546911,
    "taker_net": 0.43223399975456667,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 77.48567542239398,
+   "vol_mult": 1.3438310251059253,
+   "adx": 20.268563489604528,
+   "bb_width_pct": 2.4294722070349115,
+   "hour_pt": 10
   },
   {
    "sym": "AAVE",
@@ -1656,7 +2551,12 @@
    "maker_net": 0.16937625967964873,
    "taker_net": -1.3199999999999943,
    "maker_reason": "trailing_stop",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 29.976900284524206,
+   "vol_mult": 1.3795810234018546,
+   "adx": 19.277647879685215,
+   "bb_width_pct": 2.259015745906554,
+   "hour_pt": 16
   },
   {
    "sym": "AAVE",
@@ -1665,7 +2565,12 @@
    "maker_net": 0.8963256183570145,
    "taker_net": 0.8954724725032928,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 77.15308583403196,
+   "vol_mult": 1.5521691040924173,
+   "adx": 16.697837564145964,
+   "bb_width_pct": 1.1605267837638802,
+   "hour_pt": 1
   },
   {
    "sym": "AAVE",
@@ -1674,7 +2579,12 @@
    "maker_net": -1.2700000000000014,
    "taker_net": -1.319999999999996,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 77.10336355850174,
+   "vol_mult": 1.4961060254133078,
+   "adx": 17.185259204681024,
+   "bb_width_pct": 1.175133573013172,
+   "hour_pt": 15
   },
   {
    "sym": "AAVE",
@@ -1683,7 +2593,12 @@
    "maker_net": 0.29852481985588164,
    "taker_net": 0.19836563703736432,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 24.586931926777197,
+   "vol_mult": 1.4987890012822338,
+   "adx": 22.66832776049016,
+   "bb_width_pct": 1.172078640111171,
+   "hour_pt": 22
   },
   {
    "sym": "AAVE",
@@ -1692,7 +2607,12 @@
    "maker_net": -1.2700000000000036,
    "taker_net": -1.3200000000000007,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 28.53268666907543,
+   "vol_mult": 1.7594108019639934,
+   "adx": 14.065479595886252,
+   "bb_width_pct": 2.0006018726157015,
+   "hour_pt": 18
   },
   {
    "sym": "AAVE",
@@ -1701,7 +2621,12 @@
    "maker_net": 0.34191553544495906,
    "taker_net": 0.24209658373683063,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 74.5575282182873,
+   "vol_mult": 1.8078569309658006,
+   "adx": 20.898838376174588,
+   "bb_width_pct": 1.942952299850695,
+   "hour_pt": 7
   },
   {
    "sym": "AAVE",
@@ -1710,7 +2635,12 @@
    "maker_net": 0.381391267123301,
    "taker_net": 0.2815920631548855,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 81.51242734229788,
+   "vol_mult": 1.6987588743041013,
+   "adx": 21.869784286167103,
+   "bb_width_pct": 4.734498134216544,
+   "hour_pt": 6
   },
   {
    "sym": "AAVE",
@@ -1719,7 +2649,12 @@
    "maker_net": 0.33021609940573055,
    "taker_net": 0.2300410788663036,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.205664353288327,
+   "vol_mult": 1.370272373540856,
+   "adx": 22.187049335516775,
+   "bb_width_pct": 2.174829393729277,
+   "hour_pt": 4
   },
   {
    "sym": "AAVE",
@@ -1728,7 +2663,12 @@
    "maker_net": 0.23428187197419936,
    "taker_net": 0.13440907651245465,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 73.18299637455848,
+   "vol_mult": 1.9856535263124482,
+   "adx": 17.442611037737365,
+   "bb_width_pct": 0.9071408873438338,
+   "hour_pt": 4
   },
   {
    "sym": "AAVE",
@@ -1737,7 +2677,12 @@
    "maker_net": -1.270000000000007,
    "taker_net": -1.3200000000000032,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 70.42850201083522,
+   "vol_mult": 1.3564980833436378,
+   "adx": 22.696045625434255,
+   "bb_width_pct": 0.5966787780664087,
+   "hour_pt": 4
   },
   {
    "sym": "AAVE",
@@ -1746,7 +2691,12 @@
    "maker_net": 0.26917085158669457,
    "taker_net": 0.1690263384174978,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 21.309127030492235,
+   "vol_mult": 1.6143381278612945,
+   "adx": 28.054840112606183,
+   "bb_width_pct": 1.7089387098395266,
+   "hour_pt": 23
   },
   {
    "sym": "AAVE",
@@ -1755,7 +2705,12 @@
    "maker_net": 0.26373195432019,
    "taker_net": 0.16359015924057563,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.847809668513293,
+   "vol_mult": 1.7841306275757733,
+   "adx": 16.10789405738157,
+   "bb_width_pct": 0.7473088562016371,
+   "hour_pt": 3
   },
   {
    "sym": "AAVE",
@@ -1764,7 +2719,12 @@
    "maker_net": 0.17374356863550308,
    "taker_net": -0.7782176137697674,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 27.085813060113367,
+   "vol_mult": 1.6153998809287557,
+   "adx": 20.816825625476,
+   "bb_width_pct": 1.6028211660306366,
+   "hour_pt": 22
   },
   {
    "sym": "AAVE",
@@ -1773,7 +2733,12 @@
    "maker_net": -0.2999377916018621,
    "taker_net": -0.4001028430233613,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 70.90722963551448,
+   "vol_mult": 1.7139013452914802,
+   "adx": 16.016167801349393,
+   "bb_width_pct": 0.995473498045633,
+   "hour_pt": 12
   },
   {
    "sym": "AAVE",
@@ -1782,7 +2747,12 @@
    "maker_net": -1.2700000000000011,
    "taker_net": -1.3200000000000036,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 71.47518602465297,
+   "vol_mult": 1.573537851515626,
+   "adx": 26.539409674787002,
+   "bb_width_pct": 0.7756502160661978,
+   "hour_pt": 20
   },
   {
    "sym": "AAVE",
@@ -1791,7 +2761,12 @@
    "maker_net": -0.6352813513815831,
    "taker_net": -0.7349488769431005,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 26.60872611464221,
+   "vol_mult": 1.7765368905434051,
+   "adx": 22.541954697934607,
+   "bb_width_pct": 0.8398395130912885,
+   "hour_pt": 22
   },
   {
    "sym": "AAVE",
@@ -1800,7 +2775,12 @@
    "maker_net": 1.2440612315899378,
    "taker_net": 1.144668565872874,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 73.6046761960877,
+   "vol_mult": 1.7208709623801877,
+   "adx": 17.29364878703954,
+   "bb_width_pct": 0.40453166034119975,
+   "hour_pt": 20
   },
   {
    "sym": "AAVE",
@@ -1809,7 +2789,12 @@
    "maker_net": -1.093283323716107,
    "taker_net": -1.192721962734735,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 21.34572764305642,
+   "vol_mult": 2.1150581578120087,
+   "adx": 18.09352437834023,
+   "bb_width_pct": 0.9092463512929287,
+   "hour_pt": 13
   },
   {
    "sym": "AAVE",
@@ -1818,7 +2803,12 @@
    "maker_net": 0.39498954360931376,
    "taker_net": 0.29519714218040655,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 75.21609849853317,
+   "vol_mult": 1.4394615197469793,
+   "adx": 26.6595375340909,
+   "bb_width_pct": 1.7066179935957437,
+   "hour_pt": 0
   },
   {
    "sym": "AAVE",
@@ -1827,7 +2817,12 @@
    "maker_net": -1.2700000000000053,
    "taker_net": -1.3199999999999947,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 78.60872290470434,
+   "vol_mult": 1.4124587888252644,
+   "adx": 26.359133823426554,
+   "bb_width_pct": 2.197473633019971,
+   "hour_pt": 10
   },
   {
    "sym": "AAVE",
@@ -1836,7 +2831,12 @@
    "maker_net": -1.2699999999999954,
    "taker_net": -1.3200000000000078,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 72.01376555849899,
+   "vol_mult": 1.645852749301025,
+   "adx": 21.096762271139514,
+   "bb_width_pct": 0.793203686204345,
+   "hour_pt": 13
   },
   {
    "sym": "AAVE",
@@ -1845,7 +2845,12 @@
    "maker_net": -1.2700000000000018,
    "taker_net": -1.319999999999997,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 29.46965690981291,
+   "vol_mult": 1.5482781270526413,
+   "adx": 26.92999375912841,
+   "bb_width_pct": 1.6735758273240875,
+   "hour_pt": 2
   },
   {
    "sym": "AAVE",
@@ -1854,7 +2859,12 @@
    "maker_net": 1.1281768813033388,
    "taker_net": 1.0287262444255565,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 77.40826336105226,
+   "vol_mult": 1.8458921102998511,
+   "adx": 16.662764824991132,
+   "bb_width_pct": 0.9020487131231997,
+   "hour_pt": 19
   },
   {
    "sym": "AAVE",
@@ -1863,7 +2873,12 @@
    "maker_net": 0.14071576907101402,
    "taker_net": 0.37174499002749234,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.661421863771693,
+   "vol_mult": 1.5672531015630473,
+   "adx": 19.86965588000922,
+   "bb_width_pct": 1.0415015350934533,
+   "hour_pt": 16
   },
   {
    "sym": "TAO",
@@ -1872,7 +2887,12 @@
    "maker_net": 0.13617425483131995,
    "taker_net": 0.28089683294612827,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.310939694845302,
+   "vol_mult": 1.8890160668108018,
+   "adx": 14.787176989229362,
+   "bb_width_pct": 1.0608078709048843,
+   "hour_pt": 2
   },
   {
    "sym": "TAO",
@@ -1881,7 +2901,12 @@
    "maker_net": -1.2699999999999967,
    "taker_net": -1.3199999999999996,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 71.31994706007248,
+   "vol_mult": 1.7572745662491247,
+   "adx": 17.279627654190136,
+   "bb_width_pct": 0.7678034313500831,
+   "hour_pt": 17
   },
   {
    "sym": "TAO",
@@ -1890,7 +2915,12 @@
    "maker_net": 0.495527289028362,
    "taker_net": 0.39578518161916865,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 70.98990577182015,
+   "vol_mult": 1.5742615313315607,
+   "adx": 24.46114400322737,
+   "bb_width_pct": 2.897123164685125,
+   "hour_pt": 2
   },
   {
    "sym": "TAO",
@@ -1899,7 +2929,12 @@
    "maker_net": -1.270000000000005,
    "taker_net": -1.3199999999999916,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 74.19093157856591,
+   "vol_mult": 1.9314668910699415,
+   "adx": 18.74873349079339,
+   "bb_width_pct": 1.4331202773676155,
+   "hour_pt": 17
   },
   {
    "sym": "TAO",
@@ -1908,7 +2943,12 @@
    "maker_net": 0.7100016439257033,
    "taker_net": 0.6103668273393765,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 74.41835589534877,
+   "vol_mult": 1.771461423479361,
+   "adx": 19.75839750824679,
+   "bb_width_pct": 0.8805448195863039,
+   "hour_pt": 23
   },
   {
    "sym": "TAO",
@@ -1917,7 +2957,12 @@
    "maker_net": 0.3570885665667361,
    "taker_net": 0.25690011650849065,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.314394067263123,
+   "vol_mult": 2.1580176137831146,
+   "adx": 17.848410643103406,
+   "bb_width_pct": 2.138813520798245,
+   "hour_pt": 3
   },
   {
    "sym": "TAO",
@@ -1926,7 +2971,12 @@
    "maker_net": 0.29041836141779065,
    "taker_net": 0.19026322980288907,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.730603127972188,
+   "vol_mult": 1.9167269980169344,
+   "adx": 24.35964770547516,
+   "bb_width_pct": 3.836684217032599,
+   "hour_pt": 10
   },
   {
    "sym": "TAO",
@@ -1935,7 +2985,12 @@
    "maker_net": 0.5172443782809666,
    "taker_net": 0.4175131348483977,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 82.28322011620816,
+   "vol_mult": 2.491472769923287,
+   "adx": 21.16337884294724,
+   "bb_width_pct": 1.094666187300994,
+   "hour_pt": 23
   },
   {
    "sym": "TAO",
@@ -1944,7 +2999,12 @@
    "maker_net": 0.05851239669421394,
    "taker_net": -0.041473339975766056,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 78.16054702751131,
+   "vol_mult": 1.5591048815399418,
+   "adx": 21.742277421688318,
+   "bb_width_pct": 1.9686083331343907,
+   "hour_pt": 17
   },
   {
    "sym": "TAO",
@@ -1953,7 +3013,12 @@
    "maker_net": 0.9806854871420474,
    "taker_net": 0.8801853944448288,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 22.411455852463746,
+   "vol_mult": 1.4666977298024901,
+   "adx": 18.65987258802925,
+   "bb_width_pct": 0.6201802346735948,
+   "hour_pt": 5
   },
   {
    "sym": "TAO",
@@ -1962,7 +3027,12 @@
    "maker_net": 1.5799999999999996,
    "taker_net": 1.5300000000000065,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 26.56397380572396,
+   "vol_mult": 1.5472625581311628,
+   "adx": 20.253971072744477,
+   "bb_width_pct": 1.6652589180497759,
+   "hour_pt": 7
   },
   {
    "sym": "TAO",
@@ -1971,7 +3041,12 @@
    "maker_net": 0.219669652855553,
    "taker_net": 0.11978954762937649,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 77.5319700768199,
+   "vol_mult": 1.3845957065808265,
+   "adx": 22.122032868483743,
+   "bb_width_pct": 1.30159214546739,
+   "hour_pt": 8
   },
   {
    "sym": "TAO",
@@ -1980,7 +3055,12 @@
    "maker_net": 0.7623237946776482,
    "taker_net": 0.6619328282635271,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 16.564579919148173,
+   "vol_mult": 1.781557574668848,
+   "adx": 16.073110972432644,
+   "bb_width_pct": 1.82322287762778,
+   "hour_pt": 14
   },
   {
    "sym": "TAO",
@@ -1989,7 +3069,12 @@
    "maker_net": 0.6238445622656219,
    "taker_net": 0.5241666455884229,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 70.11005475144356,
+   "vol_mult": 3.0459415339451557,
+   "adx": 21.122838608174487,
+   "bb_width_pct": 1.959282437448639,
+   "hour_pt": 9
   },
   {
    "sym": "TAO",
@@ -1998,7 +3083,12 @@
    "maker_net": -0.5537905599948348,
    "taker_net": -0.653498810589527,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 22.664529405286885,
+   "vol_mult": 1.5672185269699472,
+   "adx": 19.17573152652908,
+   "bb_width_pct": 0.6883492536008641,
+   "hour_pt": 13
   },
   {
    "sym": "TAO",
@@ -2007,7 +3097,12 @@
    "maker_net": 0.8437227214377323,
    "taker_net": 0.8445594404338079,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 23.63279902993058,
+   "vol_mult": 1.4235806180729613,
+   "adx": 22.014111304203816,
+   "bb_width_pct": 1.349396249178225,
+   "hour_pt": 3
   },
   {
    "sym": "TAO",
@@ -2016,7 +3111,12 @@
    "maker_net": -0.06202903236235345,
    "taker_net": -0.16207506989729925,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 72.63193449959631,
+   "vol_mult": 2.1738993347136537,
+   "adx": 14.849283917130922,
+   "bb_width_pct": 0.9933659200067996,
+   "hour_pt": 13
   },
   {
    "sym": "TAO",
@@ -2025,7 +3125,12 @@
    "maker_net": 0.36999113769800784,
    "taker_net": 0.26979623957822185,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.971936251256864,
+   "vol_mult": 1.799852666175554,
+   "adx": 18.3270915311351,
+   "bb_width_pct": 1.7309949569067333,
+   "hour_pt": 15
   },
   {
    "sym": "TAO",
@@ -2034,7 +3139,12 @@
    "maker_net": -1.269999999999996,
    "taker_net": -1.3200000000000012,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 26.968448852781833,
+   "vol_mult": 1.4543086363610847,
+   "adx": 17.99200974753402,
+   "bb_width_pct": 1.1291479855444824,
+   "hour_pt": 15
   },
   {
    "sym": "TAO",
@@ -2043,7 +3153,12 @@
    "maker_net": 0.3492278726862064,
    "taker_net": 0.24904335101070912,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 28.8957388985598,
+   "vol_mult": 1.5224138509546021,
+   "adx": 26.64472951816638,
+   "bb_width_pct": 2.333653053692848,
+   "hour_pt": 14
   },
   {
    "sym": "TAO",
@@ -2052,7 +3167,12 @@
    "maker_net": 0.8036506607109568,
    "taker_net": 0.7032390411903735,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 22.58060752402089,
+   "vol_mult": 1.801872805306282,
+   "adx": 14.236807102169564,
+   "bb_width_pct": 2.843669510308573,
+   "hour_pt": 10
   },
   {
    "sym": "TAO",
@@ -2061,7 +3181,12 @@
    "maker_net": 0.12999999999999792,
    "taker_net": 0.19626715537928602,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 28.36620411931372,
+   "vol_mult": 1.4999619234576886,
+   "adx": 20.394763699544153,
+   "bb_width_pct": 2.2231833795833604,
+   "hour_pt": 13
   },
   {
    "sym": "TAO",
@@ -2070,7 +3195,12 @@
    "maker_net": 0.27256849990144355,
    "taker_net": 0.1727148573301071,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 74.84782665411288,
+   "vol_mult": 2.0567577874213776,
+   "adx": 28.72490166337787,
+   "bb_width_pct": 2.068395469518508,
+   "hour_pt": 17
   },
   {
    "sym": "TAO",
@@ -2079,7 +3209,12 @@
    "maker_net": 0.29434500986487594,
    "taker_net": 0.194187915906938,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.76978987480267,
+   "vol_mult": 1.5061541761150088,
+   "adx": 19.627537972099258,
+   "bb_width_pct": 3.095062539025739,
+   "hour_pt": 0
   },
   {
    "sym": "TAO",
@@ -2088,7 +3223,12 @@
    "maker_net": 0.8392058257763155,
    "taker_net": 0.7387764375575472,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 24.384831709898975,
+   "vol_mult": 6.116747621648033,
+   "adx": 16.235712654572534,
+   "bb_width_pct": 0.6679945589795935,
+   "hour_pt": 21
   },
   {
    "sym": "TAO",
@@ -2097,7 +3237,12 @@
    "maker_net": -1.2700000000000071,
    "taker_net": -1.3200000000000072,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 70.51177525062468,
+   "vol_mult": 1.6672002889770052,
+   "adx": 20.17116626510106,
+   "bb_width_pct": 1.8326737265150341,
+   "hour_pt": 6
   },
   {
    "sym": "TAO",
@@ -2106,7 +3251,12 @@
    "maker_net": 0.19798146091826418,
    "taker_net": 0.09787252465594842,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 21.20383041220815,
+   "vol_mult": 2.5605871504945696,
+   "adx": 17.50593837086902,
+   "bb_width_pct": 1.2573424042776244,
+   "hour_pt": 14
   },
   {
    "sym": "WLD",
@@ -2115,7 +3265,12 @@
    "maker_net": 0.3598736116430576,
    "taker_net": 0.2600636434647873,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 73.38795371609741,
+   "vol_mult": 1.436891783891643,
+   "adx": 26.15688868074687,
+   "bb_width_pct": 1.2859389059250739,
+   "hour_pt": 14
   },
   {
    "sym": "WLD",
@@ -2124,7 +3279,12 @@
    "maker_net": 0.13834307992204517,
    "taker_net": 0.2731595427343439,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 73.11557318969079,
+   "vol_mult": 2.850629370629371,
+   "adx": 12.325833252423843,
+   "bb_width_pct": 1.0774025133921021,
+   "hour_pt": 22
   },
   {
    "sym": "WLD",
@@ -2133,7 +3293,12 @@
    "maker_net": -1.2699999999999936,
    "taker_net": -1.3200000000000063,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 26.715671780280474,
+   "vol_mult": 2.0528506290275996,
+   "adx": 25.867424105347716,
+   "bb_width_pct": 1.8089716850509117,
+   "hour_pt": 5
   },
   {
    "sym": "WLD",
@@ -2142,7 +3307,12 @@
    "maker_net": 0.1360544904137298,
    "taker_net": -1.3200000000000054,
    "maker_reason": "trailing_stop",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 76.67752474630373,
+   "vol_mult": 1.7859900193660527,
+   "adx": 17.69056333420996,
+   "bb_width_pct": 1.31541908977061,
+   "hour_pt": 3
   },
   {
    "sym": "WLD",
@@ -2151,7 +3321,12 @@
    "maker_net": -0.2841509433962392,
    "taker_net": -0.38399394642302015,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 27.17042596998357,
+   "vol_mult": 1.4375040417054255,
+   "adx": 13.754374380785832,
+   "bb_width_pct": 0.7775591035458427,
+   "hour_pt": 15
   },
   {
    "sym": "WLD",
@@ -2160,7 +3335,12 @@
    "maker_net": 0.23538899430739713,
    "taker_net": 0.13526136362558966,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.569050880008774,
+   "vol_mult": 3.353673781917055,
+   "adx": 17.243217372332115,
+   "bb_width_pct": 1.1013818361545418,
+   "hour_pt": 5
   },
   {
    "sym": "WLD",
@@ -2169,7 +3349,12 @@
    "maker_net": 0.4741469013007061,
    "taker_net": 0.37439409834988724,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 76.1199590776697,
+   "vol_mult": 2.3505818178386386,
+   "adx": 15.695757374201067,
+   "bb_width_pct": 1.4800359620827752,
+   "hour_pt": 16
   },
   {
    "sym": "WLD",
@@ -2178,7 +3363,12 @@
    "maker_net": -1.270000000000001,
    "taker_net": -1.3199999999999967,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 77.44195251287351,
+   "vol_mult": 2.413650085313033,
+   "adx": 17.318970511432532,
+   "bb_width_pct": 1.2055108194090547,
+   "hour_pt": 12
   },
   {
    "sym": "WLD",
@@ -2187,7 +3377,12 @@
    "maker_net": -1.2700000000000107,
    "taker_net": -1.3199999999999958,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 71.1338112807268,
+   "vol_mult": 2.3972327411174015,
+   "adx": 23.291818071990246,
+   "bb_width_pct": 1.3502501010058232,
+   "hour_pt": 21
   },
   {
    "sym": "WLD",
@@ -2196,7 +3391,12 @@
    "maker_net": 0.2912953570035263,
    "taker_net": 0.19113978710997387,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.994761247160127,
+   "vol_mult": 2.261456995443768,
+   "adx": 25.988188280215933,
+   "bb_width_pct": 1.7983450607406521,
+   "hour_pt": 3
   },
   {
    "sym": "WLD",
@@ -2205,7 +3405,12 @@
    "maker_net": 0.37559292035398384,
    "taker_net": 0.27579081576187126,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 81.25746719805436,
+   "vol_mult": 1.7296769959380598,
+   "adx": 17.79361747574526,
+   "bb_width_pct": 3.3217398889226293,
+   "hour_pt": 8
   },
   {
    "sym": "WLD",
@@ -2214,7 +3419,12 @@
    "maker_net": -0.05865481252415501,
    "taker_net": -1.3200000000000118,
    "maker_reason": "st2_hold",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 71.08554143288133,
+   "vol_mult": 1.9727041949077992,
+   "adx": 18.529722244844436,
+   "bb_width_pct": 1.199710503086336,
+   "hour_pt": 15
   },
   {
    "sym": "WLD",
@@ -2223,7 +3433,12 @@
    "maker_net": 0.21156165442598296,
    "taker_net": 0.11167749317257988,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.80347460389515,
+   "vol_mult": 2.5341487580716797,
+   "adx": 23.92379097667758,
+   "bb_width_pct": 1.8225610275056954,
+   "hour_pt": 22
   },
   {
    "sym": "WLD",
@@ -2232,7 +3447,12 @@
    "maker_net": 0.7567894516534157,
    "taker_net": 0.6564012510279047,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 21.141646360918884,
+   "vol_mult": 1.7920995974913414,
+   "adx": 23.187855210995533,
+   "bb_width_pct": 1.6849117336610078,
+   "hour_pt": 19
   },
   {
    "sym": "WLD",
@@ -2241,7 +3461,12 @@
    "maker_net": 0.3732688349114919,
    "taker_net": 0.27346556769534147,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.99142675695934,
+   "vol_mult": 1.746712071395021,
+   "adx": 20.412349119906967,
+   "bb_width_pct": 0.8794332910354641,
+   "hour_pt": 6
   },
   {
    "sym": "WLD",
@@ -2250,7 +3475,12 @@
    "maker_net": -1.2700000000000078,
    "taker_net": -1.3200000000000063,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 24.154212960605804,
+   "vol_mult": 1.433594652455835,
+   "adx": 14.470488654356064,
+   "bb_width_pct": 3.80683444022848,
+   "hour_pt": 11
   },
   {
    "sym": "WLD",
@@ -2259,7 +3489,12 @@
    "maker_net": 1.5800000000000112,
    "taker_net": 1.5299999999999987,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 74.08560764716435,
+   "vol_mult": 1.6202813417838924,
+   "adx": 19.343626109526774,
+   "bb_width_pct": 2.078489057695761,
+   "hour_pt": 4
   },
   {
    "sym": "WLD",
@@ -2268,7 +3503,12 @@
    "maker_net": 0.38284885704540655,
    "taker_net": 0.28305038223653584,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.9525859923123,
+   "vol_mult": 2.2408145935372343,
+   "adx": 27.82316062048536,
+   "bb_width_pct": 1.9979821525361632,
+   "hour_pt": 21
   },
   {
    "sym": "WLD",
@@ -2277,7 +3517,12 @@
    "maker_net": 0.5504918032786823,
    "taker_net": 0.450206699928728,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.899109558451443,
+   "vol_mult": 1.4193691829764632,
+   "adx": 25.340403538076057,
+   "bb_width_pct": 7.12923812658995,
+   "hour_pt": 13
   },
   {
    "sym": "WLD",
@@ -2286,7 +3531,12 @@
    "maker_net": -1.2700000000000011,
    "taker_net": -1.319999999999997,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 70.40794424253079,
+   "vol_mult": 1.453969198464226,
+   "adx": 14.18967737810836,
+   "bb_width_pct": 2.4694166073613766,
+   "hour_pt": 21
   },
   {
    "sym": "WLD",
@@ -2295,7 +3545,12 @@
    "maker_net": 0.42150883838384895,
    "taker_net": 0.3217297032354657,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 70.31949373737208,
+   "vol_mult": 1.597829873562983,
+   "adx": 14.626336414456643,
+   "bb_width_pct": 2.462185044082393,
+   "hour_pt": 5
   },
   {
    "sym": "WLD",
@@ -2304,7 +3559,12 @@
    "maker_net": 1.580000000000008,
    "taker_net": 1.5300000000000025,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 27.921468514145772,
+   "vol_mult": 1.6144697069260088,
+   "adx": 16.857293376940678,
+   "bb_width_pct": 2.749977132290506,
+   "hour_pt": 19
   },
   {
    "sym": "WLD",
@@ -2313,7 +3573,12 @@
    "maker_net": 0.3325896837189729,
    "taker_net": 0.23276606675235473,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 74.70168435999638,
+   "vol_mult": 1.7118228005631897,
+   "adx": 27.401623674358714,
+   "bb_width_pct": 4.156613010291724,
+   "hour_pt": 7
   },
   {
    "sym": "WLD",
@@ -2322,7 +3587,12 @@
    "maker_net": 0.19936875567666418,
    "taker_net": 0.09947849492413796,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 70.30129388349327,
+   "vol_mult": 1.3057380124425333,
+   "adx": 21.305277600817934,
+   "bb_width_pct": 1.5914129354945163,
+   "hour_pt": 23
   },
   {
    "sym": "ONDO",
@@ -2331,7 +3601,12 @@
    "maker_net": 0.1651371951219642,
    "taker_net": 0.14171622396567446,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 75.61693655938242,
+   "vol_mult": 1.722347990191463,
+   "adx": 21.856184467922027,
+   "bb_width_pct": 1.3338998420182027,
+   "hour_pt": 0
   },
   {
    "sym": "ONDO",
@@ -2340,7 +3615,12 @@
    "maker_net": -1.269999999999992,
    "taker_net": -1.3199999999999992,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 21.433251511148725,
+   "vol_mult": 1.4876807332145032,
+   "adx": 24.171058686388218,
+   "bb_width_pct": 1.0336971391552634,
+   "hour_pt": 5
   },
   {
    "sym": "ONDO",
@@ -2349,7 +3629,12 @@
    "maker_net": 0.315681731864794,
    "taker_net": 0.21584965669314693,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 70.07666128618011,
+   "vol_mult": 1.587854371307722,
+   "adx": 23.08586179018439,
+   "bb_width_pct": 0.7877270200939905,
+   "hour_pt": 10
   },
   {
    "sym": "ONDO",
@@ -2358,7 +3643,12 @@
    "maker_net": 0.9986712718407238,
    "taker_net": 0.8991808622718653,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 73.71664998740752,
+   "vol_mult": 1.9290376200836001,
+   "adx": 23.10490729033129,
+   "bb_width_pct": 0.7678684750844669,
+   "hour_pt": 11
   },
   {
    "sym": "ONDO",
@@ -2367,7 +3657,12 @@
    "maker_net": 0.2575373721479435,
    "taker_net": 0.15739867281154118,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.87282470401253,
+   "vol_mult": 1.369670381180124,
+   "adx": 16.188157705791802,
+   "bb_width_pct": 0.676914496190664,
+   "hour_pt": 22
   },
   {
    "sym": "ONDO",
@@ -2376,7 +3671,12 @@
    "maker_net": 0.7238871473354342,
    "taker_net": 0.6235153896406116,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 25.216275072279842,
+   "vol_mult": 1.6587939887687635,
+   "adx": 19.258105439384916,
+   "bb_width_pct": 0.7378303926366142,
+   "hour_pt": 4
   },
   {
    "sym": "ONDO",
@@ -2385,7 +3685,12 @@
    "maker_net": 0.2631341053417999,
    "taker_net": 0.16299260903728457,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 23.540009375042644,
+   "vol_mult": 1.8635033863663686,
+   "adx": 18.6242542436259,
+   "bb_width_pct": 1.3805744965193045,
+   "hour_pt": 17
   },
   {
    "sym": "ONDO",
@@ -2394,7 +3699,12 @@
    "maker_net": -1.2700000000000062,
    "taker_net": -1.3200000000000118,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 72.80173194381241,
+   "vol_mult": 1.7991613066901462,
+   "adx": 20.71857112936067,
+   "bb_width_pct": 1.1391955913328085,
+   "hour_pt": 5
   },
   {
    "sym": "ONDO",
@@ -2403,7 +3713,12 @@
    "maker_net": 0.16397092578421363,
    "taker_net": -0.27292072785336297,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 25.69766207552449,
+   "vol_mult": 2.2884680442073617,
+   "adx": 26.85093702814695,
+   "bb_width_pct": 1.6795293257138577,
+   "hour_pt": 20
   },
   {
    "sym": "ONDO",
@@ -2412,7 +3727,12 @@
    "maker_net": -1.2699999999999945,
    "taker_net": -1.3199999999999925,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 21.4125585690135,
+   "vol_mult": 1.3535764228496603,
+   "adx": 21.843346958249867,
+   "bb_width_pct": 0.8884498515835537,
+   "hour_pt": 21
   },
   {
    "sym": "ONDO",
@@ -2421,7 +3741,12 @@
    "maker_net": 0.8204477611940131,
    "taker_net": 0.7200277473203651,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.376200238737,
+   "vol_mult": 1.7349618034670422,
+   "adx": 16.35243428321424,
+   "bb_width_pct": 0.8303985826216369,
+   "hour_pt": 22
   },
   {
    "sym": "ONDO",
@@ -2430,7 +3755,12 @@
    "maker_net": -1.2700000000000058,
    "taker_net": -1.3200000000000087,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 77.59473205061629,
+   "vol_mult": 2.046158450834157,
+   "adx": 19.319718537043755,
+   "bb_width_pct": 3.038718112555213,
+   "hour_pt": 6
   },
   {
    "sym": "ONDO",
@@ -2439,7 +3769,12 @@
    "maker_net": -1.2699999999999985,
    "taker_net": -1.32,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 28.393772975954562,
+   "vol_mult": 1.338298535117138,
+   "adx": 17.525583274900857,
+   "bb_width_pct": 1.878697453133503,
+   "hour_pt": 12
   },
   {
    "sym": "ONDO",
@@ -2448,7 +3783,12 @@
    "maker_net": -1.2699999999999945,
    "taker_net": -1.319999999999996,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 70.35656140696811,
+   "vol_mult": 1.4321755674334382,
+   "adx": 20.4637553314009,
+   "bb_width_pct": 0.7613759727983144,
+   "hour_pt": 20
   },
   {
    "sym": "ONDO",
@@ -2457,7 +3797,12 @@
    "maker_net": 0.5081128404669317,
    "taker_net": 0.40837702898142914,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 76.2914123138107,
+   "vol_mult": 1.6945929686122059,
+   "adx": 18.539578670046595,
+   "bb_width_pct": 1.941870911933055,
+   "hour_pt": 22
   },
   {
    "sym": "ONDO",
@@ -2466,7 +3811,12 @@
    "maker_net": 1.5799999999999945,
    "taker_net": 1.5300000000000082,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 75.18299620368154,
+   "vol_mult": 1.4507899635481212,
+   "adx": 22.023009760254165,
+   "bb_width_pct": 1.0750040697233703,
+   "hour_pt": 23
   },
   {
    "sym": "ONDO",
@@ -2475,7 +3825,12 @@
    "maker_net": -1.270000000000003,
    "taker_net": -1.3200000000000078,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 74.43978442049881,
+   "vol_mult": 1.5545156004021288,
+   "adx": 17.239529334681464,
+   "bb_width_pct": 2.991496151147632,
+   "hour_pt": 6
   },
   {
    "sym": "ONDO",
@@ -2484,7 +3839,12 @@
    "maker_net": -1.2699999999999945,
    "taker_net": -1.3200000000000034,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 71.14148753684529,
+   "vol_mult": 1.5988690085861295,
+   "adx": 26.86315009936408,
+   "bb_width_pct": 1.4446836682448054,
+   "hour_pt": 21
   },
   {
    "sym": "ONDO",
@@ -2493,7 +3853,12 @@
    "maker_net": 0.19801410743352849,
    "taker_net": 0.09790515485610846,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.845775495907446,
+   "vol_mult": 1.328426311543885,
+   "adx": 15.651715110247705,
+   "bb_width_pct": 1.7646393281035837,
+   "hour_pt": 9
   },
   {
    "sym": "ONDO",
@@ -2502,7 +3867,12 @@
    "maker_net": -1.2700000000000073,
    "taker_net": -1.320000000000005,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 81.30914441770435,
+   "vol_mult": 2.4997765644128425,
+   "adx": 23.14570743906113,
+   "bb_width_pct": 1.4574147283818395,
+   "hour_pt": 13
   },
   {
    "sym": "ONDO",
@@ -2511,7 +3881,12 @@
    "maker_net": -1.2699999999999956,
    "taker_net": -1.3199999999999976,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 70.91435192856011,
+   "vol_mult": 1.4516901198427212,
+   "adx": 20.34398772045975,
+   "bb_width_pct": 2.2963155087429277,
+   "hour_pt": 6
   },
   {
    "sym": "ONDO",
@@ -2520,7 +3895,12 @@
    "maker_net": 0.254491074224862,
    "taker_net": 0.15435389727623777,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.128188628119247,
+   "vol_mult": 1.9185770617013342,
+   "adx": 24.991513301292354,
+   "bb_width_pct": 1.1292671864030042,
+   "hour_pt": 22
   },
   {
    "sym": "RENDER",
@@ -2529,7 +3909,12 @@
    "maker_net": 0.4260317460317575,
    "taker_net": 0.3262548734685078,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 72.12555621254259,
+   "vol_mult": 1.4409583571021107,
+   "adx": 26.11706738044844,
+   "bb_width_pct": 2.2921960983300957,
+   "hour_pt": 19
   },
   {
    "sym": "RENDER",
@@ -2538,7 +3923,12 @@
    "maker_net": -1.2700000000000027,
    "taker_net": -1.3199999999999945,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 25.452716978442567,
+   "vol_mult": 4.316449759643569,
+   "adx": 24.18470678578487,
+   "bb_width_pct": 2.4639242443965244,
+   "hour_pt": 16
   },
   {
    "sym": "RENDER",
@@ -2547,7 +3937,12 @@
    "maker_net": -1.2700000000000011,
    "taker_net": -1.3200000000000038,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 77.03825072167987,
+   "vol_mult": 1.368532301949585,
+   "adx": 16.18429822843212,
+   "bb_width_pct": 0.8989270080647151,
+   "hour_pt": 5
   },
   {
    "sym": "RENDER",
@@ -2556,7 +3951,12 @@
    "maker_net": 0.21490666666666441,
    "taker_net": 0.11478927203065908,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.36384524254639,
+   "vol_mult": 3.4304626656060027,
+   "adx": 16.989515266784124,
+   "bb_width_pct": 1.6339994388605505,
+   "hour_pt": 22
   },
   {
    "sym": "RENDER",
@@ -2565,7 +3965,12 @@
    "maker_net": 0.2895068493150828,
    "taker_net": 0.18966168015516738,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 77.73982747125773,
+   "vol_mult": 2.3036240002084254,
+   "adx": 16.26112425492749,
+   "bb_width_pct": 1.6430988638369695,
+   "hour_pt": 7
   },
   {
    "sym": "RENDER",
@@ -2574,7 +3979,12 @@
    "maker_net": 0.13297085201793019,
    "taker_net": 0.08875212617906958,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 29.112724635090075,
+   "vol_mult": 3.3943614980398698,
+   "adx": 24.493831610571007,
+   "bb_width_pct": 1.4099058410384537,
+   "hour_pt": 8
   },
   {
    "sym": "RENDER",
@@ -2583,7 +3993,12 @@
    "maker_net": 0.19583427922814478,
    "taker_net": 0.09572641602013982,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 28.852263586562188,
+   "vol_mult": 1.681149974654211,
+   "adx": 23.656147350979168,
+   "bb_width_pct": 1.132045532141523,
+   "hour_pt": 4
   },
   {
    "sym": "RENDER",
@@ -2592,7 +4007,12 @@
    "maker_net": -0.23715526601520107,
    "taker_net": -0.33702175513762955,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 23.860619899306357,
+   "vol_mult": 2.2499265125447407,
+   "adx": 29.755215404805508,
+   "bb_width_pct": 1.642049601288206,
+   "hour_pt": 5
   },
   {
    "sym": "RENDER",
@@ -2601,7 +4021,12 @@
    "maker_net": 0.2797644287397019,
    "taker_net": 0.17991438593267545,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 75.21399115371356,
+   "vol_mult": 2.8288965552752177,
+   "adx": 13.575536738081423,
+   "bb_width_pct": 0.969534699895986,
+   "hour_pt": 1
   },
   {
    "sym": "RENDER",
@@ -2610,7 +4035,12 @@
    "maker_net": -1.2699999999999978,
    "taker_net": -1.3199999999999967,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 29.482736305767475,
+   "vol_mult": 2.2079383886255926,
+   "adx": 13.349410126928595,
+   "bb_width_pct": 1.090789370148508,
+   "hour_pt": 5
   },
   {
    "sym": "RENDER",
@@ -2619,7 +4049,12 @@
    "maker_net": 0.6143491735537223,
    "taker_net": 0.5146665068071332,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.32463973794813,
+   "vol_mult": 2.5740477583660732,
+   "adx": 18.35294281762264,
+   "bb_width_pct": 0.8190324648752356,
+   "hour_pt": 2
   },
   {
    "sym": "RENDER",
@@ -2628,7 +4063,12 @@
    "maker_net": 0.6946368715083926,
    "taker_net": 0.5949943686927461,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 76.5027285468579,
+   "vol_mult": 2.3218127718013277,
+   "adx": 20.022402882986846,
+   "bb_width_pct": 1.4682923824725573,
+   "hour_pt": 22
   },
   {
    "sym": "RENDER",
@@ -2637,7 +4077,12 @@
    "maker_net": 0.7321978021978173,
    "taker_net": 0.6325740892424443,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.03914369362548,
+   "vol_mult": 1.532173173861059,
+   "adx": 27.6252707907904,
+   "bb_width_pct": 5.734328965616343,
+   "hour_pt": 5
   },
   {
    "sym": "RENDER",
@@ -2646,7 +4091,12 @@
    "maker_net": -1.2699999999999965,
    "taker_net": -1.3200000000000063,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 70.0390067642208,
+   "vol_mult": 1.5182363326917878,
+   "adx": 23.732220238879997,
+   "bb_width_pct": 6.353739489463749,
+   "hour_pt": 13
   },
   {
    "sym": "RENDER",
@@ -2655,7 +4105,12 @@
    "maker_net": 0.2982616596002609,
    "taker_net": 0.19842087003528314,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 77.85989146443913,
+   "vol_mult": 1.5719244118781335,
+   "adx": 27.095765172790507,
+   "bb_width_pct": 2.0720815315940033,
+   "hour_pt": 23
   },
   {
    "sym": "RENDER",
@@ -2664,7 +4119,12 @@
    "maker_net": 0.2295189416716718,
    "taker_net": 0.12939424454940468,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 18.760725096189688,
+   "vol_mult": 1.9470985784199488,
+   "adx": 18.89419647338467,
+   "bb_width_pct": 1.7194044347528736,
+   "hour_pt": 13
   },
   {
    "sym": "RENDER",
@@ -2673,7 +4133,12 @@
    "maker_net": -1.2700000000000016,
    "taker_net": -1.3199999999999972,
    "maker_reason": "stop_loss",
-   "taker_reason": "stop_loss"
+   "taker_reason": "stop_loss",
+   "rsi": 75.15939022695613,
+   "vol_mult": 2.204898224742076,
+   "adx": 28.577353880244292,
+   "bb_width_pct": 3.0129614544300183,
+   "hour_pt": 21
   },
   {
    "sym": "RENDER",
@@ -2682,7 +4147,12 @@
    "maker_net": 0.2280803839232154,
    "taker_net": 0.12795640572035935,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 23.949887061678595,
+   "vol_mult": 1.8173950670705323,
+   "adx": 19.274254537778013,
+   "bb_width_pct": 1.3425380524222865,
+   "hour_pt": 20
   },
   {
    "sym": "RENDER",
@@ -2691,7 +4161,12 @@
    "maker_net": 0.3148311390955817,
    "taker_net": 0.2146638071919873,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 27.00188958205942,
+   "vol_mult": 1.5067567567567568,
+   "adx": 14.038909037409727,
+   "bb_width_pct": 0.8259944784047003,
+   "hour_pt": 23
   },
   {
    "sym": "RENDER",
@@ -2700,7 +4175,12 @@
    "maker_net": 0.19433962264150667,
    "taker_net": 0.09423250638832018,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 20.698309424951958,
+   "vol_mult": 2.8098140334427253,
+   "adx": 27.595017473410124,
+   "bb_width_pct": 1.6013521808561588,
+   "hour_pt": 20
   },
   {
    "sym": "1000PEPE",
@@ -2709,7 +4189,12 @@
    "maker_net": 0.285921052631579,
    "taker_net": 0.18576816854731204,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 26.483880584618376,
+   "vol_mult": 1.3214801738959543,
+   "adx": 15.613474650328607,
+   "bb_width_pct": 0.9346590053350056,
+   "hour_pt": 6
   },
   {
    "sym": "1000PEPE",
@@ -2718,7 +4203,12 @@
    "maker_net": 0.41615284128021757,
    "taker_net": 0.3163710267936155,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 75.783308598721,
+   "vol_mult": 1.3142636489856,
+   "adx": 24.891789043206316,
+   "bb_width_pct": 1.136362360203531,
+   "hour_pt": 23
   },
   {
    "sym": "1000PEPE",
@@ -2727,7 +4217,12 @@
    "maker_net": 0.30184055736393955,
    "taker_net": 0.2016797175051882,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 28.61682146038656,
+   "vol_mult": 1.3293510584392265,
+   "adx": 26.10381330933625,
+   "bb_width_pct": 2.1435992629889573,
+   "hour_pt": 8
   },
   {
    "sym": "1000PEPE",
@@ -2736,7 +4231,12 @@
    "maker_net": 1.5800000000000014,
    "taker_net": 1.5300000000000034,
    "maker_reason": "take_profit",
-   "taker_reason": "take_profit"
+   "taker_reason": "take_profit",
+   "rsi": 28.08328080930339,
+   "vol_mult": 1.5333533425429153,
+   "adx": 28.50355384363004,
+   "bb_width_pct": 1.059559139227198,
+   "hour_pt": 18
   },
   {
    "sym": "1000PEPE",
@@ -2745,7 +4245,12 @@
    "maker_net": 0.3511951251474305,
    "taker_net": 0.25100962033726676,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 24.08251653299132,
+   "vol_mult": 1.3201227562881133,
+   "adx": 25.125024129635374,
+   "bb_width_pct": 1.8245042153670696,
+   "hour_pt": 20
   },
   {
    "sym": "1000PEPE",
@@ -2754,7 +4259,12 @@
    "maker_net": 0.189793521010153,
    "taker_net": 0.0896886766718232,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 28.63380191232862,
+   "vol_mult": 1.6231154694108392,
+   "adx": 23.562920732410966,
+   "bb_width_pct": 1.3231249385139845,
+   "hour_pt": 15
   },
   {
    "sym": "1000PEPE",
@@ -2763,7 +4273,12 @@
    "maker_net": 0.21506392194304647,
    "taker_net": 0.11494644871869913,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 15.730958905299005,
+   "vol_mult": 1.4593766192017354,
+   "adx": 19.47623119565892,
+   "bb_width_pct": 1.2837917432087482,
+   "hour_pt": 16
   },
   {
    "sym": "1000PEPE",
@@ -2772,7 +4287,12 @@
    "maker_net": 0.43453777179362735,
    "taker_net": 0.3347651543708143,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 71.2911106255317,
+   "vol_mult": 1.483210774531219,
+   "adx": 27.420899813191454,
+   "bb_width_pct": 0.30123839546457015,
+   "hour_pt": 4
   },
   {
    "sym": "1000PEPE",
@@ -2781,7 +4301,12 @@
    "maker_net": 0.14132574609386986,
    "taker_net": -0.1944649440374978,
    "maker_reason": "trailing_stop",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 74.32688664325315,
+   "vol_mult": 1.3987661084661824,
+   "adx": 17.23134008090697,
+   "bb_width_pct": 0.80885601149534,
+   "hour_pt": 0
   },
   {
    "sym": "1000PEPE",
@@ -2790,7 +4315,12 @@
    "maker_net": 0.7072332762590761,
    "taker_net": 0.6068698413384097,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 25.661766260956725,
+   "vol_mult": 1.431819516994914,
+   "adx": 26.758002927533,
+   "bb_width_pct": 1.3115301712216834,
+   "hour_pt": 13
   },
   {
    "sym": "1000PEPE",
@@ -2799,7 +4329,12 @@
    "maker_net": 0.6252036036035933,
    "taker_net": 0.5248811630220822,
    "maker_reason": "trailing_stop",
-   "taker_reason": "trailing_stop"
+   "taker_reason": "trailing_stop",
+   "rsi": 24.369705056587108,
+   "vol_mult": 1.7512592449398507,
+   "adx": 16.214145316415692,
+   "bb_width_pct": 1.6636739790895503,
+   "hour_pt": 21
   },
   {
    "sym": "1000PEPE",
@@ -2808,7 +4343,26 @@
    "maker_net": -0.35629509009168325,
    "taker_net": -0.45648833425881447,
    "maker_reason": "st2_hold",
-   "taker_reason": "st2_hold"
+   "taker_reason": "st2_hold",
+   "rsi": 74.39667626150587,
+   "vol_mult": 1.8477176314695756,
+   "adx": 21.352685620031274,
+   "bb_width_pct": 1.2683389862267433,
+   "hour_pt": 12
+  },
+  {
+   "sym": "1000PEPE",
+   "side": "short",
+   "ts": 1782816900,
+   "maker_net": 0.4343509789702847,
+   "taker_net": 0.3345782681043338,
+   "maker_reason": "trailing_stop",
+   "taker_reason": "trailing_stop",
+   "rsi": 71.69893173462079,
+   "vol_mult": 1.6933705167594695,
+   "adx": 13.125094014808852,
+   "bb_width_pct": 0.6920091336267542,
+   "hour_pt": 3
   }
  ]
 }
