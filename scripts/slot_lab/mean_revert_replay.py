@@ -131,7 +131,8 @@ def _build_path(df1m, entry_ts, hold_secs, side):
 
 def _regen_signals(df5, symbol):
     """Walk 5m bars, regenerate every non-HOLD bb_mean_reversion signal (strength>=0.80
-    slot gate; per-symbol cooldown = hold window to avoid overlapping same-symbol)."""
+    slot gate; per-symbol cooldown = hold window to avoid overlapping same-symbol).
+    Captures entry features (rsi/vol_mult/adx/bb_width_pct/hour_pt) for filter analysis."""
     sigs = []
     cooldown_until = 0
     n = len(df5)
@@ -145,9 +146,19 @@ def _regen_signals(df5, symbol):
         if ts.signal == Signal.HOLD or ts.strength < 0.80:
             continue
         side = "long" if ts.signal == Signal.BUY else "short"
+        last = df5.iloc[i]
+        close = float(last["close"])
+        vol_avg = float(df5["volume"].iloc[i - 19:i + 1].mean())
+        bb_w = ((float(last["bb_upper"]) - float(last["bb_lower"])) / float(last["bb_mid"])
+                if last["bb_mid"] else 0.0)
         sigs.append({
-            "symbol": symbol, "side": side, "close": float(df5.iloc[i]["close"]),
+            "symbol": symbol, "side": side, "close": close,
             "entry_ts": bar_close_ts, "strength": ts.strength, "reason": ts.reason,
+            "rsi": float(last.get("rsi_fast", 50)),
+            "vol_mult": (float(last["volume"]) / vol_avg) if vol_avg else 0.0,
+            "adx": float(last.get("adx", 0)),
+            "bb_width_pct": bb_w * 100,
+            "hour_pt": (int((bar_close_ts - 7 * 3600) // 3600) % 24),  # PT = UTC-7
         })
         cooldown_until = bar_close_ts + PARAMS["hold_secs"]
     return sigs
@@ -169,6 +180,8 @@ def _replay(sig, df1m):
         "maker_net": _net(maker_px, m_exit, sig["side"], m_reason, NOTIONAL, MAKER_FEE),
         "taker_net": _net(taker_px, t_exit, sig["side"], t_reason, NOTIONAL, TAKER_FEE),
         "maker_reason": m_reason, "taker_reason": t_reason,
+        "rsi": sig.get("rsi"), "vol_mult": sig.get("vol_mult"), "adx": sig.get("adx"),
+        "bb_width_pct": sig.get("bb_width_pct"), "hour_pt": sig.get("hour_pt"),
     }
 
 
@@ -261,13 +274,28 @@ def main():
     print("  occupancy not modeled; can only REJECT, never confirm (forward-test adjudicates).")
 
     ex = ccxt.phemex({"enableRateLimit": True})
+    cache_dir = os.path.join(_BOT_DIR, "reports", "cache")
+    os.makedirs(cache_dir, exist_ok=True)
+
+    def _cached(sym, tf):
+        """Pickle OHLCV per (sym,tf,days) so re-runs (filter sweeps) skip the slow fetch.
+        SAFE: only loads cache files THIS script wrote (self-generated OHLCV DataFrames in
+        our own reports/cache/ dir) — never untrusted input, so pickle code-exec risk N/A."""
+        import pickle
+        key = f"{sym.replace('/', '_').replace(':', '_')}_{tf}_{args.days}d.pkl"
+        path = os.path.join(cache_dir, key)
+        if os.path.exists(path):
+            return pickle.load(open(path, "rb"))
+        df = backtest.fetch_ohlcv_full(ex, sym, tf, args.days)
+        pickle.dump(df, open(path, "wb"))
+        return df
 
     all_rows = []
     for sym in args.pairs:
         print(f"\n[{sym}]")
         try:
-            df5 = backtest.fetch_ohlcv_full(ex, sym, "5m", args.days)
-            df1m = backtest.fetch_ohlcv_full(ex, sym, "1m", args.days)
+            df5 = _cached(sym, "5m")
+            df1m = _cached(sym, "1m")
         except Exception as e:
             print(f"  fetch failed: {e} — skipping")
             continue
