@@ -83,6 +83,42 @@ def _should_halt_consecutive_losses(loss_streak: int, threshold: int = 5) -> boo
     return loss_streak >= threshold
 
 
+def _daily_loss_override_active(path: str = ".daily_loss_override") -> bool:
+    """True only on the PT calendar date written in the override file.
+
+    Lets an operator authorize trading for the rest of a single day after the
+    daily-loss kill switch has fired. Self-expires at PT midnight (the date in
+    the file no longer matches), so every future day keeps the full -3%
+    protection automatically. Reversible at any time by deleting the file.
+    """
+    if not os.path.exists(path):
+        return False
+    try:
+        with open(path) as f:
+            override_date = f.readline().strip()
+    except OSError:
+        return False
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+    today_str = _dt.now(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d")
+    return override_date == today_str
+
+
+def _pause_sentinel_is_daily_loss(path: str = ".pause_trading") -> bool:
+    """True if the .pause_trading sentinel was written by the daily-loss kill switch.
+
+    Used so the daily-loss override neutralizes ONLY a daily-loss pause — a manual
+    Telegram /pause or a consecutive-loss halt (different reason text) is left alone.
+    """
+    try:
+        with open(path) as f:
+            f.readline()  # line 1: timestamp
+            reason = f.readline().strip()  # line 2: reason
+    except OSError:
+        return False
+    return reason.startswith("DAILY LOSS HALT")
+
+
 # ExpressVPN server rotation list — cycled through on each CDN ban
 _VPN_SERVERS = [
     "usa-new-york",
@@ -571,13 +607,38 @@ class Phmex2Bot:
 
         # Global pause
         if os.path.exists(".pause_trading"):
-            if not hasattr(self, '_pause_logged') or not self._pause_logged:
-                logger.info("[SENTINEL] .pause_trading active — skipping all entries (exits still processed)")
-                self._pause_logged = True
-            self._trading_paused = True
+            # Daily-loss override: neutralize ONLY a daily-loss halt for the
+            # operator-authorized PT day. Manual/Telegram and consecutive-loss
+            # pauses (different reason text) are left fully in force.
+            if _daily_loss_override_active() and _pause_sentinel_is_daily_loss():
+                try:
+                    os.remove(".pause_trading")
+                except OSError:
+                    pass
+                self._trading_paused = False
+                self._pause_logged = False
+                if not getattr(self, '_daily_loss_override_logged', False):
+                    msg = ("DAILY LOSS OVERRIDE active — daily-loss halt cleared for "
+                           "today; entries allowed. Auto-expires at midnight PT.")
+                    logger.warning(f"[KILL SWITCH] {msg}")
+                    try:
+                        notifier.send(f"⚠️ {msg}")
+                    except Exception:
+                        pass
+                    self._daily_loss_override_logged = True
+            else:
+                if not hasattr(self, '_pause_logged') or not self._pause_logged:
+                    logger.info("[SENTINEL] .pause_trading active — skipping all entries (exits still processed)")
+                    self._pause_logged = True
+                self._trading_paused = True
         else:
             self._trading_paused = False
             self._pause_logged = False
+
+        # Reset the override one-shot notice whenever the override is not active,
+        # so a fresh override on a later PT day notifies again (and never spams).
+        if not _daily_loss_override_active():
+            self._daily_loss_override_logged = False
 
         # Per-slot kills
         for path in _glob.glob(".kill_*"):
@@ -1104,14 +1165,26 @@ class Phmex2Bot:
         # --- Extended kill switches (daily loss + consecutive loss) ---
         today_net = _compute_today_net_pnl(self.risk.closed_trades)
         if _should_halt_daily_loss(today_net, real_balance):
-            reason = f"DAILY LOSS HALT: today net ${today_net:.2f} exceeds -3% of ${real_balance:.2f}"
-            self._set_pause_sentinel(reason)
-            logger.warning(f"[KILL SWITCH] {reason}")
-            try:
-                notifier.send(f"⛔ {reason}")
-            except Exception:
-                pass
-            return
+            if _daily_loss_override_active():
+                if not getattr(self, "_daily_loss_override_logged", False):
+                    msg = (f"DAILY LOSS OVERRIDE active — today net ${today_net:.2f} past "
+                           f"-3% of ${real_balance:.2f}, but operator override for today is "
+                           f"set; entries allowed. Auto-expires at midnight PT.")
+                    logger.warning(f"[KILL SWITCH] {msg}")
+                    try:
+                        notifier.send(f"⚠️ {msg}")
+                    except Exception:
+                        pass
+                    self._daily_loss_override_logged = True
+            else:
+                reason = f"DAILY LOSS HALT: today net ${today_net:.2f} exceeds -3% of ${real_balance:.2f}"
+                self._set_pause_sentinel(reason)
+                logger.warning(f"[KILL SWITCH] {reason}")
+                try:
+                    notifier.send(f"⛔ {reason}")
+                except Exception:
+                    pass
+                return
 
         if _should_halt_consecutive_losses(self._loss_streak):
             reason = f"CONSECUTIVE LOSS HALT: {self._loss_streak} losses in a row — 4h cooldown"
