@@ -1443,13 +1443,12 @@ class Phmex2Bot:
                     logger.debug(f"[TIMING] {symbol} — skipping entry, {5-candle_offset}min to next candle open")
                     continue
 
-                # Time-of-day filter: block entries during toxic PT hours (PDT = UTC-7)
-                # Blocked PT hours → UTC (verified Apr 10–16, 417-trade analysis):
-                #   2 AM PT   (26% WR/-$4.22 all-time)    → UTC 9
-                #   10 AM-1 PM PT (28% WR/-$12.17)        → UTC 17,18,19,20
-                #   5-7 PM PT (26% WR/-$16.11)            → UTC 0,1,2
-                # Open: 12-2 AM, 3-10 AM, 2-5 PM, 8 PM-12 AM PT
-                _BLOCKED_HOURS_UTC = {0, 1, 2, 9, 17, 18, 19, 20}
+                # Time-of-day filter: config-driven, empty = 24-hour trading (Jonas 2026-06-30).
+                # Old Apr-era block (from a 417-trade ALL-STRATEGY sample, contaminated by dead
+                # strategies; gate-quantify 2026-06-13 found NO significant time edge) was:
+                #   UTC {0,1,2,9,17,18,19,20} = 5-7 PM / 2 AM / 10 AM-1 PM PT.
+                # Restore by setting TRADING_BLOCKED_HOURS_UTC=0,1,2,9,17,18,19,20 in .env.
+                _BLOCKED_HOURS_UTC = Config.TRADING_BLOCKED_HOURS_UTC
                 _utc_hour = datetime.datetime.now(datetime.timezone.utc).hour
                 _pt_hour = (_utc_hour - 7) % 24
                 if _utc_hour in _BLOCKED_HOURS_UTC:

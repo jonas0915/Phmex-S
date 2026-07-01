@@ -106,6 +106,10 @@ class Config:
     SCANNER_REFRESH_CYCLES = int(os.getenv("SCANNER_REFRESH_CYCLES", "100"))  # refresh every N cycles
     SCANNER_BLACKLIST = [s.strip() for s in os.getenv("SCANNER_BLACKLIST", "").split(",") if s.strip()]
 
+    # Time-of-day entry block (main bot). Empty = 24-hour trading (Jonas 2026-06-30).
+    # Comma-separated UTC hours to block. Old Apr-era block was: 0,1,2,9,17,18,19,20
+    TRADING_BLOCKED_HOURS_UTC = {int(h.strip()) for h in os.getenv("TRADING_BLOCKED_HOURS_UTC", "").split(",") if h.strip()}
+
     @classmethod
     def is_live(cls):
         return cls.MODE == "live"
