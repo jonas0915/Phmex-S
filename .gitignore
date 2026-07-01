@@ -27,3 +27,10 @@ docs/fix-proposals/st2-lab-*.md
 
 # worktrees created by EnterWorktree (do not track — auto-backup was committing them as gitlinks)
 .claude/worktrees/
+
+# Trading control sentinels (runtime state — must never be tracked; auto-backup was committing .daily_loss_override)
+.pause_trading
+.daily_loss_override
+.pause_*
+.kill_*
+.demote_*
