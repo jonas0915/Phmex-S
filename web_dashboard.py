@@ -507,6 +507,14 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
     ordered += sorted(s for s in slot_states
                       if s not in known_order and s != "v8_245trades")
 
+    def _stats_html(subset):
+        sn = len(subset)
+        swins = sum(1 for t in subset if _net_pnl(t) > 0)
+        swr = swins / sn * 100 if sn else 0.0
+        snet = sum(_net_pnl(t) for t in subset)
+        scls = "pos" if snet > 0 else "neg" if snet < 0 else "dim"
+        return f"{sn}t &middot; {swr:.0f}% &middot; <span class='{scls}'>${snet:+.2f}</span>"
+
     rows = ""
     for slot_id in ordered:
         trades = (slot_states.get(slot_id) or {}).get("closed_trades") or []
@@ -514,13 +522,19 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
         wins = sum(1 for t in trades if _net_pnl(t) > 0)
         wr = wins / n * 100 if n else 0.0
         net = sum(_net_pnl(t) for t in trades)
-        net_cls = "pos" if net > 0 else "neg" if net < 0 else "dim"
         name = escape(slot_id)
-        stats = f"{n}t &middot; {wr:.0f}% &middot; <span class='{net_cls}'>${net:+.2f}</span>"
+        stats = _stats_html(trades)
 
         if slot_id in live_ids:
+            # Never blend real money with sims: the LIVE row shows live-mode
+            # trades only; paper history gets its own dim sim row below.
+            live_rows = [t for t in trades if t.get("mode") == "live"]
+            sim_rows = [t for t in trades if t.get("mode") != "live"]
             rows += (f"<tr><td><span class='pos'>&#9679;</span> {name}</td>"
-                     f"<td class='pos'>LIVE</td><td>{stats}</td></tr>")
+                     f"<td class='pos'>LIVE</td><td>{_stats_html(live_rows)}</td></tr>")
+            if sim_rows:
+                rows += (f"<tr class='dim'><td></td><td>sim</td>"
+                         f"<td>{_stats_html(sim_rows)}</td></tr>")
             mode = modes.get(slot_id)
             if mode and not mode.get("paper_mode", True):
                 # Promoted slot — render the auto-demote guardrail state.
@@ -799,21 +813,19 @@ def _build_signals_section(slot_states: dict = None) -> str:
 def build_equity_series(era: str = "sentinel") -> dict:
     """Cumulative NET PnL series for /api/equity — rendered client-side by uPlot.
 
-    Merges main closed_trades with live-promoted slots' LIVE-mode closed trades
-    (slot trades carry mode=="live"), sorted by close timestamp.
+    Merges main closed_trades with every slot's LIVE-mode closed trades
+    (slot trades carry mode=="live"), sorted by close timestamp. Keyed on the
+    per-trade mode, NOT current promotion status — a demoted slot's real-money
+    history (e.g. ST2.0's 35 live trades) must stay on the curve.
     era="sentinel" reuses the exact cutoff the removed PNG sentinel chart
     used: (opened_at or closed_at) >= SENTINEL_DEPLOY_TS. era="all" = everything.
     Returns {"t": [unix_ts], "v": [cum_net], "meta": [per-trade dict]}.
     """
     rows = [("main", t) for t in read_state().get("closed_trades", []) or []]
-    for slot_id in sorted(_live_slot_ids()):
-        if slot_id == "5m_scalp":
-            continue  # main trading_state.json already merged above
-        try:
-            with open(os.path.join(PROJECT_DIR, f"trading_state_{slot_id}.json")) as f:
-                slot_trades = json.load(f).get("closed_trades", []) or []
-        except Exception:
-            continue
+    for slot_id, state in sorted(read_all_slot_states().items()):
+        if slot_id in ("5m_scalp", "v8_245trades"):
+            continue  # main file already merged above; v8 is an archive snapshot
+        slot_trades = (state or {}).get("closed_trades", []) or []
         rows.extend((slot_id, t) for t in slot_trades if t.get("mode") == "live")
     if era == "sentinel":
         # Same cutoff logic as the removed _make_cumulative_pnl_sentinel.
@@ -873,10 +885,13 @@ def collect_blotter_rows(limit: int = 500, slot_states: dict = None) -> list[dic
     if slot_states is not None:
         sources = [("main" if sid == "5m_scalp" else sid,
                     (st or {}).get("closed_trades") or [])
-                   for sid, st in slot_states.items()]
+                   for sid, st in slot_states.items()
+                   if sid != "v8_245trades"]  # archive snapshot, not a slot
     else:
         sources = []
         for owner, path in _blotter_sources():
+            if owner == "v8_245trades":
+                continue  # archive snapshot — its old main-bot trades would be mislabeled
             try:
                 with open(path) as f:
                     sources.append((owner, json.load(f).get("closed_trades", []) or []))
@@ -992,11 +1007,19 @@ def _latest_balance(lines: list = None) -> float:
 
 
 def _today_net_pnl(state: dict) -> float:
-    """Sum of NET pnl for main-state trades closed today (PT midnight onward)."""
+    """Sum of NET pnl for ALL real-money trades closed today (PT midnight
+    onward): main-state trades plus slot trades stamped mode=="live". Sim
+    (paper) trades never count."""
     try:
         today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
-        return sum(_net_pnl(t) for t in state.get("closed_trades", [])
-                   if t.get("closed_at", 0) >= today_start)
+        total = sum(_net_pnl(t) for t in state.get("closed_trades", [])
+                    if t.get("closed_at", 0) >= today_start)
+        for slot_id, sstate in read_all_slot_states().items():
+            if slot_id in ("5m_scalp", "v8_245trades"):
+                continue  # 5m_scalp IS the main state; v8 is an archive
+            total += sum(_net_pnl(t) for t in (sstate or {}).get("closed_trades") or []
+                         if t.get("mode") == "live" and t.get("closed_at", 0) >= today_start)
+        return total
     except Exception:
         return 0.0
 
@@ -1217,7 +1240,10 @@ def _build_positions_panel(lines: list = None, slot_states: dict = None) -> str:
         )
     else:
         last_line = ""
-        last = collect_blotter_rows(1, slot_states)
+        # "last:" must be the last REAL trade — a paper sim close here would
+        # masquerade as live activity under the POSITIONS panel.
+        last = [r for r in collect_blotter_rows(50, slot_states)
+                if r["mode"] == "live"][:1]
         if last:
             r = last[0]
             net_cls = "pos" if r["net"] >= 0 else "neg"
@@ -1247,7 +1273,7 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
     if not rows:
         return "<div class='dim'>no closed trades yet</div>"
     out = ("<table><tr class='dim'><th>TIME</th><th>SYM</th><th>SIDE</th>"
-           "<th>STRAT</th><th>PNL</th><th>REASON</th></tr>")
+           "<th>MODE</th><th>STRAT</th><th>PNL</th><th>REASON</th></tr>")
     for r in rows:
         net_cls = "pos" if r["net"] >= 0 else "neg"
         side = r["side"][:1].upper()
@@ -1257,14 +1283,19 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
         if r["owner"] != "main":
             b_cls = "amb" if r["mode"] == "live" else "dim"
             badge = f" <span class='{b_cls}'>[{escape(r['owner'])}]</span>"
+        # Real money vs simulation, unmissable per row (not just badge color).
+        mode_cell = ("<td class='pos'>LIVE</td>" if r["mode"] == "live"
+                     else "<td class='dim'>sim</td>")
+        sim_cls = "" if r["mode"] == "live" else " class='dim'"
         # id is generated server-side as owner:index ([A-Za-z0-9_:] only) — safe in attr;
         # sym passed via data-sym to avoid JS-string escaping issues with special chars.
         out += (
-            f"<tr onclick=\"drill(this,this.dataset.id,this.dataset.sym)\" "
+            f"<tr{sim_cls} onclick=\"drill(this,this.dataset.id,this.dataset.sym)\" "
             f"data-id=\"{r['id']}\" data-sym=\"{escape(r['sym'])}\" style='cursor:pointer'>"
             f"<td>{escape(r['time_pt'])}</td>"
             f"<td>{escape(r['sym'])}{badge}</td>"
             f"<td class='{side_cls}'>{side}</td>"
+            f"{mode_cell}"
             f"<td class='dim'>{escape(r['strat'][:16])}</td>"
             f"<td class='{net_cls}'>{r['net']:+.2f}</td>"
             f"<td class='dim'>{escape(r['reason'][:14])}</td></tr>"
