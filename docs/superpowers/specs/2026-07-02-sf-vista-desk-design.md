@@ -54,3 +54,44 @@ The view from the penthouse reads as San Francisco and the Bay Area seen from Sa
 ## Non-goals
 
 - No interior restyle, no character rework, no websocket migration, no change to poll cadence or API shape.
+
+---
+
+## Implementation addendum (2026-07-02, post-ship)
+
+Recon during execution changed the plan materially; what shipped differs from the
+original design in these ways:
+
+1. **The OSM bake was never needed (Task 6 skipped, YAGNI).** A complete 3D SF
+   city (landmarks, hills, instanced fill, ~2,200 lines) already existed in
+   `trading_desk.py` — hidden behind opaque 2D mural cylinders at the window
+   radius. The murals were deleted, not replaced.
+2. **Root causes of "ugly and slow" found during execution:**
+   - A 24,449×3,162 px (77 MP) `sf_panorama.jpg` cloned into 4 GPU textures at
+     load (main-thread freeze on the M3 Air). Deleted.
+   - The default camera sat ABOVE the ceiling staring at its gray top.
+   - The perf chip reported only the final composer quad pass (`calls=1`) —
+     `renderer.info` auto-reset per pass. Instrumentation fixed before tuning.
+   - Golden Gate, Bay Bridge, and Oakland port cranes floated at penthouse
+     altitude (built before the city was lowered to GROUND_Y=−50).
+   - The bay water plane sat 0.15 units BELOW the ground plane — the bay was
+     never visible. Water is now one vertex-displaced plane following the
+     `isWater()` shoreline map.
+   - Building heights were ~5× vertically exaggerated; the whole city now lives
+     in `cityGroup` (y-scale 0.35 + lift) so downtown tops sit just below the
+     penthouse floor — the Salesforce Tower vantage.
+   - The city was permanently night-lit under a day sky: window-light materials
+     now dim by day, whole-city material dimmer at night, fog density raised
+     ~8× for aerial perspective.
+3. **Ambience shipped as designed** (Karl the Fog, boats, bridge traffic,
+   approach aircraft, clouds, gulls) via `updateAmbience(t, dt, slowTick)`.
+4. **Verification infrastructure added:** `?hour=<0-24>` scene-clock override
+   (and `do_GET` now strips query strings when routing — it 404'd otherwise),
+   `window.DESK` debug handle with `tick()` for headless ambience driving.
+5. **Perf:** same-view synchronous frame time 437 ms → 48.5 ms. Post-processing
+   chain removed (native MSAA instead); adaptive half-rate below sustained
+   24 fps with visibility-change guard. Real vsync'd fps could not be measured
+   in-session (hidden-tab rAF throttling; user was using the browser) — the
+   perf chip now reports truthfully on screen.
+
+Commits: ff31d87, 0a01651, 4f7a53a, bb12103 (+ this docs commit).

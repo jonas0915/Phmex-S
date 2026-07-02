@@ -585,3 +585,9 @@ live: the running bot keeps the old in-memory code until a /pre-restart-audit'd 
 - **Rule:** any id that embeds a slot_id and is later validated/filename-interpolated must allow
   every char a real slot_id can contain (the dot in "ST2.0"). When a "known failing" test is
   flaky, find the data-dependent branch — don't record it as "passes".
+
+### Desk/browser verification lessons (2026-07-02, SF vista session)
+- **Kill the desk/dashboard by matching the REAL process name.** `pkill -f "python3 trading_desk.py"` matches nothing — ps shows the resolved binary `.../MacOS/Python trading_desk.py`. A zombie server kept serving STALE HTML for two whole edit-verify cycles ("my changes did nothing" = check `lsof -iTCP:8060` + grep the served HTML for your new code before concluding anything). Use `pkill -f "MacOS/Python trading_desk.py"` or kill by lsof PID.
+- **Hidden Chrome tabs freeze rAF completely.** fps=0.1, "frozen" JS probes awaiting animation frames, stale WebGL frames in CDP screenshots — all artifacts of `document.visibilityState === "hidden"`, not real perf. Verify visibility FIRST; measure real fps only with the tab visible, or measure synchronous `renderer.render()` timing via a debug handle (window.DESK) which works regardless.
+- **renderer.info under EffectComposer reports only the last pass** (autoReset per render call) — the desk perf chip said calls=1 tris=0k for weeks. With autoReset=false + manual per-frame reset it tells the truth. Fix instrumentation before tuning.
+- **Scene bugs hide behind other scene bugs.** The bay water plane was 0.15 units BELOW the ground plane (invisible) and bridges floated at penthouse altitude — both invisible while the opaque mural cylinders covered the windows. After removing any occluder, re-audit everything it hid from multiple camera angles (snapView + CDP screenshot loop).

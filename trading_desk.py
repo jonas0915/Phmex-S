@@ -7794,7 +7794,12 @@ _perfChip.style.cssText='position:fixed;top:6px;left:6px;z-index:999;background:
 _perfChip.textContent='[PERF] sampling…';
 document.body.appendChild(_perfChip);
 let _slowSamples = 0;
+let _visDirty = false;
+// A sample window that straddles a hidden period reads as false low fps and
+// wrongly triggers half-rate; reset the window whenever visibility changes.
+document.addEventListener('visibilitychange', () => { _visDirty = true; });
 function _fpsTick(){ _fpsN++; const now=performance.now();
+  if(_visDirty){ _visDirty=false; _slowSamples=0; _fpsN=0; _fpsT=now; return; }
   if(now-_fpsT>5000){
     const fps=_fpsN/((now-_fpsT)/1000);
     const inf=renderer.info;
