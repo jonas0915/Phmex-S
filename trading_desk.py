@@ -4548,6 +4548,19 @@ scene.add(beamRing);
     cityGroup.add(fogPlane);
     bayFogPlanes.push(fogPlane);
   }
+  // Day/night city dimmer: collect every unique lit material in the city once.
+  // The scene's ambient stays bright at night for the office interior, which
+  // left the whole city (hills, buildings, bridges) day-bright at 10 PM.
+  // var (not const) so it hoists to module scope for updateTimeOfDay.
+  var cityLitMats = [];
+  {
+    const seen = new Set();
+    cityGroup.traverse(o => {
+      if (o.isMesh && o.material && o.material.isMeshStandardMaterial && o.material !== cityGroundMat) {
+        if (!seen.has(o.material)) { seen.add(o.material); cityLitMats.push({m: o.material, base: o.material.color.clone()}); }
+      }
+    });
+  }
   scene.add(cityGroup);
 }
 
@@ -7351,8 +7364,14 @@ function updateTimeOfDay() {
   // which made the city read as permanent night under a daytime sky).
   const winFactor = isNight ? 1.0 : (isDay ? 0.12 : (isDawn ? 0.7 : (isGolden ? 0.5 : 0.85)));
   for (const e of cityNightMats) e.m.opacity = e.base * winFactor;
+  // Aerial perspective: the old 0.0003 fog was invisible at city distances, so
+  // distant hills (Mt Tam) rendered as flat pale walls. Near-zero effect indoors.
+  scene.fog.density = isDay ? 0.0022 : (isNight ? 0.0026 : 0.0024);
+  // Dim the whole city at night (scene ambient must stay bright for the office).
+  const cityDim = isNight ? 0.28 : (isDay ? 1.0 : 0.55);
+  if (typeof cityLitMats !== 'undefined') for (const e of cityLitMats) e.m.color.copy(e.base).multiplyScalar(cityDim);
   // City ground: concrete gray by day, dark by night (vertexColors multiply).
-  if (cityGroundMat) cityGroundMat.color.setScalar(isDay ? 2.4 : (isNight ? 1.0 : 1.7));
+  if (cityGroundMat) cityGroundMat.color.setScalar(isDay ? 2.4 : (isNight ? 0.5 : 1.2));
 }
 
 // Initial time setup
