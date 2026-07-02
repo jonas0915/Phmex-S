@@ -7804,7 +7804,7 @@ function _fpsTick(){ _fpsN++; const now=performance.now();
   if(now-_fpsT>5000){
     const fps=_fpsN/((now-_fpsT)/1000);
     const inf=renderer.info;
-    const line=`[PERF] fps=${fps.toFixed(1)}${PERF_HALF_RATE?' (half-rate)':''} calls=${inf.render.calls} tris=${(inf.render.triangles/1000).toFixed(0)}k geo=${inf.memory.geometries} tex=${inf.memory.textures}`;
+    const line=`[PERF] fps=${fps.toFixed(1)}${PERF_HALF_RATE?' (half-rate)':''}${TIMER_LOOP?' (timer-loop)':''} calls=${inf.render.calls} tris=${(inf.render.triangles/1000).toFixed(0)}k geo=${inf.memory.geometries} tex=${inf.memory.textures}`;
     console.log(line); _perfChip.textContent=line;
     // Adaptive pacing (skip decisions while tab hidden — rAF is throttled there)
     if(!document.hidden){
@@ -7816,8 +7816,29 @@ function _fpsTick(){ _fpsN++; const now=performance.now();
 let frameCount = 0;
 let PERF_HALF_RATE = false; // auto-set by _fpsTick when sustained fps < 24
 let _charNames = null;      // cached charGroups keys (keys are fixed after build)
+// rAF-throttle fallback: Chrome Energy Saver (on battery) caps rAF to ~10/s
+// even though the frame body runs in ~16ms. Timers are NOT throttled, so when
+// sustained rAF gaps exceed 150ms while visible, drive the loop with a 30fps
+// timer instead; retry rAF every 60s in case the throttle lifted (plugged in).
+let _lastFrameAt = 0, _slowGaps = 0, TIMER_LOOP = false, _timerLoopSince = 0;
+function scheduleNextFrame() {
+  if (TIMER_LOOP && !document.hidden) setTimeout(animate, 33);
+  else requestAnimationFrame(animate); // hidden tabs stay on rAF so they pause
+}
 function animate() {
-  requestAnimationFrame(animate);
+  const _nowMs = performance.now();
+  if (!document.hidden) {
+    const gap = _nowMs - _lastFrameAt;
+    if (!TIMER_LOOP && gap > 150 && _lastFrameAt > 0) {
+      if (++_slowGaps >= 8) {
+        TIMER_LOOP = true; _timerLoopSince = _nowMs;
+        console.warn('[desk] rAF throttled (browser energy saver?) - switching to 30fps timer loop');
+      }
+    } else if (gap <= 150) { _slowGaps = 0; }
+    if (TIMER_LOOP && _nowMs - _timerLoopSince > 60000) { TIMER_LOOP = false; _slowGaps = 0; }
+  } else { _slowGaps = 0; TIMER_LOOP = false; }
+  _lastFrameAt = _nowMs;
+  scheduleNextFrame();
   frameCount++;
   if(PERF_HALF_RATE && frameCount % 2 !== 0) return;
   _fpsTick();
