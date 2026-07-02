@@ -1126,21 +1126,16 @@ function createSkyDomeTexture(hour) {
     }
   }
 
-  // Distant city silhouette at horizon
-  const horizY = Math.floor(H * 0.55);
-  for(let x = 0; x < W; x += 6 + Math.random() * 10) {
-    const bh = (5 + Math.random() * 30) * (0.5 + 0.5 * Math.sin(x * 0.005));
-    ctx.fillStyle = isDaytime ? 'rgba(80,95,110,0.5)' : 'rgba(15,20,30,0.8)';
-    ctx.fillRect(x, horizY - bh, 4 + Math.random() * 6, bh + 4);
-    if(wb > 0.15) {
-      for(let wy = horizY - bh + 2; wy < horizY; wy += 4) {
-        if(Math.random() > 0.5) {
-          ctx.fillStyle = 'rgba(255,' + (200 + Math.random() * 55) + ',' + (80 + Math.random() * 80) + ',' + (wb * 0.4) + ')';
-          ctx.fillRect(x + 1, wy, 2, 2);
-        }
-      }
-    }
-  }
+  // Soft atmospheric haze at the horizon. The 3D city + fog ARE the skyline
+  // now - the old painted random-box silhouette here doubled the horizon at a
+  // different height and clashed with the real geometry ("clunky" skyline).
+  const hazeBand = ctx.createLinearGradient(0, H * 0.50, 0, H * 0.62);
+  hazeBand.addColorStop(0, 'rgba(0,0,0,0)');
+  hazeBand.addColorStop(0.5, isDaytime ? 'rgba(214,224,235,0.38)' : 'rgba(28,38,58,0.38)');
+  hazeBand.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = hazeBand;
+  ctx.fillRect(0, H * 0.50, W, H * 0.12);
+  void wb; // window-bright only used by the old silhouette painter
 
   return new THREE.CanvasTexture(c);
 }
@@ -1156,6 +1151,9 @@ function createSkyDome(hour) {
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = -1;
+  // Sink the dome: its painted horizon lived at the sphere's equator = eye
+  // level, floating ~18 units above the real city's horizon (double-horizon).
+  mesh.position.y = -45;
   return mesh;
 }
 
@@ -2679,7 +2677,9 @@ scene.add(beamRing);
         im.setMatrixAt(idx, m);
         // Per-instance color variation for realism
         const shift = (Math.random()-0.5)*0.08;
-        c.copy(grp.mat.color).offsetHSL(shift*0.3, shift, shift*0.5);
+        // vary around WHITE: instanceColor multiplies material.color in the
+        // shader; copying the material color in squared it to near-black
+        c.setScalar(1 + shift);
         im.setColorAt(idx, c);
       });
       im.instanceMatrix.needsUpdate = true;
@@ -2770,7 +2770,7 @@ scene.add(beamRing);
         );
         im.setMatrixAt(idx, m);
         const shift = (Math.random()-0.5)*0.08;
-        c.copy(grp.mat.color).offsetHSL(0, shift, shift);
+        c.setScalar(1 + shift); // white-relative (instanceColor multiplies mat color)
         im.setColorAt(idx, c);
       });
       im.instanceMatrix.needsUpdate = true;
@@ -2792,7 +2792,7 @@ scene.add(beamRing);
         );
         im.setMatrixAt(idx, m);
         const shift = (Math.random()-0.5)*0.08;
-        c.copy(cylMat.color).offsetHSL(shift*0.2, shift, shift*0.4);
+        c.setScalar(1 + shift); // white-relative (instanceColor multiplies mat color)
         im.setColorAt(idx, c);
       });
       im.instanceMatrix.needsUpdate = true;
@@ -4656,9 +4656,10 @@ scene.add(beamRing);
       g.add(fuse); g.add(wing); g.add(strobe);
       g.userData.strobe = strobe;
       // descending approach across the bay toward SFO (south), looping
+      // approach legs stay OVER THE BAY (x>65 east of the shoreline)
       g.userData.path = i === 0
-        ? {ax:170, ay:GROUND_Y+70, az:-140, bx:40, by:GROUND_Y+22, bz:170, sp:0.012, ph:0}
-        : {ax:220, ay:GROUND_Y+80, az:-40, bx:10, by:GROUND_Y+26, bz:190, sp:0.010, ph:0.5};
+        ? {ax:170, ay:GROUND_Y+70, az:-140, bx:90, by:GROUND_Y+22, bz:150, sp:0.012, ph:0}
+        : {ax:220, ay:GROUND_Y+80, az:-40, bx:100, by:GROUND_Y+26, bz:180, sp:0.010, ph:0.5};
       cityGroup.add(g);
       skyPlanes.push(g);
     }
@@ -7844,6 +7845,10 @@ function animate() {
     if (_cg && _cg.userData && _cg.userData.mixer) _cg.userData.mixer.update(dt * GLTF_CLIP_SPEED);
   }
 
+  // Story/behavior + scenery: decorative logic must never kill the render
+  // loop. Before this guard, ONE exception anywhere below froze the desk
+  // on its last rendered frame forever (HUD kept updating - '3D is static').
+  try {
   if (typeof updateAmbience === 'function') updateAmbience(t, dt, slowTick);
 
   // Character idle animations
@@ -8114,9 +8119,20 @@ function animate() {
       const path = facilityWalkPath || [facilityWalkFrom, facilityWalkTo];
       const segCount = path.length - 1;
       const segProg = progress * segCount;
-      const segIdx = Math.min(Math.floor(segProg), segCount - 1);
+      const segIdx = Math.max(0, Math.min(Math.floor(segProg), segCount - 1));
       const segT = segProg - segIdx;
       const ease = segT < 0.5 ? 2*segT*segT : 1-Math.pow(-2*segT+2,2)/2;
+      if (!path[segIdx] || !path[segIdx + 1]) {
+        // Never crash the render loop over a walk hiccup: log the state (root
+        // cause evidence) and end the walk cleanly. A thrown frame here used
+        // to kill animate() forever - the whole desk froze on its last frame.
+        console.warn('[desk] facility walk aborted: bad path', {segIdx: segIdx, segCount: segCount,
+          progress: progress, hasPath: !!facilityWalkPath, from: !!facilityWalkFrom,
+          to: !!facilityWalkTo, agent: facilityAgent});
+        facilityWalking = false;
+        facilityWalkPath = null;
+        switchToIdleAnim(facilityAgent);
+      } else {
       ag.position.lerpVectors(path[segIdx], path[segIdx+1], ease);
 
       // Only restore ground Y on main floor segments; stair/B1 segments keep computed Y
@@ -8136,6 +8152,7 @@ function animate() {
           facilityAgent = null;
           facilityLocation = null;
         }
+      }
       }
     }
   }
@@ -8370,6 +8387,11 @@ function animate() {
   // (GLTF mixer updates happen once, at the top of animate(), with real dt.
   // The scene.traverse(... mixer.update(1/30)) pass that lived here was a
   // redundant second update of the same charGroups mixers — removed.)
+
+  } catch (e) {
+    window._deskAnimErrs = (window._deskAnimErrs || 0) + 1;
+    if (window._deskAnimErrs <= 5) console.error('[desk] behavior error (render continues):', e);
+  }
 
   controls.update();
   renderer.render(scene, camera);
