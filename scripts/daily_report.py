@@ -96,6 +96,13 @@ def live_slot_summaries(date_str):
             if closed_at and datetime.fromtimestamp(closed_at, tz=CA_TZ).strftime("%Y-%m-%d") == date_str:
                 live_today.append(t)
         wins = sum(1 for t in live_today if _net(t) > 0)
+        # Lifetime blocked-gate counters from the slot's _blocked.json sidecar
+        # (generic: any bump_blocked tag surfaces, e.g. mr_rsi_floor).
+        try:
+            with open(os.path.join(BOT_DIR, f"trading_state_{slot_id}_blocked.json")) as bf:
+                blocked = json.load(bf) or {}
+        except (FileNotFoundError, json.JSONDecodeError, IOError):
+            blocked = {}
         summaries.append({
             "slot_id": slot_id,
             "trades": len(live_today),
@@ -104,6 +111,7 @@ def live_slot_summaries(date_str):
             "wr": (wins / len(live_today) * 100) if live_today else 0,
             "pnl_today": sum(_net(t) for t in live_today),
             "live_pnl": sum(_net(t) for t in live_trades),
+            "blocked": blocked,
         })
     return summaries
 
@@ -359,6 +367,10 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
         report += f"- Net PnL today: ${ls['pnl_today']:.2f}\n"
         report += f"- Live PnL since promotion: ${ls['live_pnl']:.2f}\n"
         report += f"- Cap headroom: ${ls['live_pnl'] - LIVE_LOSS_CAP:.2f} until -${abs(LIVE_LOSS_CAP):.2f} auto-demote\n"
+        if ls.get("blocked"):
+            report += ("- Blocked (lifetime): "
+                       + " ".join(f"{k}={v}" for k, v in sorted(ls["blocked"].items()))
+                       + "\n")
 
     # Save
     report_path = os.path.join(REPORT_DIR, f"{date_str}.md")
@@ -503,6 +515,10 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
             f"Since promotion: {p_sign}${ls['live_pnl']:.2f} | "
             f"Headroom: ${ls['live_pnl'] - LIVE_LOSS_CAP:.2f} until -${abs(LIVE_LOSS_CAP):.2f} demote\n"
         )
+        if ls.get("blocked"):
+            msg += ("Blocked: "
+                    + " ".join(f"{k}={v}" for k, v in sorted(ls["blocked"].items()))
+                    + "\n")
 
     try:
         import requests

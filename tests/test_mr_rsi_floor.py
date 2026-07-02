@@ -87,3 +87,10 @@ def test_gate_disabled_at_zero():
 def test_gate_fails_open_without_rsi():
     # No RSI in reason -> no block (gate only fires on a parsed value)
     assert "_mr_rsi is not None" in _gate_block()
+
+
+def test_gate_boundary_is_strict_less_than():
+    # RSI exactly at the floor must NOT be blocked (live attempts at 22.0-22.2
+    # exist; the replay lead blocks only BELOW 22). Pin `<` not `<=`.
+    assert "_mr_rsi < Config.MEAN_REVERT_LONG_RSI_MIN" in _gate_block()
+    assert "_mr_rsi <= Config.MEAN_REVERT_LONG_RSI_MIN" not in _gate_block()

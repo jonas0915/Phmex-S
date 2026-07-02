@@ -1,0 +1,220 @@
+{
+ "generated_utc": "2026-07-02T04:19:02.134266+00:00",
+ "method": {
+  "exit_model": "st2_lab.exit_replay._simulate variant=True (SL/TP + trail + breakeven), per mean_revert_replay.py conventions",
+  "params": {
+   "sl_pct": 1.2,
+   "tp_pct": 1.6,
+   "hold_secs": 14400
+  },
+  "notional": 100.0,
+  "fees_pct": {
+   "maker": 0.01,
+   "taker": 0.06,
+   "rule": "maker entry; taker exit on stop_loss/trailing_stop/catastrophe, maker on TP/hold"
+  },
+  "path": "1m OHLCV, two points per bar, adverse extreme first (pessimistic)",
+  "entry_assumption": "miss counterfactual fills at the intended [MAKER] Limit price at placement time",
+  "tz_note": "log local time Jun 18-23 = UTC-4 (ET), Jun 24+ = UTC-7 (PT); verified via entry_snapshots.jsonl epochs vs log ENTRY lines",
+  "log_coverage": "logs/bot.log + bot.log.1..5 = 2026-06-17 23:48 local -> 2026-07-01 21:12 local; no .gz; attempts before Jun 17 23:48 (slot live since Jun 12) are lost to rotation"
+ },
+ "sanity_fills": [
+  {
+   "sym": "WLD/USDT:USDT",
+   "side": "long",
+   "px": 0.6416,
+   "rsi": 27.9,
+   "ts": 1781836498,
+   "real_net": 1.5899158100000135,
+   "real_exit": 0.6519,
+   "real_reason": "exchange_close (TP)",
+   "src": "trading_state_5m_mean_revert.json opened_at=1781836498.196945",
+   "status": "OK",
+   "sim_exit": 0.6518655999999999,
+   "sim_reason": "take_profit",
+   "sim_held_s": "1922",
+   "sim_net": 1.58
+  },
+  {
+   "sym": "XLM/USDT:USDT",
+   "side": "short",
+   "px": 0.1868,
+   "rsi": 82.5,
+   "ts": 1782332781,
+   "real_net": -1.4749362599999976,
+   "real_exit": 0.18946,
+   "real_reason": "exchange_close (SL, exit delayed by host sleep)",
+   "src": "trading_state_5m_mean_revert.json opened_at=1782332781.247328",
+   "status": "OK",
+   "sim_exit": 0.18631728,
+   "sim_reason": "trailing_stop",
+   "sim_held_s": "2799",
+   "sim_net": 0.1884
+  }
+ ],
+ "sanity_note": "WLD reproduces (sim +1.58 vs real +1.59, same TP). XLM does NOT and is NOT expected to: the real trade held 16824s (>4h hold, from the state file) because host sleep suspended software exits (known 2026-06-24 incident) and price blew through the SL to 0.18946 (trigger 0.18904). Sim (bot awake): trail exit +0.19; even with trail OFF the position was +$1.01 at the 4h hold. Not tuned to match.",
+ "misses": [
+  {
+   "sym": "AVAX/USDT:USDT",
+   "side": "short",
+   "px": 5.962,
+   "rsi": null,
+   "ts": 1781907893,
+   "src": "bot.log.5: 2026-06-19 18:24:53 [MAKER] Limit sell 16.7 AVAX @ 5.962",
+   "status": "OK",
+   "sim_exit": 5.866607999999999,
+   "sim_reason": "take_profit",
+   "sim_held_s": "3367",
+   "sim_net": 1.58
+  },
+  {
+   "sym": "XRP/USDT:USDT",
+   "side": "long",
+   "px": 1.1454,
+   "rsi": null,
+   "ts": 1781960207,
+   "src": "bot.log.5: 2026-06-20 08:56:47 [MAKER] Limit buy 87.3 XRP @ 1.1454",
+   "status": "OK",
+   "sim_exit": 1.1513356000000001,
+   "sim_reason": "trailing_stop",
+   "sim_held_s": "8653",
+   "sim_net": 0.4482
+  },
+  {
+   "sym": "ADA/USDT:USDT",
+   "side": "short",
+   "px": 0.1617,
+   "rsi": 70.9,
+   "ts": 1782035586,
+   "src": "bot.log.4/5: 2026-06-21 05:53:06 [MAKER] Limit sell 618.42 ADA @ 0.1617",
+   "status": "OK",
+   "sim_exit": 0.1611821,
+   "sim_reason": "trailing_stop",
+   "sim_held_s": "5154",
+   "sim_net": 0.2503
+  },
+  {
+   "sym": "XLM/USDT:USDT",
+   "side": "long",
+   "px": 0.21313,
+   "rsi": 27.6,
+   "ts": 1782138205,
+   "src": "bot.log.4: 2026-06-22 10:23:25 [MAKER] Limit buy 468.0 XLM @ 0.21313",
+   "status": "OK",
+   "sim_exit": 0.21057243999999997,
+   "sim_reason": "stop_loss",
+   "sim_held_s": "1895",
+   "sim_net": -1.27
+  },
+  {
+   "sym": "LTC/USDT:USDT",
+   "side": "long",
+   "px": 41.93,
+   "rsi": 22.2,
+   "ts": 1782296883,
+   "src": "bot.log.3: 2026-06-24 03:28:03 [MAKER] Limit buy 2.38 LTC @ 41.93",
+   "status": "OK",
+   "sim_exit": 42.28277,
+   "sim_reason": "trailing_stop",
+   "sim_held_s": "4977",
+   "sim_net": 0.7713
+  },
+  {
+   "sym": "XLM/USDT:USDT",
+   "side": "short",
+   "px": 0.17752,
+   "rsi": 80.0,
+   "ts": 1782423896,
+   "src": "bot.log.2: 2026-06-25 14:44:56 [MAKER] Limit sell 563.0 XLM @ 0.17752",
+   "status": "OK",
+   "sim_exit": 0.17467968,
+   "sim_reason": "take_profit",
+   "sim_held_s": "13804",
+   "sim_net": 1.58
+  },
+  {
+   "sym": "ADA/USDT:USDT",
+   "side": "short",
+   "px": 0.1434,
+   "rsi": 72.0,
+   "ts": 1782423928,
+   "src": "bot.log.2: 2026-06-25 14:45:28 [MAKER] Limit sell 697.35 ADA @ 0.1434",
+   "overlap": "second concurrent signal; live slot max_positions=1 -> could not coexist with XLM short 32s earlier",
+   "status": "OK",
+   "sim_exit": 0.14302779999999998,
+   "sim_reason": "trailing_stop",
+   "sim_held_s": "12632",
+   "sim_net": 0.1896
+  },
+  {
+   "sym": "XLM/USDT:USDT",
+   "side": "long",
+   "px": 0.17789,
+   "rsi": 26.7,
+   "ts": 1782500643,
+   "src": "bot.log.2: 2026-06-26 12:04:03 [MAKER] Limit buy 561.0 XLM @ 0.17789",
+   "status": "OK",
+   "sim_exit": 0.17897147,
+   "sim_reason": "trailing_stop",
+   "sim_held_s": "957",
+   "sim_net": 0.5379
+  },
+  {
+   "sym": "XLM/USDT:USDT",
+   "side": "short",
+   "px": 0.17611,
+   "rsi": 73.6,
+   "ts": 1782535156,
+   "src": "bot.log.2: 2026-06-26 21:39:16 [MAKER] Limit sell 567.0 XLM @ 0.17611",
+   "status": "OK",
+   "sim_exit": 0.17502349999999997,
+   "sim_reason": "trailing_stop",
+   "sim_held_s": "4364",
+   "sim_net": 0.5469
+  },
+  {
+   "sym": "LTC/USDT:USDT",
+   "side": "long",
+   "px": 42.9,
+   "rsi": 28.7,
+   "ts": 1782652177,
+   "src": "bot.log.1: 2026-06-28 06:09:37 [MAKER] Limit buy 2.33 LTC @ 42.9",
+   "status": "OK",
+   "sim_exit": 43.01058,
+   "sim_reason": "trailing_stop",
+   "sim_held_s": "1583",
+   "sim_net": 0.1878
+  },
+  {
+   "sym": "DOGE/USDT:USDT",
+   "side": "long",
+   "px": 0.07205,
+   "rsi": 26.1,
+   "ts": 1782886457,
+   "src": "bot.log.1: 2026-06-30 23:14:17 [MAKER] Limit buy 1388.0 DOGE @ 0.07205",
+   "status": "OK",
+   "sim_exit": 0.0711854,
+   "sim_reason": "stop_loss",
+   "sim_held_s": "1603",
+   "sim_net": -1.27
+  }
+ ],
+ "totals": {
+  "all_covered": {
+   "n": 11,
+   "net": 3.552,
+   "wins": 9,
+   "losses": 2,
+   "avg": 0.3229
+  },
+  "occupancy_realistic": {
+   "n": 10,
+   "net": 3.3624,
+   "wins": 8,
+   "losses": 2,
+   "avg": 0.3362
+  },
+  "uncovered": 0
+ },
+ "caveat": "n=11 counterfactuals, screening-grade anecdote; fill-at-intended-price is optimistic"
+}

@@ -118,6 +118,7 @@ def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
         ("Cooldown",       "cooldown"),
         ("QUIET regime",   "QUIET regime"),
         ("Divergence",     "divergence"),
+        ("MR RSI floor",   "[MR RSI FLOOR]"),
     ]
     try:
         with open(log_file, "r", errors="replace") as fh:
