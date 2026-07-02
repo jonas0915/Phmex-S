@@ -63,6 +63,11 @@ class Config:
     # 0.0 disables the gate. Applies ONLY to the 5m_mean_revert slot.
     MEAN_REVERT_LONG_RSI_MIN = float(os.getenv("MEAN_REVERT_LONG_RSI_MIN", "0.0"))
 
+    # Slot maker re-quote (2026-07-02): max adverse drift (percent of signal
+    # price) at which a slot may re-place a missed PostOnly entry at the fresh
+    # touch. Only slots with requote_attempts > 0 use this (5m_mean_revert).
+    SLOT_REQUOTE_MAX_DRIFT_PCT = float(os.getenv("SLOT_REQUOTE_MAX_DRIFT_PCT", "0.15"))
+
     # Mode
     MODE = os.getenv("MODE", "paper")  # "live" or "paper" — default paper for safety
 

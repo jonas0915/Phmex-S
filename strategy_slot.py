@@ -42,6 +42,10 @@ class StrategySlot:
                                          # trail arms (+5% ROI), mirroring the main-bot durable trail.
                                          # The amend rests on Phemex, so the profit-lock survives a host
                                          # sleep — unlike software exits. LIVE slots only. Off = no change.
+    requote_attempts: int = 0  # per-slot opt-in (2026-07-01): on a PostOnly entry miss,
+                               # re-place up to N maker orders at the fresh touch (never
+                               # taker), drift-capped by Config.SLOT_REQUOTE_MAX_DRIFT_PCT.
+                               # 0 = give up after the first miss (pre-existing behavior).
 
     def __post_init__(self):
         # Each slot gets its own RiskManager (separate positions, P&L, Kelly)

@@ -66,11 +66,19 @@ def test_config_drift_cap_exists_and_is_float():
 
 def _requote_block():
     m = re.search(
-        r"if not order and slot\.requote_attempts > 0.{0,2500}?"
+        r"if not order and slot\.requote_attempts > 0.{0,4000}?"
         r"if not order:",
         BOT_SRC, re.DOTALL)
     assert m, "re-quote block not found in bot.py live entry path"
     return m.group(0)
+
+
+def test_requote_has_zombie_guard():
+    # Review #2 hardening: never place a second entry while the first order
+    # may still rest on the book (cancel + status fetch both failed).
+    block = _requote_block()
+    assert "fetch_open_orders" in block
+    assert "reduceOnly" in block
 
 
 def test_requote_block_exists_and_is_slot_keyed():

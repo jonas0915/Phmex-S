@@ -37,6 +37,14 @@ def _rsi_from_reason(reason) -> float | None:
     return float(m.group(1)) if m else None
 
 
+def _requote_drift_pct(direction: str, signal_price: float, touch: float) -> float:
+    """Adverse drift (percent of signal price) of the current touch vs the
+    signal price. Positive = price ran AWAY from the entry (worse fill for a
+    re-quote); negative = price came back (better fill)."""
+    raw = (touch - signal_price) / signal_price * 100
+    return raw if direction == "long" else -raw
+
+
 def _extract_strategy_name(reason: str) -> str:
     """Derive strategy key from signal reason string for time exit lookup."""
     r = reason.lower()
@@ -306,6 +314,9 @@ class Phmex2Bot:
                 max_positions=1,      # conservative — mean reversion is riskier
                 capital_pct=0.3,      # 30% allocation (less than momentum/scalp)
                 paper_mode=True,      # Paper mode first (promoted live via mode sidecar)
+                requote_attempts=1,   # 2026-07-02: one maker re-quote on PostOnly miss
+                                      # (fill rate was 2/13; misses were net winners —
+                                      # reports/mr_missed_fills.json). Drift-capped.
                 durable_trail_enabled=True,  # 2026-06-24: ratchet the resting exchange SL up
                                              # as the trail arms (+5% ROI). Closes the gap that
                                              # let an XLM short round-trip +7% -> -14.2% with only
@@ -2104,6 +2115,57 @@ class Phmex2Bot:
                             order = (self.exchange.open_long(symbol, margin, price)
                                      if direction == "long"
                                      else self.exchange.open_short(symbol, margin, price))
+                            # --- Bounded maker re-quote (2026-07-02, owner-approved): the
+                            # slot's PostOnly entries missed 11/13 attempts and the misses
+                            # were net winners (+$3.55, reports/mr_missed_fills.json). On a
+                            # miss, re-place at the fresh touch — still PostOnly, never
+                            # taker — unless price ran adversely past the drift cap.
+                            # Slot-keyed (default off; only 5m_mean_revert opts in);
+                            # exchange._try_limit_entry untouched -> main bot unaffected. ---
+                            if not order and slot.requote_attempts > 0:
+                                for _rq in range(slot.requote_attempts):
+                                    # Zombie guard (review hardening): if the first
+                                    # order still rests (cancel AND status fetch both
+                                    # failed), never stack a second entry on it. On any
+                                    # doubt, skip the re-quote — miss is the safe state.
+                                    try:
+                                        _resting = self.exchange.client.fetch_open_orders(symbol) or []
+                                    except Exception as _zg_err:
+                                        logger.info(f"[SLOT LIVE] [MR REQUOTE] {slot.slot_id} {symbol} "
+                                                    f"zombie-check failed ({_zg_err}) — skipping re-quote")
+                                        break
+                                    _entry_side = "buy" if direction == "long" else "sell"
+                                    if any(o.get("side") == _entry_side
+                                           and not (o.get("reduceOnly")
+                                                    or (o.get("info") or {}).get("reduceOnly"))
+                                           for o in _resting):
+                                        logger.info(f"[SLOT LIVE] [MR REQUOTE] {slot.slot_id} {symbol} "
+                                                    f"first order still resting — skipping re-quote")
+                                        break
+                                    _rq_ob = self.exchange.get_order_book(symbol, depth=5)
+                                    _touch = (_rq_ob or {}).get(
+                                        "best_bid" if direction == "long" else "best_ask")
+                                    if not _touch:
+                                        break
+                                    _rq_drift = _requote_drift_pct(direction, price, _touch)
+                                    if _rq_drift > Config.SLOT_REQUOTE_MAX_DRIFT_PCT:
+                                        logger.info(
+                                            f"[SLOT LIVE] [MR REQUOTE] {slot.slot_id} {symbol} "
+                                            f"{direction} abort — adverse drift {_rq_drift:.3f}% "
+                                            f"> {Config.SLOT_REQUOTE_MAX_DRIFT_PCT}%")
+                                        break
+                                    logger.info(
+                                        f"[SLOT LIVE] [MR REQUOTE] {slot.slot_id} {symbol} "
+                                        f"{direction} attempt {_rq + 1}/{slot.requote_attempts} "
+                                        f"@ {_touch} (drift {_rq_drift:+.3f}%)")
+                                    order = (self.exchange.open_long(symbol, margin, _touch)
+                                             if direction == "long"
+                                             else self.exchange.open_short(symbol, margin, _touch))
+                                    if order:
+                                        logger.info(
+                                            f"[SLOT LIVE] [MR REQUOTE] {slot.slot_id} {symbol} "
+                                            f"{direction} FILLED on re-quote")
+                                        break
                             if not order:
                                 # Log the entry conditions present at a MISS (mirrors the fill
                                 # line below, whose {signal.reason} carries imb/br/tc for ST2.0)
