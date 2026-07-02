@@ -882,10 +882,16 @@ document.getElementById('css2d').appendChild(css2dRenderer.domElement);
 renderer.info.autoReset = false; // reset manually once per frame in animate()
 
 // ── TIME OF DAY ──
+// City materials that dim by day / glow at night. Entries: {m, base(opacity)}.
+const cityNightMats = [];
+let cityGroundMat = null;
 let currentHour = new Date().getHours() + new Date().getMinutes()/60;
 let lastTimeUpdate = 0;
 
+// Debug-only: ?hour=22 freezes the scene clock at a given hour (verification aid)
+const HOUR_OVERRIDE = parseFloat(new URLSearchParams(location.search).get('hour'));
 function getTimeOfDay() {
+  if (Number.isFinite(HOUR_OVERRIDE)) return HOUR_OVERRIDE;
   const d = new Date();
   return d.getHours() + d.getMinutes()/60;
 }
@@ -2288,6 +2294,15 @@ scene.add(beamRing);
 {
   const GROUND_Y = -50;
 
+  // The whole exterior city lives in one group. The vertical scale compresses
+  // the stylized building heights (~5x exaggerated vs the 1:40m horizontal
+  // scale) to believable ratios, and the lift puts the city ground ~18 units
+  // below the penthouse floor - so downtown tops sit just below eye level:
+  // the "top of Salesforce Tower" vantage. Horizontal layout is untouched.
+  const cityGroup = new THREE.Group();
+  cityGroup.scale.set(1, 0.35, 1);
+  cityGroup.position.y = -18 - GROUND_Y * 0.35;
+
   // Ground plane (city floor / streets) — vertex-colored: darker near water, lighter inland
   const groundGeo = new THREE.PlaneGeometry(1200, 1200, 40, 40);
   const groundColors = new Float32Array(groundGeo.attributes.position.count * 3);
@@ -2300,11 +2315,12 @@ scene.add(beamRing);
   }
   groundGeo.setAttribute('color', new THREE.BufferAttribute(groundColors, 3));
   const groundMat = new THREE.MeshStandardMaterial({roughness:0.85, metalness:0.15, vertexColors: true});
+  cityGroundMat = groundMat;
   const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI/2;
   ground.position.set(0, GROUND_Y, 0);
   ground.receiveShadow = true;
-  scene.add(ground);
+  cityGroup.add(ground);
 
   // Downtown street grid overlay (subtle lines)
   const gridCanvas = document.createElement('canvas');
@@ -2324,7 +2340,7 @@ scene.add(beamRing);
   gridPlane.rotation.x = -Math.PI/2;
   gridPlane.position.set(0, GROUND_Y + 0.05, 10);
   gridPlane.renderOrder = 0.5;
-  scene.add(gridPlane);
+  cityGroup.add(gridPlane);
 
   // SF Bay water plane — extends far to cover all visible bay area
   // Uses 'var' so waterPlane is accessible from animate() outside this block
@@ -2338,7 +2354,7 @@ scene.add(beamRing);
   waterPlane.rotation.x = -Math.PI/2;
   waterPlane.position.set(20, GROUND_Y + 0.1, -180);
   waterPlane.receiveShadow = true;
-  scene.add(waterPlane);
+  cityGroup.add(waterPlane);
 
   // Store original Y positions for wave animation baseline
   var waterOrigY = new Float32Array(waterPlane.geometry.attributes.position.count);
@@ -2356,7 +2372,7 @@ scene.add(beamRing);
   );
   twinPeaks.position.set(0, GROUND_Y, 80);
   twinPeaks.scale.y = 0.5;
-  scene.add(twinPeaks);
+  cityGroup.add(twinPeaks);
 
   const twinPeaks2 = new THREE.Mesh(
     new THREE.SphereGeometry(27, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2),
@@ -2364,7 +2380,7 @@ scene.add(beamRing);
   );
   twinPeaks2.position.set(10, GROUND_Y, 75);
   twinPeaks2.scale.y = 0.45;
-  scene.add(twinPeaks2);
+  cityGroup.add(twinPeaks2);
 
   // Marin Headlands (northwest, across the bay and Golden Gate) — distant blue-gray haze
   const marinHill = new THREE.Mesh(
@@ -2373,7 +2389,7 @@ scene.add(beamRing);
   );
   marinHill.position.set(-100, GROUND_Y, -160);
   marinHill.scale.y = 0.45;
-  scene.add(marinHill);
+  cityGroup.add(marinHill);
 
   const marinHill2 = new THREE.Mesh(
     new THREE.SphereGeometry(40, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2),
@@ -2381,7 +2397,7 @@ scene.add(beamRing);
   );
   marinHill2.position.set(-70, GROUND_Y, -180);
   marinHill2.scale.y = 0.4;
-  scene.add(marinHill2);
+  cityGroup.add(marinHill2);
 
   // Mt Tamalpais (far north-northwest) — farthest, most blue-gray haze
   const tamalpais = new THREE.Mesh(
@@ -2390,7 +2406,7 @@ scene.add(beamRing);
   );
   tamalpais.position.set(-120, GROUND_Y, -230);
   tamalpais.scale.y = 0.45;
-  scene.add(tamalpais);
+  cityGroup.add(tamalpais);
 
   // Oakland Hills (east/northeast, across the bay) — long ridgeline, gradient from green to blue-gray
   for(let i = 0; i < 10; i++) {
@@ -2406,11 +2422,12 @@ scene.add(beamRing);
     );
     oh.position.set(100 + i*18 + Math.random()*8, GROUND_Y, -70 - Math.random()*40);
     oh.scale.y = 0.4 + Math.random() * 0.2;
-    scene.add(oh);
+    cityGroup.add(oh);
   }
 
   // ── EARLY MATERIAL DECLARATIONS (needed by landmarks below) ──
   const winMat = new THREE.MeshBasicMaterial({color:0xffd88a, transparent:true, opacity:0.98, side:THREE.DoubleSide});
+  cityNightMats.push({m:winMat, base:0.98});
   const avLightMat = new THREE.MeshBasicMaterial({color:0xff2200, emissive:0xff2200});
 
   // ── SF HILLS (the city's famous 7 hills + more) ──
@@ -2421,44 +2438,44 @@ scene.add(beamRing);
   const nobHill = new THREE.Mesh(new THREE.SphereGeometry(12, 32, 16, 0, Math.PI*2, 0, Math.PI/4), hillMat);
   nobHill.position.set(-35, GROUND_Y, -10);
   nobHill.scale.set(1, 0.35, 1);
-  scene.add(nobHill);
+  cityGroup.add(nobHill);
 
   // Russian Hill (northwest) — gentle rise
   const russianHill = new THREE.Mesh(new THREE.SphereGeometry(14, 32, 16, 0, Math.PI*2, 0, Math.PI/4), hillMat);
   russianHill.position.set(-30, GROUND_Y, -25);
   russianHill.scale.set(1, 0.4, 1);
-  scene.add(russianHill);
+  cityGroup.add(russianHill);
 
   // Telegraph Hill + Coit Tower (north-northwest) — moderate rise
   const telegraphHill = new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16, 0, Math.PI*2, 0, Math.PI/4), hillMat);
   telegraphHill.position.set(-12, GROUND_Y, -22);
   telegraphHill.scale.set(1, 0.5, 1);
-  scene.add(telegraphHill);
+  cityGroup.add(telegraphHill);
   // Coit Tower on top
   const coitTower = new THREE.Mesh(
     new THREE.CylinderGeometry(0.4, 0.5, 4, 8),
     new THREE.MeshStandardMaterial({color: 0xe0ddd5, roughness: 0.5})
   );
   coitTower.position.set(-12, GROUND_Y + 5, -22);
-  scene.add(coitTower);
+  cityGroup.add(coitTower);
 
   // Potrero Hill (south-southeast) — subtle
   const potreroHill = new THREE.Mesh(new THREE.SphereGeometry(12, 32, 16, 0, Math.PI*2, 0, Math.PI/4), hillMatDry);
   potreroHill.position.set(20, GROUND_Y, 55);
   potreroHill.scale.set(1, 0.25, 1);
-  scene.add(potreroHill);
+  cityGroup.add(potreroHill);
 
   // Bernal Heights (south) — subtle
   const bernalHill = new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16, 0, Math.PI*2, 0, Math.PI/4), hillMatDry);
   bernalHill.position.set(5, GROUND_Y, 90);
   bernalHill.scale.set(1, 0.3, 1);
-  scene.add(bernalHill);
+  cityGroup.add(bernalHill);
 
   // Mount Davidson (far southwest) — tallest in-city hill
   const mtDavidson = new THREE.Mesh(new THREE.SphereGeometry(14, 32, 16, 0, Math.PI*2, 0, Math.PI/4), hillMat);
   mtDavidson.position.set(-50, GROUND_Y, 100);
   mtDavidson.scale.set(1, 0.4, 1);
-  scene.add(mtDavidson);
+  cityGroup.add(mtDavidson);
 
   // ── LANDMARKS ──
 
@@ -2486,7 +2503,7 @@ scene.add(beamRing);
     fbTop.position.set(0, 13.5, 0);
     fbGroup.add(fbTop);
     fbGroup.position.set(18, GROUND_Y, -18);
-    scene.add(fbGroup);
+    cityGroup.add(fbGroup);
   }
 
   // Oracle Park / AT&T Park (south of Embarcadero)
@@ -2494,7 +2511,7 @@ scene.add(beamRing);
     const parkMat = new THREE.MeshStandardMaterial({color: 0x4a5a6a, roughness: 0.5, metalness: 0.3});
     const park = new THREE.Mesh(new THREE.BoxGeometry(8, 5, 10), parkMat);
     park.position.set(28, GROUND_Y + 2.5, 20);
-    scene.add(park);
+    cityGroup.add(park);
     // Green field
     const field = new THREE.Mesh(
       new THREE.PlaneGeometry(5, 7),
@@ -2502,7 +2519,7 @@ scene.add(beamRing);
     );
     field.rotation.x = -Math.PI/2;
     field.position.set(28, GROUND_Y + 5.1, 20);
-    scene.add(field);
+    cityGroup.add(field);
   }
 
   // Sutro Tower (on Twin Peaks — red/white radio tower)
@@ -2511,17 +2528,17 @@ scene.add(beamRing);
     // Main mast
     const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 15, 6), sutroMat);
     mast.position.set(2, GROUND_Y + 18 + 7.5, 78);
-    scene.add(mast);
+    cityGroup.add(mast);
     // Cross arms (3 levels)
     for(let ay = 0; ay < 3; ay++) {
       const arm = new THREE.Mesh(new THREE.BoxGeometry(4-ay, 0.15, 0.15), sutroMat);
       arm.position.set(2, GROUND_Y + 20 + ay*4, 78);
-      scene.add(arm);
+      cityGroup.add(arm);
     }
     // Aviation light
     const sutroLight = new THREE.Mesh(new THREE.SphereGeometry(0.2, 4, 4), avLightMat);
     sutroLight.position.set(2, GROUND_Y + 33.5, 78);
-    scene.add(sutroLight);
+    cityGroup.add(sutroLight);
   }
 
   // ── EMBARCADERO CURVE (waterfront promenade) ──
@@ -2532,7 +2549,7 @@ scene.add(beamRing);
     if(isWater(ex, ez)) continue;
     const seg = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.15, 2.5), embarcMat);
     seg.position.set(ex, GROUND_Y + 0.15, ez);
-    scene.add(seg);
+    cityGroup.add(seg);
   }
 
   // ── ALCATRAZ ISLAND (in the bay, north) ──
@@ -2540,21 +2557,21 @@ scene.add(beamRing);
     const alcMat = new THREE.MeshStandardMaterial({color: 0x6a7a60, roughness: 0.85});
     const alcIsland = new THREE.Mesh(new THREE.ConeGeometry(5, 3, 32, 4), alcMat);
     alcIsland.position.set(-15, GROUND_Y + 1.5, -80);
-    scene.add(alcIsland);
+    cityGroup.add(alcIsland);
     // Main building
     const alcBld = new THREE.Mesh(
       new THREE.BoxGeometry(4, 2, 2),
       new THREE.MeshStandardMaterial({color: 0x8a8580, roughness: 0.7})
     );
     alcBld.position.set(-15, GROUND_Y + 4, -80);
-    scene.add(alcBld);
+    cityGroup.add(alcBld);
     // Lighthouse
     const alcLight = new THREE.Mesh(
       new THREE.CylinderGeometry(0.2, 0.2, 3, 6),
       new THREE.MeshStandardMaterial({color: 0xeeeeee, roughness: 0.5})
     );
     alcLight.position.set(-14, GROUND_Y + 5.5, -80);
-    scene.add(alcLight);
+    cityGroup.add(alcLight);
   }
 
   // ── ANGEL ISLAND (larger, behind Alcatraz) ──
@@ -2562,10 +2579,10 @@ scene.add(beamRing);
     const aiMat = new THREE.MeshStandardMaterial({color: 0x4a6a48, roughness: 0.85});
     const aiHill = new THREE.Mesh(new THREE.ConeGeometry(12, 8, 32, 4), aiMat);
     aiHill.position.set(10, GROUND_Y + 4, -120);
-    scene.add(aiHill);
+    cityGroup.add(aiHill);
     const aiHill2 = new THREE.Mesh(new THREE.ConeGeometry(8, 5, 32, 4), aiMat);
     aiHill2.position.set(18, GROUND_Y + 2.5, -115);
-    scene.add(aiHill2);
+    cityGroup.add(aiHill2);
   }
 
   // Street grid — dark asphalt strips covering the whole city
@@ -2576,13 +2593,13 @@ scene.add(beamRing);
     const ns = new THREE.Mesh(new THREE.PlaneGeometry(streetW, 250), streetPaveMat);
     ns.rotation.x = -Math.PI/2;
     ns.position.set(i, GROUND_Y + 0.05, 20);
-    scene.add(ns);
+    cityGroup.add(ns);
     // E-W streets
     if(i >= -40) {
       const ew = new THREE.Mesh(new THREE.PlaneGeometry(200, streetW), streetPaveMat);
       ew.rotation.x = -Math.PI/2;
       ew.position.set(0, GROUND_Y + 0.05, i);
-      scene.add(ew);
+      cityGroup.add(ew);
     }
   }
   // Yellow center lines on major streets (every 18 units)
@@ -2591,12 +2608,12 @@ scene.add(beamRing);
     const ln = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 250), lineMat);
     ln.rotation.x = -Math.PI/2;
     ln.position.set(i, GROUND_Y + 0.06, 20);
-    scene.add(ln);
+    cityGroup.add(ln);
     if(i >= -40) {
       const ln2 = new THREE.Mesh(new THREE.PlaneGeometry(200, 0.1), lineMat);
       ln2.rotation.x = -Math.PI/2;
       ln2.position.set(0, GROUND_Y + 0.06, i);
-      scene.add(ln2);
+      cityGroup.add(ln2);
     }
   }
 
@@ -2606,7 +2623,7 @@ scene.add(beamRing);
   marketSt.rotation.x = -Math.PI/2;
   marketSt.rotation.z = Math.PI * 0.22; // ~40 degree diagonal
   marketSt.position.set(-15, GROUND_Y + 0.07, 15);
-  scene.add(marketSt);
+  cityGroup.add(marketSt);
 
   // Building materials palette (glass/steel tones — brighter, more reflective)
   const bldgColors = [0x8899bb, 0x7a8eaa, 0x9aaac5, 0x6e88a8, 0x8a9cb8, 0x7090b0, 0xa0b0cc, 0x6888a8, 0x8098bb];
@@ -2666,7 +2683,7 @@ scene.add(beamRing);
       });
       im.instanceMatrix.needsUpdate = true;
       if(im.instanceColor) im.instanceColor.needsUpdate = true;
-      scene.add(im);
+      cityGroup.add(im);
     });
 
     // Setback upper sections for tall modern buildings (narrower top tier)
@@ -2690,13 +2707,14 @@ scene.add(beamRing);
         sim.setMatrixAt(idx, sm);
       });
       sim.instanceMatrix.needsUpdate = true;
-      scene.add(sim);
+      cityGroup.add(sim);
     }
 
     // Emissive window rectangles on tall modern buildings (bright spots on faces)
     const winEmGeo = new THREE.PlaneGeometry(1, 1);
     const winWarmMat = new THREE.MeshBasicMaterial({color:0xffe8b0, transparent:true, opacity:0.7, side:THREE.DoubleSide});
     const winCoolMat2 = new THREE.MeshBasicMaterial({color:0xb0d0ff, transparent:true, opacity:0.5, side:THREE.DoubleSide});
+    cityNightMats.push({m:winWarmMat, base:0.7}, {m:winCoolMat2, base:0.5});
     fillQueue.modern.forEach(b => {
       if(b.h < 12) return;
       const winCount = 2 + Math.floor(Math.random() * 4);
@@ -2712,7 +2730,7 @@ scene.add(beamRing);
           wn.position.set(b.x + b.w/2 + 0.05, wy, b.z + (Math.random()-0.5)*b.d*0.7);
           wn.rotation.y = Math.PI/2;
         }
-        scene.add(wn);
+        cityGroup.add(wn);
       }
     });
 
@@ -2726,10 +2744,10 @@ scene.add(beamRing);
       const spireH = 3 + Math.random() * 4;
       const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.12, spireH, 6), antMat2);
       spire.position.set(b.x, GROUND_Y + b.h + spireH/2, b.z);
-      scene.add(spire);
+      cityGroup.add(spire);
       const avl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 4, 4), antLightMat2);
       avl.position.set(b.x, GROUND_Y + b.h + spireH + 0.2, b.z);
-      scene.add(avl);
+      cityGroup.add(avl);
     }
 
     // Residential buildings — 2 material groups
@@ -2756,7 +2774,7 @@ scene.add(beamRing);
       });
       im.instanceMatrix.needsUpdate = true;
       if(im.instanceColor) im.instanceColor.needsUpdate = true;
-      scene.add(im);
+      cityGroup.add(im);
     });
     // Cylindrical tower buildings — blue-gray glass, higher segment count
     if(fillQueue.cylinder.length > 0) {
@@ -2778,7 +2796,7 @@ scene.add(beamRing);
       });
       im.instanceMatrix.needsUpdate = true;
       if(im.instanceColor) im.instanceColor.needsUpdate = true;
-      scene.add(im);
+      cityGroup.add(im);
     }
   }
 
@@ -2906,7 +2924,7 @@ scene.add(beamRing);
     }
 
     g.position.set(x, GROUND_Y, z);
-    scene.add(g);
+    cityGroup.add(g);
   }
 
   // 181 Fremont (immediately south of Salesforce Tower — tall dark neighbor)
@@ -2947,7 +2965,7 @@ scene.add(beamRing);
     const beaconLight = new THREE.PointLight(0xff3322, 0.8, 8);
     beaconLight.position.set(0, ph + 7.2, 0); g.add(beaconLight);
     g.position.set(px, GROUND_Y, pz);
-    scene.add(g);
+    cityGroup.add(g);
   })();
 
   // 555 California (aka Bank of America Center) — iconic dark monolith
@@ -2977,7 +2995,7 @@ scene.add(beamRing);
       }
     }
     g.position.set(cx, GROUND_Y, cz);
-    scene.add(g);
+    cityGroup.add(g);
   })();
 
   // Coit Tower — fluted cylindrical landmark on Telegraph Hill (to the north)
@@ -3013,7 +3031,7 @@ scene.add(beamRing);
       new THREE.MeshStandardMaterial({color:0xb8ad96, roughness:0.5}));
     ring.position.set(0, 5 + 11.15, 0); g.add(ring);
     g.position.set(tx, GROUND_Y, tz);
-    scene.add(g);
+    cityGroup.add(g);
   })();
 
   // Ferry Building — low arcaded building with clock tower on east waterfront
@@ -3055,7 +3073,7 @@ scene.add(beamRing);
       w2.position.set(-1.77, 2, wz); w2.rotation.y = -Math.PI/2; g.add(w2);
     }
     g.position.set(fx, GROUND_Y, fz);
-    scene.add(g);
+    cityGroup.add(g);
   })();
 
   // ═══════════════════════════════════════════════════════
@@ -3147,7 +3165,10 @@ scene.add(beamRing);
     const ggLight = new THREE.PointLight(0xffaa66, 0.6, 40);
     ggLight.position.set((ax+bx)/2, towerH, (az+bz)/2);
     g.add(ggLight);
-    scene.add(g);
+    // Ground on the city plane (was floating at y=0 = penthouse altitude)
+    // and push NW so it spans the strait between Presidio and Marin.
+    g.position.set(-30, GROUND_Y, -45);
+    cityGroup.add(g);
   })();
 
   // Bay Bridge — western suspension span (SF → Yerba Buena) + eastern cantilever to Oakland
@@ -3244,7 +3265,8 @@ scene.add(beamRing);
       const truss = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.5), silverMat);
       truss.position.set(px, deckY + 2, pz); g.add(truss);
     }
-    scene.add(g);
+    g.position.set(0, GROUND_Y, 0); // ground it (was floating at penthouse altitude)
+    cityGroup.add(g);
   })();
 
   // Alcatraz Island
@@ -3277,7 +3299,7 @@ scene.add(beamRing);
     const bLight = new THREE.PointLight(0xff3030, 0.9, 12);
     bLight.position.set(1.3, 5.0, 0); g.add(bLight);
     g.position.set(-15, GROUND_Y - 0.2, -55);
-    scene.add(g);
+    cityGroup.add(g);
   })();
 
   // Angel Island
@@ -3295,7 +3317,7 @@ scene.add(beamRing);
     const h3 = new THREE.Mesh(new THREE.SphereGeometry(2.2, 10, 8), greenMat);
     h3.position.set(3, 0.8, -1.8); h3.scale.set(1, 0.55, 1); g.add(h3);
     g.position.set(-25, GROUND_Y - 0.2, -75);
-    scene.add(g);
+    cityGroup.add(g);
   })();
 
   // Yerba Buena + Treasure Island
@@ -3317,7 +3339,7 @@ scene.add(beamRing);
       g.add(bb);
     }
     g.position.set(50, GROUND_Y - 0.2, -55);
-    scene.add(g);
+    cityGroup.add(g);
   })();
 
   // Marin Headlands — far NW rolling hills
@@ -3341,7 +3363,7 @@ scene.add(beamRing);
       h.position.set(s.x, s.h/2, s.z); g.add(h);
     });
     g.position.set(-100, GROUND_Y - 0.2, -160);
-    scene.add(g);
+    cityGroup.add(g);
   })();
 
   // Oakland port — cranes along east shoreline
@@ -3377,7 +3399,8 @@ scene.add(beamRing);
         new THREE.MeshBasicMaterial({color:0xff4040}));
       wl.position.set(cx, ch + 2.2, craneZ); g.add(wl);
     });
-    scene.add(g);
+    g.position.y = GROUND_Y; // ground the port (was floating at penthouse altitude)
+    cityGroup.add(g);
   })();
 
   // ═══════════════════════════════════════════════════════
@@ -3391,7 +3414,7 @@ scene.add(beamRing);
     const lawn = new THREE.Mesh(new THREE.PlaneGeometry(35, 30), lawnMat);
     lawn.rotation.x = -Math.PI/2;
     lawn.position.set(-77.5, GROUND_Y + 0.12, 0);
-    scene.add(lawn);
+    cityGroup.add(lawn);
     const treeMat = new THREE.MeshStandardMaterial({color:0x1b4a1c, roughness:0.9});
     const trunkMat = new THREE.MeshStandardMaterial({color:0x3a2a18, roughness:0.9});
     for(let i = 0; i < 10; i++) {
@@ -3400,10 +3423,10 @@ scene.add(beamRing);
       const th = 2.5 + Math.random() * 1.8;
       const tree = new THREE.Mesh(new THREE.ConeGeometry(1.2, th, 8), treeMat);
       tree.position.set(tx, GROUND_Y + th/2 + 0.5, tz);
-      scene.add(tree);
+      cityGroup.add(tree);
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.6, 6), trunkMat);
       trunk.position.set(tx, GROUND_Y + 0.3, tz);
-      scene.add(trunk);
+      cityGroup.add(trunk);
     }
   })();
 
@@ -3413,7 +3436,7 @@ scene.add(beamRing);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 50), floorMat);
     floor.rotation.x = -Math.PI/2;
     floor.position.set(-75, GROUND_Y + 0.13, -55);
-    scene.add(floor);
+    cityGroup.add(floor);
     const conifMat = new THREE.MeshStandardMaterial({color:0x163a1a, roughness:0.9});
     const trunkMat = new THREE.MeshStandardMaterial({color:0x2e1e10, roughness:0.9});
     for(let i = 0; i < 26; i++) {
@@ -3422,10 +3445,10 @@ scene.add(beamRing);
       const th = 3 + Math.random() * 2.5;
       const cone = new THREE.Mesh(new THREE.ConeGeometry(1.0 + Math.random()*0.4, th, 7), conifMat);
       cone.position.set(tx, GROUND_Y + th/2 + 0.4, tz);
-      scene.add(cone);
+      cityGroup.add(cone);
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 0.6, 6), trunkMat);
       trunk.position.set(tx, GROUND_Y + 0.3, tz);
-      scene.add(trunk);
+      cityGroup.add(trunk);
     }
     // Palace of Fine Arts at (-65, -50)
     const pofa = new THREE.Group();
@@ -3454,7 +3477,7 @@ scene.add(beamRing);
     pool.position.set(0, 0.2, 6);
     pofa.add(pool);
     pofa.position.set(-65, GROUND_Y + 0.2, -50);
-    scene.add(pofa);
+    cityGroup.add(pofa);
   })();
 
   // Chinatown / North Beach — mid-height ornate buildings north of FiDi
@@ -3485,7 +3508,7 @@ scene.add(beamRing);
         g.add(cone);
       }
       g.position.set(p[0], GROUND_Y + p[2] + 0.4, p[1]);
-      scene.add(g);
+      cityGroup.add(g);
     });
   })();
 
@@ -3497,16 +3520,16 @@ scene.add(beamRing);
     pierXs.forEach(function(px) {
       const pier = new THREE.Mesh(new THREE.BoxGeometry(4, 0.4, 8), pierMat);
       pier.position.set(px, GROUND_Y + 0.2, -24);
-      scene.add(pier);
+      cityGroup.add(pier);
       // Warehouse on pier
       const wh = new THREE.Mesh(new THREE.BoxGeometry(3, 2.2, 5), whMat);
       wh.position.set(px, GROUND_Y + 0.4 + 1.1, -24);
-      scene.add(wh);
+      cityGroup.add(wh);
       // Roof
       const roof = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.3, 5.2),
         new THREE.MeshStandardMaterial({color:0x552e1e, roughness:0.8}));
       roof.position.set(px, GROUND_Y + 0.4 + 2.35, -24);
-      scene.add(roof);
+      cityGroup.add(roof);
     });
   })();
 
@@ -3517,13 +3540,13 @@ scene.add(beamRing);
     const road = new THREE.Mesh(new THREE.PlaneGeometry(3, 10), roadMat);
     road.rotation.x = -Math.PI/2;
     road.position.set(-15, GROUND_Y + 0.18, -20);
-    scene.add(road);
+    cityGroup.add(road);
     // Alternating segment hatches
     for(let i = 0; i < 6; i++) {
       const seg = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.5), edgeMat);
       seg.rotation.x = -Math.PI/2;
       seg.position.set(-15 + (i%2===0 ? -0.2 : 0.2), GROUND_Y + 0.2, -24 + i * 1.5);
-      scene.add(seg);
+      cityGroup.add(seg);
     }
   })();
 
@@ -3559,7 +3582,7 @@ scene.add(beamRing);
       g.add(bulb);
     }
     g.position.set(15, GROUND_Y, 25);
-    scene.add(g);
+    cityGroup.add(g);
   })();
 
   // Mission District — colorful pastel Victorian row homes south of SoMa
@@ -3580,7 +3603,7 @@ scene.add(beamRing);
             new THREE.MeshStandardMaterial({color:color, roughness:0.7})
           );
           accent.position.set(gx, GROUND_Y + h + 0.15, gz);
-          scene.add(accent);
+          cityGroup.add(accent);
         }
       }
     }
@@ -3672,7 +3695,7 @@ scene.add(beamRing);
     plane.rotation.x = -Math.PI / 2;
     plane.position.set(0, GROUND_Y + 0.01, 0);
     plane.renderOrder = 0.6;
-    scene.add(plane);
+    cityGroup.add(plane);
   })();
 
   // ═══════════════════════════════════════════════════════
@@ -3719,7 +3742,7 @@ scene.add(beamRing);
     // Center roughly over water area: x:-140..200 => cx=30; z:-210..-18 => cz=-114
     plane.position.set(30, GROUND_Y - 0.15, -114);
     plane.renderOrder = 0.8;
-    scene.add(plane);
+    cityGroup.add(plane);
   })();
 
   // ═══════════════════════════════════════════════════════
@@ -3731,10 +3754,10 @@ scene.add(beamRing);
     function addLamp(x, z) {
       const m = new THREE.Mesh(lampGeo, lampMat);
       m.position.set(x, GROUND_Y + 2.2, z);
-      scene.add(m);
+      cityGroup.add(m);
       const pl = new THREE.PointLight(0xffd07a, 0.35, 7);
       pl.position.set(x, GROUND_Y + 2.2, z);
-      scene.add(pl);
+      cityGroup.add(pl);
     }
     // Market St (diagonal from (-40,40) to (28,-14))
     for(let t = 0; t <= 1.0001; t += 0.12) {
@@ -3898,7 +3921,7 @@ scene.add(beamRing);
   );
   oaklandGround.rotation.x = -Math.PI/2;
   oaklandGround.position.set(130, GROUND_Y + 0.2, -80);
-  scene.add(oaklandGround);
+  cityGroup.add(oaklandGround);
   for(let gx = 90; gx <= 180; gx += 7) {
     for(let gz = -120; gz <= -40; gz += 7) {
       const dist = Math.abs(gx-130);
@@ -3946,7 +3969,7 @@ scene.add(beamRing);
   );
   tiGround.rotation.x = -Math.PI/2;
   tiGround.position.set(55, GROUND_Y + 0.25, -55);
-  scene.add(tiGround);
+  cityGroup.add(tiGround);
   for(let gx = 48; gx <= 62; gx += 6) {
     for(let gz = -65; gz <= -45; gz += 6) {
       const h = 3 + Math.random()*5;
@@ -3963,10 +3986,10 @@ scene.add(beamRing);
     const graniteMat = new THREE.MeshStandardMaterial({color:0x4a6080, roughness:0.3, metalness:0.4});
     const b = new THREE.Mesh(new THREE.BoxGeometry(5, 35, 4.5), graniteMat);
     b.position.set(-20, GROUND_Y+17.5, 2);
-    scene.add(b);
+    cityGroup.add(b);
     const avl = new THREE.Mesh(new THREE.SphereGeometry(0.2, 4, 4), avLightMat);
     avl.position.set(-20, GROUND_Y+35.5, 2);
-    scene.add(avl);
+    cityGroup.add(avl);
   }
 
   // Embarcadero Center (4 white brutalist towers, NNW of Salesforce)
@@ -3974,7 +3997,7 @@ scene.add(beamRing);
     const ecMat = new THREE.MeshStandardMaterial({color:0x7a90a8, roughness:0.3, metalness:0.35});
     const ec = new THREE.Mesh(new THREE.BoxGeometry(3.5, 17+i*1.5, 3), ecMat);
     ec.position.set(-10 + i*4.5, GROUND_Y + (17+i*1.5)/2, -8);
-    scene.add(ec);
+    cityGroup.add(ec);
   }
 
   // 101 California — cylindrical glass tower
@@ -3983,7 +4006,7 @@ scene.add(beamRing);
     new THREE.MeshPhysicalMaterial({color:0x7a8a9a, roughness:0.1, metalness:0.5, transparent:true, opacity:0.85})
   );
   cal101.position.set(-14, GROUND_Y + 9, -3);
-  scene.add(cal101);
+  cityGroup.add(cal101);
 
   // SF City Hall — Beaux-Arts with dome (WSW)
   {
@@ -3992,19 +4015,19 @@ scene.add(beamRing);
       new THREE.MeshStandardMaterial({color:0x7a8a9a, roughness:0.4, metalness:0.3})
     );
     chBase.position.set(-55, GROUND_Y + 2.5, 15);
-    scene.add(chBase);
+    cityGroup.add(chBase);
     const chDome = new THREE.Mesh(
       new THREE.SphereGeometry(2.5, 12, 8, 0, Math.PI*2, 0, Math.PI/2),
       new THREE.MeshStandardMaterial({color:0xc8b050, roughness:0.3, metalness:0.7})
     );
     chDome.position.set(-55, GROUND_Y + 5, 15);
-    scene.add(chDome);
+    cityGroup.add(chDome);
     const chLantern = new THREE.Mesh(
       new THREE.CylinderGeometry(0.4, 0.5, 2, 8),
       new THREE.MeshStandardMaterial({color:0xd4b840, roughness:0.2, metalness:0.8})
     );
     chLantern.position.set(-55, GROUND_Y + 8, 15);
-    scene.add(chLantern);
+    cityGroup.add(chLantern);
   }
 
   // Transamerica Pyramid (distinctive pointed shape)
@@ -4037,7 +4060,7 @@ scene.add(beamRing);
       }
     }
     pyrGroup.position.set(-25, GROUND_Y, -5);
-    scene.add(pyrGroup);
+    cityGroup.add(pyrGroup);
   }
 
   // Golden Gate Bridge (far northwest) — International Orange, massive scale
@@ -4172,7 +4195,7 @@ scene.add(beamRing);
 
     ggGroup.position.set(-120, GROUND_Y, -110);
     ggGroup.rotation.y = Math.PI * 0.3;
-    scene.add(ggGroup);
+    cityGroup.add(ggGroup);
   }
 
   // GG Bridge approach road — connects south anchor through Presidio to city
@@ -4194,7 +4217,7 @@ scene.add(beamRing);
       const road = new THREE.Mesh(new THREE.BoxGeometry(6, 0.5, len+3), ggRoadMat);
       road.position.set((x1+x2)/2, GROUND_Y + 1.0, (z1+z2)/2);
       road.rotation.y = ang;
-      scene.add(road);
+      cityGroup.add(road);
       // Road side barriers
       for(let side = -1; side <= 1; side += 2) {
         const barrier = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.6, len+3), ggRoadSideMat);
@@ -4202,7 +4225,7 @@ scene.add(beamRing);
         const offsetZ = Math.sin(ang + Math.PI/2) * 3 * side;
         barrier.position.set((x1+x2)/2 + offsetX, GROUND_Y + 1.3, (z1+z2)/2 + offsetZ);
         barrier.rotation.y = ang;
-        scene.add(barrier);
+        cityGroup.add(barrier);
       }
     }
   }
@@ -4248,7 +4271,7 @@ scene.add(beamRing);
     }
     westSpan.position.set(38, GROUND_Y, -18);
     westSpan.rotation.y = -Math.atan2(-55+18, 55-38); // aim toward TI
-    scene.add(westSpan);
+    cityGroup.add(westSpan);
 
     // Eastern span (Yerba Buena Island to Oakland) — new self-anchored suspension
     const eastSpan = new THREE.Group();
@@ -4282,7 +4305,7 @@ scene.add(beamRing);
     }
     eastSpan.position.set(55, GROUND_Y, -55);
     eastSpan.rotation.y = -Math.atan2(-75+55, 120-55); // aim toward Oakland
-    scene.add(eastSpan);
+    cityGroup.add(eastSpan);
   }
 
   // Bay Bridge approach — elevated freeway from SF to west span
@@ -4304,13 +4327,13 @@ scene.add(beamRing);
       const road = new THREE.Mesh(new THREE.BoxGeometry(5, 0.4, len+2), bbRoadMat);
       road.position.set((x1+x2)/2, y, (z1+z2)/2);
       road.rotation.y = ang;
-      scene.add(road);
+      cityGroup.add(road);
       // Support columns under elevated sections
       if(frac > 0.2) {
         const colH = y - GROUND_Y;
         const col = new THREE.Mesh(new THREE.BoxGeometry(0.6, colH, 0.6), bbRoadMat);
         col.position.set((x1+x2)/2, GROUND_Y + colH/2, (z1+z2)/2);
-        scene.add(col);
+        cityGroup.add(col);
       }
     }
   }
@@ -4326,18 +4349,18 @@ scene.add(beamRing);
     );
     presidioGround.rotation.x = -Math.PI/2;
     presidioGround.position.set(-50, GROUND_Y + 0.35, -55);
-    scene.add(presidioGround);
+    cityGroup.add(presidioGround);
 
     // Presidio hills / terrain bumps
     const pHill1 = new THREE.Mesh(new THREE.ConeGeometry(15, 12, 32, 4), presidioMat);
     pHill1.position.set(-55, GROUND_Y + 6, -50);
-    scene.add(pHill1);
+    cityGroup.add(pHill1);
     const pHill2 = new THREE.Mesh(new THREE.ConeGeometry(12, 8, 32, 4), presidioMat);
     pHill2.position.set(-70, GROUND_Y + 4, -70);
-    scene.add(pHill2);
+    cityGroup.add(pHill2);
     const pHill3 = new THREE.Mesh(new THREE.ConeGeometry(10, 7, 32, 4), presidioMat);
     pHill3.position.set(-45, GROUND_Y + 3.5, -80);
-    scene.add(pHill3);
+    cityGroup.add(pHill3);
 
     // Trees on Presidio (green cones — instanced for performance)
     const treeGeo = new THREE.ConeGeometry(2, 5, 5, 1);
@@ -4353,10 +4376,10 @@ scene.add(beamRing);
     treePositions.forEach(([tx, tz]) => {
       const tree = new THREE.Mesh(treeGeo, treeMat);
       tree.position.set(tx, GROUND_Y + 3.5, tz);
-      scene.add(tree);
+      cityGroup.add(tree);
       const trunk = new THREE.Mesh(trunkGeo, trunkMat);
       trunk.position.set(tx, GROUND_Y + 1, tz);
-      scene.add(trunk);
+      cityGroup.add(trunk);
     });
 
     // Low Presidio buildings (barracks, officer housing)
@@ -4374,14 +4397,14 @@ scene.add(beamRing);
       new THREE.MeshStandardMaterial({color: 0x8a6a50, roughness: 0.8})
     );
     fortPoint.position.set(-85, GROUND_Y + 1.5, -90);
-    scene.add(fortPoint);
+    cityGroup.add(fortPoint);
     // Fort Point parapet
     const fortWall = new THREE.Mesh(
       new THREE.BoxGeometry(7, 1, 0.5),
       new THREE.MeshStandardMaterial({color: 0x7a5a40, roughness: 0.8})
     );
     fortWall.position.set(-85, GROUND_Y + 3.5, -87.5);
-    scene.add(fortWall);
+    cityGroup.add(fortWall);
   }
 
   // ══════════════════════════════════════════════════════
@@ -4395,7 +4418,7 @@ scene.add(beamRing);
     );
     marinGround.rotation.x = -Math.PI/2;
     marinGround.position.set(-100, GROUND_Y + 0.3, -165);
-    scene.add(marinGround);
+    cityGroup.add(marinGround);
 
     // Additional hill connecting to bridge north anchor
     const marinConnect = new THREE.Mesh(
@@ -4403,7 +4426,7 @@ scene.add(beamRing);
       new THREE.MeshStandardMaterial({color: 0x6a7048, roughness: 0.9})
     );
     marinConnect.position.set(-90, GROUND_Y + 9, -135);
-    scene.add(marinConnect);
+    cityGroup.add(marinConnect);
 
     // Ridge between the two main Marin hills
     const marinRidge = new THREE.Mesh(
@@ -4411,7 +4434,7 @@ scene.add(beamRing);
       new THREE.MeshStandardMaterial({color: 0x7a7048, roughness: 0.9})
     );
     marinRidge.position.set(-85, GROUND_Y + 7, -170);
-    scene.add(marinRidge);
+    cityGroup.add(marinRidge);
   }
 
   // ══════════════════════════════════════════════════════
@@ -4424,13 +4447,13 @@ scene.add(beamRing);
     for(let sz = -18; sz <= 25; sz += 3) {
       const seg = new THREE.Mesh(new THREE.BoxGeometry(2, 0.2, 3.5), shoreMat);
       seg.position.set(32, GROUND_Y + 0.12, sz);
-      scene.add(seg);
+      cityGroup.add(seg);
     }
     // Northern SF shoreline: along the bay from Presidio to Ferry Building
     for(let sx = -80; sx <= 18; sx += 3) {
       const seg = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.2, 2), shoreMat);
       seg.position.set(sx, GROUND_Y + 0.12, -18);
-      scene.add(seg);
+      cityGroup.add(seg);
     }
     // Curved shoreline around NE corner (North Beach to Embarcadero)
     for(let a = -0.3; a <= 0.5; a += 0.06) {
@@ -4438,13 +4461,13 @@ scene.add(beamRing);
       const sz = -18 + Math.sin(a) * 8;
       const seg = new THREE.Mesh(new THREE.BoxGeometry(2, 0.2, 2), shoreMat);
       seg.position.set(sx, GROUND_Y + 0.12, sz);
-      scene.add(seg);
+      cityGroup.add(seg);
     }
     // Presidio / GG waterfront shoreline
     for(let sx = -90; sx <= -30; sx += 4) {
       const seg = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.2, 2), shoreMat);
       seg.position.set(sx, GROUND_Y + 0.12, -95);
-      scene.add(seg);
+      cityGroup.add(seg);
     }
   }
 
@@ -4456,12 +4479,12 @@ scene.add(beamRing);
     const ybiHill = new THREE.Mesh(new THREE.SphereGeometry(10, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), ybiMat);
     ybiHill.position.set(55, GROUND_Y, -55);
     ybiHill.scale.y = 0.55;
-    scene.add(ybiHill);
+    cityGroup.add(ybiHill);
     // Secondary bump
     const ybiHill2 = new THREE.Mesh(new THREE.SphereGeometry(7, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), ybiMat);
     ybiHill2.position.set(50, GROUND_Y, -50);
     ybiHill2.scale.y = 0.5;
-    scene.add(ybiHill2);
+    cityGroup.add(ybiHill2);
   }
 
   // ══════════════════════════════════════════════════════
@@ -4475,7 +4498,7 @@ scene.add(beamRing);
     );
     oakExtGround.rotation.x = -Math.PI/2;
     oakExtGround.position.set(150, GROUND_Y + 0.18, -85);
-    scene.add(oakExtGround);
+    cityGroup.add(oakExtGround);
 
     // Oakland downtown core — denser tall buildings
     for(let gx = 115; gx <= 145; gx += 5) {
@@ -4522,9 +4545,10 @@ scene.add(beamRing);
     fogPlane.rotation.x = -Math.PI/2;
     fogPlane.scale.set(cfg.sx, cfg.sz, 1);
     fogPlane.position.set(20, cfg.y, cfg.z);
-    scene.add(fogPlane);
+    cityGroup.add(fogPlane);
     bayFogPlanes.push(fogPlane);
   }
+  scene.add(cityGroup);
 }
 
 // ── HELPER FUNCTIONS ──
@@ -7322,6 +7346,13 @@ function updateTimeOfDay() {
     renderer.toneMappingExposure = 1.05;
     setCeilingBrightness(0.3 - t*0.3);
   }
+
+  // City window lights: full at night, faint by day (they were always-on,
+  // which made the city read as permanent night under a daytime sky).
+  const winFactor = isNight ? 1.0 : (isDay ? 0.12 : (isDawn ? 0.7 : (isGolden ? 0.5 : 0.85)));
+  for (const e of cityNightMats) e.m.opacity = e.base * winFactor;
+  // City ground: concrete gray by day, dark by night (vertexColors multiply).
+  if (cityGroundMat) cityGroundMat.color.setScalar(isDay ? 2.4 : (isNight ? 1.0 : 1.7));
 }
 
 // Initial time setup
@@ -8271,7 +8302,8 @@ class Handler(BaseHTTPRequestHandler):
         pass  # silence request logs
 
     def do_GET(self):
-        if self.path == "/api/data":
+        path = self.path.split("?", 1)[0]  # ignore query string (e.g. ?hour= debug param)
+        if path == "/api/data":
             data = _build_api_response()
             body = json.dumps(data).encode()
             self.send_response(200)
@@ -8279,7 +8311,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(body)
-        elif self.path == "/" or self.path == "/index.html":
+        elif path == "/" or path == "/index.html":
             body = HTML_PAGE.encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -8287,7 +8319,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Pragma", "no-cache")
             self.end_headers()
             self.wfile.write(body)
-        elif self.path == "/jonas_avatar.jpg":
+        elif path == "/jonas_avatar.jpg":
             try:
                 with open("jonas_avatar.jpg", "rb") as f:
                     img = f.read()
@@ -8298,9 +8330,9 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 self.send_response(404)
                 self.end_headers()
-        elif self.path.startswith("/assets/"):
+        elif path.startswith("/assets/"):
             # Static file serving with path traversal protection
-            rel_path = self.path[len("/assets/"):]
+            rel_path = path[len("/assets/"):]
             if ".." in rel_path or rel_path.startswith("/"):
                 self.send_response(403)
                 self.end_headers()
