@@ -4,6 +4,7 @@ import datetime
 import subprocess
 import os
 import json
+import re
 import threading
 from collections import deque
 from config import Config
@@ -25,6 +26,15 @@ from ws_feed import WSDataFeed
 import notifier
 
 logger = setup_logger()
+
+
+_RSI_REASON_RE = re.compile(r"RSI\(7\)=([\d.]+)")
+
+
+def _rsi_from_reason(reason) -> float | None:
+    """RSI(7) value embedded in a signal reason string, or None if absent."""
+    m = _RSI_REASON_RE.search(reason or "")
+    return float(m.group(1)) if m else None
 
 
 def _extract_strategy_name(reason: str) -> str:
@@ -1954,6 +1964,21 @@ class Phmex2Bot:
                             slot.bump_blocked("st2_filter")
                             logger.debug(f"[SLOT] [ST2.0 FILTER] {symbol} blocked "
                                          f"(cvd={_cvd:.3f} spread={_spread:.4f} br={_br:.2f} tc={_tc})")
+                            continue
+
+                    # --- 5m_mean_revert RSI floor (2026-07-02, owner-approved
+                    # forward-test of the 2026-06-30 90d replay lead): deep-oversold
+                    # longs are the falling-knife cohort (RSI<22 n=21 maker −$4.08;
+                    # band 22–30 n=132 +$12.05 — reports/mr_replay_90d.json). Blocks
+                    # LONGS with RSI(7) below the floor; shorts and other slots
+                    # untouched. 0.0 disables. Fails open when no RSI in reason. ---
+                    if (slot.slot_id == "5m_mean_revert" and direction == "long"
+                            and Config.MEAN_REVERT_LONG_RSI_MIN > 0.0):
+                        _mr_rsi = _rsi_from_reason(signal.reason)
+                        if _mr_rsi is not None and _mr_rsi < Config.MEAN_REVERT_LONG_RSI_MIN:
+                            slot.bump_blocked("mr_rsi_floor")
+                            logger.debug(f"[SLOT] [MR RSI FLOOR] {symbol} LONG blocked — "
+                                         f"RSI(7)={_mr_rsi:.1f} < {Config.MEAN_REVERT_LONG_RSI_MIN:.1f}")
                             continue
 
                     margin = (slot.trade_amount_usdt if slot.trade_amount_usdt is not None

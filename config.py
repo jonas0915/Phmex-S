@@ -58,6 +58,11 @@ class Config:
     PULLBACK_SESSION_GATE = os.getenv("PULLBACK_SESSION_GATE", "false").lower() == "true"
     PULLBACK_VOLATILE_GATE = os.getenv("PULLBACK_VOLATILE_GATE", "false").lower() == "true"
 
+    # 5m_mean_revert RSI floor (2026-07-02): block slot LONGS when RSI(7) is
+    # below this value (falling-knife cohort per reports/mr_replay_90d.json).
+    # 0.0 disables the gate. Applies ONLY to the 5m_mean_revert slot.
+    MEAN_REVERT_LONG_RSI_MIN = float(os.getenv("MEAN_REVERT_LONG_RSI_MIN", "0.0"))
+
     # Mode
     MODE = os.getenv("MODE", "paper")  # "live" or "paper" — default paper for safety
 
