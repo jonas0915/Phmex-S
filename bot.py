@@ -2139,6 +2139,7 @@ class Phmex2Bot:
                                            and not (o.get("reduceOnly")
                                                     or (o.get("info") or {}).get("reduceOnly"))
                                            for o in _resting):
+                                        slot.bump_blocked("requote_abort_zombie")
                                         logger.info(f"[SLOT LIVE] [MR REQUOTE] {slot.slot_id} {symbol} "
                                                     f"first order still resting — skipping re-quote")
                                         break
@@ -2149,6 +2150,7 @@ class Phmex2Bot:
                                         break
                                     _rq_drift = _requote_drift_pct(direction, price, _touch)
                                     if _rq_drift > Config.SLOT_REQUOTE_MAX_DRIFT_PCT:
+                                        slot.bump_blocked("requote_abort_drift")
                                         logger.info(
                                             f"[SLOT LIVE] [MR REQUOTE] {slot.slot_id} {symbol} "
                                             f"{direction} abort — adverse drift {_rq_drift:.3f}% "
@@ -2162,10 +2164,12 @@ class Phmex2Bot:
                                              if direction == "long"
                                              else self.exchange.open_short(symbol, margin, _touch))
                                     if order:
+                                        slot.bump_blocked("requote_fill")
                                         logger.info(
                                             f"[SLOT LIVE] [MR REQUOTE] {slot.slot_id} {symbol} "
                                             f"{direction} FILLED on re-quote")
                                         break
+                                    slot.bump_blocked("requote_miss")
                             if not order:
                                 # Log the entry conditions present at a MISS (mirrors the fill
                                 # line below, whose {signal.reason} carries imb/br/tc for ST2.0)

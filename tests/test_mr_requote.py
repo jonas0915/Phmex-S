@@ -81,6 +81,16 @@ def test_requote_has_zombie_guard():
     assert "reduceOnly" in block
 
 
+def test_requote_outcomes_reach_telegram_and_dashboard():
+    # CLAUDE.md propagation rule: every outcome persists via the slot counter
+    # sidecar (renders in the md report + Telegram "Counters" line) and the
+    # [MR REQUOTE] log tag feeds the dashboard gates panel.
+    block = _requote_block()
+    for tag in ("requote_fill", "requote_miss",
+                "requote_abort_drift", "requote_abort_zombie"):
+        assert f'bump_blocked("{tag}")' in block, f"missing counter: {tag}"
+
+
 def test_requote_block_exists_and_is_slot_keyed():
     block = _requote_block()
     assert "slot.requote_attempts" in block

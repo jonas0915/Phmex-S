@@ -368,7 +368,7 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
         report += f"- Live PnL since promotion: ${ls['live_pnl']:.2f}\n"
         report += f"- Cap headroom: ${ls['live_pnl'] - LIVE_LOSS_CAP:.2f} until -${abs(LIVE_LOSS_CAP):.2f} auto-demote\n"
         if ls.get("blocked"):
-            report += ("- Blocked (lifetime): "
+            report += ("- Counters (lifetime): "
                        + " ".join(f"{k}={v}" for k, v in sorted(ls["blocked"].items()))
                        + "\n")
 
@@ -516,7 +516,7 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
             f"Headroom: ${ls['live_pnl'] - LIVE_LOSS_CAP:.2f} until -${abs(LIVE_LOSS_CAP):.2f} demote\n"
         )
         if ls.get("blocked"):
-            msg += ("Blocked: "
+            msg += ("Counters: "
                     + " ".join(f"{k}={v}" for k, v in sorted(ls["blocked"].items()))
                     + "\n")
 
