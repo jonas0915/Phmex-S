@@ -702,11 +702,6 @@ body { background:#080f1c; overflow:hidden; height:100vh; width:100vw; font-fami
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // SSAOPass and ShaderPass removed — too heavy for integrated GPU
 
@@ -868,7 +863,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoft too heavy on integrated GPU
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -881,9 +876,10 @@ css2dRenderer.domElement.style.left = '0';
 css2dRenderer.domElement.style.pointerEvents = 'none';
 document.getElementById('css2d').appendChild(css2dRenderer.domElement);
 
-// ── POST-PROCESSING (HDR BLOOM) ──
-const composer = new EffectComposer(renderer);
-// RenderPass added after scene/camera init (below)
+// Post-processing removed 2026-07-02: the bloom pass chain cost extra full
+// passes on integrated GPU and made renderer.info report only the final
+// quad pass (calls=1). Direct render + native MSAA instead.
+renderer.info.autoReset = false; // reset manually once per frame in animate()
 
 // ── TIME OF DAY ──
 let currentHour = new Date().getHours() + new Date().getMinutes()/60;
@@ -901,8 +897,11 @@ scene.fog = new THREE.FogExp2(0x9ab5cc, 0.0003);
 
 // ── CAMERA ──
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.5, 2000);
-camera.position.set(2, 6, 9);
-camera.lookAt(0, 0.5, 0);
+// Default view: inside the penthouse at standing eye-level, looking across the
+// trading floor and out the glass toward the city. (The old default (2,6,9) sat
+// ABOVE the ceiling staring at its gray top — the whole scene looked broken.)
+camera.position.set(4.2, 2.4, 6.2);
+camera.lookAt(0, 1.0, -1.5);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -914,15 +913,15 @@ controls.minPolarAngle = 0.02;
 controls.enablePan = true;
 controls.panSpeed = 1.0;
 controls.screenSpacePanning = true;
-controls.target.set(0, 0, 0);
+controls.target.set(0, 1.0, -1.5);
 controls.zoomSpeed = 1.2;
 
 // ── Right-click drag to move orbit target freely ──
 // Middle-click or Ctrl+left-click pans (default OrbitControls)
 // Double-click to reset view
 renderer.domElement.addEventListener('dblclick', () => {
-  controls.target.set(0, 0, 0);
-  camera.position.set(2, 6, 9);
+  controls.target.set(0, 1.0, -1.5);
+  camera.position.set(4.2, 2.4, 6.2);
   controls.update();
 });
 
@@ -7244,23 +7243,7 @@ function updateHUD() {
 }
 
 
-// ── POST-PROCESSING SETUP (post scene/camera init) ──
-composer.addPass(new RenderPass(scene, camera));
-
-// SSAO disabled — too heavy on integrated GPU
-var ssaoPass = null;
-
-const bloomPass = new UnrealBloomPass(
-  new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.12,  // strength — very subtle for realism
-  0.4,   // radius
-  0.85   // threshold — only brightest surfaces bloom
-);
-composer.addPass(bloomPass);
-
-// Color grading removed — extra render pass too heavy for integrated GPU
-
-composer.addPass(new OutputPass());
+// (post-processing setup removed — direct render)
 
 // ── TIME OF DAY UPDATE ──
 function updateTimeOfDay() {
@@ -7297,7 +7280,6 @@ function updateTimeOfDay() {
     scene.fog.color.setHex(0x9ab5cc);
     scene.fog.density = 0.0003;
     renderer.toneMappingExposure = 1.0;
-    bloomPass.strength = 0.12;
     setCeilingBrightness(1.0);
   } else if(isGolden) {
     const t = (h-16.5)/2.5;
@@ -7309,7 +7291,6 @@ function updateTimeOfDay() {
     scene.background.setRGB(bg/255*0.88, bg/255*0.48, bg/255*0.22);
     scene.fog.color.copy(scene.background);
     renderer.toneMappingExposure = 1.25 - t*0.15;
-    bloomPass.strength = 0.18 + t*0.12;
     setCeilingBrightness(1.0 - t*0.7);
   } else if(isNight) {
     ambientLight.intensity = 0.7;
@@ -7320,7 +7301,6 @@ function updateTimeOfDay() {
     scene.fog.color.setHex(0x030814);
     scene.fog.density = 0.0003;
     renderer.toneMappingExposure = 1.1;
-    bloomPass.strength = 0.15;
     setCeilingBrightness(1.0);
   } else if(isDawn) {
     const t = (h-5.5)/2;
@@ -7331,7 +7311,6 @@ function updateTimeOfDay() {
     scene.background.setRGB(0.1+t*0.3, 0.08+t*0.2, 0.06+t*0.15);
     scene.fog.color.copy(scene.background);
     renderer.toneMappingExposure = 1.0 + t*0.2;
-    bloomPass.strength = 0.2 - t*0.08;
     setCeilingBrightness(t*0.8);
   } else if(isDusk) {
     const t = (h-19)/1.5;
@@ -7341,7 +7320,6 @@ function updateTimeOfDay() {
     scene.background.setRGB(0.08-t*0.05, 0.06-t*0.03, 0.1-t*0.04);
     scene.fog.color.copy(scene.background);
     renderer.toneMappingExposure = 1.05;
-    bloomPass.strength = 0.15 + t*0.05;
     setCeilingBrightness(0.3 - t*0.3);
   }
 }
@@ -7562,19 +7540,29 @@ const _perfChip=document.createElement('div');
 _perfChip.style.cssText='position:fixed;top:6px;left:6px;z-index:999;background:rgba(0,0,0,0.7);color:#f0a500;font:11px Menlo,monospace;padding:3px 8px;border:1px solid #2d3a1e;pointer-events:none';
 _perfChip.textContent='[PERF] sampling…';
 document.body.appendChild(_perfChip);
+let _slowSamples = 0;
 function _fpsTick(){ _fpsN++; const now=performance.now();
   if(now-_fpsT>5000){
+    const fps=_fpsN/((now-_fpsT)/1000);
     const inf=renderer.info;
-    const line=`[PERF] fps=${(_fpsN/((now-_fpsT)/1000)).toFixed(1)} calls=${inf.render.calls} tris=${(inf.render.triangles/1000).toFixed(0)}k geo=${inf.memory.geometries} tex=${inf.memory.textures}`;
+    const line=`[PERF] fps=${fps.toFixed(1)}${PERF_HALF_RATE?' (half-rate)':''} calls=${inf.render.calls} tris=${(inf.render.triangles/1000).toFixed(0)}k geo=${inf.memory.geometries} tex=${inf.memory.textures}`;
     console.log(line); _perfChip.textContent=line;
+    // Adaptive pacing (skip decisions while tab hidden — rAF is throttled there)
+    if(!document.hidden){
+      if(fps < 24){ _slowSamples++; if(_slowSamples >= 2) PERF_HALF_RATE = true; }
+      else { _slowSamples = 0; if(fps > 40) PERF_HALF_RATE = false; }
+    }
     _fpsN=0; _fpsT=now; } }
 
 let frameCount = 0;
+let PERF_HALF_RATE = false; // auto-set by _fpsTick when sustained fps < 24
+let _charNames = null;      // cached charGroups keys (keys are fixed after build)
 function animate() {
   requestAnimationFrame(animate);
   frameCount++;
-  if(frameCount % 2 !== 0) return; // ~30fps instead of 60fps
+  if(PERF_HALF_RATE && frameCount % 2 !== 0) return;
   _fpsTick();
+  renderer.info.reset(); // after _fpsTick so the chip reads the previous full frame
   // Slow bucket: every 4th RENDERED frame (~7.5Hz). Rendered frames are the even
   // frameCounts (2,4,6,8,…) thanks to the %2 skip above, so every 4th rendered
   // frame is frameCount 8,16,24,… → frameCount % 8 === 0.
@@ -7592,12 +7580,15 @@ function animate() {
   // doubled again on a 120Hz display. GLTF_CLIP_SPEED = 2.0 preserves the
   // pre-fix apparent speed at 60Hz, now consistent on any refresh rate.
   var GLTF_CLIP_SPEED = 2.0; // preserves pre-fix apparent speed
-  Object.values(charGroups).forEach(function(g){
-    if (g && g.userData && g.userData.mixer) g.userData.mixer.update(dt * GLTF_CLIP_SPEED);
-  });
+  if(!_charNames) _charNames = Object.keys(charGroups);
+  for (var _ci = 0; _ci < _charNames.length; _ci++) {
+    var _cg = charGroups[_charNames[_ci]];
+    if (_cg && _cg.userData && _cg.userData.mixer) _cg.userData.mixer.update(dt * GLTF_CLIP_SPEED);
+  }
 
   // Character idle animations
-  Object.entries(charGroups).forEach(([name, g]) => {
+  _charNames.forEach((name) => {
+    const g = charGroups[name];
     if (g.userData && g.userData.isGLTF) return; // GLTF uses mixer, skip procedural animation
     const head = g.userData.head;
     if(head) {
@@ -8121,7 +8112,7 @@ function animate() {
   // redundant second update of the same charGroups mixers — removed.)
 
   controls.update();
-  composer.render();
+  renderer.render(scene, camera);
   css2dRenderer.render(scene, camera);
 }
 
@@ -8130,14 +8121,14 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-  if (ssaoPass) ssaoPass.setSize(window.innerWidth, window.innerHeight);
   css2dRenderer.setSize(window.innerWidth, window.innerHeight);
 });
 
 // ── INIT ──
 fetchData();
 setInterval(fetchData, 3000);
+// Debug handle for console/automation introspection (read-only diagnostics)
+window.DESK = { scene, camera, renderer, controls };
 animate();
 
 // ── BACKGROUND GLTF CHARACTER LOADING ──
@@ -8173,7 +8164,7 @@ animate();
         // Enable shadows
         model.traverse(function(child) {
           if (child.isMesh) {
-            child.castShadow = true;
+            child.castShadow = false; // skinned meshes in the shadow pass are a top frame cost on integrated GPU
             child.receiveShadow = true;
           }
         });
