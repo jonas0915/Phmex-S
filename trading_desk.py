@@ -2644,6 +2644,7 @@ scene.add(beamRing);
   // Collect all fill building transforms, then batch into InstancedMesh
   const fillQueue = {modern:[], residential:[], cylinder:[]};
   function fillBuilding(x, z, w, d, h, isResidential) {
+    if (isWater(x, z)) return; // never stand buildings in the bay
     // ~12% of tall modern buildings become cylindrical for skyline variety
     if(!isResidential && h > 12 && Math.random() < 0.12) {
       fillQueue.cylinder.push({x, z, w, d, h});
@@ -3733,14 +3734,34 @@ scene.add(beamRing);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(4, 4);
     tex.minFilter = THREE.LinearFilter;
+    bayWaterTex = tex; // scrolled per-frame by updateAmbience for shimmer
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x2a5a78, roughness: 0.25, metalness: 0.7,
+      // white: the map is already painted bay-teal; tinting the material the
+      // same color squared the darkening and the bay read as black land
+      color: 0xffffff, roughness: 0.25, metalness: 0.35,
       transparent: true, opacity: 0.92, map: tex,
     });
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(360, 210), mat);
+    // One plane over the whole bay domain, vertex-displaced by the isWater()
+    // land/water map: water vertices at the surface, land vertices tucked
+    // below the ground plane. Follows the real shoreline; islands and the
+    // Presidio/Marin/Oakland land stay dry. (The old 360x210 rectangle was
+    // also buried 0.15 BELOW the ground plane - the bay was never visible.)
+    const CX = 120, CZ = -125, WW = 560, WD = 550;
+    const waterGeo = new THREE.PlaneGeometry(WW, WD, 56, 55);
+    {
+      const pos = waterGeo.attributes.position;
+      for (let vi = 0; vi < pos.count; vi++) {
+        const wx = CX + pos.getX(vi);
+        const wz = CZ - pos.getY(vi); // plane local +y -> world -z after rotation
+        pos.setZ(vi, isWater(wx, wz) ? 0 : -2.5);
+      }
+      pos.needsUpdate = true;
+      waterGeo.computeVertexNormals();
+    }
+    tex.repeat.set(6, 6);
+    const plane = new THREE.Mesh(waterGeo, mat);
     plane.rotation.x = -Math.PI / 2;
-    // Center roughly over water area: x:-140..200 => cx=30; z:-210..-18 => cz=-114
-    plane.position.set(30, GROUND_Y - 0.15, -114);
+    plane.position.set(CX, GROUND_Y + 0.25, CZ);
     plane.renderOrder = 0.8;
     cityGroup.add(plane);
   })();
@@ -4548,6 +4569,188 @@ scene.add(beamRing);
     cityGroup.add(fogPlane);
     bayFogPlanes.push(fogPlane);
   }
+
+  // ═══════════════════════════════════════════════════════
+  // LIVING AMBIENCE — Karl the Fog, boats, bridge traffic, sky life.
+  // All cheap: instanced or a handful of meshes; heavy updates on slowTick.
+  // var declarations hoist to module scope for animate()/updateTimeOfDay.
+  // ═══════════════════════════════════════════════════════
+  var bayWaterTex = bayWaterTex || null; // set inside bayWaterOverlay above
+
+  // Shared soft-blob texture (fog banks, clouds)
+  const _softTex = (function(){
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const x = c.getContext('2d');
+    const g = x.createRadialGradient(64,64,8, 64,64,62);
+    g.addColorStop(0, 'rgba(255,255,255,0.85)');
+    g.addColorStop(0.6, 'rgba(255,255,255,0.35)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0,0,128,128);
+    return new THREE.CanvasTexture(c);
+  })();
+
+  // -- Karl the Fog: drifting banks rolling in from the Golden Gate (west/NW)
+  var karlBanks = [];
+  {
+    const karlMat = new THREE.MeshBasicMaterial({map:_softTex, transparent:true, opacity:0.4, depthWrite:false, color:0xe8eef4});
+    for (let i = 0; i < 5; i++) {
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(1,1), karlMat.clone());
+      p.rotation.x = -Math.PI/2;
+      p.scale.set(180 + i*40, 90 + i*20, 1);
+      p.position.set(-260 - i*60, GROUND_Y + 6 + i*2, -80 + (i%3)*50 - 30);
+      p.renderOrder = 2;
+      p.userData.speed = 1.6 + i*0.5; // units/sec eastward
+      cityGroup.add(p);
+      karlBanks.push(p);
+    }
+  }
+
+  // -- Boats: single instanced hull, slow fixed routes across the bay
+  var boatMesh = null, boatRoutes = [];
+  {
+    const hullGeo = new THREE.BoxGeometry(3.2, 1.0, 1.1);
+    const hullMat = new THREE.MeshStandardMaterial({color:0xb8bcc2, roughness:0.6, metalness:0.2});
+    boatRoutes = [
+      {ax:26, az:-24, bx:52, bz:-46, sp:0.045, ph:0.0},   // ferry: Ferry Bldg -> YBI north
+      {ax:24, az:-20, bx:90, bz:-80, sp:0.030, ph:0.4},   // ferry: toward Oakland
+      {ax:110, az:-100, bx:30, bz:-30, sp:0.020, ph:0.1}, // container ship inbound
+      {ax:-30, az:-150, bx:60, bz:-60, sp:0.018, ph:0.7}, // ship from the Gate
+      {ax:70, az:-30, bx:20, bz:-26, sp:0.05, ph:0.55},   // small ferry return
+    ];
+    boatMesh = new THREE.InstancedMesh(hullGeo, hullMat, boatRoutes.length);
+    boatMesh.position.y = GROUND_Y + 0.5;
+    cityGroup.add(boatMesh);
+  }
+
+  // -- Bay Bridge traffic: headlight/taillight dots along the two spans
+  //    (bridge deck local y=5.5, bridge group grounded at GROUND_Y)
+  var trafficHead = null, trafficTail = null;
+  {
+    const dotGeo = new THREE.SphereGeometry(0.22, 4, 3);
+    const headMat = new THREE.MeshBasicMaterial({color:0xfff2cc, transparent:true, opacity:0.9});
+    const tailMat = new THREE.MeshBasicMaterial({color:0xff4433, transparent:true, opacity:0.9});
+    cityNightMats.push({m:headMat, base:0.9}, {m:tailMat, base:0.9}); // fade out by day
+    const N = 36;
+    trafficHead = new THREE.InstancedMesh(dotGeo, headMat, N);
+    trafficTail = new THREE.InstancedMesh(dotGeo, tailMat, N);
+    cityGroup.add(trafficHead); cityGroup.add(trafficTail);
+  }
+  // Polyline of the bridge deck in city coords: SF anchor -> YBI -> Oakland side
+  var _bridgePath = [[35,-5],[60,-50],[100,-25]];
+  function _bridgePoint(s) { // s in [0,1] along the whole polyline
+    const seg = s < 0.55 ? 0 : 1, t = seg === 0 ? s/0.55 : (s-0.55)/0.45;
+    const [x1,z1] = _bridgePath[seg], [x2,z2] = _bridgePath[seg+1];
+    return [x1+(x2-x1)*t, z1+(z2-z1)*t];
+  }
+
+  // -- Sky life: two planes on approach + drifting clouds + a gull flock
+  var skyPlanes = [];
+  {
+    const fuseMat = new THREE.MeshStandardMaterial({color:0xd8dce2, roughness:0.5});
+    for (let i = 0; i < 2; i++) {
+      const g = new THREE.Group();
+      const fuse = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.5, 0.5), fuseMat);
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 3.4), fuseMat);
+      const strobe = new THREE.Mesh(new THREE.SphereGeometry(0.25, 4, 3), new THREE.MeshBasicMaterial({color:0xff3333}));
+      strobe.position.y = 0.5;
+      g.add(fuse); g.add(wing); g.add(strobe);
+      g.userData.strobe = strobe;
+      // descending approach across the bay toward SFO (south), looping
+      g.userData.path = i === 0
+        ? {ax:170, ay:GROUND_Y+70, az:-140, bx:40, by:GROUND_Y+22, bz:170, sp:0.012, ph:0}
+        : {ax:220, ay:GROUND_Y+80, az:-40, bx:10, by:GROUND_Y+26, bz:190, sp:0.010, ph:0.5};
+      cityGroup.add(g);
+      skyPlanes.push(g);
+    }
+  }
+  var cloudSprites = [];
+  {
+    for (let i = 0; i < 3; i++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1,1),
+        new THREE.MeshBasicMaterial({map:_softTex, transparent:true, opacity:0.18, depthWrite:false, color:0xffffff, side:THREE.DoubleSide}));
+      m.scale.set(150 + i*50, 45 + i*12, 1);
+      m.position.set(-150 + i*180, GROUND_Y + 95 + i*14, -220 - i*40);
+      m.renderOrder = 2;
+      m.userData.speed = 0.8 + i*0.3;
+      cityGroup.add(m);
+      cloudSprites.push(m);
+    }
+  }
+  var gullMesh = null;
+  {
+    const gullGeo = new THREE.ConeGeometry(0.25, 0.7, 3);
+    const gullMat = new THREE.MeshBasicMaterial({color:0x3a4048});
+    gullMesh = new THREE.InstancedMesh(gullGeo, gullMat, 8);
+    cityGroup.add(gullMesh);
+  }
+
+  // -- The per-frame driver (called from animate; matrix work on slowTick)
+  var _ambM = new THREE.Matrix4(), _ambQ = new THREE.Quaternion(), _ambUp = new THREE.Vector3(0,1,0);
+  var updateAmbience = function(t, dt, slowTick) {
+    // water shimmer: cheap texture scroll, every frame
+    if (bayWaterTex) { bayWaterTex.offset.x = (t * 0.004) % 1; bayWaterTex.offset.y = (t * 0.0023) % 1; }
+    // planes fly + strobe every frame (they are fast)
+    for (const g of skyPlanes) {
+      const p = g.userData.path;
+      const s = ((t * p.sp) + p.ph) % 1.15; // 15% off-map dwell between passes
+      if (s > 1) { g.visible = false; continue; }
+      g.visible = true;
+      g.position.set(p.ax + (p.bx-p.ax)*s, p.ay + (p.by-p.ay)*s, p.az + (p.bz-p.az)*s);
+      g.rotation.y = Math.atan2(p.ax-p.bx, p.az-p.bz);
+      g.userData.strobe.visible = (t * 1.4) % 1 < 0.15;
+    }
+    if (!slowTick) return;
+    const hh = getTimeOfDay();
+    const karlFactor = (hh >= 20 || hh < 8) ? 0.5 : (hh < 11 ? 0.3 : 0.12); // Karl thick at night/morning
+    for (const p of karlBanks) {
+      p.position.x += p.userData.speed * dt * 8; // slowTick sees ~8 frames of dt
+      if (p.position.x > 60) p.position.x = -420; // recycle west of the Gate
+      // fade in from the west, fade out over downtown
+      const fade = Math.max(0, Math.min(1, 1 - (p.position.x + 120) / 170));
+      p.material.opacity = (0.10 + 0.5 * fade) * karlFactor * 2;
+    }
+    for (const m of cloudSprites) {
+      m.position.x += m.userData.speed * dt * 8;
+      if (m.position.x > 400) m.position.x = -420;
+    }
+    for (let i = 0; i < boatRoutes.length; i++) {
+      const r = boatRoutes[i];
+      const s = ((t * r.sp) + r.ph) % 1;
+      const x = r.ax + (r.bx-r.ax)*s, z = r.az + (r.bz-r.az)*s;
+      _ambQ.setFromAxisAngle(_ambUp, Math.atan2(r.bx-r.ax, r.bz-r.az));
+      _ambM.compose(new THREE.Vector3(x, 0, z), _ambQ, new THREE.Vector3(1,1,1));
+      boatMesh.setMatrixAt(i, _ambM);
+    }
+    boatMesh.instanceMatrix.needsUpdate = true;
+    const NT = 36;
+    for (let i = 0; i < NT; i++) {
+      const sH = (t * 0.02 + i / NT) % 1;
+      const sT = (1 - ((t * 0.017 + i / NT) % 1));
+      const [hx,hz] = _bridgePoint(sH), [tx2,tz2] = _bridgePoint(sT);
+      _ambM.makeTranslation(hx, GROUND_Y + 6.0, hz - 0.8);
+      trafficHead.setMatrixAt(i, _ambM);
+      _ambM.makeTranslation(tx2, GROUND_Y + 6.0, tz2 + 0.8);
+      trafficTail.setMatrixAt(i, _ambM);
+    }
+    trafficHead.instanceMatrix.needsUpdate = true;
+    trafficTail.instanceMatrix.needsUpdate = true;
+    // gulls: lazy circle over the Ferry Building, only by day
+    gullMesh.visible = hh >= 7 && hh < 20;
+    if (gullMesh.visible) {
+      for (let i = 0; i < 8; i++) {
+        const a = t * 0.25 + i * (Math.PI/4);
+        const flap = 1 + 0.5 * Math.sin(t * 6 + i);
+        _ambM.compose(
+          new THREE.Vector3(24 + Math.cos(a) * (6 + i % 3), GROUND_Y + 16 + Math.sin(t*0.7+i)*1.5, -6 + Math.sin(a) * (6 + i % 3)),
+          _ambQ.setFromAxisAngle(_ambUp, -a),
+          new THREE.Vector3(1, 1, flap)
+        );
+        gullMesh.setMatrixAt(i, _ambM);
+      }
+      gullMesh.instanceMatrix.needsUpdate = true;
+    }
+  };
+
   // Day/night city dimmer: collect every unique lit material in the city once.
   // The scene's ambient stays bright at night for the office interior, which
   // left the whole city (hills, buildings, bridges) day-bright at 10 PM.
@@ -7636,6 +7839,8 @@ function animate() {
     if (_cg && _cg.userData && _cg.userData.mixer) _cg.userData.mixer.update(dt * GLTF_CLIP_SPEED);
   }
 
+  if (typeof updateAmbience === 'function') updateAmbience(t, dt, slowTick);
+
   // Character idle animations
   _charNames.forEach((name) => {
     const g = charGroups[name];
@@ -8178,7 +8383,7 @@ window.addEventListener('resize', () => {
 fetchData();
 setInterval(fetchData, 3000);
 // Debug handle for console/automation introspection (read-only diagnostics)
-window.DESK = { scene, camera, renderer, controls };
+window.DESK = { scene, camera, renderer, controls, tick: (t, dt, slow) => updateAmbience(t, dt, slow) };
 animate();
 
 // ── BACKGROUND GLTF CHARACTER LOADING ──
