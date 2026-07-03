@@ -67,7 +67,20 @@ def parse_cli():
                     help="Cycles before deep-red cut can fire (default 120).")
     ap.add_argument("--dump-json", type=str, default=None,
                     help="Write per-trade rows to PATH (for variant-vs-baseline diffing).")
+    ap.add_argument("--window-start", type=str, default=None,
+                    help="Entry-window start, YYYY-MM-DD (UTC) or epoch secs. "
+                         "Default: the documented 5/11-5/30 rig window.")
+    ap.add_argument("--window-end", type=str, default=None,
+                    help="Entry-window end, YYYY-MM-DD (UTC) or epoch secs.")
+    ap.add_argument("--data-dir", type=str, default=None,
+                    help=f"Candle CSV dir (default {DATA_DIR}).")
     return ap.parse_args()
+
+
+def _parse_when(s: str) -> int:
+    if s.isdigit():
+        return int(s)
+    return int(datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
 
 
 def load_candles(path):
@@ -82,13 +95,17 @@ def main():
     backtest.apply_exit_overrides(args)  # sets module knobs used by check_exits_live
     sl_pct = args.sl_floor_pct if args.sl_floor_pct is not None else SL_PCT
     tp_pct = args.tp_cap_pct if args.tp_cap_pct is not None else TP_PCT
+    lo = _parse_when(args.window_start) if args.window_start else LO
+    end = _parse_when(args.window_end) if args.window_end else END
+    mid = (lo + end) // 2
+    data_dir = args.data_dir or DATA_DIR
     knobs = {k: v for k, v in vars(args).items() if v is not None and k != "dump_json"}
     print(f"knobs: {knobs if knobs else 'BASELINE (live parity)'}")
 
     state = json.load(open("trading_state.json"))
     live = [
         t for t in state["closed_trades"]
-        if t.get("strategy") == STRATEGY and LO <= t.get("opened_at", 0) <= END
+        if t.get("strategy") == STRATEGY and lo <= t.get("opened_at", 0) <= end
         and t.get("exit_reason") != "min_margin_skip"
     ]
     print(f"live executed trades in window: {len(live)}")
@@ -101,8 +118,8 @@ def main():
         sym = t["symbol"]
         safe = sym.replace("/", "_").replace(":", "_")
         if sym not in dfs:
-            p5 = os.path.join(DATA_DIR, f"{safe}_5m.csv")
-            p1 = os.path.join(DATA_DIR, f"{safe}_1h.csv")
+            p5 = os.path.join(data_dir, f"{safe}_5m.csv")
+            p1 = os.path.join(data_dir, f"{safe}_1h.csv")
             if not os.path.exists(p5):
                 print(f"  [skip] no candle data for {sym}")
                 continue
@@ -197,8 +214,8 @@ def main():
     print(f"\n  sim WR: {len(wins)}/{n} ({len(wins)/n*100 if n else 0:.1f}%) | "
           f"avg win ${sum(wins)/len(wins) if wins else 0:+.3f} | "
           f"avg loss ${sum(losses)/len(losses) if losses else 0:+.3f}")
-    for label, half in [("first half", [r for r in rows if r["opened_at"] < MID]),
-                        ("second half", [r for r in rows if r["opened_at"] >= MID])]:
+    for label, half in [("first half", [r for r in rows if r["opened_at"] < mid]),
+                        ("second half", [r for r in rows if r["opened_at"] >= mid])]:
         hs = sum(r["sim_net"] for r in half)
         hl = sum(r["live_net"] for r in half)
         hw = sum(1 for r in half if r["sim_net"] > 0)

@@ -192,6 +192,19 @@ def _net_pnl(t: dict) -> float:
     return n if n is not None else t.get("pnl_usdt", 0)
 
 
+def _sim_net_pnl(t: dict) -> float:
+    """Honest net for a PAPER (sim) trade. The slot paper writer records
+    fees_usdt but does NOT deduct them (net_pnl == pnl_usdt on most sim rows),
+    silently overstating sim results. Deduct at render time when the recorded
+    net clearly never subtracted fees; trust records that did."""
+    net = t.get("net_pnl")
+    pnl = t.get("pnl_usdt", 0)
+    fees = t.get("fees_usdt") or 0
+    if net is not None and abs(net - pnl) > 1e-9:
+        return net          # writer already deducted something — trust it
+    return pnl - fees
+
+
 def _real_fee(t: dict) -> float:
     """Return real fees_usdt when present, else estimate (margin*lev*0.06%*2)."""
     f = t.get("fees_usdt")
@@ -507,34 +520,38 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
     ordered += sorted(s for s in slot_states
                       if s not in known_order and s != "v8_245trades")
 
-    def _stats_html(subset):
+    def _stats_html(subset, pnl_fn=_net_pnl):
         sn = len(subset)
-        swins = sum(1 for t in subset if _net_pnl(t) > 0)
+        swins = sum(1 for t in subset if pnl_fn(t) > 0)
         swr = swins / sn * 100 if sn else 0.0
-        snet = sum(_net_pnl(t) for t in subset)
+        snet = sum(pnl_fn(t) for t in subset)
         scls = "pos" if snet > 0 else "neg" if snet < 0 else "dim"
         return f"{sn}t &middot; {swr:.0f}% &middot; <span class='{scls}'>${snet:+.2f}</span>"
+
+    def _sim_row_html(sim_rows):
+        # Sim stats are fee-adjusted at render time (the paper writer records
+        # fees but doesn't deduct them) — hence the fee-adj tag.
+        return (f"<tr class='dim'><td></td><td>sim</td>"
+                f"<td>{_stats_html(sim_rows, _sim_net_pnl)}"
+                f" <span style='font-size:8px'>fee-adj</span></td></tr>")
 
     rows = ""
     for slot_id in ordered:
         trades = (slot_states.get(slot_id) or {}).get("closed_trades") or []
         n = len(trades)
-        wins = sum(1 for t in trades if _net_pnl(t) > 0)
-        wr = wins / n * 100 if n else 0.0
-        net = sum(_net_pnl(t) for t in trades)
         name = escape(slot_id)
-        stats = _stats_html(trades)
+        # Never blend real money with sims, in ANY branch: live-mode trades and
+        # paper sims always get separate stat rows (main-state 5m_scalp trades
+        # carry no mode field — they are all real).
+        live_rows = ([t for t in trades if t.get("mode") == "live"]
+                     if slot_id != "5m_scalp" else trades)
+        sim_rows = [t for t in trades if t.get("mode") != "live"] if slot_id != "5m_scalp" else []
 
         if slot_id in live_ids:
-            # Never blend real money with sims: the LIVE row shows live-mode
-            # trades only; paper history gets its own dim sim row below.
-            live_rows = [t for t in trades if t.get("mode") == "live"]
-            sim_rows = [t for t in trades if t.get("mode") != "live"]
             rows += (f"<tr><td><span class='pos'>&#9679;</span> {name}</td>"
                      f"<td class='pos'>LIVE</td><td>{_stats_html(live_rows)}</td></tr>")
             if sim_rows:
-                rows += (f"<tr class='dim'><td></td><td>sim</td>"
-                         f"<td>{_stats_html(sim_rows)}</td></tr>")
+                rows += _sim_row_html(sim_rows)
             mode = modes.get(slot_id)
             if mode and not mode.get("paper_mode", True):
                 # Promoted slot — render the auto-demote guardrail state.
@@ -555,11 +572,28 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
                     f"({len(live_trades)} so far)</div>"
                     "</td></tr>")
         elif n >= 50 and _kelly_wr_rr(trades) < 0:
-            rows += (f"<tr class='dim'><td>&#10013; {name}</td><td>killed @{n}</td>"
-                     f"<td>{n}t &middot; {wr:.0f}% &middot; ${net:+.2f}</td></tr>")
+            # Killed slot — a demoted slot may still hold real-money history
+            # (e.g. ST2.0's 35 live trades): show it on its own row, never
+            # blended into the sim stats.
+            if live_rows:
+                rows += (f"<tr class='dim'><td>&#10013; {name}</td><td>killed @{n}</td>"
+                         f"<td>live {_stats_html(live_rows)}</td></tr>")
+                rows += _sim_row_html(sim_rows)
+            else:
+                rows += (f"<tr class='dim'><td>&#10013; {name}</td><td>killed @{n}</td>"
+                         f"<td>{_stats_html(sim_rows, _sim_net_pnl)}"
+                         f" <span style='font-size:8px'>sim fee-adj</span></td></tr>")
         else:
-            rows += (f"<tr><td><span class='amb'>&#9679;</span> {name}</td>"
-                     f"<td class='amb'>paper</td><td>{stats}</td></tr>")
+            if live_rows:
+                # Previously-promoted slot back on paper: keep its real record visible.
+                rows += (f"<tr><td><span class='amb'>&#9679;</span> {name}</td>"
+                         f"<td class='amb'>paper</td><td>live {_stats_html(live_rows)}</td></tr>")
+                rows += _sim_row_html(sim_rows)
+            else:
+                rows += (f"<tr><td><span class='amb'>&#9679;</span> {name}</td>"
+                         f"<td class='amb'>paper</td>"
+                         f"<td>{_stats_html(sim_rows, _sim_net_pnl)}"
+                         f" <span style='font-size:8px'>sim fee-adj</span></td></tr>")
 
     if not rows:
         rows = "<tr><td class='dim'>no slot state files found</td></tr>"
@@ -725,14 +759,16 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
         # Slot has BOTH real (live) and simulated (paper) history — e.g. a slot
         # that traded live then auto-demoted to paper. Never conflate real money
         # with sim: split the actual W/L record and PnL by mode (2026-06-15).
-        def _wl(ts):
-            w = sum(1 for t in ts if _net_pnl(t) > 0)
-            l = sum(1 for t in ts if _net_pnl(t) < 0)
-            return w, l, sum(_net_pnl(t) for t in ts)
+        def _wl(ts, pnl_fn=_net_pnl):
+            w = sum(1 for t in ts if pnl_fn(t) > 0)
+            l = sum(1 for t in ts if pnl_fn(t) < 0)
+            return w, l, sum(pnl_fn(t) for t in ts)
         live_ts = [t for t in trades if t.get("mode") == "live"]
         paper_ts = [t for t in trades if t.get("mode") != "live"]
         lw, ll, lnet = _wl(live_ts)
-        pw, pl, pnet = _wl(paper_ts)
+        # Sim stats fee-adjusted at render time (paper writer records fees but
+        # doesn't deduct them from net_pnl).
+        pw, pl, pnet = _wl(paper_ts, _sim_net_pnl)
         # Break-even trades (net==0) are neither W nor L; show them so W/L reconciles
         # to the trade count (else e.g. 11W/15L reads as 26 but live total is 27).
         l_be = len(live_ts) - lw - ll
@@ -757,7 +793,8 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"&middot; {lwr:.0f}% WR &middot; <span class='{lcls}'>${lnet:+.2f}</span>"
             f"<span class='dim' style='font-size:9px'> &middot; {len(live_ts)} tr</span></td></tr>"
             f"<tr><td class='dim'>paper (sim)</td><td>"
-            f"{pw}W / {pl}L{_pbe} &middot; {pwr:.0f}% WR &middot; <span class='{pcls}'>${pnet:+.2f}</span></td></tr>"
+            f"{pw}W / {pl}L{_pbe} &middot; {pwr:.0f}% WR &middot; <span class='{pcls}'>${pnet:+.2f}</span>"
+            f" <span class='dim' style='font-size:8px'>fee-adj</span></td></tr>"
             f"<tr><td class='dim'>net PnL (live)</td><td class='{lcls}'>${lnet:+.2f}</td></tr>"
             f"<tr><td class='dim'>avg win (live)</td><td class='pos'>${l_avgw:+.2f}</td></tr>"
             f"<tr><td class='dim'>avg loss (live)</td><td class='neg'>${l_avgl:+.2f}</td></tr>"
@@ -917,7 +954,8 @@ def collect_blotter_rows(limit: int = 500, slot_states: dict = None) -> list[dic
                 "sym": str(t.get("symbol") or "?").replace("/USDT:USDT", ""),
                 "side": str(t.get("side") or "?"),
                 "strat": str(t.get("strategy") or ""),
-                "net": round(_net_pnl(t), 4),
+                # Sim rows fee-adjusted at render time (paper writer bug)
+                "net": round(_net_pnl(t) if mode == "live" else _sim_net_pnl(t), 4),
                 "reason": str(t.get("exit_reason") or t.get("reason") or ""),
                 "owner": owner,
                 "mode": mode,
