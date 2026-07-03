@@ -1,0 +1,926 @@
+{
+ "part_a": [
+  {
+   "symbol": "ARB/USDT:USDT",
+   "side": "long",
+   "outcome": "win",
+   "net_pnl": 0.1779525999999903,
+   "limit_px": 0.0839,
+   "log_matched_placement": false,
+   "covered": true,
+   "norm_med": 74736.0,
+   "q20": {
+    "size": 44094.0,
+    "size_usd": 3699.49,
+    "rel": 0.59,
+    "snap_gap_s": 0.34,
+    "at_exact_level": false
+   },
+   "q10": {
+    "size": 44867.0,
+    "size_usd": 3764.34,
+    "rel": 0.6,
+    "snap_gap_s": 1.36,
+    "at_exact_level": false
+   }
+  },
+  {
+   "symbol": "ARB/USDT:USDT",
+   "side": "long",
+   "outcome": "loss",
+   "net_pnl": -1.367031,
+   "limit_px": 0.0846,
+   "log_matched_placement": false,
+   "covered": true,
+   "norm_med": 74736.0,
+   "q20": {
+    "size": 11558.0,
+    "size_usd": 977.81,
+    "rel": 0.155,
+    "snap_gap_s": 0.53,
+    "at_exact_level": false
+   },
+   "q10": {
+    "size": 55017.0,
+    "size_usd": 4654.44,
+    "rel": 0.736,
+    "snap_gap_s": 0.45,
+    "at_exact_level": false
+   }
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "short",
+   "outcome": "loss",
+   "net_pnl": -1.354328639999997,
+   "limit_px": 5.098,
+   "log_matched_placement": false,
+   "covered": true,
+   "norm_med": 62.7,
+   "q20": {
+    "size": 144.0,
+    "size_usd": 734.11,
+    "rel": 2.297,
+    "snap_gap_s": 0.01,
+    "at_exact_level": false
+   },
+   "q10": {
+    "size": 184.4,
+    "size_usd": 940.07,
+    "rel": 2.941,
+    "snap_gap_s": 0.29,
+    "at_exact_level": false
+   }
+  },
+  {
+   "symbol": "BTC/USDT:USDT",
+   "side": "long",
+   "outcome": "loss",
+   "net_pnl": -0.4798076100000015,
+   "limit_px": 64549.5,
+   "log_matched_placement": false,
+   "covered": true,
+   "norm_med": 0.485,
+   "q20": {
+    "size": 0.316,
+    "size_usd": 20397.64,
+    "rel": 0.652,
+    "snap_gap_s": 0.19,
+    "at_exact_level": false
+   },
+   "q10": {
+    "size": 0.772,
+    "size_usd": 49832.21,
+    "rel": 1.592,
+    "snap_gap_s": 0.02,
+    "at_exact_level": false
+   }
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "outcome": "win",
+   "net_pnl": 1.5815139199999937,
+   "limit_px": 5.772,
+   "log_matched_placement": false,
+   "covered": true,
+   "norm_med": 64.0,
+   "q20": {
+    "size": 17.3,
+    "size_usd": 99.86,
+    "rel": 0.27,
+    "snap_gap_s": 0.34,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 0.3,
+    "size_usd": 1.73,
+    "rel": 0.005,
+    "snap_gap_s": 1.12,
+    "at_exact_level": false
+   }
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "short",
+   "outcome": "win",
+   "net_pnl": 0.235479,
+   "limit_px": 1691.36,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 4.84,
+   "q20": {
+    "size": 2.81,
+    "size_usd": 4752.72,
+    "rel": 0.581,
+    "snap_gap_s": 0.37,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 2.81,
+    "size_usd": 4752.72,
+    "rel": 0.581,
+    "snap_gap_s": 0.37,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "BTC/USDT:USDT",
+   "side": "short",
+   "outcome": "win",
+   "net_pnl": 0.2738999999999942,
+   "limit_px": 62705.7,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 0.71,
+   "q20": {
+    "size": 1.198,
+    "size_usd": 75121.43,
+    "rel": 1.687,
+    "snap_gap_s": 0.21,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 1.198,
+    "size_usd": 75121.43,
+    "rel": 1.687,
+    "snap_gap_s": 0.21,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "BTC/USDT:USDT",
+   "side": "short",
+   "outcome": "loss",
+   "net_pnl": -0.15274131000000143,
+   "limit_px": 58266.2,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 0.715,
+   "q20": {
+    "size": 0.001,
+    "size_usd": 58.27,
+    "rel": 0.001,
+    "snap_gap_s": 0.02,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 0.001,
+    "size_usd": 58.27,
+    "rel": 0.001,
+    "snap_gap_s": 0.02,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "BTC/USDT:USDT",
+   "side": "long",
+   "outcome": "loss",
+   "net_pnl": -0.76987556,
+   "limit_px": 60526.6,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 0.571,
+   "q20": {
+    "size": 0.001,
+    "size_usd": 60.53,
+    "rel": 0.002,
+    "snap_gap_s": 0.01,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 0.001,
+    "size_usd": 60.53,
+    "rel": 0.002,
+    "snap_gap_s": 0.01,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "long",
+   "outcome": "win",
+   "net_pnl": 0.361728,
+   "limit_px": 1609.87,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 5.86,
+   "q20": {
+    "size": 10.04,
+    "size_usd": 16163.09,
+    "rel": 1.713,
+    "snap_gap_s": 0.07,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 10.04,
+    "size_usd": 16163.09,
+    "rel": 1.713,
+    "snap_gap_s": 0.07,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "long",
+   "outcome": "loss",
+   "net_pnl": -0.075982,
+   "limit_px": 1699.91,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 5.95,
+   "q20": {
+    "size": 6.36,
+    "size_usd": 10811.43,
+    "rel": 1.069,
+    "snap_gap_s": 0.0,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 6.36,
+    "size_usd": 10811.43,
+    "rel": 1.069,
+    "snap_gap_s": 0.0,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "BTC/USDT:USDT",
+   "side": "long",
+   "outcome": "loss",
+   "net_pnl": -0.10880000000000291,
+   "limit_px": 61646.4,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 0.765,
+   "q20": {
+    "size": 0.495,
+    "size_usd": 30514.97,
+    "rel": 0.647,
+    "snap_gap_s": 0.04,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 0.495,
+    "size_usd": 30514.97,
+    "rel": 0.647,
+    "snap_gap_s": 0.04,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "short",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 1709.96,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 3.71,
+   "q20": {
+    "size": 16.4,
+    "size_usd": 28043.34,
+    "rel": 4.42,
+    "snap_gap_s": 0.01,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 16.4,
+    "size_usd": 28043.34,
+    "rel": 4.42,
+    "snap_gap_s": 0.01,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "BTC/USDT:USDT",
+   "side": "short",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 62656.0,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 0.675,
+   "q20": {
+    "size": 2.742,
+    "size_usd": 171802.75,
+    "rel": 4.062,
+    "snap_gap_s": 0.0,
+    "at_exact_level": false
+   },
+   "q10": {
+    "size": 2.742,
+    "size_usd": 171802.75,
+    "rel": 4.062,
+    "snap_gap_s": 0.0,
+    "at_exact_level": false
+   }
+  },
+  {
+   "symbol": "ARB/USDT:USDT",
+   "side": "short",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 0.0783,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 104284.5,
+   "q20": {
+    "size": 67482.0,
+    "size_usd": 5283.84,
+    "rel": 0.647,
+    "snap_gap_s": 0.62,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 67482.0,
+    "size_usd": 5283.84,
+    "rel": 0.647,
+    "snap_gap_s": 0.62,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "ARB/USDT:USDT",
+   "side": "short",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 0.0783,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 104284.5,
+   "q20": {
+    "size": 50478.0,
+    "size_usd": 3952.43,
+    "rel": 0.484,
+    "snap_gap_s": 0.31,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 50478.0,
+    "size_usd": 3952.43,
+    "rel": 0.484,
+    "snap_gap_s": 0.31,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "BTC/USDT:USDT",
+   "side": "short",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 62767.2,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 0.71,
+   "q20": {
+    "size": 1.007,
+    "size_usd": 63206.57,
+    "rel": 1.418,
+    "snap_gap_s": 0.09,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 1.007,
+    "size_usd": 63206.57,
+    "rel": 1.418,
+    "snap_gap_s": 0.09,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "BTC/USDT:USDT",
+   "side": "short",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 62724.2,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 0.71,
+   "q20": {
+    "size": 1.475,
+    "size_usd": 92518.2,
+    "rel": 2.077,
+    "snap_gap_s": 0.24,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 1.475,
+    "size_usd": 92518.2,
+    "rel": 2.077,
+    "snap_gap_s": 0.24,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "BTC/USDT:USDT",
+   "side": "short",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 62733.9,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 0.71,
+   "q20": {
+    "size": 4.101,
+    "size_usd": 257271.72,
+    "rel": 5.776,
+    "snap_gap_s": 0.06,
+    "at_exact_level": false
+   },
+   "q10": {
+    "size": 4.101,
+    "size_usd": 257271.72,
+    "rel": 5.776,
+    "snap_gap_s": 0.06,
+    "at_exact_level": false
+   }
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 5.017,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 72.7,
+   "q20": {
+    "size": 61.7,
+    "size_usd": 309.55,
+    "rel": 0.849,
+    "snap_gap_s": 0.05,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 61.7,
+    "size_usd": 309.55,
+    "rel": 0.849,
+    "snap_gap_s": 0.05,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 4.924,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 72.7,
+   "q20": {
+    "size": 134.5,
+    "size_usd": 662.28,
+    "rel": 1.85,
+    "snap_gap_s": 0.04,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 134.5,
+    "size_usd": 662.28,
+    "rel": 1.85,
+    "snap_gap_s": 0.04,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "ARB/USDT:USDT",
+   "side": "long",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 0.0767,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 121824.0,
+   "q20": {
+    "size": 376999.0,
+    "size_usd": 28915.82,
+    "rel": 3.095,
+    "snap_gap_s": 1.15,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 376999.0,
+    "size_usd": 28915.82,
+    "rel": 3.095,
+    "snap_gap_s": 1.15,
+    "at_exact_level": true
+   }
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "long",
+   "outcome": "miss",
+   "net_pnl": null,
+   "limit_px": 1700.0,
+   "log_matched_placement": true,
+   "covered": true,
+   "norm_med": 5.15,
+   "q20": {
+    "size": 10.63,
+    "size_usd": 18071.0,
+    "rel": 2.064,
+    "snap_gap_s": 0.11,
+    "at_exact_level": true
+   },
+   "q10": {
+    "size": 10.63,
+    "size_usd": 18071.0,
+    "rel": 2.064,
+    "snap_gap_s": 0.11,
+    "at_exact_level": true
+   }
+  }
+ ],
+ "part_b": [
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "short",
+   "depth": 6237817.4195,
+   "net": 0.16039999999999963,
+   "opened_at": 1778566557.6822898,
+   "depth_pctile": 0.25
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 243215.7961,
+   "net": 0.14840000000000247,
+   "opened_at": 1778572011.77762,
+   "depth_pctile": 0.812
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 215976.9068,
+   "net": 0.40660000000000274,
+   "opened_at": 1778575017.146105,
+   "depth_pctile": 0.5
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 226461.0809,
+   "net": 0.3309757500000003,
+   "opened_at": 1778620387.436049,
+   "depth_pctile": 0.625
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 236515.2465,
+   "net": 0.855622,
+   "opened_at": 1778649689.076096,
+   "depth_pctile": 0.75
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "short",
+   "depth": 315598.88533,
+   "net": 0.30431,
+   "opened_at": 1779139881.372587,
+   "depth_pctile": 0.714
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "short",
+   "depth": 396936.11639000004,
+   "net": 0.9563163599999994,
+   "opened_at": 1779204662.891113,
+   "depth_pctile": 1.0
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "short",
+   "depth": 4464496.135,
+   "net": 0.201675,
+   "opened_at": 1779209194.824234,
+   "depth_pctile": 0.125
+  },
+  {
+   "symbol": "WLD/USDT:USDT",
+   "side": "long",
+   "depth": 247606.1489,
+   "net": 0.422428,
+   "opened_at": 1779445672.970599,
+   "depth_pctile": 0.75
+  },
+  {
+   "symbol": "WLD/USDT:USDT",
+   "side": "long",
+   "depth": 253494.8189,
+   "net": 0.581464,
+   "opened_at": 1779468089.179265,
+   "depth_pctile": 0.875
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 248076.27479999998,
+   "net": -1.2892816000000051,
+   "opened_at": 1779487864.957505,
+   "depth_pctile": 0.875
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "short",
+   "depth": 360473.55973000004,
+   "net": -1.3138511799999957,
+   "opened_at": 1779538997.293855,
+   "depth_pctile": 0.857
+  },
+  {
+   "symbol": "WLD/USDT:USDT",
+   "side": "long",
+   "depth": 234753.5442,
+   "net": -0.592678,
+   "opened_at": 1779571629.031769,
+   "depth_pctile": 0.5
+  },
+  {
+   "symbol": "WLD/USDT:USDT",
+   "side": "long",
+   "depth": 255523.5397,
+   "net": -1.3207424800000085,
+   "opened_at": 1779577351.9409258,
+   "depth_pctile": 1.0
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 200792.135,
+   "net": -0.087119,
+   "opened_at": 1779751359.115377,
+   "depth_pctile": 0.312
+  },
+  {
+   "symbol": "WLD/USDT:USDT",
+   "side": "long",
+   "depth": 245765.3757,
+   "net": 0.413106,
+   "opened_at": 1779766907.238813,
+   "depth_pctile": 0.625
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "short",
+   "depth": 8119817.6616,
+   "net": -0.420574,
+   "opened_at": 1779951995.5274858,
+   "depth_pctile": 0.75
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 189925.27109999998,
+   "net": 0.348451,
+   "opened_at": 1780090681.520812,
+   "depth_pctile": 0.188
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 230317.292,
+   "net": 0.236201,
+   "opened_at": 1780113076.086907,
+   "depth_pctile": 0.688
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 204593.5936,
+   "net": 0.587702,
+   "opened_at": 1780399662.010968,
+   "depth_pctile": 0.375
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 192057.51200000002,
+   "net": -1.4625802399999996,
+   "opened_at": 1780410446.384314,
+   "depth_pctile": 0.25
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "long",
+   "depth": 7059035.9265,
+   "net": -0.027296728203350797,
+   "opened_at": 1780915299.734257,
+   "depth_pctile": 0.625
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 173763.0177,
+   "net": -0.016125,
+   "opened_at": 1780915632.844335,
+   "depth_pctile": 0.062
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "long",
+   "depth": 6834774.4914,
+   "net": 0.6665149,
+   "opened_at": 1780927664.676266,
+   "depth_pctile": 0.5
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 309522.5047,
+   "net": 0.158882,
+   "opened_at": 1780933361.596004,
+   "depth_pctile": 1.0
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 216175.5892,
+   "net": 0.125038,
+   "opened_at": 1780937003.222594,
+   "depth_pctile": 0.562
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 296709.7109,
+   "net": 0.446077,
+   "opened_at": 1780992478.6995058,
+   "depth_pctile": 0.938
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "short",
+   "depth": 179073.9195,
+   "net": -1.354328639999997,
+   "opened_at": 1781321221.921655,
+   "depth_pctile": 0.125
+  },
+  {
+   "symbol": "WLD/USDT:USDT",
+   "side": "long",
+   "depth": 154926.6419,
+   "net": 0.405436,
+   "opened_at": 1781527946.9635022,
+   "depth_pctile": 0.125
+  },
+  {
+   "symbol": "INJ/USDT:USDT",
+   "side": "long",
+   "depth": 205196.7108,
+   "net": 1.5815139199999937,
+   "opened_at": 1781597479.933742,
+   "depth_pctile": 0.438
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "long",
+   "depth": 266622.86203,
+   "net": 0.1481,
+   "opened_at": 1781616109.0757298,
+   "depth_pctile": 0.357
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "long",
+   "depth": 218446.27086,
+   "net": 0.103604,
+   "opened_at": 1781618259.7481868,
+   "depth_pctile": 0.071
+  },
+  {
+   "symbol": "WLD/USDT:USDT",
+   "side": "long",
+   "depth": 198942.4087,
+   "net": 1.436366,
+   "opened_at": 1781628976.969653,
+   "depth_pctile": 0.25
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "long",
+   "depth": 264639.51474,
+   "net": -1.278652,
+   "opened_at": 1781644107.6271648,
+   "depth_pctile": 0.286
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "long",
+   "depth": 292738.9641,
+   "net": 1.589781339999992,
+   "opened_at": 1781702498.8669598,
+   "depth_pctile": 0.643
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "long",
+   "depth": 228190.10692,
+   "net": 0.004916,
+   "opened_at": 1781714826.048291,
+   "depth_pctile": 0.143
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "long",
+   "depth": 282927.08761,
+   "net": 0.592699,
+   "opened_at": 1781740563.030019,
+   "depth_pctile": 0.5
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "short",
+   "depth": 9312862.518,
+   "net": 0.235479,
+   "opened_at": 1781871165.362879,
+   "depth_pctile": 1.0
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "short",
+   "depth": 364968.53525,
+   "net": 0.178602,
+   "opened_at": 1781905650.266243,
+   "depth_pctile": 0.929
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "short",
+   "depth": 246988.12143,
+   "net": 0.233224,
+   "opened_at": 1782188180.841974,
+   "depth_pctile": 0.214
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "long",
+   "depth": 335714.68277,
+   "net": -1.7494189400000113,
+   "opened_at": 1782801768.092386,
+   "depth_pctile": 0.786
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "long",
+   "depth": 288781.6043,
+   "net": -1.3729562199999967,
+   "opened_at": 1782898860.452537,
+   "depth_pctile": 0.571
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "long",
+   "depth": 9051532.9452,
+   "net": 0.361728,
+   "opened_at": 1782950225.694635,
+   "depth_pctile": 0.875
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "side": "long",
+   "depth": 6534531.8911,
+   "net": 0.351594,
+   "opened_at": 1783065512.3432808,
+   "depth_pctile": 0.375
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "side": "long",
+   "depth": 270476.41191,
+   "net": 0.371301,
+   "opened_at": 1783080363.252168,
+   "depth_pctile": 0.429
+  },
+  {
+   "symbol": "WLD/USDT:USDT",
+   "side": "long",
+   "depth": 203501.7625,
+   "net": 0.166094,
+   "opened_at": 1783083481.354795,
+   "depth_pctile": 0.375
+  }
+ ]
+}
