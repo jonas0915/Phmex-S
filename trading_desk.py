@@ -2651,16 +2651,39 @@ scene.add(beamRing);
     const queue = isResidential ? fillQueue.residential : fillQueue.modern;
     queue.push({x, z, w, d, h});
   }
+  // Shared facade textures: baked window grids turn the flat fill boxes into
+  // buildings. White walls so the material color supplies the hue (map is
+  // multiplied by material.color - the wall must be white, not tinted).
+  function makeFacadeTex(cols, rows, winShade) {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    const x = c.getContext('2d');
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, 64, 64);
+    const cw = 64 / cols, rh = 64 / rows;
+    for (let i = 0; i < cols; i++) {
+      for (let j = 0; j < rows; j++) {
+        const v = winShade + Math.floor(Math.random() * 28);
+        x.fillStyle = 'rgb(' + v + ',' + (v + 6) + ',' + (v + 14) + ')';
+        x.fillRect(i * cw + cw * 0.22, j * rh + rh * 0.2, cw * 0.56, rh * 0.55);
+      }
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    return t;
+  }
+  const officeFacadeTex = makeFacadeTex(6, 9, 46);   // dense glass grid
+  const resFacadeTex = makeFacadeTex(4, 6, 60);      // fewer, warmer windows
+
   // Called after all fillBuilding() calls to create the InstancedMesh batches
   function flushFillBuildings() {
     const unitGeo = new THREE.BoxGeometry(1, 1, 1);
     // Modern glass buildings — 5 material groups for premium blue-gray glass variety
     const modernGroups = [
-      {mat: new THREE.MeshStandardMaterial({color:0x8899bb, roughness:0.4, metalness:0.3, emissive:0x8899bb, emissiveIntensity:0.05}), items:[]},
-      {mat: new THREE.MeshStandardMaterial({color:0x7a8eaa, roughness:0.35, metalness:0.35, emissive:0x7a8eaa, emissiveIntensity:0.05}), items:[]},
-      {mat: new THREE.MeshStandardMaterial({color:0x9aaac5, roughness:0.38, metalness:0.28, emissive:0x9aaac5, emissiveIntensity:0.04}), items:[]},
-      {mat: new THREE.MeshStandardMaterial({color:0x6e88a8, roughness:0.42, metalness:0.32, emissive:0x6e88a8, emissiveIntensity:0.05}), items:[]},
-      {mat: new THREE.MeshStandardMaterial({color:0x8a9cb8, roughness:0.36, metalness:0.34, emissive:0x8a9cb8, emissiveIntensity:0.04}), items:[]},
+      {mat: new THREE.MeshStandardMaterial({map:officeFacadeTex, color:0x9db1d4, roughness:0.4, metalness:0.3, emissive:0x8899bb, emissiveIntensity:0.05}), items:[]},
+      {mat: new THREE.MeshStandardMaterial({map:officeFacadeTex, color:0x8ba3c2, roughness:0.35, metalness:0.35, emissive:0x7a8eaa, emissiveIntensity:0.05}), items:[]},
+      {mat: new THREE.MeshStandardMaterial({map:officeFacadeTex, color:0xb2c1d9, roughness:0.38, metalness:0.28, emissive:0x9aaac5, emissiveIntensity:0.04}), items:[]},
+      {mat: new THREE.MeshStandardMaterial({map:officeFacadeTex, color:0x7f9cbf, roughness:0.42, metalness:0.32, emissive:0x6e88a8, emissiveIntensity:0.05}), items:[]},
+      {mat: new THREE.MeshStandardMaterial({map:officeFacadeTex, color:0xa0b2cc, roughness:0.36, metalness:0.34, emissive:0x8a9cb8, emissiveIntensity:0.04}), items:[]},
     ];
     fillQueue.modern.forEach((b,i) => modernGroups[i%5].items.push(b));
     modernGroups.forEach(grp => {
@@ -2711,6 +2734,38 @@ scene.add(beamRing);
       cityGroup.add(sim);
     }
 
+    // Rooftop clutter - parapet/mechanical boxes and water tanks break up the
+    // flat slab tops that made the fill read as toy blocks.
+    {
+      const roofItems = [];
+      const addRoof = (b) => {
+        const n = 1 + Math.floor(Math.random() * 2);
+        for (let k = 0; k < n; k++) {
+          roofItems.push({
+            x: b.x + (Math.random() - 0.5) * b.w * 0.5,
+            z: b.z + (Math.random() - 0.5) * b.d * 0.5,
+            y: b.h,
+            w: Math.max(0.5, b.w * (0.12 + Math.random() * 0.18)),
+            d: Math.max(0.5, b.d * (0.12 + Math.random() * 0.18)),
+            h: 0.5 + Math.random() * 1.4,
+          });
+        }
+      };
+      fillQueue.modern.forEach(b => { if (b.h > 14 && Math.random() < 0.55) addRoof(b); });
+      fillQueue.residential.forEach(b => { if (b.h > 8 && Math.random() < 0.25) addRoof(b); });
+      if (roofItems.length) {
+        const roofMat = new THREE.MeshStandardMaterial({color:0x8d8a84, roughness:0.85, metalness:0.15});
+        const rim = new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1), roofMat, roofItems.length);
+        const rm = new THREE.Matrix4();
+        roofItems.forEach((r, idx) => {
+          rm.compose(new THREE.Vector3(r.x, GROUND_Y + r.y + r.h/2, r.z), new THREE.Quaternion(), new THREE.Vector3(r.w, r.h, r.d));
+          rim.setMatrixAt(idx, rm);
+        });
+        rim.instanceMatrix.needsUpdate = true;
+        cityGroup.add(rim);
+      }
+    }
+
     // Emissive window rectangles on tall modern buildings (bright spots on faces)
     const winEmGeo = new THREE.PlaneGeometry(1, 1);
     const winWarmMat = new THREE.MeshBasicMaterial({color:0xffe8b0, transparent:true, opacity:0.7, side:THREE.DoubleSide});
@@ -2752,11 +2807,14 @@ scene.add(beamRing);
     }
 
     // Residential buildings — 2 material groups
+    // SF's residential fabric reads WHITE/cream from above - not steel blue.
     const resGroups = [
-      {mat: new THREE.MeshStandardMaterial({color:0x5a7088, roughness:0.38, metalness:0.32, emissive:0x5a7088, emissiveIntensity:0.04}), items:[]},
-      {mat: new THREE.MeshStandardMaterial({color:0x4a6878, roughness:0.35, metalness:0.34, emissive:0x4a6878, emissiveIntensity:0.04}), items:[]},
+      {mat: new THREE.MeshStandardMaterial({map:resFacadeTex, color:0xe4ddd0, roughness:0.75, metalness:0.05, emissive:0x6a655c, emissiveIntensity:0.03}), items:[]},
+      {mat: new THREE.MeshStandardMaterial({map:resFacadeTex, color:0xd7cbb8, roughness:0.8, metalness:0.04, emissive:0x635c50, emissiveIntensity:0.03}), items:[]},
+      {mat: new THREE.MeshStandardMaterial({map:resFacadeTex, color:0xc4b6a2, roughness:0.78, metalness:0.05, emissive:0x585044, emissiveIntensity:0.03}), items:[]},
+      {mat: new THREE.MeshStandardMaterial({map:resFacadeTex, color:0xb0a494, roughness:0.72, metalness:0.06, emissive:0x4e483f, emissiveIntensity:0.03}), items:[]},
     ];
-    fillQueue.residential.forEach((b,i) => resGroups[i%2].items.push(b));
+    fillQueue.residential.forEach((b,i) => resGroups[i%4].items.push(b));
     resGroups.forEach(grp => {
       if(grp.items.length === 0) return;
       const im = new THREE.InstancedMesh(unitGeo, grp.mat, grp.items.length);
@@ -7570,7 +7628,7 @@ function updateTimeOfDay() {
   for (const e of cityNightMats) e.m.opacity = e.base * winFactor;
   // Aerial perspective: the old 0.0003 fog was invisible at city distances, so
   // distant hills (Mt Tam) rendered as flat pale walls. Near-zero effect indoors.
-  scene.fog.density = isDay ? 0.0022 : (isNight ? 0.0026 : 0.0024);
+  scene.fog.density = isDay ? 0.0022 : (isNight ? 0.0022 : 0.0014); // golden/dawn/dusk thinner - keep the skyline present
   // Dim the whole city at night (scene ambient must stay bright for the office).
   const cityDim = isNight ? 0.28 : (isDay ? 1.0 : 0.55);
   if (typeof cityLitMats !== 'undefined') for (const e of cityLitMats) e.m.color.copy(e.base).multiplyScalar(cityDim);
