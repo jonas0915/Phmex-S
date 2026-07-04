@@ -1246,6 +1246,18 @@ def _open_pos_count(state: dict = None, slot_states: dict = None) -> int:
     return count
 
 
+def _trade_size_env() -> float:
+    """Read TRADE_AMOUNT_USDT from .env at request time (NOT import time) so a
+    size change + bot restart shows here without a dashboard restart."""
+    try:
+        for line in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")):
+            if line.startswith("TRADE_AMOUNT_USDT="):
+                return float(line.strip().split("=", 1)[1])
+    except Exception:
+        pass
+    return None
+
+
 def build_ticker(lines: list = None, slot_states: dict = None, state: dict = None) -> str:
     """One-line sticky status ticker (12-hour PT, NET basis).
     Pass pre-fetched lines/slot_states/state to avoid redundant file reads per poll."""
@@ -1262,6 +1274,9 @@ def build_ticker(lines: list = None, slot_states: dict = None, state: dict = Non
              f"BAL ${bal:.2f} <span class='{cls}'>{escape(arrow)}{abs(today):.2f}</span>"]
     if hdrm is not None:
         parts.append(f"MR-LIVE HDRM ${hdrm:.2f}")
+    _sz = _trade_size_env()
+    if _sz is not None:
+        parts.append(f"SIZE ${_sz:g}")
     parts += [
         f"DD {_drawdown_pct(_state, bal):.1f}%",
         f"POS {_open_pos_count(_state, slot_states)}",
