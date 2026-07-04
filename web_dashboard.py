@@ -813,6 +813,44 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"<tr><td class='dim'>avg loss (live)</td><td class='neg'>${l_avgl:+.2f}</td></tr>"
             f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
         )
+    elif slot_id == "5m_scalp" and n:
+        # Main/htf_l2 card: same split-row design as the mean_revert box. All
+        # main trades are real money, so the meaningful split is the CURRENT
+        # CONFIG ERA (Jun 1+: 24h trading, partial-TP, cleared blacklist) vs
+        # earlier history — mirrors live-vs-sim in layout.
+        ERA_TS = 1780297200  # 2026-06-01 00:00 PT
+        era_ts = [t for t in trades if (t.get("opened_at") or 0) >= ERA_TS]
+        old_ts = [t for t in trades if (t.get("opened_at") or 0) < ERA_TS]
+
+        def _rec(ts):
+            w = sum(1 for t in ts if _net_pnl(t) > 0)
+            l = sum(1 for t in ts if _net_pnl(t) < 0)
+            be = len(ts) - w - l
+            wr_ = w / (w + l) * 100 if (w + l) else 0.0
+            return w, l, be, wr_, sum(_net_pnl(t) for t in ts)
+        ew, el, ebe, ewr, enet = _rec(era_ts)
+        ow, ol, obe, owr, onet = _rec(old_ts)
+        _ebe = f" / <span class='dim'>{ebe}BE</span>" if ebe else ""
+        _e_wins = [_net_pnl(t) for t in era_ts if _net_pnl(t) > 0]
+        _e_losses = [_net_pnl(t) for t in era_ts if _net_pnl(t) < 0]
+        e_avgw = sum(_e_wins) / len(_e_wins) if _e_wins else 0.0
+        e_avgl = sum(_e_losses) / len(_e_losses) if _e_losses else 0.0
+        ecls = "pos" if enet > 0 else "neg" if enet < 0 else "dim"
+        ocls = "pos" if onet > 0 else "neg" if onet < 0 else "dim"
+        stats_rows = (
+            f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
+            f"<tr><td class='dim'>trades</td><td><span class='amb'>{len(era_ts)} current era</span>"
+            f"<span class='dim' style='font-size:9px'> &middot; {len(old_ts)} earlier &middot; {n} total</span></td></tr>"
+            f"<tr><td class='dim'>era (Jun+)</td><td>"
+            f"<span class='pos'>{ew}W</span> / <span class='neg'>{el}L</span>{_ebe} "
+            f"&middot; {ewr:.0f}% WR &middot; <span class='{ecls}'>${enet:+.2f}</span></td></tr>"
+            f"<tr><td class='dim'>earlier</td><td class='dim'>"
+            f"{ow}W / {ol}L &middot; {owr:.0f}% WR &middot; <span class='{ocls}'>${onet:+.2f}</span></td></tr>"
+            f"<tr><td class='dim'>net PnL (era)</td><td class='{ecls}'>${enet:+.2f}</td></tr>"
+            f"<tr><td class='dim'>avg win (era)</td><td class='pos'>${e_avgw:+.2f}</td></tr>"
+            f"<tr><td class='dim'>avg loss (era)</td><td class='neg'>${e_avgl:+.2f}</td></tr>"
+            f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
+        )
     else:
         stats_rows = (
             f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"

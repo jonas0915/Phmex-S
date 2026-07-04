@@ -17,13 +17,15 @@ from collections import defaultdict
 def _now_pt_12hr() -> str:
     """Return current PT time in 12-hour format with AM/PM (e.g., '8:42 PM PT').
     Per CLAUDE.md: all human-readable timestamps use 12-hour Pacific Time."""
-    pt = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-7)))
+    from zoneinfo import ZoneInfo
+    pt = datetime.now(ZoneInfo("America/Los_Angeles"))
     return pt.strftime("%-I:%M %p PT")
 
 
 def _now_pt_date_12hr() -> str:
     """PT date + 12-hour time (e.g., '2026-04-26 8:42 PM PT')."""
-    pt = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=-7)))
+    from zoneinfo import ZoneInfo
+    pt = datetime.now(ZoneInfo("America/Los_Angeles"))
     return pt.strftime("%Y-%m-%d %-I:%M %p PT")
 
 BOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -265,14 +267,9 @@ def run_monitor():
             msg += f"• {a}\n"
         tg_send(msg)
 
-    # Generate daily report (runs alongside hourly check)
-    # Only generate full report at specific hours
-    if now.hour in [0, 6, 12, 18]:
-        try:
-            from daily_report import generate_report
-            generate_report()
-        except Exception:
-            pass
+    # Daily report sends are owned by com.phmex.daily-report (6 AM PT).
+    # monitor_daemon previously re-sent the full report at 0/6/12/18 local —
+    # up to 5 copies/day incl. the 6 AM double — removed 2026-07-03.
 
     print(f"[{_now_pt_12hr()}] Monitor complete. {len(alerts)} alerts. {summary}")
 

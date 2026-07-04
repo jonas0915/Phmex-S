@@ -329,7 +329,20 @@ def run_iteration(by_symbol=None, iteration=None, dry_run=False) -> dict:
             # LIVE truth_reject (alert=True) is the load-bearing signal: the live
             # ST2.0 config is failing REAL-fill confirmation. Push it to Telegram
             # (best-effort; never raises). Other transitions stay log-only.
-            if tr["alert"] and not dry_run:
+            # 2026-07-03: only alert while ST2.0 is actually LIVE (mode sidecar
+            # paper_mode false) — the slot was demoted 6/29; a "LIVE config
+            # failing" alert for a paper slot is a false alarm.
+            _st2_live = False
+            try:
+                import json as _json, os as _os
+                _mp = _os.path.join(_os.path.dirname(_os.path.dirname(
+                    _os.path.dirname(_os.path.abspath(__file__)))),
+                    "trading_state_ST2.0_mode.json")
+                with open(_mp) as _f:
+                    _st2_live = not (_json.load(_f) or {}).get("paper_mode", True)
+            except Exception:
+                pass
+            if tr["alert"] and not dry_run and _st2_live:
                 notify.telegram_alert(
                     f"🚨 ST2.0 LAB — LIVE config failing REAL confirmation\n{tr['msg']}")
         result["confirm_transitions"] = [t["msg"] for t in transitions]

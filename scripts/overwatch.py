@@ -519,11 +519,18 @@ def check_trade_reconciliation() -> CheckResult:
 def check_report_accuracy() -> CheckResult:
     """Check 10: Verify latest daily report matches trading_state.json."""
     try:
-        report_files = sorted(glob_mod.glob(os.path.join(REPORTS_DIR, "*.md")))
+        # Only daily reports (YYYY-MM-DD.md) — the dir also holds sweep_*.md,
+        # forensics_*.md etc. which sorted lexicographically outrank daily
+        # reports and silently killed this check.
+        report_files = [
+            f for f in glob_mod.glob(os.path.join(REPORTS_DIR, "*.md"))
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}\.md", os.path.basename(f))
+        ]
         if not report_files:
             return CheckResult("report_accuracy", "OK", "No reports to verify")
 
-        latest_report = report_files[-1]
+        # ISO dates are zero-padded, so max by basename == newest by date.
+        latest_report = max(report_files, key=os.path.basename)
         report_date = os.path.basename(latest_report).replace(".md", "")
 
         with open(latest_report, encoding="utf-8") as f:
@@ -544,16 +551,32 @@ def check_report_accuracy() -> CheckResult:
         state = load_state()
         closed_trades = state.get("closed_trades", [])
 
+        # Date trades the same way daily_report.analyze_trades does:
+        # closed_at is a Unix epoch (time.time()) — bucket by PT calendar day.
+        # exit_time is None on real records; keep it only as a legacy fallback.
         day_trades = []
         for t in closed_trades:
-            exit_time = t.get("exit_time", "")
-            if isinstance(exit_time, str) and exit_time.startswith(report_date):
+            closed_at = t.get("closed_at", 0)
+            if closed_at:
+                trade_date = datetime.fromtimestamp(closed_at, tz=PT_TZ).strftime("%Y-%m-%d")
+                if trade_date == report_date:
+                    day_trades.append(t)
+                    continue
+            ts = t.get("exit_time", "") or t.get("close_time", "")
+            if report_date in str(ts):
                 day_trades.append(t)
 
+        # Match daily_report._net: net_pnl when present, else gross pnl_usdt.
+        # The report's "Net PnL" / "Win Rate (net)" are computed from _net, so
+        # comparing against gross pnl_usdt produced false mismatches.
+        def _net(t):
+            n = t.get("net_pnl")
+            return n if n is not None else t.get("pnl_usdt", 0)
+
         state_trades = len(day_trades)
-        state_wins = sum(1 for t in day_trades if t.get("pnl_usdt", 0) > 0)
+        state_wins = sum(1 for t in day_trades if _net(t) > 0)
         state_wr = (state_wins / state_trades * 100) if state_trades > 0 else 0
-        state_pnl = sum(t.get("pnl_usdt", 0) for t in day_trades)
+        state_pnl = sum(_net(t) for t in day_trades)
 
         mismatches = []
         if report_trades != state_trades:
@@ -927,7 +950,7 @@ CODEBASE_MAP_STATIC_FOOTER = """\
 - Risk parameters come from .env / config.py — do NOT propose changes to stop-loss, take-profit,
   adverse-exit thresholds, or flat_exit cycles. These are governed by the R&D process, not bug-fixes.
 - Must `rm -rf __pycache__` before restart (stale bytecode bug)
-- 12-hour PT time format always (PDT = UTC-7)
+- 12-hour PT time format always (America/Los_Angeles, DST-aware — never hardcode UTC-7)
 - exchange.py already calls client.load_markets() eagerly in Exchange.__init__ (3-attempt retry).
   Do NOT propose "add eager load_markets()" — it already exists.
 """

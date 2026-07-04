@@ -27,6 +27,9 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+PT_TZ = ZoneInfo("America/Los_Angeles")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -185,7 +188,7 @@ def verify_spec(spec_path: Path) -> SpecVerdict:
 
 
 def build_digest(verdicts: list[SpecVerdict]) -> str:
-    lines = [f"[FIX PROPOSALS DIGEST] {datetime.now().strftime('%Y-%m-%d %H:%M PT')}"]
+    lines = [f"[FIX PROPOSALS DIGEST] {datetime.now(PT_TZ).strftime('%Y-%m-%d %-I:%M %p PT')}"]
     lines.append(f"New since last run: {len(verdicts)}")
     lines.append("")
     counts = {"VALID": 0, "SUSPICIOUS": 0, "HALLUCINATED": 0, "NO_CITATIONS": 0}

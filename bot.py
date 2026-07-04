@@ -2080,7 +2080,9 @@ class Phmex2Bot:
                     if _conf < 4:
                         _gate_tags.append(f"confidence:{_conf}/7<4")
                     _utc_hr = datetime.datetime.now(datetime.timezone.utc).hour
-                    if _utc_hr in {0, 1, 2, 17, 18, 19, 20}:
+                    # Mirror the LIVE config (24h trading = empty set → tag never fires);
+                    # was a hardcoded copy of the retired blocked-hours set.
+                    if _utc_hr in Config.TRADING_BLOCKED_HOURS_UTC:
                         _gate_tags.append(f"time_block:UTC{_utc_hr}")
                     if time.time() - self._last_entry_time < 120:
                         _gate_tags.append("global_cooldown")
@@ -2112,7 +2114,7 @@ class Phmex2Bot:
                         )
                         notifier.notify_paper_entry(
                             symbol, direction, price, margin,
-                            signal.strength, signal.reason
+                            signal.strength, signal.reason, slot=slot.slot_id
                         )
                         logger.info(
                             f"[PAPER] {slot.slot_id} ENTRY {direction.upper()} {symbol} | "
@@ -2928,7 +2930,7 @@ class Phmex2Bot:
         pnl_pct = pos.pnl_percent(price)
         if slot.paper_mode:
             slot.risk.close_position(symbol, price, reason)
-            notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, reason)
+            notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, reason, slot=slot.slot_id)
             return True
         try:
             self.exchange.cancel_open_orders(symbol)

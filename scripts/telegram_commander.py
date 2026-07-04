@@ -206,16 +206,15 @@ async def cmd_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Error: {e}")
 
 
-async def cmd_narrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Detailed NARROW paper slot view — 7/14/30d stats, blocked counts, today's trades."""
+async def cmd_mr(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """5m_mean_revert LIVE experiment — live trades, blocked counters, mode sidecar."""
     if not check_auth(update):
         return
-    from datetime import datetime, timezone, timedelta
-    path = os.path.join(BOT_DIR, "trading_state_5m_narrow.json")
+    slot_id = "5m_mean_revert"
+    path = os.path.join(BOT_DIR, f"trading_state_{slot_id}.json")
     if not os.path.exists(path):
         await update.message.reply_text(
-            "🧪 <b>NARROW (paper)</b>\nNo state file yet — slot has not run.\n"
-            "blocked: sym=0 hr=0 ens=0",
+            "🔬 <b>5m_mean_revert</b>\nNo state file yet — slot has not run.",
             parse_mode="HTML",
         )
         return
@@ -223,58 +222,48 @@ async def cmd_narrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with open(path) as f:
             state = json.load(f)
     except (json.JSONDecodeError, IOError) as e:
-        await update.message.reply_text(f"Error reading NARROW state: {e}")
+        await update.message.reply_text(f"Error reading {slot_id} state: {e}")
         return
 
     trades = state.get("closed_trades", []) or []
-    try:
-        with open(os.path.join(BOT_DIR, "trading_state_5m_narrow_blocked.json")) as bf:
-            bc = json.load(bf) or {}
-    except (FileNotFoundError, json.JSONDecodeError):
-        bc = {"blocked_symbol": 0, "blocked_hour": 0, "blocked_ensemble": 0}
-    b_sym = bc.get("blocked_symbol", 0)
-    b_hr = bc.get("blocked_hour", 0)
-    b_ens = bc.get("blocked_ensemble", 0)
+    live_ts = [t for t in trades if t.get("mode") == "live"]
+    live_net = sum(_net(t) for t in live_ts)
+    live_w = sum(1 for t in live_ts if _net(t) > 0)
+    live_l = sum(1 for t in live_ts if _net(t) < 0)
 
-    now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    mode = _slot_mode(slot_id)
+    if mode is None:
+        mode_str = "no mode sidecar (paper default)"
+    else:
+        mode_str = "LIVE" if not mode.get("paper_mode", True) else "PAPER (demoted)"
+        mode_str += f" | capital_pct={mode.get('capital_pct', 0)}"
+        pa = mode.get("promoted_at")
+        if pa:
+            pa_str = datetime.fromtimestamp(pa, tz=PT_TZ).strftime("%b %-d, %Y %-I:%M %p PT")
+            mode_str += f" | since {pa_str}"
 
-    def _window(days):
-        cutoff = (now - timedelta(days=days)).timestamp()
-        sel = [t for t in trades if t.get("closed_at", 0) >= cutoff]
-        n = len(sel)
-        if n == 0:
-            return (0, 0.0, 0.0)
-        wins = sum(1 for t in sel if t.get("pnl_usdt", 0) > 0)
-        pnl = sum(t.get("pnl_usdt", 0) for t in sel)
-        wr = wins / n * 100
-        return (n, wr, pnl)
-
-    n7, wr7, pnl7 = _window(7)
-    n14, wr14, pnl14 = _window(14)
-    n30, wr30, pnl30 = _window(30)
-
-    today_trades = [t for t in trades if t.get("closed_at", 0) >= today_start]
-    today_pnl = sum(t.get("pnl_usdt", 0) for t in today_trades)
-    today_wins = sum(1 for t in today_trades if t.get("pnl_usdt", 0) > 0)
+    blocked_path = os.path.join(BOT_DIR, f"trading_state_{slot_id}_blocked.json")
+    bc = _read_json(blocked_path, default={}) if os.path.exists(blocked_path) else {}
+    if bc:
+        counter_str = " ".join(f"{k}={v}" for k, v in sorted(bc.items()))
+    else:
+        counter_str = "no counter events yet"
 
     lines = [
-        "🧪 <b>NARROW (paper) — Detailed</b>",
-        f"7d:  {n7} trades | WR {wr7:.0f}% | ${pnl7:+.2f}",
-        f"14d: {n14} trades | WR {wr14:.0f}% | ${pnl14:+.2f}",
-        f"30d: {n30} trades | WR {wr30:.0f}% | ${pnl30:+.2f}",
-        "",
-        f"<b>Blocked counts</b>: symbol={b_sym} hour={b_hr} ensemble={b_ens}",
-        "",
-        f"<b>Today</b>: {len(today_trades)} trades "
-        f"({today_wins}W/{len(today_trades)-today_wins}L) | ${today_pnl:+.2f}",
+        "🔬 <b>5m_mean_revert (MR)</b>",
+        f"Mode: {mode_str}",
+        f"Live: {len(live_ts)} trades ({live_w}W/{live_l}L) | net ${live_net:+.2f}",
+        f"Counters: {counter_str}",
     ]
-    for t in today_trades[-5:]:
-        sym = t.get("symbol", "?")
-        side = (t.get("side", "?") or "?").upper()
-        pnl = t.get("pnl_usdt", 0)
-        reason = t.get("exit_reason") or t.get("reason") or "?"
-        lines.append(f"  {side} {sym} | ${pnl:+.2f} | {reason}")
+    if live_ts:
+        lines.append("")
+        lines.append("<b>Recent live trades</b>:")
+        for t in live_ts[-5:]:
+            sym = t.get("symbol", "?")
+            side = (t.get("side", "?") or "?").upper()
+            pnl = _net(t)
+            reason = t.get("exit_reason") or t.get("reason") or "?"
+            lines.append(f"  {side} {sym} | ${pnl:+.2f} | {reason}")
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
 
@@ -487,7 +476,7 @@ def main():
         app.add_handler(CommandHandler("status", cmd_status))
         app.add_handler(CommandHandler("balance", cmd_balance))
         app.add_handler(CommandHandler("slots", cmd_slots))
-        app.add_handler(CommandHandler("narrow", cmd_narrow))
+        app.add_handler(CommandHandler("mr", cmd_mr))
         app.add_handler(CommandHandler("kill", cmd_kill))
         app.add_handler(CommandHandler("pause", cmd_pause))
         app.add_handler(CommandHandler("resume", cmd_resume))
