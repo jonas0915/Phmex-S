@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phmex-S — Strategy Improvement Tracker</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0b0e13; color:#d7dce3; font:14px/1.5 "SF Mono", Menlo, monospace; padding:28px; }
+  h1 { color:#f0a500; font-size:19px; letter-spacing:1px; margin-bottom:2px; }
+  .sub { color:#8b93a1; font-size:12px; margin-bottom:22px; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:26px; }
+  .tile { background:#12161f; border:1px solid #232a38; border-radius:6px; padding:12px 14px; }
+  .tile .k { color:#8b93a1; font-size:11px; text-transform:uppercase; letter-spacing:1px; }
+  .tile .v { font-size:22px; margin-top:4px; color:#e8ecf2; }
+  .tile .n { font-size:11px; color:#8b93a1; margin-top:2px; }
+  h2 { color:#f0a500; font-size:13px; letter-spacing:2px; text-transform:uppercase;
+        border-bottom:1px solid #232a38; padding-bottom:6px; margin:26px 0 12px; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; color:#8b93a1; font-size:11px; text-transform:uppercase; padding:6px 8px; }
+  td { padding:7px 8px; border-top:1px solid #1a2030; vertical-align:top; }
+  td.num { text-align:right; white-space:nowrap; }
+  th:nth-child(n+4) { text-align:right; }
+  .mono { color:#aeb6c2; font-size:12px; }
+  .desc { color:#8b93a1; font-size:12px; }
+  .pill { border:1px solid; border-radius:3px; font-size:10px; padding:1px 7px; letter-spacing:1px; }
+  .research, .watch { background:#12161f; border:1px solid #232a38; border-radius:6px;
+        padding:11px 14px; margin-bottom:9px; }
+  .live-exp { border-color:#2c5a3c; }
+  .rhead { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+  .rdate { color:#8b93a1; font-size:11px; }
+  .verdict { color:#fbbf24; font-size:11px; letter-spacing:1px; }
+  .rbody { color:#aeb6c2; font-size:12.5px; margin-top:5px; }
+  .foot { color:#5b6270; font-size:11px; margin-top:28px; border-top:1px solid #1a2030; padding-top:10px; }
+  b { color:#e8ecf2; }
+</style></head><body>
+<h1>PHMEX-S — STRATEGY IMPROVEMENT TRACKER</h1>
+<div class="sub">Generated Jul 3, 2026 9:22 PM PT · regenerate: <b>python3 scripts/strategy_tracker.py</b> · all numbers computed from state files + logs at generation time</div>
+
+<div class="tiles">
+  <div class="tile"><div class="k">Balance</div><div class="v">$62.21</div><div class="n">latest bot.log line</div></div>
+  <div class="tile"><div class="k">Lifetime net (all books)</div><div class="v" style="color:#e05252">−$111.75</div><div class="n">sum of ALL trading_state*.json</div></div>
+  <div class="tile"><div class="k">Live green book</div><div class="v" style="color:#4ecb71">+$2.62</div><div class="n">5m_mean_revert · 22 trades</div></div>
+  <div class="tile"><div class="k">Bot</div><div class="v" style="color:#4ecb71">RUNNING</div><div class="n">PID 61576</div></div>
+</div>
+
+<h2>Live experiment</h2>
+
+      <div class="research live-exp">
+        <div class="rhead"><span class="rdate">2026-07-02</span>
+          <strong>MR forward-test bundle</strong>
+          <span class="pill" style="border-color:#4ecb71;color:#4ecb71">LIVE</span></div>
+        <div class="rbody">
+          RSI floor blocks longs when RSI &lt; <b>22.0</b> +
+          bounded maker re-quote (1 retry at touch, drift cap <b>0.15%</b>,
+          zombie guard) attacking the ~15% fill rate.<br>
+          Slot record so far: <b>22 trades,
+          +$2.62</b> (only green book on the desk).
+          Re-quote events in current bot.log: <b>0</b> — none fired yet.
+          Rollback: MEAN_REVERT_LONG_RSI_MIN=0 / remove requote_attempts=1 + restart.
+        </div>
+      </div>
+
+<h2>Strategy ledger — every book, fee-inclusive</h2>
+<table>
+  <tr><th>Status</th><th>State file</th><th>What</th><th>Trades</th><th>WR</th><th>Net</th></tr>
+  
+        <tr>
+          <td><span class="pill" style="border-color:#4ecb71;color:#4ecb71">LIVE</span></td>
+          <td class="mono">trading_state.json</td>
+          <td class="desc">Main bot — htf_l2 signal (gross-positive, fee drag)</td>
+          <td class="num">693</td>
+          <td class="num">43.9%</td>
+          <td class="num" style="color:#e05252">−$48.70</td>
+        </tr>
+        <tr>
+          <td><span class="pill" style="border-color:#6b7280;color:#6b7280">KILLED</span></td>
+          <td class="mono">trading_state_5m_liq_cascade.json</td>
+          <td class="desc">Killed slot (historical)</td>
+          <td class="num">50</td>
+          <td class="num">34.0%</td>
+          <td class="num" style="color:#e05252">−$5.16</td>
+        </tr>
+        <tr>
+          <td><span class="pill" style="border-color:#4ecb71;color:#4ecb71">LIVE</span></td>
+          <td class="mono">trading_state_5m_mean_revert.json</td>
+          <td class="desc">MR slot — RSI floor + re-quote forward test (LIVE 7/2)</td>
+          <td class="num">22</td>
+          <td class="num">50.0%</td>
+          <td class="num" style="color:#4ecb71">+$2.62</td>
+        </tr>
+        <tr>
+          <td><span class="pill" style="border-color:#6b7280;color:#6b7280">KILLED</span></td>
+          <td class="mono">trading_state_5m_narrow.json</td>
+          <td class="desc">Killed slot (historical)</td>
+          <td class="num">51</td>
+          <td class="num">19.6%</td>
+          <td class="num" style="color:#e05252">−$27.58</td>
+        </tr>
+        <tr>
+          <td><span class="pill" style="border-color:#fbbf24;color:#fbbf24">PAPER</span></td>
+          <td class="mono">trading_state_ST2.0.json</td>
+          <td class="desc">Demoted 6/29 — paper sims for data only</td>
+          <td class="num">51</td>
+          <td class="num">41.2%</td>
+          <td class="num" style="color:#e05252">−$9.45</td>
+        </tr>
+        <tr>
+          <td><span class="pill" style="border-color:#6b7280;color:#6b7280">ARCHIVE</span></td>
+          <td class="mono">trading_state_v8_245trades.json</td>
+          <td class="desc">v8-era archive</td>
+          <td class="num">245</td>
+          <td class="num">35.9%</td>
+          <td class="num" style="color:#e05252">−$23.47</td>
+        </tr>
+</table>
+
+<h2>Closed research — verdicts stand, do not re-mine</h2>
+<div class="research"><div class="rhead"><span class="rdate">2026-07-01</span>
+        <strong>L2X exit strategy</strong> <span class="verdict">HONEST NULL</span></div>
+        <div class="rbody">148 real htf_l2 fills: entry adverse selection confirmed (−4.5bps@1m), losers mildly continue, HOLD beats cut 9/9 cells. L2X not built. Tool: scripts/l2x_lab/postentry_drift.py</div></div><div class="research"><div class="rhead"><span class="rdate">2026-06-29</span>
+        <strong>New-strategy feasibility</strong> <span class="verdict">NULL — closed</span></div>
+        <div class="rbody">Funding, cross-sectional, OI all eliminated at this scale. ST2.0 signal likely wrong-signed. Lab exhausted 0/500. DO NOT re-mine.</div></div><div class="research"><div class="rhead"><span class="rdate">2026-06-29</span>
+        <strong>ST2.0 book×tape absorption</strong> <span class="verdict">DEMOTED TO PAPER</span></div>
+        <div class="rbody">35 live trades −$4.14, 95% CI excl. 0. Root cause: execution adverse selection, not signal. Re-arm requires a promote path, not a flag delete.</div></div><div class="research"><div class="rhead"><span class="rdate">2026-06-13</span>
+        <strong>Entry-gate quantification</strong> <span class="verdict">NULL</span></div>
+        <div class="rbody">No gate measurably blocks winners or losers; every 95% CI spans 0. Gate stack left alone. Don't re-run.</div></div><div class="research"><div class="rhead"><span class="rdate">2026-06-13</span>
+        <strong>Edge-hunt (5 backtest edges)</strong> <span class="verdict">ALL DIED under verification</span></div>
+        <div class="rbody">Imbalance / reversion / vol-fade / funding / XS-momentum. Backtesting this data makes artifacts; forward-testing is the only adjudicator.</div></div>
+
+<h2>Watching</h2>
+<div class="watch"><strong>MR forward-test scoreboard</strong><div class="rbody">Telegram 'Counters:' line (requote_fill / miss / aborts) judges the re-quote; RSI-floor verdict needs blocked-entry counterfactuals.</div></div><div class="watch"><strong>24h trading (since 6/30)</strong><div class="rbody">Time-of-day block removed (TRADING_BLOCKED_HOURS_UTC empty). Reversible; gate-quantify found no time edge.</div></div><div class="watch"><strong>Scanner blacklist cleared (6/30)</strong><div class="rbody">9 April-era cuts back in circulation; old list preserved in .env comment. BTC stays IN per Jonas 6/30.</div></div>
+
+<div class="foot">Sources: trading_state*.json (closed_trades, net_pnl→pnl_usdt fallback), logs/bot.log (balance, requote grep), .env (thresholds), *_mode.json sidecars (live/paper). Research verdicts curated in scripts/strategy_tracker.py with dates + source docs. Never edit numbers in this HTML — regenerate.</div>
+</body></html>
