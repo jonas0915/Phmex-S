@@ -110,10 +110,12 @@ def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
         ("Tape gate",      "[TAPE GATE]"),
         ("OB gate",        "[OB GATE]"),
         ("Ensemble <4/7",  "ENSEMBLE SKIP"),
-        ("Time block",     "time_block"),
+        # "No confluence" MUST outrank "ADX": every idle HOLD line reads
+        # "No confluence signal (1h ADX=...)" and first-match-wins was
+        # mislabeling 91% of them as "ADX too low" even when ADX passed.
+        ("No confluence",  "No confluence"),
         ("ADX too low",    "ADX"),
         ("Low volume",     "low vol"),
-        ("No confluence",  "No confluence"),
         ("Choppy market",  "Choppy"),
         ("Cooldown",       "cooldown"),
         ("QUIET regime",   "QUIET regime"),
@@ -651,21 +653,25 @@ def _st2_fill_stats() -> dict:
 #             plus the negative-Kelly kill switch (≥50 trades, Kelly<0)
 #   "killed"→ generic: any paper slot with >=50 trades and negative Kelly is
 #             shown KILLED by _slot_status_html (no dedicated box anymore)
-#   "st2"   → ST2.0: live unless .demote_ST2.0 flag, plus the maker fill row
+#   "st2"   → ST2.0: DEMOTED to paper 2026-06-29 (mode sidecar); fill-rate
+#             block renders only while live
 #
 # A .demote_<slot_id> flag file always overrides to DEMOTED (rollback latch).
 # (slot_id, title, one-line description of what the strategy does)
 _SIGNAL_BOXES = [
-    ("5m_scalp",       "5M_SCALP &mdash; CONFLUENCE (MAIN LIVE)",
-     "HTF (1h) trend + VWAP pullback, entry confirmed by live L2 order-book &amp; "
-     "tape rather than a closed candle. The main live bot."),
-    ("5m_mean_revert", "5M_MEAN_REVERT",
+    ("5m_scalp",       "HTF_L2_ANTICIPATION &mdash; MAIN LIVE",
+     "The main live bot's (only) strategy since the 2026-05-02 cull: HTF (1h) "
+     "trend + VWAP context, entry confirmed by live L2 order-book &amp; tape "
+     "rather than a closed candle. Stats below are htf_l2 trades only &mdash; "
+     "retired strategies' history lives in the blotter/equity, not here."),
+    ("5m_mean_revert", "5M_MEAN_REVERT &mdash; LIVE FORWARD TEST",
      "Bollinger-Band mean-reversion scalp &mdash; fades lower-BB bounces / upper-BB "
-     "rejections, only in ranging (low-ADX) markets. Paper slot."),
-    ("ST2.0",          "ST2.0 &mdash; BOOK&times;TAPE ABSORPTION SHORT",
+     "rejections in ranging (low-ADX) markets. LIVE since 2026-06-12; running the "
+     "3-leg fill experiment (RSI&lt;22 long floor + maker re-quote + 45s entry patience)."),
+    ("ST2.0",          "ST2.0 &mdash; BOOK&times;TAPE ABSORPTION SHORT (DEMOTED)",
      "Shorts a bid-heavy book being aggressively bought into (imbalance &ge; 0.35 &amp; "
-     "buy-ratio 0.60&ndash;0.85), filtered by cvd_slope &le; &minus;0.374, spread &ge; 0.039 "
-     "(live promotion 2026-06-16). ~20-min maker hold; live."),
+     "buy-ratio 0.60&ndash;0.85), cvd/spread filtered. DEMOTED TO PAPER 2026-06-29 "
+     "(35 live trades, no edge &mdash; execution adverse selection); paper sims only."),
 ]
 # 5m_liq_cascade and 5m_narrow boxes removed 2026-06-13 — both hard-KILLED
 # in paper (neg Kelly), no longer tracked. State files kept; they still surface
@@ -691,6 +697,13 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
     # .demote_<slot> rollback flag above still wins.
     if slot_id in live_ids:
         return "<span class='pos'>&#9679; LIVE</span>"
+    # Sidecar demotion (paper_mode=true written by auto/manual demote): a slot
+    # with real-money history is DEMOTED, not "killed @<blended count>" — the
+    # kill label conflated 35 live + 16 paper trades for ST2.0.
+    mode = modes.get(slot_id)
+    n_live_trades = sum(1 for t in trades if t.get("mode") == "live")
+    if mode and mode.get("paper_mode", True) and n_live_trades:
+        return f"<span class='neg'>&#9679; DEMOTED @{n_live_trades} live</span>"
     if len(trades) >= 50 and _kelly_wr_rr(trades) < 0:
         return f"<span class='dim'>&#10013; KILLED @{len(trades)}</span>"
     return "<span class='amb'>&#9679; PAPER</span>"
@@ -828,8 +841,8 @@ def _build_signals_section(slot_states: dict = None) -> str:
 
     Reads slot states once (read_all_slot_states maps 5m_scalp → the main
     trading_state.json, so it is NOT double-counted against any sidecar — there
-    is no trading_state_5m_scalp.json on disk). ST2.0 has no state file yet, so
-    it renders 0 trades but still shows its maker fill-rate from bot.log.
+    is no trading_state_5m_scalp.json on disk). ST2.0 reads its own state file
+    (51 trades: 35 live + 16 paper); its fill-rate block renders only while live.
     Read-only: no order/state writes, no bot imports."""
     if slot_states is None:
         slot_states = read_all_slot_states()
@@ -839,7 +852,18 @@ def _build_signals_section(slot_states: dict = None) -> str:
     cards = ""
     for slot_id, title, desc in _SIGNAL_BOXES:
         state = slot_states.get(slot_id) or {"closed_trades": [], "positions": {}}
-        fill_stats = _st2_fill_stats() if slot_id == "ST2.0" else None
+        if slot_id == "5m_scalp":
+            # The main box is the htf_l2_anticipation card: filter its stats to
+            # that strategy so retired strategies' history doesn't blend in.
+            # Open positions stay unfiltered (whatever the main bot holds).
+            state = {
+                "closed_trades": [t for t in (state.get("closed_trades") or [])
+                                  if t.get("strategy") == "htf_l2_anticipation"
+                                  and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"],
+                "positions": state.get("positions") or {},
+            }
+        fill_stats = (_st2_fill_stats()
+                      if slot_id == "ST2.0" and slot_id in live_ids else None)
         card = _build_signal_card(slot_id, title, state, live_ids, modes,
                                   fill_stats, desc)
         cards += f'<div class="panel sig-box" id="sig-{escape(slot_id)}">{card}</div>'
@@ -1411,9 +1435,10 @@ _OB_SPREAD_RE = re.compile(r'\[OB\] ([\w/:.]+) imb=\S+ spread=([\d.]+)%')
 # Short tokens for the one-line 24h gate summary ("ens 169 · time 42 · …")
 _GATE_SHORT = {
     "Tape gate": "tape", "OB gate": "ob", "Ensemble <4/7": "ens",
-    "Time block": "time", "ADX too low": "adx", "Low volume": "vol",
+    "ADX too low": "adx", "Low volume": "vol",
     "No confluence": "conf", "Choppy market": "chop", "Cooldown": "cool",
     "QUIET regime": "quiet", "Divergence": "div",
+    "MR RSI floor": "mr-rsi", "MR re-quote": "mr-rq",
 }
 
 
@@ -1740,7 +1765,7 @@ async function drill(tr, id, sym){{
   const row = document.createElement('tr');
   row.dataset.drill = id;
   // every dynamic value above went through escq() — safe innerHTML sink
-  row.innerHTML = '<td colspan="6" style="border-left:2px solid #f0a500;'+
+  row.innerHTML = '<td colspan="7" style="border-left:2px solid #f0a500;'+
     'padding:3px 6px;background:#0a0e08;">'+body+'</td>';
   tr.after(row);
 }}

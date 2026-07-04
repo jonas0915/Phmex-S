@@ -10,6 +10,9 @@ import os
 import sys
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+PT_TZ = ZoneInfo("America/Los_Angeles")
 
 # Setup paths
 BOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,32 +43,87 @@ def check_auth(update: Update) -> bool:
     return str(update.effective_chat.id) == CHAT_ID
 
 
+def _net(t: dict) -> float:
+    """Net PnL if present, else fall back to gross pnl_usdt (matches daily_report.py)."""
+    v = t.get("net_pnl")
+    return (v if v is not None else t.get("pnl_usdt", 0)) or 0
+
+
+def _read_json(path: str, default=None):
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        return data if data is not None else (default if default is not None else {})
+    except (FileNotFoundError, json.JSONDecodeError, IOError):
+        return default if default is not None else {}
+
+
+def _slot_mode(slot_id: str):
+    """Return the slot's mode sidecar dict, or None if no sidecar exists."""
+    path = os.path.join(BOT_DIR, f"trading_state_{slot_id}_mode.json")
+    if not os.path.exists(path):
+        return None
+    return _read_json(path)
+
+
+def _kelly(trades: list) -> float | None:
+    """Kelly fraction from net PnL: wr - (1-wr)/(avg_win/|avg_loss|). None if no trades."""
+    if not trades:
+        return None
+    wins = [_net(t) for t in trades if _net(t) > 0]
+    losses = [_net(t) for t in trades if _net(t) < 0]
+    wr = len(wins) / len(trades)
+    if not losses:
+        return wr  # no losses: kelly is non-negative by construction
+    if not wins:
+        return -1.0
+    avg_win = sum(wins) / len(wins)
+    avg_loss = abs(sum(losses) / len(losses))
+    if avg_loss == 0:
+        return wr
+    return wr - (1 - wr) / (avg_win / avg_loss)
+
+
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not check_auth(update):
         return
     try:
+        import glob
         with open(os.path.join(BOT_DIR, "trading_state.json")) as f:
             state = json.load(f)
-        positions = state.get("positions", {})
-        trades_today = [
-            t for t in state.get("closed_trades", [])
-            if t.get("closed_at", 0) > datetime.now(timezone.utc).replace(hour=0, minute=0, second=0).timestamp()
-        ]
-        pnl_today = sum(t.get("pnl_usdt", 0) for t in trades_today)
-        wins = sum(1 for t in trades_today if t.get("pnl_usdt", 0) > 0)
+        positions = state.get("positions", {}) or {}
+        # "Today" = PT (America/Los_Angeles) calendar day, matching daily_report.py
+        today_pt = datetime.now(PT_TZ).strftime("%Y-%m-%d")
 
-        pos_str = ""
-        if positions:
-            for sym, p in positions.items():
-                pos_str += f"\n  {p.get('side','?').upper()} {sym} @ {p.get('entry_price',0):.4f}"
-        else:
-            pos_str = "\n  None"
+        def _is_today(t):
+            ca = t.get("closed_at", 0)
+            return bool(ca) and datetime.fromtimestamp(ca, tz=PT_TZ).strftime("%Y-%m-%d") == today_pt
+
+        trades_today = [t for t in state.get("closed_trades", []) if _is_today(t)]
+        pnl_today = sum(_net(t) for t in trades_today)
+        wins = sum(1 for t in trades_today if _net(t) > 0)
+
+        pos_lines = []
+        for sym, p in positions.items():
+            pos_lines.append(f"\n  {p.get('side','?').upper()} {sym} @ {p.get('entry_price',0):.4f}")
+        # Open positions from LIVE slots (mode sidecar paper_mode == false)
+        for mpath in sorted(glob.glob(os.path.join(BOT_DIR, "trading_state_*_mode.json"))):
+            mode = _read_json(mpath)
+            if mode.get("paper_mode", True):
+                continue
+            slot_id = os.path.basename(mpath).replace("trading_state_", "").replace("_mode.json", "")
+            slot_state = _read_json(os.path.join(BOT_DIR, f"trading_state_{slot_id}.json"))
+            for sym, p in (slot_state.get("positions", {}) or {}).items():
+                pos_lines.append(
+                    f"\n  [{slot_id}] {p.get('side','?').upper()} {sym} @ {p.get('entry_price',0):.4f}"
+                )
+        pos_str = "".join(pos_lines) if pos_lines else "\n  None"
 
         msg = (
             f"📊 <b>Status</b>\n"
             f"Open positions:{pos_str}\n"
-            f"Today: {len(trades_today)} trades ({wins}W/{len(trades_today)-wins}L)\n"
-            f"PnL: ${pnl_today:+.2f}"
+            f"Today (PT): {len(trades_today)} trades ({wins}W/{len(trades_today)-wins}L)\n"
+            f"PnL (net): ${pnl_today:+.2f}"
         )
         await update.message.reply_text(msg, parse_mode="HTML")
     except Exception as e:
@@ -106,67 +164,43 @@ async def cmd_slots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         import glob
         msg = "📋 <b>Slots</b>\n"
-        narrow_path = os.path.join(BOT_DIR, "trading_state_5m_narrow.json")
         for path in sorted(glob.glob(os.path.join(BOT_DIR, "trading_state_*.json"))):
-            slot_name = os.path.basename(path).replace("trading_state_", "").replace(".json", "")
-            is_narrow = (path == narrow_path)
+            fname = os.path.basename(path)
+            # Skip sidecars + archived snapshot (mirrors web_dashboard.py skip rule)
+            if fname.endswith("_mode.json") or fname.endswith("_blocked.json"):
+                continue
+            if fname == "trading_state_v8_245trades.json":
+                continue
+            slot_name = fname.replace("trading_state_", "").replace(".json", "")
             try:
                 with open(path) as f:
                     state = json.load(f)
             except (json.JSONDecodeError, IOError) as e:
                 msg += f"\n{slot_name}: ERROR ({e})"
                 continue
-            trades = state.get("closed_trades", [])
-            if is_narrow:
-                try:
-                    with open(os.path.join(BOT_DIR, "trading_state_5m_narrow_blocked.json")) as bf:
-                        bc = json.load(bf) or {}
-                except (FileNotFoundError, json.JSONDecodeError):
-                    bc = {"blocked_symbol": 0, "blocked_hour": 0, "blocked_ensemble": 0}
-                b_sym = bc.get("blocked_symbol", 0)
-                b_hr = bc.get("blocked_hour", 0)
-                b_ens = bc.get("blocked_ensemble", 0)
-                if not trades:
-                    msg += (
-                        f"\n🧪 NARROW (paper) | 0 trades | "
-                        f"blocked: sym={b_sym} hr={b_hr} ens={b_ens}"
-                    )
-                    continue
-                wins = sum(1 for t in trades if t.get("pnl_usdt", 0) > 0)
-                pnl = sum(t.get("pnl_usdt", 0) for t in trades)
-                wr = wins / len(trades) * 100
-                msg += (
-                    f"\n🧪 NARROW (paper) | {len(trades)} trades | "
-                    f"WR: {wr:.0f}% | PnL: ${pnl:+.2f} | "
-                    f"blocked: sym={b_sym} hr={b_hr} ens={b_ens}"
-                )
-                continue
-            if not trades:
-                msg += f"\n{slot_name}: 0 trades"
-                continue
-            # Live-canonical to match the dashboard: if the slot has live (real-money)
-            # history, report the LIVE count + net PnL + WR (paper noted separately).
-            # Paper-only slots fall back to gross pnl_usdt. _net = net_pnl, fallback gross.
-            def _net(t):
-                v = t.get("net_pnl")
-                return (v if v is not None else t.get("pnl_usdt", 0)) or 0
+            trades = state.get("closed_trades", []) or []
             live_ts = [t for t in trades if t.get("mode") == "live"]
-            if live_ts:
-                lw = sum(1 for t in live_ts if _net(t) > 0)
-                ll = sum(1 for t in live_ts if _net(t) < 0)
-                lnet = sum(_net(t) for t in live_ts)
-                lwr = lw / (lw + ll) * 100 if (lw + ll) else 0.0  # WR excludes break-evens
-                n_paper = len(trades) - len(live_ts)
-                paper_note = f" (+{n_paper} paper)" if n_paper else ""
-                msg += f"\n{slot_name}: {len(live_ts)} live | {lwr:.0f}% WR | ${lnet:+.2f}{paper_note}"
+            mode = _slot_mode(slot_name)
+            kelly = _kelly(trades)
+            if mode is not None and not mode.get("paper_mode", True):
+                status = "LIVE"
+            elif mode is not None and mode.get("paper_mode", True) and live_ts:
+                status = f"DEMOTED @{len(live_ts)} live"
+            elif len(trades) >= 50 and kelly is not None and kelly < 0:
+                status = "KILLED"
             else:
-                wins = sum(1 for t in trades if t.get("pnl_usdt", 0) > 0)
-                pnl = sum(t.get("pnl_usdt", 0) for t in trades)
-                wr = wins / len(trades) * 100
-                msg += f"\n{slot_name}: {len(trades)} trades | {wr:.0f}% WR | ${pnl:+.2f}"
-        # If narrow file doesn't exist yet, still surface a zeroed line.
-        if not os.path.exists(narrow_path):
-            msg += "\n🧪 NARROW (paper) | 0 trades | blocked: sym=0 hr=0 ens=0 (no state file yet)"
+                status = "PAPER"
+            if not trades:
+                msg += f"\n{slot_name} [{status}]: 0 trades"
+                continue
+            wins = sum(1 for t in trades if _net(t) > 0)
+            total = sum(_net(t) for t in trades)
+            wr = wins / len(trades) * 100
+            line = f"\n{slot_name} [{status}]: {len(trades)} trades | {wr:.0f}% WR | ${total:+.2f}"
+            if (status == "LIVE" or status.startswith("DEMOTED")) and live_ts:
+                lnet = sum(_net(t) for t in live_ts)
+                line += f" (live: {len(live_ts)} / ${lnet:+.2f})"
+            msg += line
         await update.message.reply_text(msg, parse_mode="HTML")
     except Exception as e:
         await update.message.reply_text(f"Error: {e}")

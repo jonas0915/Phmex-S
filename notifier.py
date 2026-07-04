@@ -19,14 +19,34 @@ def send(message: str):
         import logging
         logging.getLogger("DegenCryt").debug(f"[TG] Send failed: {e}")
 
+def _env_float(name: str, default: float) -> float:
+    """Import-light config read (notifier deliberately does not import Config)."""
+    try:
+        return float(os.getenv(name, "") or default)
+    except ValueError:
+        return default
+
 def notify_startup(balance: float, pairs: list, mode: str, strategy: str):
+    # Config.STRATEGY still reads "confluence", but since the 5/02 strategy cull the
+    # confluence router emits only htf_l2_anticipation — report what actually trades.
     send(
         f"🤖 <b>{BOT_NAME} Started</b>\n"
-        f"Mode: {mode.upper()} | Strategy: {strategy}\n"
+        f"Mode: {mode.upper()} | Strategy: htf_l2_anticipation (confluence router)\n"
         f"Leverage: {os.getenv('LEVERAGE', '10')}x | Margin/trade: ${os.getenv('TRADE_AMOUNT_USDT', '8')}\n"
         f"Balance: <b>${balance:.2f} USDT</b>\n"
         f"Pairs: {', '.join(p.split('/')[0] for p in pairs)}"
     )
+
+def _tp_backstop_hint() -> str:
+    """When partial-TP is armed, the resting exchange TP is only a backstop —
+    real exit management scales half at +PARTIAL_TP_ROI and re-targets the
+    runner to +PARTIAL_RUNNER_TP_ROI. Empty when partial-TP is off."""
+    ptp = _env_float("PARTIAL_TP_ROI", 0.0)
+    if ptp <= 0:
+        return ""
+    runner = _env_float("PARTIAL_RUNNER_TP_ROI", 0.0)
+    runner_txt = f", runner +{runner:.0f}%" if runner > 0 else ""
+    return f"  (backstop — scales ½ at +{ptp:.0f}% ROI{runner_txt})"
 
 def notify_entry(symbol: str, side: str, price: float, margin: float, sl: float, tp: float, strength: float, reason: str, strategy: str = "", confidence=None):
     emoji = "🟢" if side == "long" else "🔴"
@@ -41,33 +61,41 @@ def notify_entry(symbol: str, side: str, price: float, margin: float, sl: float,
         f"Price:    ${price:.4f}\n"
         f"Margin:   ${margin:.2f} USDT\n"
         f"SL:       ${sl:.4f}  ({(sl-price)/price*100:+.1f}%)\n"
-        f"TP:       ${tp:.4f}  ({(tp-price)/price*100:+.1f}%)\n"
+        f"TP:       ${tp:.4f}  ({(tp-price)/price*100:+.1f}%){_tp_backstop_hint()}\n"
         f"Strength: {strength:.2f}\n"
         f"Reason:   {reason}"
     )
 
 def notify_exit(symbol: str, side: str, entry: float, exit_price: float, pnl: float, pnl_pct: float, reason: str):
-    if reason == "take_profit" or reason == "partial_tp":
+    # Slot live exits arrive as e.g. "take_profit [slot 5m_mean_revert]" — strip the
+    # suffix before matching so the pretty label/emoji still render, then re-display
+    # the suffix after the label.
+    base = reason
+    suffix = ""
+    idx = reason.find(" [slot ")
+    if idx != -1 and reason.endswith("]"):
+        base, suffix = reason[:idx], reason[idx:]
+    if base == "take_profit" or base == "partial_tp":
         emoji = "✅"
-        label = "TAKE PROFIT" if reason == "take_profit" else "PARTIAL TP"
-    elif reason == "stop_loss":
+        label = "TAKE PROFIT" if base == "take_profit" else "PARTIAL TP"
+    elif base == "stop_loss":
         emoji = "🔴"
         label = "STOP LOSS"
-    elif reason == "early_exit":
+    elif base == "early_exit":
         emoji = "⚡"
         label = "EARLY EXIT"
-    elif reason == "trailing_stop":
+    elif base == "trailing_stop":
         emoji = "🎯"
         label = "TRAILING STOP"
-    elif reason == "durable_sl":
+    elif base == "durable_sl":
         emoji = "🛡"
         label = "DURABLE SL"
     else:
         emoji = "⏹"
-        label = reason.upper()
+        label = base.upper()
     sign = "+" if pnl >= 0 else ""
     send(
-        f"{emoji} <b>[LIVE] {label} — {symbol}</b>  [{BOT_NAME}]\n"
+        f"{emoji} <b>[LIVE] {label}{suffix} — {symbol}</b>  [{BOT_NAME}]\n"
         f"Entry: ${entry:.4f}  →  Exit: ${exit_price:.4f}\n"
         f"PnL:   <b>{sign}${pnl:.2f} USDT ({sign}{pnl_pct:.1f}%)</b>\n"
         f"Reason: {reason}"
@@ -77,9 +105,11 @@ def notify_partial_tp(symbol: str, side: str, exit_price: float, pnl: float, pnl
     sign = "+" if pnl >= 0 else ""
     send(
         f"⚡ <b>[LIVE] PARTIAL TP — {symbol}</b>  [{BOT_NAME}]\n"
-        f"Closed 50% @ ${exit_price:.4f}\n"
+        f"Half banked @ ${exit_price:.4f} (+{_env_float('PARTIAL_TP_ROI', 10):.0f}% ROI target)\n"
         f"PnL on half: <b>{sign}${pnl:.2f} USDT ({sign}{pnl_pct:.1f}%)</b>\n"
-        f"Remaining 50% running with SL at breakeven"
+        # Truthful copy (risk_manager.partial_close_position): the stop is deliberately
+        # NOT moved — the runner keeps the original SL / trail floor, TP re-targets.
+        f"Runner keeps ORIGINAL SL/trail — targets +{_env_float('PARTIAL_RUNNER_TP_ROI', 25):.0f}% ROI"
     )
 
 def notify_sl_move_fail(symbol: str, target_sl: float, resting_sl: float, error: str):
@@ -128,22 +158,24 @@ def notify_shutdown(open_positions: list, balance: float):
         f"Balance: ${balance:.2f} USDT"
     )
 
-def notify_paper_entry(symbol: str, side: str, price: float, margin: float, strength: float, reason: str):
+def notify_paper_entry(symbol: str, side: str, price: float, margin: float, strength: float, reason: str, slot: str = ""):
     emoji = "🔵" if side == "long" else "🟣"
     direction = "LONG" if side == "long" else "SHORT"
+    slot_tag = f"[{slot}] " if slot else ""
     send(
-        f"{emoji} <b>[PAPER] {direction} ENTRY — {symbol}</b>  [{BOT_NAME}]\n"
+        f"{emoji} <b>[PAPER] {slot_tag}{direction} ENTRY — {symbol}</b>  [{BOT_NAME}]\n"
         f"Price:    ${price:.4f}\n"
         f"Margin:   ${margin:.2f} USDT (simulated)\n"
         f"Strength: {strength:.2f}\n"
         f"Reason:   {reason}"
     )
 
-def notify_paper_exit(symbol: str, side: str, entry: float, exit_price: float, pnl: float, pnl_pct: float, reason: str):
+def notify_paper_exit(symbol: str, side: str, entry: float, exit_price: float, pnl: float, pnl_pct: float, reason: str, slot: str = ""):
     emoji = "🔷" if pnl >= 0 else "🔶"
     sign = "+" if pnl >= 0 else ""
+    slot_tag = f"[{slot}] " if slot else ""
     send(
-        f"{emoji} <b>[PAPER] EXIT — {symbol}</b>  [{BOT_NAME}]\n"
+        f"{emoji} <b>[PAPER] {slot_tag}EXIT — {symbol}</b>  [{BOT_NAME}]\n"
         f"Entry: ${entry:.4f}  →  Exit: ${exit_price:.4f}\n"
         f"PnL:   <b>{sign}${pnl:.2f} USDT ({sign}{pnl_pct:.1f}%)</b>\n"
         f"Reason: {reason}"

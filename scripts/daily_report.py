@@ -14,7 +14,9 @@ BOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE_FILE = os.path.join(BOT_DIR, "trading_state.json")
 LOG_FILE = os.path.join(BOT_DIR, "logs", "bot.log")
 REPORT_DIR = os.path.join(BOT_DIR, "reports")
-LIVE_LOSS_CAP = -10.0  # promoted slot auto-demotes when live PnL hits this (matches bot.py:289 loss_cap_usdt=-10.0)
+DEFAULT_LIVE_LOSS_CAP = -5.0  # per-slot cap comes from the mode sidecar; this default
+                              # matches strategy_slot.py:12 (the old -10 hardcode was
+                              # ST2.0-specific and overstated other slots' headroom 2x)
 
 os.makedirs(REPORT_DIR, exist_ok=True)
 
@@ -103,8 +105,10 @@ def live_slot_summaries(date_str):
                 blocked = json.load(bf) or {}
         except (FileNotFoundError, json.JSONDecodeError, IOError):
             blocked = {}
+        loss_cap = float(mode.get("loss_cap_usdt") or DEFAULT_LIVE_LOSS_CAP)
         summaries.append({
             "slot_id": slot_id,
+            "loss_cap": loss_cap,
             "trades": len(live_today),
             "wins": wins,
             "losses": len(live_today) - wins,
@@ -228,13 +232,13 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
         for t in today_trades:
             opened = t.get("opened_at", t.get("closed_at", 0))
             if opened:
-                hour = datetime.fromtimestamp(opened).strftime("%H")
+                hour = datetime.fromtimestamp(opened, tz=CA_TZ).strftime("%H")
                 hours[hour]["count"] += 1
                 hours[hour]["pnl"] += _net(t)
                 if _net(t) > 0:
                     hours[hour]["wins"] += 1
 
-        report += "\n## Today by Hour (UTC)\n"
+        report += "\n## Today by Hour (PT)\n"
         report += "| Hour | Trades | Wins | WR | PnL |\n|------|--------|------|----|-----|\n"
         for hour in sorted(hours.keys()):
             h = hours[hour]
@@ -249,7 +253,7 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
         for t in today_trades:
             opened = t.get("opened_at", t.get("closed_at", 0))
             if opened:
-                h = datetime.fromtimestamp(opened).hour
+                h = datetime.fromtimestamp(opened, tz=CA_TZ).hour
                 if 0 <= h < 6:
                     key = "🌃 Early AM (12:01AM-5:59AM)"
                 elif 6 <= h < 12:
@@ -286,78 +290,9 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
     for a in alerts:
         report += f"- {a}\n"
 
-    # Paper slot comparison
-    paper_state_file = os.path.join(BOT_DIR, "trading_state_5m_liq_cascade.json")
-    if os.path.exists(paper_state_file):
-        with open(paper_state_file) as f:
-            paper_state = json.load(f)
-        paper_closed = paper_state.get("closed_trades", [])
-        paper_today = []
-        for t in paper_closed:
-            closed_at = t.get("closed_at", 0)
-            if closed_at:
-                trade_date = datetime.fromtimestamp(closed_at, tz=CA_TZ).strftime("%Y-%m-%d")
-                if trade_date == date_str:
-                    paper_today.append(t)
-        paper_today_wins = sum(1 for t in paper_today if _net(t) > 0)
-        paper_today_pnl = sum(_net(t) for t in paper_today)
-        paper_today_wr = (paper_today_wins / len(paper_today) * 100) if paper_today else 0
-
-        report += f"""
-## Paper Slot: ADX+SMA+VWAP
-| Metric | Live | Paper |
-|--------|------|-------|
-| Trades | {len(today_trades)} | {len(paper_today)} |
-| Win Rate | {today_wr:.0f}% | {paper_today_wr:.0f}% |
-| PnL | ${today_pnl:.2f} | ${paper_today_pnl:.2f} |
-"""
-
-    # NARROW paper slot section (new)
-    narrow_state_file = os.path.join(BOT_DIR, "trading_state_5m_narrow.json")
-    narrow_today = []
-    narrow_bc = {"blocked_symbol": 0, "blocked_hour": 0, "blocked_ensemble": 0}
-    narrow_today_pnl = 0.0
-    narrow_today_wr = 0.0
-    narrow_delta = 0.0
-    narrow_exists = os.path.exists(narrow_state_file)
-    if narrow_exists:
-        try:
-            with open(narrow_state_file) as f:
-                n_state = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            n_state = {}
-        for t in n_state.get("closed_trades", []) or []:
-            closed_at = t.get("closed_at", 0)
-            if closed_at and datetime.fromtimestamp(closed_at, tz=CA_TZ).strftime("%Y-%m-%d") == date_str:
-                narrow_today.append(t)
-        try:
-            with open(os.path.join(BOT_DIR, "trading_state_5m_narrow_blocked.json")) as bf:
-                bc = json.load(bf) or {}
-        except (FileNotFoundError, json.JSONDecodeError):
-            bc = {}
-        for k in narrow_bc:
-            narrow_bc[k] = bc.get(k, 0)
-        narrow_today_wins = sum(1 for t in narrow_today if _net(t) > 0)
-        narrow_today_pnl = sum(_net(t) for t in narrow_today)
-        narrow_today_wr = (narrow_today_wins / len(narrow_today) * 100) if narrow_today else 0
-        narrow_delta = narrow_today_pnl - today_pnl
-
-    report += "\n## NARROW Paper Slot\n"
-    if not narrow_exists:
-        report += "_No state file yet — slot has not run._\n"
-        report += f"- Blocked: symbol={narrow_bc['blocked_symbol']} "
-        report += f"hour={narrow_bc['blocked_hour']} ensemble={narrow_bc['blocked_ensemble']}\n"
-    else:
-        narrow_today_wins = sum(1 for t in narrow_today if _net(t) > 0)
-        report += f"- Trades today: {len(narrow_today)} "
-        report += f"({narrow_today_wins}W / {len(narrow_today)-narrow_today_wins}L)\n"
-        report += f"- Win Rate: {narrow_today_wr:.1f}%\n"
-        report += f"- PnL today: ${narrow_today_pnl:.2f}\n"
-        report += (
-            f"- Blocked: symbol={narrow_bc['blocked_symbol']} "
-            f"hour={narrow_bc['blocked_hour']} ensemble={narrow_bc['blocked_ensemble']}\n"
-        )
-        report += f"- Delta vs Live: ${narrow_delta:+.2f} (NARROW minus Live)\n"
+    # Dead paper slots (5m_liq_cascade, 5m_narrow — KILLED) removed from the
+    # report 2026-07-03: dead sims were headlining while the LIVE experiment
+    # got 5 lines. Their state files remain on disk.
 
     # Live slot sections (promoted via mode sidecar) — absent when nothing is promoted
     for ls in live_slot_summaries(date_str):
@@ -366,7 +301,7 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
         report += f"- Win Rate: {ls['wr']:.1f}%\n"
         report += f"- Net PnL today: ${ls['pnl_today']:.2f}\n"
         report += f"- Live PnL since promotion: ${ls['live_pnl']:.2f}\n"
-        report += f"- Cap headroom: ${ls['live_pnl'] - LIVE_LOSS_CAP:.2f} until -${abs(LIVE_LOSS_CAP):.2f} auto-demote\n"
+        report += f"- Cap headroom: ${ls['live_pnl'] - ls['loss_cap']:.2f} until -${abs(ls['loss_cap']):.2f} auto-demote\n"
         if ls.get("blocked"):
             report += ("- Counters (lifetime): "
                        + " ".join(f"{k}={v}" for k, v in sorted(ls["blocked"].items()))
@@ -428,7 +363,7 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
         for t in today_trades:
             opened = t.get("opened_at", t.get("closed_at", 0))
             if opened:
-                hour = int(datetime.fromtimestamp(opened).strftime("%H"))
+                hour = int(datetime.fromtimestamp(opened, tz=CA_TZ).strftime("%H"))
                 if 0 <= hour < 6:
                     period = "🌃 Early AM (12:01AM-5:59AM)"
                 elif 6 <= hour < 12:
@@ -453,58 +388,6 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
     if len(today_trades) == 0:
         msg += "\n⚠️ No trades today — market quiet or filters blocking"
 
-    # Add paper slot comparison if available
-    paper_state_file = os.path.join(BOT_DIR, "trading_state_5m_liq_cascade.json")
-    if os.path.exists(paper_state_file):
-        with open(paper_state_file) as f:
-            ps = json.load(f)
-        pc = ps.get("closed_trades", [])
-        pt = [t for t in pc if t.get("closed_at") and datetime.fromtimestamp(t["closed_at"]).strftime("%Y-%m-%d") == date_str]
-        pt_wins = sum(1 for t in pt if _net(t) > 0)
-        pt_pnl = sum(_net(t) for t in pt)
-        pt_wr = (pt_wins / len(pt) * 100) if pt else 0
-        pt_sign = "+" if pt_pnl >= 0 else ""
-        msg += (
-            f"\n🔵 <b>Paper Slot (ADX+SMA+VWAP)</b>\n"
-            f"{len(pt)} trades | {pt_wr:.0f}% WR | {pt_sign}${pt_pnl:.2f}\n"
-        )
-
-    # NARROW paper slot block (new)
-    narrow_state_file = os.path.join(BOT_DIR, "trading_state_5m_narrow.json")
-    if os.path.exists(narrow_state_file):
-        try:
-            with open(narrow_state_file) as f:
-                ns = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            ns = {}
-        nc = ns.get("closed_trades", []) or []
-        nt = [t for t in nc if t.get("closed_at") and datetime.fromtimestamp(t["closed_at"], tz=CA_TZ).strftime("%Y-%m-%d") == date_str]
-        nt_wins = sum(1 for t in nt if _net(t) > 0)
-        nt_pnl = sum(_net(t) for t in nt)
-        nt_wr = (nt_wins / len(nt) * 100) if nt else 0
-        try:
-            with open(os.path.join(BOT_DIR, "trading_state_5m_narrow_blocked.json")) as bf:
-                bc = json.load(bf) or {}
-        except (FileNotFoundError, json.JSONDecodeError):
-            bc = {}
-        b_sym = bc.get("blocked_symbol", 0)
-        b_hr = bc.get("blocked_hour", 0)
-        b_ens = bc.get("blocked_ensemble", 0)
-        nt_sign = "+" if nt_pnl >= 0 else ""
-        delta = nt_pnl - today_pnl
-        d_sign = "+" if delta >= 0 else ""
-        msg += (
-            f"\n🧪 <b>NARROW (paper)</b>\n"
-            f"{len(nt)} trades | {nt_wr:.0f}% WR | {nt_sign}${nt_pnl:.2f}\n"
-            f"Blocked: sym={b_sym} hr={b_hr} ens={b_ens}\n"
-            f"Δ vs Live: {d_sign}${delta:.2f}\n"
-        )
-    else:
-        msg += (
-            "\n🧪 <b>NARROW (paper)</b>\n"
-            "No state file yet — slot has not run.\n"
-        )
-
     # Promoted live slots (mode sidecar paper_mode false) — absent when none
     for ls in live_slot_summaries(date_str):
         t_sign = "+" if ls["pnl_today"] >= 0 else ""
@@ -513,7 +396,7 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
             f"\n🔴 <b>LIVE Slot: {ls['slot_id']}</b>\n"
             f"{ls['trades']} trades | {ls['wr']:.0f}% WR | {t_sign}${ls['pnl_today']:.2f}\n"
             f"Since promotion: {p_sign}${ls['live_pnl']:.2f} | "
-            f"Headroom: ${ls['live_pnl'] - LIVE_LOSS_CAP:.2f} until -${abs(LIVE_LOSS_CAP):.2f} demote\n"
+            f"Headroom: ${ls['live_pnl'] - ls['loss_cap']:.2f} until -${abs(ls['loss_cap']):.2f} demote\n"
         )
         if ls.get("blocked"):
             msg += ("Counters: "

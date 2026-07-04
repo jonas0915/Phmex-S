@@ -15,6 +15,9 @@ import logging
 import glob as glob_mod
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+PT_TZ = ZoneInfo("America/Los_Angeles")
 
 # ── paths ──────────────────────────────────────────────────────────────
 BOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -149,8 +152,9 @@ def load_state() -> dict:
 
 
 def utc_to_pt_12hr(utc_hour: int) -> str:
-    """Convert UTC hour to 12-hour PT string (PDT = UTC-7)."""
-    pt = (utc_hour - 7) % 24
+    """Convert UTC hour to 12-hour PT string (DST-aware via America/Los_Angeles)."""
+    offset_hours = int(datetime.now(PT_TZ).utcoffset().total_seconds() // 3600)
+    pt = (utc_hour + offset_hours) % 24
     suffix = "AM" if pt < 12 else "PM"
     display = pt if pt <= 12 else pt - 12
     if display == 0:
@@ -159,11 +163,8 @@ def utc_to_pt_12hr(utc_hour: int) -> str:
 
 
 def now_pt_12hr() -> str:
-    """Current time in 12-hour PT format."""
-    from datetime import timezone
-    utc_now = datetime.now(timezone.utc)
-    pt = utc_now - timedelta(hours=7)
-    return pt.strftime("%-I:%M %p PT")
+    """Current time in 12-hour PT format (DST-aware)."""
+    return datetime.now(PT_TZ).strftime("%-I:%M %p PT")
 
 
 # ── check stubs (implemented in later tasks) ───────────────────────────
