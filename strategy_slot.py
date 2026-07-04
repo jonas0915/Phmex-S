@@ -46,6 +46,12 @@ class StrategySlot:
                                # re-place up to N maker orders at the fresh touch (never
                                # taker), drift-capped by Config.SLOT_REQUOTE_MAX_DRIFT_PCT.
                                # 0 = give up after the first miss (pre-existing behavior).
+    entry_patience_s: float = None  # per-slot opt-in (2026-07-03): how long the PostOnly
+                                    # entry rests before cancel. None = exchange default
+                                    # (20s). 5m_mean_revert runs 45s — mean-reversion
+                                    # fills on the way back (9/11 missed winners returned
+                                    # through the limit within 60s); main bot stays 20s
+                                    # (its patience buys back-of-queue toxic fills).
 
     def __post_init__(self):
         # Each slot gets its own RiskManager (separate positions, P&L, Kelly)

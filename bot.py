@@ -317,6 +317,13 @@ class Phmex2Bot:
                 requote_attempts=1,   # 2026-07-02: one maker re-quote on PostOnly miss
                                       # (fill rate was 2/13; misses were net winners —
                                       # reports/mr_missed_fills.json). Drift-capped.
+                entry_patience_s=45.0,  # 2026-07-03: rest 45s not 20s — 9/11 missed
+                                        # winners returned through the limit within 60s;
+                                        # mean-reversion fills on the way back. Worst-case
+                                        # stall (45s + 20s re-quote) is bounded to ONE
+                                        # patient attempt per cycle (see _patient_missed),
+                                        # keeping the cycle under the ~120s watchdog
+                                        # budget (alarm(180) spans cycle + 60s sleep).
                 durable_trail_enabled=True,  # 2026-06-24: ratchet the resting exchange SL up
                                              # as the trail arms (+5% ROI). Closes the gap that
                                              # let an XLM short round-trip +7% -> -14.2% with only
@@ -1837,7 +1844,13 @@ class Phmex2Bot:
             # --- Paper entries ---
             if not slot.is_active:
                 continue  # killed slots close out open positions above but never re-enter
+            _patient_missed = False  # one long-patience entry attempt per slot per
+                                     # cycle: bounds the worst-case cycle stall
+                                     # (~45+20s) under the ~120s watchdog budget
+                                     # (alarm(180) covers cycle + 60s sleep)
             for symbol in active_pairs:
+                if _patient_missed:
+                    break
                 if not slot.can_enter(symbol, self.slots):
                     continue
 
@@ -2112,9 +2125,17 @@ class Phmex2Bot:
                             logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} entry blocked — account halt")
                             continue
                         try:
-                            order = (self.exchange.open_long(symbol, margin, price)
+                            # Per-slot entry patience (2026-07-03): first attempt may
+                            # rest longer than the 20s default; the re-quote below
+                            # deliberately keeps the 20s default so the worst-case
+                            # entry stall stays bounded (~45+20s per signal).
+                            _patience = (slot.entry_patience_s
+                                         if slot.entry_patience_s else 20.0)
+                            order = (self.exchange.open_long(symbol, margin, price,
+                                                             patience_s=_patience)
                                      if direction == "long"
-                                     else self.exchange.open_short(symbol, margin, price))
+                                     else self.exchange.open_short(symbol, margin, price,
+                                                                   patience_s=_patience))
                             # --- Bounded maker re-quote (2026-07-02, owner-approved): the
                             # slot's PostOnly entries missed 11/13 attempts and the misses
                             # were net winners (+$3.55, reports/mr_missed_fills.json). On a
@@ -2176,6 +2197,9 @@ class Phmex2Bot:
                                 # so fill-vs-miss can finally be compared — the instrumentation
                                 # gap that blocked the 2026-06-20 execution analysis.
                                 logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} {direction} — no fill (PostOnly miss), skipping | {signal.reason}")
+                                if _patience > 20.0:
+                                    _patient_missed = True  # no second patient stall this cycle
+                                    break
                                 continue
                             fill_price = self._extract_fill_price(order, price)
                             slot.risk.open_position(symbol, fill_price, margin, side=direction,

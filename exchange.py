@@ -360,9 +360,15 @@ class Exchange:
             logger.error(f"[GROUND TRUTH] fetch_positions failed for {symbol}: {e}")
         return None
 
-    def _try_limit_entry(self, symbol: str, side: str, amount: float, limit_price: float) -> Optional[dict]:
+    def _try_limit_entry(self, symbol: str, side: str, amount: float, limit_price: float,
+                         patience_s: float = 20.0) -> Optional[dict]:
         """Place limit-only entry order. No market fallback — if unfilled, skip the trade.
         Maker fee = 0.01% vs taker 0.06%. Missing a fill is better than overpaying 6x fees.
+
+        patience_s: how long the order rests before cancel (default 20s = the
+        2026-04-13 calibration). Slots may extend it (5m_mean_revert 45s,
+        2026-07-03 — mean-reversion fills on the way back; 9/11 of its missed
+        winners returned through the limit within 60s).
 
         Every early-return path that says "no fill" MUST end by confirming with the exchange
         that no position materialized. Any races here create unmanaged orphan positions
@@ -391,12 +397,12 @@ class Exchange:
             order_id = order.get("id")
             logger.info(f"[MAKER] Limit {order_side} {amount} {symbol} @ {limit_price} (id={order_id})")
 
-            # Wait up to 20s for fill (40 polls × 0.5s).
+            # Wait up to patience_s for fill (0.5s polls; default 20s).
             # Was 5s pre-2026-04-13 — produced 1.5% fill rate on Phemex; book moved
             # away from PostOnly price faster than 5s. Widened after forensic showed
             # 66 signals → 1 fill in 7 days. The ground-truth safety net below catches
             # any late-fill race beyond the cancel.
-            for _ in range(40):
+            for _ in range(int(patience_s / 0.5)):
                 time.sleep(0.5)
                 try:
                     fetched = self.client.fetch_order(order_id, symbol)
@@ -419,7 +425,7 @@ class Exchange:
                 except Exception as e:
                     logger.debug(f"[POLL] fetch_order failed for {symbol} id={order_id}: {e}")
 
-            # Not filled in 5s — cancel and skip (no market fallback)
+            # Not filled within patience_s — cancel and skip (no market fallback)
             try:
                 self.client.cancel_order(order_id, symbol)
                 # Check for race: filled between our last poll and cancel
@@ -455,7 +461,7 @@ class Exchange:
             if gt:
                 return gt
 
-            logger.info(f"[FILL MISS] {symbol} {order_side} — limit not filled in 20s, skipping entry")
+            logger.info(f"[FILL MISS] {symbol} {order_side} — limit not filled in {patience_s:.0f}s, skipping entry")
             return None
 
         except Exception as e:
@@ -467,7 +473,8 @@ class Exchange:
                 return gt
             return None
 
-    def open_long(self, symbol: str, margin_usdt: float, price: float = None) -> Optional[dict]:
+    def open_long(self, symbol: str, margin_usdt: float, price: float = None,
+                  patience_s: float = 20.0) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_open(symbol, margin_usdt, side="long")
         if price is None:
@@ -483,7 +490,8 @@ class Exchange:
         # Use best bid for maker entry (buy at bid = maker)
         ob = self.get_order_book(symbol, depth=5)
         limit_price = ob["best_bid"] if ob and ob.get("best_bid") else price
-        return self._try_limit_entry(symbol, "long", amount, limit_price)
+        return self._try_limit_entry(symbol, "long", amount, limit_price,
+                                     patience_s=patience_s)
 
     def close_long(self, symbol: str, coin_amount: float, urgent: bool = True) -> Optional[dict]:
         """urgent=True (default): straight to market reduceOnly — protective exits
@@ -519,7 +527,8 @@ class Exchange:
 
     # ── Short ────────────────────────────────────────────────────────────────
 
-    def open_short(self, symbol: str, margin_usdt: float, price: float = None) -> Optional[dict]:
+    def open_short(self, symbol: str, margin_usdt: float, price: float = None,
+                   patience_s: float = 20.0) -> Optional[dict]:
         if not Config.is_live():
             return self._paper_open(symbol, margin_usdt, side="short")
         if price is None:
@@ -535,7 +544,8 @@ class Exchange:
         # Use best ask for maker entry (sell at ask = maker)
         ob = self.get_order_book(symbol, depth=5)
         limit_price = ob["best_ask"] if ob and ob.get("best_ask") else price
-        return self._try_limit_entry(symbol, "short", amount, limit_price)
+        return self._try_limit_entry(symbol, "short", amount, limit_price,
+                                     patience_s=patience_s)
 
     def close_short(self, symbol: str, coin_amount: float, urgent: bool = True) -> Optional[dict]:
         """See close_long — same urgency contract, mirrored sides."""
