@@ -20,7 +20,7 @@ Current version: **Sentinel (v11)** — deployed 2026-04-01.
 ## Current Parameters
 | Parameter | Value | Location |
 |-----------|-------|----------|
-| Trade size | $10 margin | .env: TRADE_AMOUNT_USDT |
+| Trade size | $15 margin (raised from $10 on 2026-07-04, owner directive; note: one full SL ≈ trips the 3% daily halt at ~$62 balance) | .env: TRADE_AMOUNT_USDT |
 | Leverage | 10x | .env: LEVERAGE |
 | Max open trades | 3 | .env: MAX_OPEN_TRADES |
 | Stop loss | 1.2% | .env: STOP_LOSS_PERCENT |
