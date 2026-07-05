@@ -1,5 +1,7 @@
 {
   "last_closed_at": 1782349605.560201,
-  "counters": {},
-  "last_run": 1783192466.111893
+  "counters": {
+    "requote_miss": 1
+  },
+  "last_run": 1783210466.5538461
 }
