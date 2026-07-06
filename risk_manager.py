@@ -48,6 +48,8 @@ class Position:
     def update_trailing_stop(self, current_price: float):
         """Tiered trailing stop — the bigger the winner, the tighter the trail.
         Never give back more than 1/3 of peak profit.
+        Arms at Config.TRAIL_ARM_ROI (env TRAIL_ARM_ROI; 8.0 since the 2026-07-05
+        forward test — tiers below the arm are unreachable until it reverts to 5.0).
 
         | ROI Reached | Min Lock-In | Trail from Peak |
         |-------------|-------------|-----------------|
@@ -61,7 +63,7 @@ class Position:
             return
 
         roi = self.pnl_percent(current_price)
-        if roi < 5.0:
+        if roi < Config.TRAIL_ARM_ROI:
             return  # Not yet in profit territory for trailing
 
         # Determine tier
@@ -713,7 +715,7 @@ class RiskManager:
             elif pos.should_stop_loss(price):
                 # Classify trail fires vs hard-SL fires. A trail fire is any
                 # should_stop_loss trigger where trailing_stop_price is armed
-                # (set by update_trailing_stop once ROI >= 5%). PnL sign
+                # (set by update_trailing_stop once ROI >= Config.TRAIL_ARM_ROI). PnL sign
                 # distinguishes profitable trail (trailing_stop) from losing
                 # trail (stop_loss). Pure hard-SL hits never arm trailing_stop_price.
                 if pos.trailing_stop_price is not None and pos.pnl_usdt(price) > 0:

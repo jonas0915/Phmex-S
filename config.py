@@ -33,6 +33,11 @@ class Config:
     TAKE_PROFIT_PERCENT = float(os.getenv("TAKE_PROFIT_PERCENT", "1.8"))
     TRAILING_STOP = os.getenv("TRAILING_STOP", "true").lower() == "true"
     TRAILING_STOP_OFFSET = float(os.getenv("TRAILING_STOP_OFFSET", "1.0"))
+    # Margin-ROI % at which the software trail arms. Was hardcoded 5.0 in
+    # risk_manager.py; env-driven since 2026-07-05 for the arm-8 forward test
+    # (replay: +$2.45/+20% net, avg win +29%, positive both halves — see
+    # reports/trail_june_arm8.json). Revert = set 5.0 + restart.
+    TRAIL_ARM_ROI = float(os.getenv("TRAIL_ARM_ROI", "5.0"))
     # Durable exchange-resting trail backstop: price % below/above peak once the
     # software trail is armed. Wide on purpose (fast-track 2026-06-11, spec range
     # 1.0-1.5) — software tiers still exit first; this caps inter-cycle reversals.

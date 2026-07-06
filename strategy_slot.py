@@ -39,7 +39,7 @@ class StrategySlot:
                                      # None = global Config.ADVERSE_EXIT_THRESHOLD (-999 = disabled)
     adverse_exit_cycles: int = None  # cycles before the per-slot adverse-exit arms; None = Config default
     durable_trail_enabled: bool = False  # per-slot opt-in: ratchet the resting exchange SL up as the
-                                         # trail arms (+5% ROI), mirroring the main-bot durable trail.
+                                         # trail arms (Config.TRAIL_ARM_ROI), mirroring the main-bot durable trail.
                                          # The amend rests on Phemex, so the profit-lock survives a host
                                          # sleep — unlike software exits. LIVE slots only. Off = no change.
     requote_attempts: int = 0  # per-slot opt-in (2026-07-01): on a PostOnly entry miss,

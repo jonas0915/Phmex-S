@@ -325,7 +325,7 @@ class Phmex2Bot:
                                         # keeping the cycle under the ~120s watchdog
                                         # budget (alarm(180) spans cycle + 60s sleep).
                 durable_trail_enabled=True,  # 2026-06-24: ratchet the resting exchange SL up
-                                             # as the trail arms (+5% ROI). Closes the gap that
+                                             # as the trail arms (Config.TRAIL_ARM_ROI). Closes the gap that
                                              # let an XLM short round-trip +7% -> -14.2% with only
                                              # a static SL. OHLCV replay on live history: -$3.33
                                              # -> -$0.85 (rescues 4 losers, caps 1 winner). Per-slot.
@@ -1513,7 +1513,7 @@ class Phmex2Bot:
 
                 # Weekend sizing boost: +85-92% weekend returns (p < 0.001)
                 if datetime.datetime.now(datetime.timezone.utc).weekday() in (5, 6):  # Saturday=5, Sunday=6
-                    margin = min(margin * 1.3, 10.0)  # cap at $10 (MAX_TRADE_MARGIN)
+                    margin = min(margin * 1.3, 15.0)  # cap at $15 (TRADE_AMOUNT_USDT — keep weekend size equal to weekday, Jonas 2026-07-05)
 
                 if margin > available:
                     logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {available:.2f}")
@@ -2867,7 +2867,7 @@ class Phmex2Bot:
         """Durable trailing-stop ratchet for a LIVE slot position — mirror of the
         main-bot [DURABLE SL] block (bot.py:987-1032) on slot.risk positions.
 
-        As the trail arms (+5% ROI), amend the resting exchange SL up toward the
+        As the trail arms (Config.TRAIL_ARM_ROI), amend the resting exchange SL up toward the
         breakeven lock / wide durable band. The amend rests on Phemex, so the
         profit-lock survives a host sleep — which is exactly the gap that let the
         XLM 5m_mean_revert short round-trip +7% -> -14.2% on 2026-06-24.
@@ -2885,7 +2885,7 @@ class Phmex2Bot:
         old_sl = pos.stop_loss
         pos.check_breakeven(price)
         pos.update_trailing_stop(price)
-        # Durable backstop: wide band from peak once the trail is armed (+5% ROI).
+        # Durable backstop: wide band from peak once the trail is armed (TRAIL_ARM_ROI).
         band = Config.DURABLE_TRAIL_BAND_PCT / 100.0
         durable_floor = None
         if pos.trailing_stop_price is not None and pos.peak_price > 0:
