@@ -78,6 +78,25 @@ entry drift −5.33bps@1m (n=60) vs −4.5 baseline — worse but inside alert t
 lines lack slot tag) — follow-up, not modified tonight. Left to wire: launchd + --telegram
 after Jonas approves format. Receipts: r1_lab_build.md.
 
+**[~11:55 PM] SESSION LIMIT HIT — resets 1:20 AM PT.** Two agents died mid-work:
+(1) queue-state study — died at "23 symbol-days, in-memory too slow, switching to
+streaming pass per day file" (resume with that plan via SendMessage/agent resume);
+(2) partial-TP fraction round-2 — died at "rig side — CLI knob + fraction-aware
+accounting" (resume same way). REVISED SCHEDULE: idle-chain hourly wakeups → at
+~1:25 AM resume both agents → collect ~2:30-3:30 → compile REPORT.md by 4:10 AM,
+Telegram by 5:00 AM. Everything else already landed (see accumulator above);
+even if the two resumes fail, the report can ship on R1 results + the
+instrumentation-gap recommendation.
+
+**[8:15 AM 7/6] REPORT SHIPPED** (REPORT.md + Telegram) — 3h late due to the session
+suspension; primary rec = queue-state instrumentation → conditioned posting.
+
+**[8:20 AM 7/6] PARTIAL-TP FRACTION (R2): NULL.** f75×t6 +$0.80 (+5.5%) — only variant
+that flips 4 losers to winners (WR 68.6→73.3) but ~4x inside rig error, both-halves FAIL.
+No deploy. Noted as the nominated cell if a partial-TP forward test is ever wanted.
+Rig now has --partial-tp-fraction knob (regression-checked). reports/ptp_june_frac*.json.
+Queue-study agent still PENDING.
+
 ## Report
 Due 5:00 AM PT at docs/overnight-2026-07-05/REPORT.md + Telegram summary.
 Must contain ONE primary recommendation (don't flip-flop), runners-up, receipts.

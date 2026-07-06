@@ -1,0 +1,32 @@
+37 anchors over 23 symbol-days
+ARB/USDT:USDT 2026-06-12: 2 anchors, 2 covered (86630 lines)
+ARB/USDT:USDT 2026-06-24: 2 anchors, 2 covered (91322 lines)
+ARB/USDT:USDT 2026-06-29: 1 anchors, 1 covered (93804 lines)
+BTC/USDT:USDT 2026-06-14: 1 anchors, 1 covered (800616 lines)
+BTC/USDT:USDT 2026-06-19: 1 anchors, 1 covered (946633 lines)
+BTC/USDT:USDT 2026-06-24: 4 anchors, 4 covered (1092358 lines)
+BTC/USDT:USDT 2026-06-30: 1 anchors, 1 covered (457010 lines)
+BTC/USDT:USDT 2026-07-01: 1 anchors, 1 covered (1045038 lines)
+BTC/USDT:USDT 2026-07-03: 1 anchors, 1 covered (799833 lines)
+BTC/USDT:USDT 2026-07-04: 2 anchors, 2 covered (657961 lines)
+ETH/USDT:USDT 2026-06-08: NO FILE
+ETH/USDT:USDT 2026-06-18: 1 anchors, 1 covered (842275 lines)
+ETH/USDT:USDT 2026-06-19: 1 anchors, 1 covered (677895 lines)
+ETH/USDT:USDT 2026-07-01: 1 anchors, 1 covered (752072 lines)
+ETH/USDT:USDT 2026-07-03: 2 anchors, 2 covered (700828 lines)
+ETH/USDT:USDT 2026-07-04: 3 anchors, 3 covered (483625 lines)
+ETH/USDT:USDT 2026-07-05: 1 anchors, 1 covered (566133 lines)
+INJ/USDT:USDT 2026-06-02: NO FILE
+INJ/USDT:USDT 2026-06-08: NO FILE
+INJ/USDT:USDT 2026-06-09: NO FILE
+INJ/USDT:USDT 2026-06-13: 1 anchors, 1 covered (56590 lines)
+INJ/USDT:USDT 2026-06-16: 1 anchors, 1 covered (169111 lines)
+INJ/USDT:USDT 2026-06-27: 2 anchors, 2 covered (107667 lines)
+
+covered 29/37; exact-level 11
+fill-win: n=9 median rel-queue 0.66 mean 0.74
+fill-loss: n=9 median rel-queue 0.17 mean 0.41
+miss: n=11 median rel-queue 1.07 mean 1.95
+loss-minus-win rel-queue diff -0.33 95% CI [-0.88,+0.31]
+miss-minus-fill rel-queue diff +1.37 95% CI [+0.18,+3.14]
+wrote exact_stream_out.json

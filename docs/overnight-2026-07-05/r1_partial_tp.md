@@ -99,3 +99,63 @@ needed.** This closes the last untested TP-side item in the exit-geometry invent
   `_resting_order_hit` software-TP skip), `scripts/calibrate_exits.py` (CLI + accounting).
 - Per-trade dumps: `reports/ptp_june_{off,6,10,12}.json` (knobs recorded in each).
 - Regression proof: pre-change baseline in scratchpad diffed 0/86 vs `ptp_june_off.json`.
+
+---
+
+## Round 2: fraction (scale out 75% instead of 50%)
+
+**Date:** 2026-07-05 overnight, round 2 · **Verdict: still NULL vs the ±25% rig error, but
+frac 0.75 × threshold 6 is the best-of-family (+$0.80, +5.5%) and flips 4 losers to winners.**
+
+Coordinator-supplied external finding (arXiv 2604.27150, flagged weak evidence: top-5/8960
+configs all scaled out 75% at the first threshold). Rig gained `--partial-tp-fraction`
+(default 0.5 = live behavior; `PARTIAL_TP_FRACTION` in backtest.py, wired through
+`apply_exit_overrides`, `BTPosition.partial_exit_fraction`, fraction-aware accounting in
+calibrate_exits.py). ROI/trail state is scale-free, so fraction only reweights banked-vs-runner
+PnL — the exit path per trade is identical to the same threshold at 0.5. py_compile clean;
+live files untouched.
+
+**Regression check:** fraction 0.5 × threshold 10 re-run
+(`reports/ptp_june_frac50_t10.json`) vs the round-1 `ptp_june_10.json`: totals identical,
+**0/86 row diffs. PASS.**
+
+### Results (same June window, 86 entries, --trail-arm-roi 8, runner-tp 25)
+
+| variant | sim net | Δ vs off | WR | avg win | avg loss | H1 | H2 | Δ H1 | Δ H2 |
+|---|---|---|---|---|---|---|---|---|---|
+| off | +$14.57 | — | 68.6% | +$0.721 | −$1.036 | +$3.94 | +$10.64 | — | — |
+| frac .50 × t6 | +$15.12 | +$0.55 | 68.6% | +$0.675 | −$0.915 | +$3.52 | +$11.60 | −$0.41 | +$0.96 |
+| frac .50 × t10 (live) | +$14.38 | −$0.19 | 68.6% | +$0.718 | −$1.036 | +$3.90 | +$10.48 | −$0.03 | −$0.16 |
+| **frac .75 × t6** | **+$15.37** | **+$0.80 (+5.5%)** | **73.3%** | +$0.620 | −$1.031 | +$3.58 | +$11.80 | −$0.36 | +$1.16 |
+| frac .75 × t10 | +$14.63 | +$0.06 | 68.6% | +$0.722 | −$1.036 | +$4.60 | +$10.03 | +$0.67 | −$0.61 |
+
+### What changed
+
+- **frac .75 × t6 is the only variant in either round that flips trade signs** — the four
+  reversing losers that peaked ≥+6% ROI become small net winners once 75% is banked up top:
+  HYPE −$0.81→+$0.13, ETH short −$0.89→+$0.16, TAO −$1.27→+$0.19, ADA −$1.27→+$0.17
+  (WR 68.6%→73.3%). Cost: avg win compresses $0.721→$0.620 (75% of every big winner capped
+  at +6% ROI).
+- frac .75 × t10 is a wash (+$0.06): at the higher threshold only 26 trades scale out and the
+  bank-more gains on reversers cancel against deeper caps on the +16%-ROI exchange-TP winners.
+
+### Honest read vs the error band
+
+Best delta is **+$0.80 = 5.5%** of window net — still ~4x inside the rig's ±25% exit-model
+error (~±$3.6), and the sim-vs-live gap this window is itself +16.8%. The both-halves
+improvement bar also still fails (frac75×t6: Δ H1 −$0.36 / Δ H2 +$1.16; frac75×t10:
++$0.67 / −$0.61). The WR flip is real but rests on exactly 4 trades — well within what a
+±25%-error instrument can conjure.
+
+**Round-2 verdict: NULL.** Direction is consistent with round 1 (bank more, earlier → less
+trail giveback on reversers) and frac 0.75 × t6 is the family's best cell, but nothing here
+clears model error or the both-halves bar. Not a deploy candidate off this rig alone; if the
+avg-win program ever wants a partial-TP forward test, frac 0.75 × threshold 6 is the cell to
+nominate. No live change, no restart.
+
+### Round-2 artifacts
+
+- Dumps: `reports/ptp_june_frac50_t10.json` (regression), `reports/ptp_june_frac75_t6.json`,
+  `reports/ptp_june_frac75_t10.json`.
+- Code: `--partial-tp-fraction` in scripts/calibrate_exits.py; `PARTIAL_TP_FRACTION` +
+  `BTPosition.partial_exit_fraction` in backtest.py (default 0.5, off-path unchanged).
