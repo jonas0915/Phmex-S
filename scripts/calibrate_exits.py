@@ -19,7 +19,11 @@ Run from repo root:
 
 Exit-rule A/B knobs (2026-06-12 Phase 1) mirror backtest.py's CLI; defaults are
 live parity, so a no-flag run reproduces the documented baseline (sim net -$9.31,
--24.6% vs live net). AE stays hardcoded at -999/10 (live parity for the window).
+-24.6% vs live net). AE defaults to -999/10 (live parity); the RESTRICTED-AE
+knobs (2026-07-06: --ae-threshold/--ae-cycles/--ae-symbols/--ae-regime) enable
+adverse_exit only for an allowlisted symbol set and/or entry-regime set —
+NEVER a global re-enable (blanket AE sweeps are do-not-retry, see
+reference_sl_loss_levers). Default None = AE off = prior behavior exactly.
 """
 import argparse
 import json
@@ -34,7 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import backtest
-from backtest import BTPosition, check_exits_live, LEVERAGE
+from backtest import BTPosition, check_exits_live, LEVERAGE, _classify_regime_label
 from flow_replay import FlowIndex
 from indicators import add_all_indicators
 
@@ -74,6 +78,19 @@ def parse_cli():
     ap.add_argument("--partial-tp-fraction", type=float, default=None,
                     help="Fraction banked at the first threshold (live 0.5 = half; "
                          "round-2 arXiv variant 0.75). Default None keeps 0.5.")
+    ap.add_argument("--ae-threshold", type=float, default=None,
+                    help="Adverse-exit ROI %% threshold (e.g. -5.0). Default None = AE "
+                         "off (-999, live parity since 2026-05-07). Only applied to "
+                         "trades matching --ae-symbols/--ae-regime if those are set.")
+    ap.add_argument("--ae-cycles", type=float, default=None,
+                    help="Min cycles (~minutes) held before AE can fire (default 10).")
+    ap.add_argument("--ae-symbols", type=str, default=None,
+                    help="Comma allowlist of base symbols (e.g. SUI,ETH,LINK); AE fires "
+                         "only on these. Requires --ae-threshold.")
+    ap.add_argument("--ae-regime", type=str, default=None,
+                    help="Comma allowlist of 5m entry regimes (VOLATILE,TRENDING_UP,"
+                         "TRENDING_DOWN,CHOPPY,QUIET); AE fires only on trades entered "
+                         "in these regimes. Requires --ae-threshold.")
     ap.add_argument("--dump-json", type=str, default=None,
                     help="Write per-trade rows to PATH (for variant-vs-baseline diffing).")
     ap.add_argument("--window-start", type=str, default=None,
@@ -110,6 +127,13 @@ def main():
     data_dir = args.data_dir or DATA_DIR
     knobs = {k: v for k, v in vars(args).items() if v is not None and k != "dump_json"}
     print(f"knobs: {knobs if knobs else 'BASELINE (live parity)'}")
+
+    # Restricted adverse-exit (2026-07-06). Default OFF (-999/10, prior hardcode).
+    ae_syms = ({s.strip().upper() for s in args.ae_symbols.split(",") if s.strip()}
+               if args.ae_symbols else None)
+    ae_regimes = ({r.strip().upper() for r in args.ae_regime.split(",") if r.strip()}
+                  if args.ae_regime else None)
+    ae_cyc_on = args.ae_cycles if args.ae_cycles is not None else 10
 
     state = json.load(open("trading_state.json"))
     live = [
@@ -155,6 +179,17 @@ def main():
             size_usd=notional, margin=margin, sl_price=sl, tp_price=tp,
             strategy=STRATEGY, peak_price=entry_px, entry_epoch=opened,
         )
+
+        # 5m entry regime (bot.py _classify_regime port; no lookahead — uses
+        # only candles up to the entry bar) + restricted-AE eligibility.
+        regime = _classify_regime_label(df.iloc[e_idx], df.iloc[max(0, e_idx - 19):e_idx + 1])
+        base = sym.split("/")[0].upper()
+        ae_on = (args.ae_threshold is not None
+                 and (ae_syms is None or base in ae_syms)
+                 and (ae_regimes is None or regime in ae_regimes))
+        ae_thr = args.ae_threshold if ae_on else -999.0
+        ae_cyc = ae_cyc_on if ae_on else 10
+
         bar_s = 300
         result = None
         for idx in range(e_idx + 1, len(df)):
@@ -169,7 +204,7 @@ def main():
                 if h_idx >= 1:
                     htf_w = h.iloc[max(0, h_idx - 2):h_idx + 1]
             result = check_exits_live(pos, candle, idx, df, htf_w, points, bar_close_ts,
-                                      ae_threshold=-999.0, ae_cycles=10, stats=stats)
+                                      ae_threshold=ae_thr, ae_cycles=ae_cyc, stats=stats)
             if result:
                 break
         if result is None:
@@ -203,6 +238,7 @@ def main():
             "sim_scaled_out": bool(pos.scaled_out),
             "sim_partial_px": pos.partial_exit_price,
             "sim_partial_frac": pos.partial_exit_fraction if pos.scaled_out else None,
+            "regime": regime, "ae_applied": ae_on,
         })
 
     n = len(rows)
