@@ -207,6 +207,12 @@ class BTPosition:
     trailing_stop_price: Optional[float] = None
     entry_epoch: float = 0.0    # epoch seconds of entry (bar close) — live exit model
     entry_meta: dict = field(default_factory=dict)  # entry-time diagnostics (cohort-gate sims)
+    # Partial-TP research knob state (check_exits_live, off unless PARTIAL_TP_ROI set)
+    scaled_out: bool = False                      # half banked (bot.py:862 pos.scaled_out)
+    partial_exit_price: Optional[float] = None    # sim fill price of the banked half
+    partial_exit_epoch: float = 0.0               # when the half was banked
+    partial_exit_fraction: float = 0.5            # fraction banked (PARTIAL_TP_FRACTION at fire time)
+    tp_is_software: bool = False                  # runner TP lifted -> resting exchange TP cancelled
 
     def roi(self, current_price: float) -> float:
         """ROI as % of margin (leveraged)."""
@@ -595,6 +601,20 @@ SL_RATCHET: list[tuple[float, float]] = []   # [(cycles, sl_pct_of_entry)] sorte
                                              # empty = off (override: --sl-ratchet)
 DEEP_RED_ROI: Optional[float] = None         # deep-red cut: exit when roi <= this ...
 DEEP_RED_CYCLES = 120.0                      # ... after this many cycles. None = off.
+# Partial-TP head-to-head (2026-07-05, override: --partial-tp-roi / --runner-tp-roi).
+# Live port of bot.py:859-905 + risk_manager.py:748-829: bank HALF at
+# +PARTIAL_TP_ROI margin-ROI at a 60s cycle price; runner half continues under
+# the untouched trail/breakeven/SL machinery; runner TP lifted to
+# +PARTIAL_RUNNER_TP_ROI (live 25) and becomes SOFTWARE-enforced (live cancels
+# the stale resting exchange TP -> intra-bar resting checks stop matching it).
+# None = OFF (default; rig behavior unchanged). Only scripts/calibrate_exits.py
+# accounts for the banked half's PnL — do NOT enable via run_backtest paths.
+PARTIAL_TP_ROI: Optional[float] = None       # live .env PARTIAL_TP_ROI=10.0
+PARTIAL_RUNNER_TP_ROI: Optional[float] = None  # live .env PARTIAL_RUNNER_TP_ROI=25.0
+PARTIAL_TP_FRACTION = 0.5                    # fraction banked at the first threshold
+                                             # (live = half; override: --partial-tp-fraction).
+                                             # ROI/trail/exit path are scale-free, so this only
+                                             # reweights banked-vs-runner PnL.
 
 
 def parse_sl_ratchet(spec: str) -> list[tuple[float, float]]:
@@ -621,6 +641,9 @@ def apply_exit_overrides(args) -> None:
         ("trail_tier1_lock", "TRAIL_TIER1_LOCK"),
         ("deep_red_roi", "DEEP_RED_ROI"),
         ("deep_red_cycles", "DEEP_RED_CYCLES"),
+        ("partial_tp_roi", "PARTIAL_TP_ROI"),
+        ("runner_tp_roi", "PARTIAL_RUNNER_TP_ROI"),
+        ("partial_tp_fraction", "PARTIAL_TP_FRACTION"),
     ]:
         v = getattr(args, attr, None)
         if v is not None:
@@ -754,10 +777,14 @@ def _resting_order_hit(pos: BTPosition, seg_lo: float, seg_hi: float) -> Optiona
     ever moved on BREAKEVEN ('[BREAKEVEN] ... exchange SL updated'); the tiered
     trailing stop was SOFTWARE-ONLY (checked at 60s cycle prices). So intra-bar
     touches use pos.sl_price (breakeven-ratcheted base SL) — NOT the trail.
-    Pessimistic: SL wins when both SL and TP are inside the segment."""
+    Pessimistic: SL wins when both SL and TP are inside the segment.
+
+    tp_is_software (partial-TP knob): after a sim scale-out the live bot cancels
+    the stale resting exchange TP (bot.py:897-900) — the runner TP is enforced
+    software-side only, so the intra-bar resting check must skip tp_price."""
     if seg_lo <= pos.sl_price <= seg_hi:
         return pos.sl_price, "exchange_close"
-    if seg_lo <= pos.tp_price <= seg_hi:
+    if not pos.tp_is_software and seg_lo <= pos.tp_price <= seg_hi:
         return pos.tp_price, "exchange_close"
     return None
 
@@ -817,6 +844,31 @@ def check_exits_live(
 
         roi = pos.roi(p)
         cycles_held = (t - pos.entry_epoch) / 60.0  # live cycle == 60s
+
+        # --- 0b. partial take-profit (research knob, --partial-tp-roi; live port
+        # of bot.py:859-905 + risk_manager.py:748-829, which runs at the 60s cycle
+        # BEFORE early_exit). Bank half at the cycle price; halve size/margin
+        # (roi/pnl-sign for the runner are unchanged — margin ROI is scale-free);
+        # leave sl/trail/peak untouched (runner rides the same machinery); lift
+        # tp_price to the runner target and mark it software-enforced (live
+        # cancels the stale resting exchange TP on a confirmed cancel). Fires
+        # once per position (scaled_out latch, mirrors live). ---
+        if (PARTIAL_TP_ROI is not None and PARTIAL_TP_ROI > 0
+                and not pos.scaled_out and roi >= PARTIAL_TP_ROI):
+            pos.scaled_out = True
+            pos.partial_exit_price = p
+            pos.partial_exit_epoch = t
+            frac = PARTIAL_TP_FRACTION
+            pos.partial_exit_fraction = frac
+            pos.size_usd *= (1 - frac)
+            pos.margin *= (1 - frac)
+            if PARTIAL_RUNNER_TP_ROI is not None and PARTIAL_RUNNER_TP_ROI > 0:
+                move = PARTIAL_RUNNER_TP_ROI / 100 / LEVERAGE
+                if pos.direction == "long":
+                    pos.tp_price = pos.entry_price * (1 + move)
+                else:
+                    pos.tp_price = pos.entry_price * (1 - move)
+                pos.tp_is_software = True
 
         # --- 1. early_exit (bot.py:680) ---
         if _live_should_exit_early(pos, p, last, prev):

@@ -65,6 +65,15 @@ def parse_cli():
                     help="Deep-red cut ROI %% (off by default; A/B 3: -6.0).")
     ap.add_argument("--deep-red-cycles", type=float, default=None,
                     help="Cycles before deep-red cut can fire (default 120).")
+    ap.add_argument("--partial-tp-roi", type=float, default=None,
+                    help="Bank half at this margin-ROI %% (live 10.0; bot.py:859). "
+                         "Off by default — baseline rig behavior preserved exactly.")
+    ap.add_argument("--runner-tp-roi", type=float, default=None,
+                    help="Runner-half TP margin-ROI %% after scale-out (live 25.0; "
+                         "risk_manager.py:823). Software-enforced, stale exchange TP cancelled.")
+    ap.add_argument("--partial-tp-fraction", type=float, default=None,
+                    help="Fraction banked at the first threshold (live 0.5 = half; "
+                         "round-2 arXiv variant 0.75). Default None keeps 0.5.")
     ap.add_argument("--dump-json", type=str, default=None,
                     help="Write per-trade rows to PATH (for variant-vs-baseline diffing).")
     ap.add_argument("--window-start", type=str, default=None,
@@ -168,7 +177,22 @@ def main():
         else:
             sim_exit, sim_reason = result
 
-        sim_gross = (sim_exit - entry_px) * amount if side == "long" else (entry_px - sim_exit) * amount
+        if pos.scaled_out and pos.partial_exit_price is not None:
+            # Partial-TP knob fired: `frac` of the size banked at partial_exit_price,
+            # the runner remainder exits at sim_exit. PnL is linear in size, so live
+            # positions that were themselves scaled out (two half-size rows sharing
+            # one entry) aggregate exactly like one full position.
+            frac = pos.partial_exit_fraction
+            banked = amount * frac
+            runner = amount * (1 - frac)
+            if side == "long":
+                sim_gross = ((pos.partial_exit_price - entry_px) * banked
+                             + (sim_exit - entry_px) * runner)
+            else:
+                sim_gross = ((entry_px - pos.partial_exit_price) * banked
+                             + (entry_px - sim_exit) * runner)
+        else:
+            sim_gross = (sim_exit - entry_px) * amount if side == "long" else (entry_px - sim_exit) * amount
         live_gross = t.get("pnl_usdt", 0.0)
         live_fee = t.get("fees_usdt", 0.0)
         rows.append({
@@ -176,6 +200,9 @@ def main():
             "sim_reason": sim_reason, "live_reason": t.get("exit_reason"),
             "sim_gross": sim_gross, "live_gross": live_gross,
             "sim_net": sim_gross - live_fee, "live_net": t.get("net_pnl", live_gross - live_fee),
+            "sim_scaled_out": bool(pos.scaled_out),
+            "sim_partial_px": pos.partial_exit_price,
+            "sim_partial_frac": pos.partial_exit_fraction if pos.scaled_out else None,
         })
 
     n = len(rows)
