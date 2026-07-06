@@ -13,7 +13,8 @@ Experiments graded (registry below is the single source of truth):
                candle-MFE) yet closed at full SL (stop_loss/exchange_close, net<0).
                REVERT-TRIPPED: >= 3 givebacks within the first ~20 trail-relevant
                trades, or avg win < baseline once >= 10 wins exist.
-  sizing_15    TRADE_AMOUNT_USDT 10 -> 15, restart 2026-07-04 10:48 AM PT.
+  sizing_15    $15 sizing EFFECTIVE via MIN_TRADE_MARGIN 10 -> 15, restart
+               2026-07-05 8:34 PM PT (the 7/4 TRADE_AMOUNT raise never bound).
                Metrics: realized margin/trade (post vs pre, bootstrap diff CI)
                and daily-halt frequency ("DAILY LOSS HALT" lines in bot.log).
                Report-only: no revert criterion was defined for this one.
@@ -38,6 +39,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import logging
 import os
@@ -90,7 +92,8 @@ EXPERIMENTS = {
         "min_wins_for_avg_verdict": 10,
     },
     "sizing_15": {
-        "deployed_ts": _pt_ts(2026, 7, 4, 10, 48),
+        "deployed_ts": _pt_ts(2026, 7, 5, 20, 34),  # MIN_TRADE_MARGIN 15 restart —
+        # the 7/4 10:48 AM TRADE_AMOUNT raise alone never reached trades (Kelly floor)
         "baseline_lookback_trades": 50,
     },
     "mr_bundle": {
@@ -263,9 +266,9 @@ def grade_sizing(trades: list[dict], log_text: str, cfg: dict,
     else:
         status = WATCH  # report-only: no revert criterion defined for sizing
         binding = diff is not None and ci is not None and ci[0] > 0
-        note = ("cap binding (post margins up vs pre)" if binding else
-                "cap NOT binding — Kelly still sizing below $15 "
-                "(known: risk_manager.py:399-415)")
+        note = ("$15 sizing confirmed in prints" if binding else
+                "margins still below $15 — UNEXPECTED after the 7/5 8:34 PM "
+                "MIN_TRADE_MARGIN=15 fix; check calculate_kelly_margin clamp")
         if halt_dates:
             note += f"; {len(halt_dates)} daily-halt day(s) since deploy"
 
@@ -420,7 +423,9 @@ def main(argv=None) -> int:
     log.info("digest:\n%s", digest)
 
     if args.telegram:
-        ok = telegram_alert("🧾 " + digest)
+        # notify.telegram_alert sends parse_mode=HTML — raw '<' (e.g. "n<3")
+        # makes Telegram reject the message, so escape the whole digest.
+        ok = telegram_alert("🧾 " + html.escape(digest))
         log.info("telegram send: %s", "ok" if ok else "FAILED")
         print(f"(telegram: {'sent' if ok else 'FAILED'})")
     return 0

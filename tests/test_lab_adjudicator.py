@@ -153,16 +153,16 @@ def test_sizing_from_fake_state_file(tmp_path):
     p.write_text(json.dumps({"closed_trades": trades}))
     loaded = adj.load_closed_trades(p)
     assert len(loaded) == 20
-    log = ("2026-07-05 06:07:55 [WARNING] [KILL SWITCH] DAILY LOSS HALT: "
+    log = ("2026-07-06 01:00:00 [WARNING] [KILL SWITCH] DAILY LOSS HALT: "
            "today net $-2.16 exceeds -3% of $57.40\n"
-           "2026-07-01 01:00:00 [WARNING] [KILL SWITCH] DAILY LOSS HALT: old\n")
+           "2026-07-05 06:07:55 [WARNING] [KILL SWITCH] DAILY LOSS HALT: pre-deploy\n")
     r = adj.grade_sizing(loaded, log, adj.EXPERIMENTS["sizing_15"],
                          now=dep + 2 * 86400)
     assert r["n_post_deploy"] == 10 and r["n_pre_baseline"] == 10
     assert abs(r["margin_diff_usd"] - 5.0) < 1e-9
     lo, hi = r["margin_diff_ci95"]
     assert lo <= 5.0 <= hi
-    assert r["halt_days"] == ["2026-07-05"]  # pre-deploy halt excluded
+    assert r["halt_days"] == ["2026-07-06"]  # pre-deploy halt excluded
 
 
 def test_sizing_no_post_trades_is_no_verdict():
