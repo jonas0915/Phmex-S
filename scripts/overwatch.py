@@ -51,6 +51,7 @@ BALANCE_CRITICAL_USD = 5.0
 BALANCE_WARNING_USD = 2.0
 MAX_LOG_ERRORS = 5
 MAX_WS_STALE_EVENTS = 3
+BOT_LOG_FRESH_MAX_MIN = 10  # bot.log silent this long while process exists = frozen/blind
 MIN_FEE_USD = 0.02
 PNL_TOLERANCE = 0.05
 WR_TOLERANCE = 1.0
@@ -249,6 +250,51 @@ def check_ws_freshness() -> CheckResult:
                            f"WebSocket instability detected.\n\nEvents:\n{sample}")
     return CheckResult("ws_freshness", "OK",
                         f"{len(stale_events)} WS event(s) — within threshold")
+
+
+def check_bot_log_freshness() -> CheckResult:
+    """Check 3b: bot.log freshness — a live bot writes at least once per cycle
+    (~60-75s), so a silent log while the PROCESS still exists means the bot is
+    frozen/blind (DNS outage, host sleep, hung call) — a state check_process_alive
+    cannot see. Added 2026-07-06 after two silent DNS outages the same day
+    (5:34–7:53 AM and 3:07–3:35 PM PT) produced zero alerts: the existing checks
+    count error EVENTS in the log, but a stalled bot writes nothing at all."""
+    if not os.path.exists(LOG_FILE):
+        return CheckResult("bot_log_freshness", "WARNING",
+                           "bot.log missing — cannot judge log freshness")
+    age_min = (time.time() - os.path.getmtime(LOG_FILE)) / 60.0
+    if age_min <= BOT_LOG_FRESH_MAX_MIN:
+        return CheckResult("bot_log_freshness", "OK",
+                           f"bot.log written {age_min:.1f} min ago")
+    # Log is stale — only escalate if the bot process actually exists.
+    # (A dead bot is check_process_alive's job, incl. its auto-restart.)
+    try:
+        result = subprocess.run(
+            ["bash", "-c", "ps aux | grep 'Python.*main' | grep -v grep"],
+            capture_output=True, text=True, timeout=10,
+        )
+        proc_line = result.stdout.strip()
+    except Exception as e:
+        return CheckResult("bot_log_freshness", "WARNING",
+                           f"bot.log stale ({age_min:.0f} min) but process check failed: {e}",
+                           str(e))
+    if not proc_line:
+        return CheckResult("bot_log_freshness", "OK",
+                           f"bot.log stale ({age_min:.0f} min) but no bot process — "
+                           f"process_alive check owns this")
+    last_write_pt = datetime.fromtimestamp(
+        os.path.getmtime(LOG_FILE), tz=PT_TZ).strftime("%-I:%M %p PT")
+    return CheckResult(
+        "bot_log_freshness", "CRITICAL",
+        f"Bot BLIND/FROZEN — process alive but bot.log silent for {age_min:.0f} min "
+        f"(last write {last_write_pt})",
+        f"Bot process exists ({proc_line.split()[1] if proc_line.split() else '?'}) but "
+        f"logs/bot.log has not been written for {age_min:.0f} minutes "
+        f"(threshold {BOT_LOG_FRESH_MAX_MIN} min; a healthy bot logs every cycle, ~60-75s). "
+        f"Likely causes: DNS/network outage stalling the cycle, host sleep, or a hung API "
+        f"call the 180s watchdog missed. Entries are effectively paused; exchange-side SL "
+        f"remains armed. Check `logs/bot.log` tail and network (ping, DNS) before restarting.",
+    )
 
 
 def check_position_desync() -> CheckResult:
@@ -739,11 +785,12 @@ def check_unrealized_drawdown() -> CheckResult:
 
 # ── orchestrator ───────────────────────────────────────────────────────
 def run_all_checks() -> list[CheckResult]:
-    """Run all 12 checks and return results."""
+    """Run all 13 checks and return results."""
     checks = [
         check_process_alive,
         check_log_errors,
         check_ws_freshness,
+        check_bot_log_freshness,  # after process_alive: an auto-restart freshens the log
         check_position_desync,
         check_balance_anomaly,
         check_syntax,

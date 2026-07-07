@@ -89,6 +89,12 @@ class Config:
     # Fee & slippage accounting
     TAKER_FEE_PERCENT = float(os.getenv("TAKER_FEE_PERCENT", "0.06"))
     SLIPPAGE_PERCENT = float(os.getenv("SLIPPAGE_PERCENT", "0.05"))
+    # Phemex verified base maker rate (0.01%). Used ONLY by the paper-slot fee
+    # simulation: live entries are ~99% PostOnly maker, so charging paper entries
+    # taker+slippage over-penalized every paper strategy ~$0.23/trade
+    # (docs/overnight-2026-07-05/r2_fee_research.md). Live fees are never
+    # simulated — they come from the exchange fill.
+    MAKER_FEE_PERCENT = float(os.getenv("MAKER_FEE_PERCENT", "0.01"))
 
     # Maker exit patience (opt-in, prepared 2026-06-11 — exit maker fills were 0%
     # because the legacy limit-exit window is 4s; flow data shows ~0% touch at 4s).

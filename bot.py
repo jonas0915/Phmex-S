@@ -253,6 +253,98 @@ def _build_position_owners(main_risk, slots):
     return owners
 
 
+# ── "Bot is blind" monitor ─────────────────────────────────────────────────
+# Built 2026-07-06 after two silent DNS outages the same day (5:34–7:53 AM and
+# 3:07–3:35 PM PT): WS feeds went stale, cycles stalled, the bot recovered on
+# its own and nobody was told. Same failure family as the June host-sleep loss.
+# Two detectors, both Telegram-only (no trading behavior changes):
+#   1. WS-blind: ALL subscribed symbols' WS data stale for > BLIND_AFTER_S
+#      → one [BLIND] alert, re-alerted at most once per REALERT_COOLDOWN_S,
+#      with a [BLIND-CLEARED] message on recovery.
+#   2. Cycle stall: gap between cycle starts > STALL_GAP_S → retroactive
+#      [BLIND-RECOVERED] notice (covers host sleep / process freeze, where
+#      the bot can only report after the fact).
+# Pure state machine — `notify` is injected so tests run with no network.
+class BlindMonitor:
+    BLIND_AFTER_S = 300.0        # all feeds stale this long → blind
+    REALERT_COOLDOWN_S = 3600.0  # at most one [BLIND] alert per hour
+    STALL_GAP_S = 300.0          # cycle-start gap beyond this → stall notice
+
+    def __init__(self, notify=None):
+        self._notify = notify or notifier.send
+        self.blind_since: float | None = None    # when all feeds first went stale
+        self.blind_alerted = False               # [BLIND] sent for current episode
+        self.last_blind_alert_ts = 0.0           # cooldown anchor (spans episodes)
+        self.last_cycle_ts: float | None = None  # previous cycle start
+
+    @staticmethod
+    def _fmt_pt(ts: float, with_date: bool = False) -> str:
+        """12-hour PT string for a unix timestamp (never label raw local times PT)."""
+        from zoneinfo import ZoneInfo
+        dt = datetime.datetime.fromtimestamp(ts, tz=ZoneInfo("America/Los_Angeles"))
+        return dt.strftime("%b %-d %-I:%M %p" if with_date else "%-I:%M %p")
+
+    def _send(self, msg: str):
+        logger.warning(f"[BLIND] {msg}")
+        try:
+            self._notify(msg)
+        except Exception as e:
+            logger.debug(f"[BLIND] notify failed: {e}")
+
+    def check_cycle_gap(self, now: float) -> bool:
+        """Call at every cycle start. Sends a retroactive [BLIND-RECOVERED]
+        notice when the gap since the previous cycle start exceeds STALL_GAP_S
+        (normal gap is ~60-180s: cycle + LOOP_INTERVAL sleep, watchdog-bounded).
+        Returns True if the notice was sent."""
+        prev, self.last_cycle_ts = self.last_cycle_ts, now
+        if prev is None or (now - prev) <= self.STALL_GAP_S:
+            return False
+        from zoneinfo import ZoneInfo
+        pt = ZoneInfo("America/Los_Angeles")
+        cross_day = (datetime.datetime.fromtimestamp(prev, tz=pt).date()
+                     != datetime.datetime.fromtimestamp(now, tz=pt).date())
+        gap_min = (now - prev) / 60.0
+        self._send(
+            f"👁 <b>[BLIND-RECOVERED]</b>  [{notifier.BOT_NAME}]\n"
+            f"Bot was stalled/blind {gap_min:.0f} min "
+            f"({self._fmt_pt(prev, cross_day)}–{self._fmt_pt(now, cross_day)} PT), now resumed.\n"
+            f"Entries were paused during the stall; exchange SL stayed armed."
+        )
+        return True
+
+    def check_ws_blind(self, all_stale: bool, now: float) -> None:
+        """Call every cycle with `all_stale` = every subscribed symbol's WS data
+        is stale. Alerts once after BLIND_AFTER_S of continuous blindness, then
+        at most once per REALERT_COOLDOWN_S (cooldown spans flapping episodes so
+        an unstable link can't spam). Sends a clear message on recovery."""
+        if not all_stale:
+            if self.blind_alerted:
+                blind_min = (now - self.blind_since) / 60.0 if self.blind_since else 0.0
+                self._send(
+                    f"✅ <b>[BLIND-CLEARED]</b>  [{notifier.BOT_NAME}]\n"
+                    f"WS feeds fresh again as of {self._fmt_pt(now)} PT "
+                    f"(was blind ~{blind_min:.0f} min). Entries re-enabled."
+                )
+            self.blind_since = None
+            self.blind_alerted = False
+            return
+        if self.blind_since is None:
+            self.blind_since = now
+            return
+        if (now - self.blind_since) < self.BLIND_AFTER_S:
+            return
+        if (now - self.last_blind_alert_ts) < self.REALERT_COOLDOWN_S:
+            return
+        self._send(
+            f"👁 <b>[BLIND]</b>  [{notifier.BOT_NAME}]\n"
+            f"All WS feeds stale since {self._fmt_pt(self.blind_since)} PT — "
+            f"entries effectively paused, exchange SL still armed.\n"
+            f"Likely network/DNS outage; will report recovery."
+        )
+        self.blind_alerted = True
+        self.last_blind_alert_ts = now
+
+
 class Phmex2Bot:
     def __init__(self):
         Config.validate()
@@ -268,6 +360,7 @@ class Phmex2Bot:
         self.ban_mode_until = 0
         self.ban_extensions = 0
         self._ws_feed: WSDataFeed | None = None
+        self._blind = BlindMonitor()  # "bot is blind" Telegram alerts (2026-07-06)
         self._empty_price_cycles = 0  # consecutive cycles with no ticker data (CDN ban detection)
         self._loss_streak = 0    # consecutive losses for streak-based sizing
         self._pair_cooldown: dict[str, float] = {}  # symbol -> timestamp when cooldown expires
@@ -752,6 +845,17 @@ class Phmex2Bot:
 
     def _run_cycle(self):
         import time as _time_module
+        # "Bot is blind" alerts (2026-07-06): stall-recovery notice + WS-blind
+        # state machine. Runs BEFORE the ban-mode early-return so outage cycles
+        # are still covered. Telegram-only — never touches trading logic.
+        _blind_now = _time_module.time()
+        try:
+            self._blind.check_cycle_gap(_blind_now)
+            if self._ws_feed and self.active_pairs:
+                _all_stale = all(self._ws_feed.is_stale(s) for s in self.active_pairs)
+                self._blind.check_ws_blind(_all_stale, _blind_now)
+        except Exception as _blind_err:
+            logger.debug(f"[BLIND] monitor error: {_blind_err}")
         if self.ban_mode:
             if _time_module.time() < self.ban_mode_until:
                 return

@@ -637,7 +637,15 @@ class RiskManager:
         if fees_usdt is None:
             if self.is_paper:
                 notional = pos.entry_price * pos.amount
-                fee_pct = (Config.TAKER_FEE_PERCENT + Config.SLIPPAGE_PERCENT) * 2 / 100
+                # Paper fee model (2026-07-05, docs/overnight-2026-07-05/r2_fee_research.md):
+                # entry leg = maker only (live entries are ~99% PostOnly maker — a resting
+                # PostOnly order cannot slip); exit leg = taker + slippage (conservative:
+                # 81% of live exits are taker). RT = 0.01 + 0.11 = 0.12% of notional —
+                # deliberately above the ~0.066% measured live RT so paper never flatters.
+                # (Old model charged taker+slippage BOTH legs = 0.22% RT, ~$0.23/trade
+                # over-penalty.) LIVE fees are never simulated here — see fees_usdt param.
+                fee_pct = (Config.MAKER_FEE_PERCENT
+                           + Config.TAKER_FEE_PERCENT + Config.SLIPPAGE_PERCENT) / 100
                 fees_usdt = notional * fee_pct
             else:
                 fees_usdt = 0.0  # unknown — treat as 0 rather than crash
@@ -768,7 +776,10 @@ class RiskManager:
         if fees_usdt is None:
             if self.is_paper:
                 notional = pos.entry_price * half_amount
-                fees_usdt = notional * (Config.TAKER_FEE_PERCENT + Config.SLIPPAGE_PERCENT) * 2 / 100
+                # Same paper fee model as close_position: maker entry leg + taker+slippage
+                # exit leg = 0.12% RT (see comment there; r2_fee_research.md).
+                fees_usdt = notional * (Config.MAKER_FEE_PERCENT
+                                        + Config.TAKER_FEE_PERCENT + Config.SLIPPAGE_PERCENT) / 100
             else:
                 fees_usdt = 0.0
                 fees_pending = True
