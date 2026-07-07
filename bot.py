@@ -20,6 +20,11 @@ ST2_HOLD_CYCLES = 15
 # Per-slot hold overrides (cycles). ST2.0 holds ~20 min (1200s) since the 2026-06-16
 # LIVE promotion (proposal 8df1250186dd); falls back to ST2_HOLD_CYCLES otherwise.
 ST2_HOLD_CYCLES_BY_SLOT = {"ST2.0": 20}
+# ETH-TSM-28 slow-horizon slot (2026-07-06 build). Signal math + frozen spec
+# constants live in tsm_slot.py; bot.py only orchestrates (see _evaluate_eth_tsm).
+import tsm_slot
+from tsm_slot import (TSM_SLOT_ID, TSM_SYMBOL, TSM_AMOUNT_ETH, TSM_LEVERAGE,
+                      TSM_STOP_PCT, TSM_OHLCV_LIMIT, TSM_TAKER_FALLBACK_S)
 from scanner import scan_top_gainers, volatility_scan, start_background_scan, get_scan_result
 from logger import setup_logger
 from ws_feed import WSDataFeed
@@ -470,7 +475,36 @@ class Phmex2Bot:
                                               # taker trail would also corrupt the maker-fill
                                               # measurement that is the whole point of ST2.0.
             ),
+            # ETH_TSM_28 — slow-horizon long-only trend (Han/Kang/Ryu 28/5 tercile),
+            # one fixed 0.01-ETH position, min-hold 5d, −8% resting exchange stop as
+            # the ONLY protective exit. Pre-registered: docs/overnight-2026-07-05/
+            # r5_slow_horizon_research.md §7; build: r6_eth_tsm_build.md.
+            # strategy_name is deliberately NOT in STRATEGIES: _evaluate_slots skips
+            # the whole slot (strategy_fn None → continue BEFORE its exit block), so
+            # NO scalper exit (SL/TP/time/flat/adverse/trail/st2_hold) can ever touch
+            # this position. All entries/exits run in _evaluate_eth_tsm instead.
+            StrategySlot(
+                slot_id=TSM_SLOT_ID,
+                strategy_name="eth_tsm_28",  # not a STRATEGIES key — see note above
+                timeframe="1d",
+                max_positions=1,
+                capital_pct=0.0,
+                paper_mode=True,          # ships paper-safe; promote via .promote_ETH_TSM_28
+                trade_amount_usdt=None,   # unused — sizing is a FIXED 0.01 ETH, no Kelly
+                loss_cap_usdt=-999.0,     # rails opt-out: kill criteria are ADJUDICATOR-tracked
+                                          # (scripts/lab_adjudicator, net −$10 line), not slot-automated
+                kelly_min_trades=10**9,   # neg-Kelly auto-demote never arms (10-20 trades of a
+                                          # 48%-deployment strategy is noise to that rail)
+                durable_trail_enabled=False,  # spec: NO trail — signal exit or −8% stop only
+            ),
         ]
+        # ETH-TSM-28 runtime state: sidecar mirror + per-cycle entry-in-flight flag
+        # (read by _tsm_locks_symbol so the main bot never grabs ETH mid-entry).
+        self._tsm_state = tsm_slot.load_state()
+        self._tsm_entry_active = False
+        # Ownership-interaction Telegram dedup: {kind: "YYYY-MM-DD"} — owner sees
+        # every interaction once per UTC day per kind (owner directive 2026-07-06).
+        self._tsm_ownership_notified: dict[str, str] = {}
 
     def _fetch_htf_data(self, symbol: str):
         """Fetch 1h candle data with 5-minute cache. Returns indicator-enriched DataFrame or None."""
@@ -625,11 +659,24 @@ class Phmex2Bot:
                 self.ban_mode_until = time.time() + 120
                 self.ban_extensions = 0
             elif open_pos:
+                # Ownership filter (2026-07-06, ETH-TSM-28 build): LIVE-slot positions
+                # persist in their own state files across restarts. Without this filter
+                # the main bot would ALSO adopt them here and re-pin scalper SL/TP
+                # (1.2%/1.6%) over the slot's exchange orders — for the TSM slot that
+                # would destroy the −8% disaster stop and add a TP the spec forbids.
+                # Slot copies stay under their slot's RiskManager; per-cycle
+                # _sync_exchange_closes reconciles them via _build_position_owners.
+                _slot_owned = {s for slot in self.slots if not slot.paper_mode
+                               for s in slot.risk.positions}
+                main_pos = [p for p in open_pos if p["symbol"] not in _slot_owned]
+                _excluded = [p["symbol"] for p in open_pos if p["symbol"] in _slot_owned]
+                if _excluded:
+                    logger.info(f"[SYNC] Startup: {', '.join(_excluded)} owned by live slot(s) — excluded from main-bot sync")
                 # Sync ALL open positions — don't filter by active_pairs
                 # (positions may exist on pairs not yet in the scanner/config list)
-                if open_pos:
-                    self.risk.sync_positions(open_pos, current_cycle=self.cycle_count)
-                    logger.info(f"Synced {len(open_pos)} open position(s) from exchange")
+                if main_pos:
+                    self.risk.sync_positions(main_pos, current_cycle=self.cycle_count)
+                    logger.info(f"Synced {len(main_pos)} open position(s) from exchange")
                     # Refresh peak_price — may be stale if bot was down while price moved
                     for sym, pos in self.risk.positions.items():
                         try:
@@ -821,6 +868,25 @@ class Phmex2Bot:
                 capital_pct = 0.10
             for slot in self.slots:
                 if slot.slot_id == slot_id:
+                    # Flush open PAPER positions BEFORE flipping the mode (2026-07-06,
+                    # ETH-TSM-28 build): a paper position has no exchange backing, but
+                    # after set_live the owner map (_build_position_owners) treats every
+                    # slot position as exchange-backed — the next _sync_exchange_closes
+                    # would "close" the phantom and record a fabricated LIVE trade.
+                    # Near-certain for ETH_TSM_28 (long-horizon, ~48% deployment).
+                    if slot.paper_mode:
+                        for _psym in list(slot.risk.positions.keys()):
+                            _ppos = slot.risk.positions[_psym]
+                            _ppx = _ppos.entry_price
+                            try:
+                                _pt = self.exchange.get_ticker(_psym)
+                                if _pt and _pt.get("last"):
+                                    _ppx = float(_pt["last"])
+                            except Exception:
+                                pass
+                            slot.risk.close_position(_psym, _ppx, "promote_reset")
+                            logger.warning(f"[SENTINEL] {slot_id} paper position {_psym} "
+                                           f"closed at promote (promote_reset @ {_ppx})")
                     slot.set_live(capital_pct=capital_pct)
                     logger.warning(f"[SENTINEL] Slot '{slot_id}' PROMOTED to live at {capital_pct*100:.0f}%")
                     notifier.send(f"🚀 Slot <b>{slot_id}</b> promoted to live ({capital_pct*100:.0f}% capital)")
@@ -1331,6 +1397,17 @@ class Phmex2Bot:
         for symbol in self.active_pairs:
             if symbol in self.risk.positions:
                 continue
+            # ETH ownership rule (ETH-TSM-28, 2026-07-06): Phemex one-way mode
+            # ("posSide=Merged") merges all positions per symbol, so while the TSM
+            # slot owns ETH (live position held / entry in flight today / its 3x
+            # leverage flip not yet restored to 10x) the main bot must NOT enter
+            # ETH — a main-bot fill would merge into the slot's position AND be
+            # sized wrong at 3x (amount math assumes Config.LEVERAGE=10x).
+            _tsm_lock = self._tsm_locks_symbol(symbol)
+            if _tsm_lock:
+                self._tsm_notify_ownership(
+                    "main_skip", f"main-bot ETH entry skipped ({_tsm_lock})")
+                continue
             # Global cooldown: 2 min between any new entry (continue, not break)
             if time.time() - self._last_entry_time < 120:
                 continue
@@ -1834,6 +1911,14 @@ class Phmex2Bot:
         except Exception as e:
             logger.debug(f"[PAPER] Slot evaluation error: {e}")
 
+        # ETH-TSM-28 daily evaluator (2026-07-06): once-per-cycle state machine —
+        # daily signal at the UTC day roll, entry/exit intents, leverage restore.
+        # ERROR (not debug) on failure: this slot has no other evaluation path.
+        try:
+            self._evaluate_eth_tsm(prices)
+        except Exception as e:
+            logger.error(f"[TSM] evaluation error: {e}", exc_info=True)
+
         # Log slot status
         for slot in self.slots:
             s = slot.stats_summary()
@@ -2229,6 +2314,15 @@ class Phmex2Bot:
                         # account halts: pause sentinel + main drawdown pause (risk_manager.py:351)
                         if os.path.exists(".pause_trading") or self.risk._drawdown_pause_until > time.time():
                             logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} entry blocked — account halt")
+                            continue
+                        # ETH ownership rule (ETH-TSM-28, 2026-07-06): same skip the main
+                        # entry path applies — one-way mode would merge a scalper-slot ETH
+                        # fill into the TSM position (and at the wrong 3x leverage).
+                        _tsm_lock = self._tsm_locks_symbol(symbol)
+                        if _tsm_lock:
+                            self._tsm_notify_ownership(
+                                f"slot_skip_{slot.slot_id}",
+                                f"slot {slot.slot_id} ETH entry skipped ({_tsm_lock})")
                             continue
                         try:
                             # Per-slot entry patience (2026-07-03): first attempt may
@@ -3027,6 +3121,397 @@ class Phmex2Bot:
             except Exception as ne:
                 logger.warning(f"[SLOT SL-MOVE-FAIL] Telegram alert failed for {symbol}: {ne}")
 
+    # ── ETH-TSM-28 slow-horizon slot (2026-07-06 build) ────────────────────
+    # Spec: docs/overnight-2026-07-05/r5_slow_horizon_research.md §7 (frozen).
+    # Build doc: docs/overnight-2026-07-05/r6_eth_tsm_build.md.
+    # All signal math is in tsm_slot.py (pure, unit-tested); these methods only
+    # orchestrate. No threads, no cron: _evaluate_eth_tsm runs once per main
+    # cycle and does the daily work when the UTC date rolls.
+
+    def _tsm_slot(self):
+        for slot in self.slots:
+            if slot.slot_id == TSM_SLOT_ID:
+                return slot
+        return None
+
+    def _tsm_locks_symbol(self, symbol: str):
+        """Ownership rule: reason-string when the main bot / other live slots must
+        stay off `symbol` because ETH_TSM_28 owns it, else None. Phemex one-way
+        ("Merged") mode merges same-symbol positions, and while the slot owns ETH
+        the symbol leverage is 3x (scalper sizing assumes Config.LEVERAGE=10x)."""
+        if symbol != TSM_SYMBOL:
+            return None
+        slot = self._tsm_slot()
+        if slot is None:
+            return None
+        if not slot.paper_mode and symbol in slot.risk.positions:
+            return f"{TSM_SLOT_ID} holds a live ETH position"
+        if self._tsm_state.get("leverage_3x_set"):
+            return f"ETH leverage still {TSM_LEVERAGE}x from {TSM_SLOT_ID} (restore pending)"
+        if self._tsm_entry_active:
+            return f"{TSM_SLOT_ID} entry in flight today"
+        return None
+
+    def _tsm_notify_ownership(self, kind: str, msg: str) -> None:
+        """Telegram notice for every ETH ownership interaction (owner directive
+        2026-07-06: he sees each one), deduped to once per UTC day per kind so a
+        60s cycle can't spam. In-memory dedup — a restart re-sends once, which
+        errs on the side of visibility. Always logs regardless of dedup."""
+        logger.info(f"[TSM OWNERSHIP] {msg}")
+        today = tsm_slot.utc_date_str()
+        if self._tsm_ownership_notified.get(kind) == today:
+            return
+        self._tsm_ownership_notified[kind] = today
+        try:
+            notifier.send(f"🔒 [TSM] {msg}")
+        except Exception as e:
+            logger.debug(f"[TSM] ownership notify failed: {e}")
+
+    def _tsm_restore_leverage(self) -> bool:
+        """Restore ETH to Config.LEVERAGE after the slot's 3x flip. Complete-or-
+        retry: on failure the sidecar flag stays set, which keeps the main bot
+        (and other live slots) locked out of ETH via _tsm_locks_symbol — a
+        mis-leveraged scalper entry is worse than a skipped one."""
+        try:
+            self.exchange.set_symbol_leverage(TSM_SYMBOL, Config.LEVERAGE)
+            self._tsm_state["leverage_3x_set"] = False
+            tsm_slot.save_state(self._tsm_state)
+            self._leverage_set.add(TSM_SYMBOL)  # main-bot cache: already configured
+            logger.info(f"[TSM] {TSM_SYMBOL} leverage restored to {Config.LEVERAGE}x")
+            return True
+        except Exception as e:
+            logger.error(f"[TSM] leverage restore to {Config.LEVERAGE}x FAILED: {e} — "
+                         f"ETH stays locked for main bot; retrying next cycle")
+            return False
+
+    def _evaluate_eth_tsm(self, prices: dict):
+        """Per-cycle TSM state machine (runs after _evaluate_slots):
+          0. leverage-restore retry (runs even if slot disabled/demoted/killed)
+          1. paper disaster-stop replica (live stop rests on the exchange)
+          2. daily signal evaluation when the UTC date rolls
+          3. pending signal-exit retry   4. pending entry attempts
+        """
+        slot = self._tsm_slot()
+        if slot is None:
+            return
+        st = self._tsm_state
+        sym = TSM_SYMBOL
+        self._tsm_entry_active = False  # recomputed below
+
+        # (0) leverage restore — after ANY exit path (signal exit, disaster stop
+        # reconciled by _sync_exchange_closes, demote, kill). Unconditional on
+        # slot mode/enabled so a demoted slot can't strand ETH at 3x.
+        if st.get("leverage_3x_set") and not (not slot.paper_mode and sym in slot.risk.positions):
+            self._tsm_restore_leverage()
+
+        # (1) paper disaster-stop: the live stop is a resting exchange order; the
+        # paper book replicates it here (generic _evaluate_slots SL check never
+        # runs for this slot — strategy_fn is None by design).
+        if slot.paper_mode and sym in slot.risk.positions:
+            pos = slot.risk.positions[sym]
+            price = prices.get(sym)
+            if price and price <= pos.stop_loss:
+                logger.info(f"[TSM] paper disaster stop hit @ {pos.stop_loss:.2f}")
+                if self._close_slot_position(slot, sym, pos, pos.stop_loss, "disaster_stop"):
+                    st["entry_date"] = None
+                    st["exit_pending"] = False
+                    tsm_slot.save_state(st)
+
+        # (1b) live SL heal: the −8% exchange stop is this position's ONLY
+        # protective exit — if placement failed at entry, retry every cycle.
+        if not slot.paper_mode and sym in slot.risk.positions:
+            pos = slot.risk.positions[sym]
+            if pos.sl_order_id in (None, "software"):
+                sl_id = self.exchange.place_stop_loss(sym, "long", pos.amount, pos.stop_loss)
+                if sl_id:
+                    pos.sl_order_id = sl_id
+                    pos.exchange_sl_price = pos.stop_loss
+                    slot.risk._save_state()
+                    logger.warning(f"[TSM] disaster stop (re)placed @ {pos.stop_loss:.2f}")
+                else:
+                    logger.error(f"[TSM] disaster stop STILL missing for {sym} — retrying next cycle")
+
+        # (2) daily evaluation at the UTC day roll (also first cycle after restart)
+        today = tsm_slot.utc_date_str()
+        if st.get("last_eval_date") != today:
+            self._tsm_daily_eval(slot, st, today, prices)
+
+        # (3) pending signal exit (decided at daily eval; retried until closed)
+        if st.get("exit_pending"):
+            if sym in slot.risk.positions:
+                pos = slot.risk.positions[sym]
+                price = prices.get(sym) or pos.entry_price
+                if self._close_slot_position(slot, sym, pos, price, "signal_exit"):
+                    st["exit_pending"] = False
+                    st["entry_date"] = None
+                    tsm_slot.save_state(st)
+                    if not slot.paper_mode and st.get("leverage_3x_set"):
+                        self._tsm_restore_leverage()
+                # reduceOnly-abort race: _close_slot_position returned False but
+                # stashed the reason — _sync_exchange_closes reconciles the fill,
+                # and this branch clears exit_pending next cycle (position gone).
+            else:
+                st["exit_pending"] = False  # already closed (stop / demote / sync)
+                st["entry_date"] = None
+                tsm_slot.save_state(st)
+
+        # (4) pending entry (signal ON today, still flat, day not skipped)
+        if (st.get("entry_pending_date") == today and slot.is_active
+                and sym not in slot.risk.positions and not st.get("exit_pending")):
+            self._tsm_try_entry(slot, st, today, prices)
+
+    def _tsm_price(self, prices: dict):
+        """Best current ETH price: cycle price map, else one REST ticker."""
+        price = prices.get(TSM_SYMBOL)
+        if price:
+            return float(price)
+        try:
+            t = self.exchange.get_ticker(TSM_SYMBOL)
+            if t and t.get("last"):
+                return float(t["last"])
+        except Exception as e:
+            logger.debug(f"[TSM] ticker fetch failed: {e}")
+        return None
+
+    def _tsm_daily_eval(self, slot, st: dict, today: str, prices: dict):
+        """Compute the daily signal from COMPLETE 1d candles and set intents.
+        On fetch failure last_eval_date is NOT stamped, so this retries every
+        cycle until the day's signal is computed (no thread, no cron)."""
+        df = self.exchange.get_ohlcv(TSM_SYMBOL, "1d", limit=TSM_OHLCV_LIMIT)
+        closes = tsm_slot.complete_daily_closes(df)
+        sig = tsm_slot.compute_signal(closes)
+        if sig is None:
+            logger.warning(f"[TSM] daily eval {today}: insufficient history "
+                           f"({len(closes)} complete candles) — retrying next cycle")
+            return
+
+        # Parallel BTC replica signal (spec §7.1 — logged, never traded). Best-effort.
+        btc = None
+        try:
+            btc_df = self.exchange.get_ohlcv(tsm_slot.TSM_BTC_SYMBOL, "1d", limit=TSM_OHLCV_LIMIT)
+            btc = tsm_slot.compute_signal(tsm_slot.complete_daily_closes(btc_df))
+        except Exception as e:
+            logger.debug(f"[TSM] BTC replica signal failed: {e}")
+
+        rep = tsm_slot.advance_replica(st, sig["signal_on"], today)
+        holding = TSM_SYMBOL in slot.risk.positions
+        note = ""
+
+        if holding:
+            if not sig["signal_on"]:
+                if tsm_slot.min_hold_met(st.get("entry_date"), today):
+                    st["exit_pending"] = True
+                    note = "signal left top tercile after min-hold — exit pending"
+                else:
+                    note = (f"signal off but min-hold "
+                            f"({tsm_slot.held_days(st['entry_date'], today)}/"
+                            f"{tsm_slot.TSM_MIN_HOLD_DAYS}d) — holding")
+            else:
+                note = "signal on — holding"
+        elif sig["signal_on"] and slot.is_active:
+            # Ownership check BOTH directions (investigation #1): if the main bot
+            # (or any other live slot) already holds ETH, the TSM slot SKIPS the day.
+            other_owner = None
+            if TSM_SYMBOL in self.risk.positions:
+                other_owner = "main bot"
+            else:
+                for other in self.slots:
+                    if (other.slot_id != TSM_SLOT_ID and not other.paper_mode
+                            and TSM_SYMBOL in other.risk.positions):
+                        other_owner = f"slot {other.slot_id}"
+                        break
+            if other_owner and not slot.paper_mode:
+                note = f"SKIP-DAY: {other_owner} holds ETH"
+                self._tsm_notify_ownership(
+                    "tsm_skip", f"TSM entry skipped for {today} ({other_owner} holds ETH)")
+            else:
+                st["entry_pending_date"] = today
+                st["entry_first_attempt_ts"] = None
+                note = "signal on — entry pending"
+        elif sig["signal_on"]:
+            note = "signal on but slot disabled/killed — no entry"
+        else:
+            note = "signal off — flat"
+
+        st.update({"last_eval_date": today, "signal_on": sig["signal_on"],
+                   "ret_28d": sig["ret_28d"], "threshold": sig["threshold"]})
+        tsm_slot.append_day(st, {
+            "date": today,
+            "signal_on": sig["signal_on"],
+            "ret_28d": round(sig["ret_28d"], 6),
+            "threshold": round(sig["threshold"], 6),
+            "n_history": sig["n_history"],
+            "close": sig["close"],
+            "replica_position": bool(rep.get("position")),
+            "actual_position": holding,
+            "mode": "paper" if slot.paper_mode else "live",
+            "note": note,
+            "btc_signal_on": (btc or {}).get("signal_on"),
+            "btc_ret_28d": round(btc["ret_28d"], 6) if btc else None,
+        })
+        tsm_slot.save_state(st)
+        logger.info(f"[TSM] daily eval {today}: ret28={sig['ret_28d']:+.4f} "
+                    f"thr={sig['threshold']:+.4f} (n={sig['n_history']}) "
+                    f"signal={'ON' if sig['signal_on'] else 'OFF'} | {note}")
+
+    def _tsm_try_entry(self, slot, st: dict, today: str, prices: dict):
+        """One entry attempt per cycle: PostOnly maker at the touch; after 30 min
+        of misses (spec §7.2) a single market (taker) order. Fixed 0.01 ETH."""
+        price = self._tsm_price(prices)
+        if not price:
+            self._tsm_entry_active = not slot.paper_mode
+            return
+
+        if slot.paper_mode:
+            # Paper: fill at current price, sim book only. Margin recorded at the
+            # spec's 3x so ROI% matches what live would report.
+            margin = TSM_AMOUNT_ETH * price / TSM_LEVERAGE
+            pos = slot.risk.open_position(TSM_SYMBOL, price, margin, side="long",
+                                          atr=0.0, regime="medium",
+                                          cycle=self.cycle_count, strategy="eth_tsm_28")
+            pos.amount = TSM_AMOUNT_ETH
+            pos.margin = margin
+            pos.stop_loss = price * (1 - TSM_STOP_PCT / 100)   # −8% disaster stop
+            pos.take_profit = None                             # spec: NO take profit
+            slot.risk._save_state()
+            st["entry_pending_date"] = None
+            st["entry_date"] = today
+            tsm_slot.save_state(st)
+            slot.total_entries += 1
+            notifier.notify_paper_entry(TSM_SYMBOL, "long", price, margin, 1.0,
+                                        f"TSM-28 top-tercile (ret28={st.get('ret_28d'):+.4f})",
+                                        slot=TSM_SLOT_ID)
+            logger.info(f"[PAPER] {TSM_SLOT_ID} ENTRY LONG {TSM_SYMBOL} @ {price:.2f} "
+                        f"| 0.01 ETH | stop {pos.stop_loss:.2f} (−{TSM_STOP_PCT}%)")
+            return
+
+        # --- LIVE entry ---
+        if os.path.exists(".pause_trading") or self.risk._drawdown_pause_until > time.time():
+            logger.info(f"[TSM] live entry blocked — account halt")
+            return
+        if TSM_SYMBOL in self.risk.positions:
+            # Main bot grabbed ETH between the daily eval and now → skip the day.
+            st["entry_pending_date"] = None
+            tsm_slot.save_state(st)
+            self._tsm_notify_ownership(
+                "tsm_skip", f"TSM entry skipped for {today} (main bot holds ETH)")
+            return
+        # Belt-and-suspenders merge guard (owner directive 2026-07-06): never trust
+        # local bookkeeping alone — re-fetch positions from the EXCHANGE and abort
+        # if ANY ETH position already exists on the account (manual trade, orphan,
+        # desynced state). One-way mode would merge our fill into it. A failed
+        # fetch also aborts: unknown state = no order.
+        try:
+            _exch_pos = self.exchange.get_open_positions()
+        except Exception as _gt_err:
+            logger.warning(f"[TSM] pre-entry exchange position check failed: {_gt_err} — no order this cycle")
+            self._tsm_entry_active = True
+            return
+        if _exch_pos is None:
+            logger.warning("[TSM] pre-entry exchange position check returned None — no order this cycle")
+            self._tsm_entry_active = True
+            return
+        _eth_on_exch = [p for p in _exch_pos if p.get("symbol") == TSM_SYMBOL]
+        if _eth_on_exch:
+            st["entry_pending_date"] = None
+            tsm_slot.save_state(st)
+            _p0 = _eth_on_exch[0]
+            self._tsm_notify_ownership(
+                "tsm_abort_exchange",
+                f"TSM entry ABORTED for {today} — exchange already shows an ETH position "
+                f"({_p0.get('side')} {_p0.get('amount')} @ {_p0.get('entry_price')}) "
+                f"not attributed to the TSM slot; merge risk, skipping day")
+            return
+        self._tsm_entry_active = True  # main bot stays off ETH while we work
+
+        # Leverage FIRST (investigation #2): flag is persisted BEFORE the flip so a
+        # crash can never leave ETH at 3x unflagged. Complete-or-skip: no order is
+        # placed unless the isolated-3x call succeeded (0.01 ETH at 3x ≈ $5.90
+        # margin; liq ≈ −32% — far beyond the −8% stop; at 10x liq ≈ −9% is too
+        # close, hence the flip).
+        if not st.get("leverage_3x_set"):
+            st["leverage_3x_set"] = True
+            tsm_slot.save_state(st)
+            try:
+                self.exchange.set_symbol_leverage(TSM_SYMBOL, TSM_LEVERAGE)
+                logger.info(f"[TSM] {TSM_SYMBOL} leverage set to {TSM_LEVERAGE}x isolated")
+            except Exception as e:
+                logger.error(f"[TSM] set_leverage {TSM_LEVERAGE}x failed: {e} — no order placed, retry next cycle")
+                # flag stays set: leverage state on the exchange is UNKNOWN, so the
+                # ownership lock must hold until a restore confirms 10x.
+                return
+
+        first = st.get("entry_first_attempt_ts") or time.time()
+        if st.get("entry_first_attempt_ts") is None:
+            st["entry_first_attempt_ts"] = first
+            tsm_slot.save_state(st)
+
+        try:
+            if time.time() - first <= TSM_TAKER_FALLBACK_S:
+                # Maker attempt: open_long computes amount = margin*Config.LEVERAGE/price,
+                # so margin is back-computed to yield EXACTLY 0.01 ETH (one min-step —
+                # partial fills below the step are impossible).
+                margin_for_amount = TSM_AMOUNT_ETH * price / Config.LEVERAGE
+                order = self.exchange.open_long(TSM_SYMBOL, margin_for_amount, price)
+            else:
+                logger.info(f"[TSM] maker window ({TSM_TAKER_FALLBACK_S/60:.0f} min) exhausted — taker fallback")
+                order = self.exchange.open_long_market(TSM_SYMBOL, TSM_AMOUNT_ETH)
+        except Exception as e:
+            logger.error(f"[TSM] entry order error: {e} — any landed fill is caught by the orphan scanner")
+            self._last_entry_time = time.time()
+            return
+        if not order:
+            logger.info(f"[TSM] entry no fill (PostOnly miss) — retrying next cycle "
+                        f"({(time.time()-first)/60:.0f} min into maker window)")
+            return
+
+        fill = self._extract_fill_price(order, price)
+        amount = self._extract_fill_amount(order, TSM_AMOUNT_ETH)
+        margin = amount * fill / TSM_LEVERAGE  # actual isolated margin at 3x
+        pos = slot.risk.open_position(TSM_SYMBOL, fill, margin, side="long",
+                                      atr=0.0, regime="medium",
+                                      cycle=self.cycle_count, strategy="eth_tsm_28")
+        pos.amount = amount
+        pos.margin = margin
+        pos.stop_loss = fill * (1 - TSM_STOP_PCT / 100)
+        pos.take_profit = None  # spec: no TP; exits are signal-exit or the −8% stop
+        # Persist ownership BEFORE the stop placement: a crash in this window must
+        # leave the position attributed to this slot on restart, or the startup sync
+        # adopts it into the main bot and re-pins scalper 1.2/1.6 brackets over the
+        # −8% disaster stop while the leverage-restore path flips a live position
+        # (review finding 2026-07-06). The stop itself heals next cycle via (1b).
+        slot.risk._save_state()
+        sl_id = self.exchange.place_stop_loss(TSM_SYMBOL, "long", amount, pos.stop_loss)
+        if sl_id:
+            pos.sl_order_id = sl_id
+            pos.exchange_sl_price = pos.stop_loss
+        else:
+            pos.sl_order_id = "software"  # heals via (1b) next cycle; alert loudly now
+            logger.error(f"[TSM] disaster-stop placement FAILED — position live WITHOUT its only protective exit; retrying next cycle")
+            try:
+                notifier.send(f"⚠️ [TSM] {TSM_SYMBOL} entry filled but −{TSM_STOP_PCT}% stop placement FAILED — retrying each cycle")
+            except Exception:
+                pass
+        slot.risk._save_state()
+        st["entry_pending_date"] = None
+        st["entry_date"] = today
+        tsm_slot.save_state(st)
+        slot.total_entries += 1
+        self._last_entry_time = time.time()  # global anti-cluster cooldown, like other live entries
+        logger.info(f"[SLOT LIVE] {TSM_SLOT_ID} ENTRY LONG {TSM_SYMBOL} | Fill: {fill:.2f} | "
+                    f"{amount} ETH @ {TSM_LEVERAGE}x (margin ${margin:.2f}) | stop {pos.stop_loss:.2f}")
+        try:
+            notifier.send(
+                f"🟢 <b>[LIVE] LONG ENTRY — {TSM_SYMBOL}</b>  [slot {TSM_SLOT_ID}]\n"
+                f"Signal:   <b>TSM-28 top tercile</b> (ret28 {st.get('ret_28d'):+.2%})\n"
+                f"Price:    ${fill:.2f}\n"
+                f"Size:     {amount} ETH ({TSM_LEVERAGE}x isolated, margin ${margin:.2f})\n"
+                f"Stop:     ${pos.stop_loss:.2f} (−{TSM_STOP_PCT:.0f}%, exchange-resting)\n"
+                f"Exit:     daily signal, min hold {tsm_slot.TSM_MIN_HOLD_DAYS}d — no TP, no trail"
+            )
+        except Exception:
+            pass
+
     def _close_slot_position(self, slot, symbol, pos, price, reason):
         """Close a slot position — simulated for paper, real market order for live.
         Returns True if closed."""
@@ -3040,9 +3525,13 @@ class Phmex2Bot:
             self.exchange.cancel_open_orders(symbol)
             # ST2.0's edge is maker-only — close patiently (maker) so the round trip
             # stays maker-maker. Other slots close urgently (taker) as before.
+            # ETH_TSM_28 signal exits are also maker-first (spec §7.3): patient limit
+            # at the touch, market fallback within the same call — no protective
+            # deadline on a signal exit, and 5bp saved matters on an $18 notional.
             # EXCEPTION: an adverse-exit loss-cut MUST fill now — a patient maker cut
             # would just ride to the -12% SL — so force taker regardless of slot.
-            _urgent = slot.strategy_name != "ST2.0" or reason == "adverse_exit"
+            _urgent = (slot.strategy_name not in ("ST2.0", "eth_tsm_28")
+                       or reason == "adverse_exit")
             order = (self.exchange.close_long(symbol, pos.amount, urgent=_urgent) if pos.side == "long"
                      else self.exchange.close_short(symbol, pos.amount, urgent=_urgent))
             if not order:

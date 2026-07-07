@@ -987,6 +987,74 @@ class Exchange:
         except Exception as e:
             logger.warning(f"Could not set leverage for {symbol}: {e}")
 
+    def set_symbol_leverage(self, symbol: str, leverage: int) -> None:
+        """Set ISOLATED leverage for one symbol (ETH-TSM-28, 2026-07-06).
+
+        Phemex USDT perps: positive leverageRr = isolated, negative = cross
+        (ccxt phemex.set_leverage → PUT /g-positions/leverage). Per-symbol —
+        other symbols' leverage is untouched. Unlike ensure_leverage this
+        RAISES on failure: the caller sizes orders for `leverage`, so placing
+        an order after a silent failure would be mis-margined."""
+        if not Config.is_live():
+            return
+        self.client.set_leverage(leverage, symbol)
+        logger.info(f"Leverage set to {leverage}x (isolated) for {symbol}")
+
+    def place_stop_loss(self, symbol: str, side: str, amount: float, sl_price: float):
+        """Place ONLY a stop-loss conditional order (no TP) — the ETH-TSM-28 slot
+        must not carry a take-profit (spec: signal exit or −8% stop, nothing else).
+        Mirrors the SL block of place_sl_tp: triggerDirection 'descending' for a
+        long SL / 'ascending' for a short SL (lessons.md), price_to_precision via
+        _round_price. Returns the order id or None."""
+        order_side = "sell" if side == "long" else "buy"
+        sl_price = self._round_price(symbol, sl_price)
+        amount = self._round_amount(symbol, amount)
+        if amount <= 0:
+            logger.error(f"place_stop_loss skip: amount rounded to 0 for {symbol}")
+            return None
+        sl_trigger_dir = "descending" if side == "long" else "ascending"
+        for attempt in range(3):
+            try:
+                params = {
+                    "reduceOnly": True,
+                    "triggerPrice": sl_price,
+                    "triggerDirection": sl_trigger_dir,
+                }
+                order = self.client.create_order(symbol, "market", order_side, amount, None, params=params)
+                oid = order.get("id")
+                logger.info(f"SL-only order placed: {symbol} {order_side} trigger@{sl_price} dir={sl_trigger_dir} (id={oid})")
+                return oid
+            except Exception as e:
+                if self._is_rate_limit_error(e) and attempt < 2:
+                    time.sleep(1)
+                else:
+                    logger.error(f"Failed to place SL-only for {symbol} (attempt {attempt+1}): {e}")
+                    return None
+        return None
+
+    def open_long_market(self, symbol: str, coin_amount: float) -> Optional[dict]:
+        """Market (taker) entry for the ETH-TSM-28 30-minute maker-window fallback
+        (pre-registered spec §7.2). Fixed coin amount, NOT margin-based. On an
+        exception the ground-truth check catches a fill that landed anyway
+        (mirrors _try_limit_entry's safety net; pre_amount=0 is safe here — the
+        slot only enters when no ETH position exists anywhere, enforced by the
+        ownership rule)."""
+        if not Config.is_live():
+            logger.error("open_long_market called in paper mode — refusing")
+            return None
+        amount = self._round_amount(symbol, coin_amount)
+        if amount <= 0:
+            logger.error(f"open_long_market: amount rounded to 0 for {symbol}")
+            return None
+        try:
+            order = self.client.create_market_buy_order(symbol, amount)
+            logger.info(f"[TAKER] OPEN LONG {amount} {symbol} (TSM maker-window fallback)")
+            return order
+        except Exception as e:
+            logger.error(f"open_long_market failed for {symbol}: {e} — checking ground truth")
+            gt = self._position_ground_truth(symbol, "long", pre_amount=0.0)
+            return gt or None
+
     def get_open_positions(self) -> list[dict]:
         """Fetch open positions from the exchange (live mode only)."""
         try:

@@ -672,6 +672,12 @@ _SIGNAL_BOXES = [
      "Shorts a bid-heavy book being aggressively bought into (imbalance &ge; 0.35 &amp; "
      "buy-ratio 0.60&ndash;0.85), cvd/spread filtered. DEMOTED TO PAPER 2026-06-29 "
      "(35 live trades, no edge &mdash; execution adverse selection); paper sims only."),
+    ("ETH_TSM_28",     "ETH-TSM-28 &mdash; SLOW TREND (PAPER)",
+     "Daily-horizon time-series momentum: long 0.01 ETH when the 28-day return is "
+     "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "
+     "&minus;8% exchange disaster stop only (no trail/TP/Kelly). Built 2026-07-06, "
+     "ships PAPER; promote = .promote_ETH_TSM_28. Kill criteria graded by the "
+     "nightly adjudicator (&minus;$10 net / 2 disaster stops / replica drift)."),
 ]
 # 5m_liq_cascade and 5m_narrow boxes removed 2026-06-13 — both hard-KILLED
 # in paper (neg Kelly), no longer tracked. State files kept; they still surface

@@ -23,6 +23,11 @@ Experiments graded (registry below is the single source of truth):
                [MR REQUOTE] events from bot.log since deploy, requote/RSI-floor
                counters from the blocked sidecar, live-slot record; fill rate
                vs the 15% baseline with a bootstrap CI.
+  eth_tsm_28   ETH-TSM-28 slow-horizon slot (2026-07-06 build, ships paper).
+               Kill criteria (pre-registered, spec §9) are graded HERE — the
+               slot's own rails are opted out: net vs the −$10 kill line,
+               disaster-stop count (2 = revert), replica-tracking error from
+               eth_tsm_28_signal.json (>0.1%/day over a full 14d window).
 
 Statistics reuse scripts/st2_lab/stats.py: bootstrap_diff_ci resamples the two
 sides INDEPENDENTLY and sorts the diffs (house lesson — sorting per-side means
@@ -101,7 +106,29 @@ EXPERIMENTS = {
         "baseline_fill_rate": 0.15,
         "pass_min_attempts": 20,
     },
+    # ETH-TSM-28 slow-horizon slot (2026-07-06 build; pre-registered spec
+    # docs/overnight-2026-07-05/r5_slow_horizon_research.md §7 + §9 kill criteria).
+    # Kill criteria live HERE, not in the slot (rails deliberately opted out):
+    #   - cumulative live net <= −$10
+    #   - >= 2 disaster-stop exits (stop doing the exiting = not this strategy)
+    #   - replica tracking error > 0.1%/day over the trailing 14 days
+    #     (approximation of the spec's "2 consecutive weeks" — daily records in
+    #     eth_tsm_28_signal.json carry replica vs actual position + close).
+    # exchange_close on THIS slot = the −8% disaster stop by construction: the
+    # only exchange-resting order it ever places is the stop (no TP, no trail).
+    "eth_tsm_28": {
+        "deployed_ts": _pt_ts(2026, 7, 6, 4, 0),  # build shipped paper-first; live
+        # trades are additionally filtered by mode=="live" so this ts is a window anchor only
+        "kill_net_usd": -10.0,
+        "kill_disaster_stops": 2,
+        "disaster_reasons": ("exchange_close", "disaster_stop", "stop_loss"),
+        "tracking_err_daily": 0.001,   # 0.1%/day, spec §9
+        "tracking_window_days": 14,
+    },
 }
+
+TSM_STATE_FILE = BOT_DIR / "trading_state_ETH_TSM_28.json"
+TSM_SIGNAL_FILE = BOT_DIR / "eth_tsm_28_signal.json"
 
 
 # ── shared helpers ────────────────────────────────────────────────────────
@@ -348,6 +375,73 @@ def grade_mr_bundle(slot_state: dict, counters: dict, log_text: str,
             "live_net_usd": round(sum(nets), 4) if nets else 0.0}
 
 
+def grade_eth_tsm(slot_state: dict, signal_state: dict, cfg: dict) -> dict:
+    """ETH-TSM-28 kill-criteria grader (spec §9, pre-registered):
+      REVERT: live net <= kill_net_usd; OR disaster-stop exits >= 2; OR mean
+      |live − replica| daily return > 0.1%/day over a FULL trailing 14-day
+      window. Otherwise WATCH (a 6-month process-validation test has no early
+      PASS). Disaster stops = losing exits whose reason is exchange_close /
+      disaster_stop / stop_loss — the −8% stop is the only exchange-resting
+      order this slot ever places, so exchange_close on it IS the stop."""
+    trades = slot_state.get("closed_trades", []) or []
+    live = [t for t in trades if t.get("mode") == "live"]
+    nets = [n for t in live for n in [_net(t)] if n is not None]
+    net = sum(nets) if nets else 0.0
+    disasters = [t for t in live
+                 if (t.get("exit_reason") or t.get("reason")) in cfg["disaster_reasons"]
+                 and (_net(t) or 0) < 0]
+
+    # Replica-vs-actual daily-return tracking from the signal sidecar. Day t's
+    # position earns close[t]/close[t-1]−1 (fees/fills excluded — this measures
+    # BEHAVIORAL fidelity, believability bar (b), not cost drag).
+    days = (signal_state or {}).get("days", []) or []
+    window = cfg["tracking_window_days"]
+    recent = days[-(window + 1):]
+    diffs, div_days = [], 0
+    for prev, cur in zip(recent, recent[1:]):
+        try:
+            r = float(cur["close"]) / float(prev["close"]) - 1.0
+        except (KeyError, TypeError, ZeroDivisionError, ValueError):
+            continue
+        live_r = r if prev.get("actual_position") else 0.0
+        rep_r = r if prev.get("replica_position") else 0.0
+        diffs.append(abs(live_r - rep_r))
+        if bool(prev.get("actual_position")) != bool(prev.get("replica_position")):
+            div_days += 1
+    track_err = (sum(diffs) / len(diffs)) if diffs else None
+    window_full = len(diffs) >= window
+
+    if not live and not days:
+        status, note = WATCH, "n=0 — no verdict"
+    elif net <= cfg["kill_net_usd"]:
+        status = REVERT
+        note = f"net ${net:+.2f} breached the ${cfg['kill_net_usd']:.0f} kill line"
+    elif len(disasters) >= cfg["kill_disaster_stops"]:
+        status = REVERT
+        note = (f"{len(disasters)} disaster-stop exits (limit "
+                f"{cfg['kill_disaster_stops']}) — the stop is doing the exiting")
+    elif window_full and track_err is not None and track_err > cfg["tracking_err_daily"]:
+        status = REVERT
+        note = (f"tracking error {track_err*100:.3f}%/day > "
+                f"{cfg['tracking_err_daily']*100:.1f}%/day over {len(diffs)}d")
+    else:
+        status = WATCH  # 6-month process test: no early PASS defined
+        note = (f"within kill lines ({len(days)} signal days logged)"
+                if days else "no signal days logged yet")
+
+    return {"experiment": "eth_tsm_28", "status": status, "note": note,
+            "n_live_trades": len(live),
+            "live_net_usd": round(net, 4),
+            "kill_net_usd": cfg["kill_net_usd"],
+            "disaster_stops": len(disasters),
+            "signal_days": len(days),
+            "divergence_days_window": div_days,
+            "tracking_err_daily": (round(track_err, 6)
+                                   if track_err is not None else None),
+            "tracking_window_full": window_full,
+            "last_day": (days[-1] if days else None)}
+
+
 # ── digest ────────────────────────────────────────────────────────────────
 def _line_trail(r) -> str:
     avg = (f"avg win ${r['avg_win_usd']:.2f} vs ${r['baseline_avg_win_usd']:.2f} "
@@ -386,6 +480,20 @@ def _line_mr(r) -> str:
             f"${r['live_net_usd']:+.2f} | counters: {side or 'none'}")
 
 
+def _line_tsm(r) -> str:
+    err = (f"track {r['tracking_err_daily']*100:.3f}%/day"
+           f"{'' if r['tracking_window_full'] else ' (window not full)'}"
+           if r["tracking_err_daily"] is not None else "track n/a")
+    last = r.get("last_day") or {}
+    sig = ("sig " + ("ON" if last.get("signal_on") else "OFF")
+           + (" · pos" if last.get("actual_position") else " · flat")
+           if last else "no days yet")
+    return (f"[eth_tsm_28]   {r['status']} — {r['note']} | "
+            f"live {r['n_live_trades']} trades ${r['live_net_usd']:+.2f} "
+            f"(kill {r['kill_net_usd']:.0f}) · {r['disaster_stops']} disaster-stops | "
+            f"{r['signal_days']} days · {r['divergence_days_window']} div | {err} | {sig}")
+
+
 def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     now = now or time.time()
     trades = load_closed_trades()
@@ -396,12 +504,16 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
         grade_mr_bundle(load_json(MR_STATE_FILE, {}),
                         load_json(MR_COUNTERS_FILE, {}),
                         log_text, EXPERIMENTS["mr_bundle"]),
+        grade_eth_tsm(load_json(TSM_STATE_FILE, {}),
+                      load_json(TSM_SIGNAL_FILE, {}),
+                      EXPERIMENTS["eth_tsm_28"]),
     ]
     stamp = datetime.fromtimestamp(now, tz=PT).strftime("%b %-d %-I:%M %p PT")
     lines = [f"LAB ADJUDICATOR — live forward tests ({stamp})"]
     lines.append(_line_trail(results[0]))
     lines.append(_line_sizing(results[1]))
     lines.append(_line_mr(results[2]))
+    lines.append(_line_tsm(results[3]))
     return "\n".join(lines), results
 
 
