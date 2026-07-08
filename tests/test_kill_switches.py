@@ -14,12 +14,40 @@ def test_compute_today_net_pnl_sums_only_today():
     assert _compute_today_net_pnl(trades) == -1.5
 
 
-def test_daily_loss_halt_triggers_at_3_percent():
+def test_daily_loss_halt_triggers_at_3_percent_above_floor():
     from bot import _should_halt_daily_loss
-    balance = 100.0
-    assert _should_halt_daily_loss(today_net=-2.0, balance=balance) is False
-    assert _should_halt_daily_loss(today_net=-3.0, balance=balance) is True
-    assert _should_halt_daily_loss(today_net=-5.0, balance=balance) is True
+    # Large balance: 3% ($6) exceeds the $5 floor, so percent governs
+    balance = 200.0
+    assert _should_halt_daily_loss(today_net=-5.5, balance=balance) is False
+    assert _should_halt_daily_loss(today_net=-6.0, balance=balance) is True
+    assert _should_halt_daily_loss(today_net=-9.0, balance=balance) is True
+
+
+def test_daily_loss_halt_floor_5_dollars_at_small_balance():
+    # 2026-07-07 Jonas directive: halt = max(3% x balance, $5.00).
+    # At $59.73 balance, 3% = $1.79 — one full $15-margin SL (~-$2.05)
+    # was ending the whole trading day. Floor lets ~2 stops through;
+    # halt only on a genuinely bad day.
+    from bot import _should_halt_daily_loss
+    balance = 59.73  # 3% = $1.79, floor $5 governs
+    assert _should_halt_daily_loss(today_net=-2.05, balance=balance) is False  # 1 full SL
+    assert _should_halt_daily_loss(today_net=-4.10, balance=balance) is False  # 2 full SLs
+    assert _should_halt_daily_loss(today_net=-4.99, balance=balance) is False
+    assert _should_halt_daily_loss(today_net=-5.00, balance=balance) is True
+    assert _should_halt_daily_loss(today_net=-6.15, balance=balance) is True   # 3 full SLs
+
+
+def test_daily_loss_halt_crossover_balance():
+    # Floor governs below $166.67 balance (where 3% == $5), percent above
+    from bot import _should_halt_daily_loss
+    assert _should_halt_daily_loss(today_net=-5.0, balance=166.0) is True    # floor edge
+    assert _should_halt_daily_loss(today_net=-5.0, balance=167.0) is False   # 3% = $5.01
+    assert _should_halt_daily_loss(today_net=-5.01, balance=167.0) is True
+
+
+def test_daily_loss_halt_zero_balance_never_halts():
+    from bot import _should_halt_daily_loss
+    assert _should_halt_daily_loss(today_net=-99.0, balance=0.0) is False
 
 
 def test_consecutive_loss_halt_triggers_at_5():

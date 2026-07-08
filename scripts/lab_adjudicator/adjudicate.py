@@ -537,7 +537,8 @@ def main(argv=None) -> int:
     if args.telegram:
         # notify.telegram_alert sends parse_mode=HTML — raw '<' (e.g. "n<3")
         # makes Telegram reject the message, so escape the whole digest.
-        ok = telegram_alert("🧾 " + html.escape(digest))
+        # attempts=4: survive a dark-wake/DNS blip at 6 AM (waits 15/60/240s)
+        ok = telegram_alert("🧾 " + html.escape(digest), attempts=4)
         log.info("telegram send: %s", "ok" if ok else "FAILED")
         print(f"(telegram: {'sent' if ok else 'FAILED'})")
     return 0

@@ -89,3 +89,82 @@ def test_alert_swallows_errors_never_raises(tmp_path, monkeypatch):
         raise RuntimeError("network down")
 
     assert N.telegram_alert("x", env_path=p, poster=boom) is False  # no exception propagates
+
+# ── Retry support (2026-07-07) ────────────────────────────────────────────
+# Root cause: the 6 AM adjudicator digest fired during a battery dark-wake
+# with DNS down — both sends failed instantly and Jonas never got the digest.
+# telegram_alert grows attempts/retry_waits (default attempts=1 = exact old
+# behavior for the lab loop callers); adjudicate.py + drift_watchdog.py opt in.
+
+def test_alert_retries_after_exception_then_succeeds(tmp_path, monkeypatch):
+    monkeypatch.delenv("TELEGRAM_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    p = _write_env(tmp_path, token="T", chat="C")
+    calls, naps = [], []
+
+    def flaky(u, pl):
+        calls.append(1)
+        if len(calls) < 3:
+            raise OSError("DNS down")
+        return 200
+
+    ok = N.telegram_alert("x", env_path=p, poster=flaky,
+                          attempts=4, sleeper=naps.append)
+    assert ok is True
+    assert len(calls) == 3          # failed, failed, succeeded
+    assert len(naps) == 2           # slept between attempts only
+    assert naps == sorted(naps)     # backoff never shrinks
+
+
+def test_alert_retries_after_non_200_then_succeeds(tmp_path, monkeypatch):
+    monkeypatch.delenv("TELEGRAM_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    p = _write_env(tmp_path, token="T", chat="C")
+    codes = iter([502, 200])
+    naps = []
+    ok = N.telegram_alert("x", env_path=p, poster=lambda u, pl: next(codes),
+                          attempts=3, sleeper=naps.append)
+    assert ok is True
+    assert len(naps) == 1
+
+
+def test_alert_default_is_single_attempt(tmp_path, monkeypatch):
+    # confirm.tick / nightly_research callers keep exact old behavior
+    monkeypatch.delenv("TELEGRAM_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    p = _write_env(tmp_path, token="T", chat="C")
+    calls = []
+
+    def boom(u, pl):
+        calls.append(1)
+        raise OSError("down")
+
+    assert N.telegram_alert("x", env_path=p, poster=boom) is False
+    assert len(calls) == 1          # no retry unless asked
+
+
+def test_alert_no_creds_never_retries(tmp_path, monkeypatch):
+    # missing creds is a config problem, not transient — fail fast
+    monkeypatch.delenv("TELEGRAM_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    p = _write_env(tmp_path)
+    naps = []
+    assert N.telegram_alert("x", env_path=p, poster=lambda u, pl: 200,
+                            attempts=4, sleeper=naps.append) is False
+    assert naps == []
+
+
+def test_alert_exhausted_retries_returns_false_never_raises(tmp_path, monkeypatch):
+    monkeypatch.delenv("TELEGRAM_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    p = _write_env(tmp_path, token="T", chat="C")
+    calls, naps = [], []
+
+    def boom(u, pl):
+        calls.append(1)
+        raise OSError("still down")
+
+    assert N.telegram_alert("x", env_path=p, poster=boom,
+                            attempts=3, sleeper=naps.append) is False
+    assert len(calls) == 3
+    assert len(naps) == 2

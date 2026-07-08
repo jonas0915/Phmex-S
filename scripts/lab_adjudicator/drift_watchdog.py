@@ -160,7 +160,8 @@ def main(argv=None) -> int:
     log.info(line)
 
     if args.telegram:
-        ok = telegram_alert("📉 " + line)
+        # attempts=4: survive a dark-wake/DNS blip at 6 AM (waits 15/60/240s)
+        ok = telegram_alert("📉 " + line, attempts=4)
         log.info("telegram send: %s", "ok" if ok else "FAILED")
         print(f"(telegram: {'sent' if ok else 'FAILED'})")
     return 0

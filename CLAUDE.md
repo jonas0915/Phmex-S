@@ -20,7 +20,8 @@ Current version: **Sentinel (v11)** — deployed 2026-04-01.
 ## Current Parameters
 | Parameter | Value | Location |
 |-----------|-------|----------|
-| Trade size | $15 margin (raised from $10 on 2026-07-04, owner directive; note: one full SL ≈ trips the 3% daily halt at ~$62 balance) | .env: TRADE_AMOUNT_USDT |
+| Trade size | $15 margin (raised from $10 on 2026-07-04, owner directive) | .env: TRADE_AMOUNT_USDT |
+| Daily loss halt | max(3% × balance, $5.00) — $5 floor added 2026-07-07 (owner directive) so one full $15 SL (≈−$2.05) no longer ends the day; ~2 stops tolerated, halt on the 3rd | bot.py:_should_halt_daily_loss |
 | Leverage | 10x | .env: LEVERAGE |
 | Max open trades | 3 | .env: MAX_OPEN_TRADES |
 | Stop loss | 1.2% | .env: STOP_LOSS_PERCENT |

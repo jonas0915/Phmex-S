@@ -105,10 +105,18 @@ def _compute_today_net_pnl(closed_trades: list) -> float:
     return total
 
 
-def _should_halt_daily_loss(today_net: float, balance: float, threshold_pct: float = 3.0) -> bool:
+def _should_halt_daily_loss(today_net: float, balance: float, threshold_pct: float = 3.0,
+                            floor_usdt: float = 5.0) -> bool:
+    """Daily-loss kill switch: halt when today's net <= -max(threshold_pct% of
+    balance, floor_usdt). The $5 floor (Jonas directive 2026-07-07) exists
+    because at $15 margin one full SL (~-$2.05) exceeded 3% of a ~$60 balance
+    (-$1.79) — a single normal stop was ending the whole trading day (r2
+    research 2026-07-06 projected ~32% of days would trip). Floor lets ~2 full
+    stops through; the percent branch takes over above ~$167 balance."""
     if balance <= 0:
         return False
-    return today_net <= -(balance * threshold_pct / 100.0)
+    threshold = max(balance * threshold_pct / 100.0, floor_usdt)
+    return today_net <= -threshold
 
 
 def _should_halt_consecutive_losses(loss_streak: int, threshold: int = 5) -> bool:
@@ -120,8 +128,9 @@ def _daily_loss_override_active(path: str = ".daily_loss_override") -> bool:
 
     Lets an operator authorize trading for the rest of a single day after the
     daily-loss kill switch has fired. Self-expires at PT midnight (the date in
-    the file no longer matches), so every future day keeps the full -3%
-    protection automatically. Reversible at any time by deleting the file.
+    the file no longer matches), so every future day keeps the full daily-loss
+    protection (max of -3% / -$5 floor) automatically. Reversible at any time
+    by deleting the file.
     """
     if not os.path.exists(path):
         return False
@@ -1372,10 +1381,12 @@ class Phmex2Bot:
         # --- Extended kill switches (daily loss + consecutive loss) ---
         today_net = _compute_today_net_pnl(self.risk.closed_trades)
         if _should_halt_daily_loss(today_net, real_balance):
+            _halt_thr = max(real_balance * 0.03, 5.0)  # mirror _should_halt_daily_loss
             if _daily_loss_override_active():
                 if not getattr(self, "_daily_loss_override_logged", False):
                     msg = (f"DAILY LOSS OVERRIDE active — today net ${today_net:.2f} past "
-                           f"-3% of ${real_balance:.2f}, but operator override for today is "
+                           f"-${_halt_thr:.2f} (max of 3% / $5 floor) of ${real_balance:.2f}, "
+                           f"but operator override for today is "
                            f"set; entries allowed. Auto-expires at midnight PT.")
                     logger.warning(f"[KILL SWITCH] {msg}")
                     try:
@@ -1384,7 +1395,8 @@ class Phmex2Bot:
                         pass
                     self._daily_loss_override_logged = True
             else:
-                reason = f"DAILY LOSS HALT: today net ${today_net:.2f} exceeds -3% of ${real_balance:.2f}"
+                reason = (f"DAILY LOSS HALT: today net ${today_net:.2f} exceeds "
+                          f"-${_halt_thr:.2f} (max of 3% / $5 floor) of ${real_balance:.2f}")
                 self._set_pause_sentinel(reason)
                 logger.warning(f"[KILL SWITCH] {reason}")
                 try:
