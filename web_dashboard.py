@@ -911,7 +911,8 @@ def _build_signals_section(slot_states: dict = None) -> str:
         card = _build_signal_card(slot_id, title, state, live_ids, modes,
                                   fill_stats, desc)
         cards += f'<div class="panel sig-box" id="sig-{escape(slot_id)}">{card}</div>'
-    return f'<div id="signals-grid">{cards}</div>'
+    return (f'<div id="signals-title">STRATEGIES</div>'
+            f'<div id="signals-grid">{cards}</div>')
 
 
 # ── Equity series (JSON for the client-side uPlot chart) ────────────────
@@ -1713,6 +1714,9 @@ body {{ background:var(--bg); color:var(--txt);
   min-height:120px; overflow-y:auto; max-height:46vh; }}
 .sig-header {{ color:var(--amber); letter-spacing:2px; font-size:10px;
   text-transform:uppercase; padding:6px 3px 2px; }}
+#signals-title {{ color:var(--amber); letter-spacing:2px; font-size:11px;
+  text-transform:uppercase; font-weight:bold; padding:6px 6px 4px;
+  border-bottom:1px solid #1a2412; margin:0 3px 3px; }}
 #signals-grid {{ display:grid; grid-template-columns:repeat(3,1fr); gap:3px;
   padding:0 3px 3px; }}
 .sig-box {{ min-height:0; max-height:none; }}
