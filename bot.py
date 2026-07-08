@@ -50,6 +50,15 @@ def _requote_drift_pct(direction: str, signal_price: float, touch: float) -> flo
     return raw if direction == "long" else -raw
 
 
+def _meets_min_strength(strength: float, minimum: float) -> bool:
+    """Float-safe min-strength gate. The short penalty (0.84 - 0.04) and the
+    additive strength ladders inside strategies produce IEEE-754 dust like
+    0.7999999999999999 — which displays as 0.80 yet fails `< 0.80`. XLM lost
+    11 boundary signals to this on 2026-07-07. Round to 4dp before comparing
+    so dust can't flip the gate; a genuine 0.7999 still fails."""
+    return round(strength, 4) >= minimum
+
+
 def _extract_strategy_name(reason: str) -> str:
     """Derive strategy key from signal reason string for time exit lookup."""
     r = reason.lower()
@@ -1490,8 +1499,8 @@ class Phmex2Bot:
             if signal.signal == Signal.SELL:
                 signal = TradeSignal(signal.signal, signal.reason, signal.strength - 0.04)
 
-            # Min strength check
-            if signal.signal != Signal.HOLD and signal.strength < Config.SCALP_MIN_STRENGTH:
+            # Min strength check (float-safe: 0.84 - 0.04 dust must count as 0.80)
+            if signal.signal != Signal.HOLD and not _meets_min_strength(signal.strength, Config.SCALP_MIN_STRENGTH):
                 logger.debug(f"Signal too weak for {symbol}: {signal.strength:.2f}, skipping")
                 continue
 
@@ -2124,7 +2133,7 @@ class Phmex2Bot:
                         if signal is not None and "SMA+VWAP gate" in signal.reason:
                             logger.debug(f"[PAPER] {slot.slot_id} {symbol}: {signal.reason}")
                         continue
-                    if signal.strength < 0.80:
+                    if not _meets_min_strength(signal.strength, 0.80):
                         logger.debug(f"[PAPER] {slot.slot_id} {symbol}: strength {signal.strength:.2f} < 0.80")
                         continue
 

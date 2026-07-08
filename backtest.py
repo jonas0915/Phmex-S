@@ -1304,11 +1304,13 @@ def run_backtest(
             # Short penalty (bot.py:1051-1053): -0.04 strength on SELL signals,
             # applied BEFORE the min-strength check. Was never ported — root cause
             # of the ZEC 10x overfire (sim 30 shorts vs live 15; longs matched 22=22).
-            # NOTE: keep the live float semantics (0.84-0.04 = 0.7999... < 0.80 blocks).
+            # NOTE: mirror live float semantics. Live gate is float-SAFE as of
+            # 2026-07-07 (bot.py _meets_min_strength: round to 4dp before compare,
+            # so 0.84-0.04 dust counts as 0.80) — keep this in sync with bot.py.
             sig_strength = raw_strength - 0.04 if signal.signal == Signal.SELL else raw_strength
 
-            # Min strength check (live: Config.SCALP_MIN_STRENGTH)
-            if sig_strength < SCALP_MIN_STRENGTH:
+            # Min strength check (live: Config.SCALP_MIN_STRENGTH, float-safe)
+            if round(sig_strength, 4) < SCALP_MIN_STRENGTH:
                 continue
 
             # --- Flow gate port (live bot.py:1082-1143), replayed from capture ---
