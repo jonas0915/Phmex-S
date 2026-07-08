@@ -50,6 +50,18 @@ def _requote_drift_pct(direction: str, signal_price: float, touch: float) -> flo
     return raw if direction == "long" else -raw
 
 
+def _equity_for_drawdown(exchange_equity: float, free_plus_main_margin: float) -> float:
+    """Equity value for drawdown/peak/daily-halt tracking. Prefer the EXCHANGE's
+    own total equity (free + ALL used margin, whoever placed the order) — the
+    old `free + main-bot margin_in_use` sum was blind to live SLOT positions'
+    margin (risk.positions only tracks the main bot), reading equity $10-15 low
+    whenever a slot held a live trade. That fired 9 false [DRAWDOWN] pauses
+    June 23 - July 7, including the 2026-07-07 7:20 AM "32.1% - SEVERE" 1.5h
+    block (true drawdown was 8%). Fall back to the old sum only when the equity
+    cache is unset (get_equity returns 0.0 before the first successful fetch)."""
+    return exchange_equity if exchange_equity > 0 else free_plus_main_margin
+
+
 def _meets_min_strength(strength: float, minimum: float) -> bool:
     """Float-safe min-strength gate. The short penalty (0.84 - 0.04) and the
     additive strength ladders inside strategies produce IEEE-754 dust like
@@ -1352,7 +1364,15 @@ class Phmex2Bot:
         # Check for new entry signals
         available = self.exchange.get_balance(Config.BASE_CURRENCY)     # free balance for trade sizing
         margin_in_use = sum(pos.margin for pos in self.risk.positions.values())
-        real_balance = available + margin_in_use                        # true equity for drawdown tracking
+        # Drawdown/peak/halt tracking uses exchange-reported TOTAL equity (cached
+        # by the get_balance call above) — free+main-margin is blind to live slot
+        # positions' margin and fired 9 false [DRAWDOWN] pauses (see helper doc).
+        # Paper mode passes 0 to force the fallback sum: paper_balances is already
+        # margin-debited and paper positions ARE in risk.positions, so the old
+        # free+margin math is exactly right there (review 2026-07-08 catch).
+        _exchange_equity = (self.exchange.get_equity(Config.BASE_CURRENCY)
+                            if Config.is_live() else 0.0)
+        real_balance = _equity_for_drawdown(_exchange_equity, available + margin_in_use)
         self.risk.update_peak_balance(real_balance)
 
         # Regime filter — pause all entries after consecutive losses
