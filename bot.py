@@ -1976,6 +1976,7 @@ class Phmex2Bot:
                 accum: dict[str, dict] = {}
                 for symbol in pairs:
                     flow = self._ws_feed.get_order_flow(symbol) if self._ws_feed else None
+                    lp = self._ws_feed.last_price(symbol) if self._ws_feed else None
                     depth = self._ob_depth_cache.get(symbol, {})
                     accum[symbol] = {
                         "buy_ratio":         (flow or {}).get("buy_ratio"),
@@ -1984,7 +1985,7 @@ class Phmex2Bot:
                         "ask_depth_usdt":    depth.get("ask_depth_usdt"),
                         "large_trade_bias":  (flow or {}).get("large_trade_bias"),
                         "trade_count":       (flow or {}).get("trade_count", 0),
-                        "last_price":        None,
+                        "last_price":        lp[0] if lp else None,
                         "updated_at":        time.time(),
                     }
                 _write_l2_snapshot(accum)

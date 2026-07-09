@@ -419,6 +419,47 @@ def _parse_last_prices(lines: list[str]) -> dict[str, float]:
     return prices
 
 
+def _snapshot_prices(max_age_s: float = 30.0) -> dict[str, float]:
+    """Live per-symbol mark price from l2_snapshot.json (`last_price`, written
+    by the bot's WS feed ~every 5s). Preferred over log-parsed fill prices for
+    the POSITIONS uPnL column because fill prices freeze for a trade's whole
+    life. Returns {} when the file is missing, stale (bot down), or last_price
+    isn't populated yet (field ships 2026-07-08; None until the bot restarts
+    on the new code — uPnL falls back to log prices until then).
+    Freshness: per-symbol embedded `updated_at`, falling back to the top-level
+    `updated_at`, falling back to file mtime — must be within max_age_s.
+    Each price is keyed by the full symbol AND its base (pre-'/') so lookups
+    survive format drift between the snapshot and position dicts.
+    File read only — NO API calls, preserving dashboard bot-independence."""
+    path = os.path.join(PROJECT_DIR, "l2_snapshot.json")
+    try:
+        mtime = os.path.getmtime(path)
+        with open(path) as f:
+            snap = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    if not isinstance(snap, dict):
+        return {}
+    now = time.time()
+    snap_ts = snap.get("updated_at") or mtime
+    prices: dict[str, float] = {}
+    for sym, s in (snap.get("symbols") or {}).items():
+        if not isinstance(s, dict):
+            continue
+        px = s.get("last_price")
+        if not isinstance(px, (int, float)) or isinstance(px, bool) or px <= 0:
+            continue  # None/absent = bot not on new code yet; skip, don't invent
+        ts = s.get("updated_at") or snap_ts
+        try:
+            if now - float(ts) > max_age_s:
+                continue  # stale snapshot (bot down) — fall back to log prices
+        except (TypeError, ValueError):
+            continue
+        prices[str(sym)] = float(px)
+        prices.setdefault(str(sym).split("/")[0], float(px))
+    return prices
+
+
 def _reconcile_summary() -> dict:
     """Data behind the old reconcile card, reduced to OK / non-OK.
     Same rules as the card: STALE when the last run is >8h old, DRIFT when the
@@ -1318,14 +1359,17 @@ def build_feed(lines: list = None) -> str:
 # ── HTML rendering ───────────────────────────────────────────────────────
 def _build_positions_panel(lines: list = None, slot_states: dict = None) -> str:
     """POSITIONS panel: main positions + LIVE slots' positions (owner-tagged).
-    uPnL shows "—" unless the symbol's price appears in the log tail already
-    read this request (_parse_last_prices) — the dashboard NEVER calls the
-    exchange. Flat state shows the last merged close; a reconcile problem
-    (DRIFT/STALE) renders as a single red line, nothing when clean."""
+    uPnL price source: fresh l2_snapshot.json last_price when available
+    (_snapshot_prices, ~5s WS mark), else the symbol's last price in the log
+    tail already read this request (_parse_last_prices) — the dashboard NEVER
+    calls the exchange. Shows "—" when neither source has the symbol. Flat
+    state shows the last merged close; a reconcile problem (DRIFT/STALE)
+    renders as a single red line, nothing when clean."""
     lines = lines if lines is not None else tail_log(3000)
     if slot_states is None:
         slot_states = read_all_slot_states()
     prices = _parse_last_prices(lines)
+    live_px = _snapshot_prices()
 
     pos_rows = []
     for owner in sorted(_live_slot_ids()):
@@ -1340,7 +1384,10 @@ def _build_positions_panel(lines: list = None, slot_states: dict = None) -> str:
             tp = p.get("take_profit") or 0
             opened = p.get("opened_at") or 0
             age = f"{(time.time() - opened) / 60:.0f}m" if opened else "&mdash;"
-            px = prices.get(sym)
+            # Prefer the live WS mark (fresh snapshot) over the frozen log
+            # fill price; try the full symbol then the base for format drift.
+            px = (live_px.get(sym) or live_px.get(str(sym).split("/")[0])
+                  or prices.get(sym))
             amt = p.get("amount") or 0
             if px and entry and amt:
                 upnl = (px - entry) * float(amt) * (1 if side.startswith("L") else -1)
@@ -1772,13 +1819,30 @@ body {{ background:var(--bg); color:var(--txt);
     </div><div id="equity-chart"></div>
 </div>
 <div id="feed" class="panel">{feed}</div>
-<div class="footer">Auto-refresh 3s &middot; Equity 30s &middot; Read-only &middot; Zero API calls &middot; NET basis<span id="upd"></span></div>
+<div class="footer">Auto-refresh 3s &middot; Equity 10s &middot; Read-only &middot; Zero API calls &middot; NET basis<span id="upd"></span></div>
 <script>
 async function poll(){{
   try{{
     const r = await fetch('/api/content'); const j = await r.json();
     document.getElementById('ticker').innerHTML = j.ticker;
+    // #content is replaced wholesale — save open blotter drill-down rows
+    // (keyed by their stable owner:index id) and re-insert them after the
+    // swap so an expanded row survives the 3s poll. Drill content is static
+    // per trade, so re-using the saved HTML (no refetch) is correct.
+    const openDrills = {{}};
+    document.querySelectorAll('#content tr[data-drill]').forEach(x => {{
+      openDrills[x.dataset.drill] = x.innerHTML;
+    }});
     document.getElementById('content').innerHTML = j.content;
+    for(const [id, html] of Object.entries(openDrills)){{
+      const tr = document.querySelector('#content tr[data-id="'+CSS.escape(id)+'"]');
+      if(tr){{
+        const row = document.createElement('tr');
+        row.dataset.drill = id;
+        row.innerHTML = html;  // saved from our own escq()-sanitized render
+        tr.after(row);
+      }}
+    }}
     document.getElementById('feed').innerHTML = j.feed;
     // live heartbeat: ticks every successful poll so static trade counts don't
     // read as "frozen". A stale time = the poll loop or server actually stopped.
@@ -1787,8 +1851,8 @@ async function poll(){{
 }}
 setInterval(poll, 3000); poll();
 
-// ── Blotter drill-down. NOTE: #content is replaced wholesale every 3s, so
-// an expanded row collapses on the next poll — acceptable for v1. ──
+// ── Blotter drill-down. #content is replaced wholesale every 3s; poll()
+// saves open drill rows by id and re-inserts them after the swap. ──
 function escq(v){{ return String(v==null?'':v).replace(/&/g,'&amp;')
   .replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }}
 async function drill(tr, id, sym){{
@@ -1833,9 +1897,11 @@ async function drill(tr, id, sym){{
   tr.after(row);
 }}
 
-// ── Equity chart (uPlot, vendored at /static/, refreshed every 30s) ──
-let plot=null, era='sentinel', eqMeta=[];
-// Zoom state, preserved across the 30s rebuild so a zoomed view doesn't reset.
+// ── Equity chart (uPlot, vendored at /static/, refreshed every 10s) ──
+// plotEra tracks which era the live uPlot instance was built for: same era →
+// flicker-free setData() update; era switch (or first load) → full rebuild.
+let plot=null, era='sentinel', plotEra=null, eqMeta=[];
+// Zoom state, preserved across refreshes so a zoomed view doesn't reset.
 let eqZoomed=false, eqXMin=null, eqXMax=null;
 // uPlot plugin: wheel-zoom at cursor, shift+wheel pan, dbl-click reset.
 // (Drag-select zoom is uPlot-native via cursor.drag below.)
@@ -1897,40 +1963,49 @@ async function loadEquity(){{
     const r=await fetch('/api/equity?era='+era); const d=await r.json();
     eqMeta=d.meta;
     const node=document.getElementById('equity-chart');
-    const opts={{width:node.clientWidth||800,
-      height:180, scales:{{x:{{time:true}}}},
-      series:[{{}}, {{label:'NET PnL', stroke:'#f0a500', width:1.5,
-        points:{{show:true, size:5,
-          fill:(u,si,i)=> eqMeta[i] && eqMeta[i].win ? '#4af626' : '#ff5555'}}}}],
-      axes:[{{stroke:'#5a6b5a',grid:{{stroke:'#1a2412'}}}},{{stroke:'#5a6b5a',grid:{{stroke:'#1a2412'}}}}],
-      cursor:{{drag:{{x:true,y:false}}}}, legend:{{show:false}},
-      plugins:[wheelZoomPlugin()]}};
-    if(plot){{ plot.destroy(); plot=null; }}
-    node.innerHTML='';
-    plot=new uPlot(opts,[d.t,d.v],node);
-    // Preserve a user's zoom window across the 30s rebuild.
-    if(eqZoomed && eqXMin!=null){{ plot.setScale('x', {{min:eqXMin, max:eqXMax}}); }}
-    // tooltip: absolutely-positioned div fed from meta at the cursor's idx
-    const tip=document.createElement('div'); tip.id='eqtip'; node.appendChild(tip);
-    plot.over.addEventListener('mousemove', ()=>{{
-      const i=plot.cursor.idx;
-      if(i==null || !eqMeta[i]){{ tip.style.display='none'; return; }}
-      const m=eqMeta[i], sign=m.pnl>=0?'+':'';
-      tip.innerHTML=escq(m.time_pt)+' &middot; '+escq(m.sym)+' &middot; '+escq(m.strat)+
-        ' &middot; <span class="'+(m.win?'pos':'neg')+'">'+sign+m.pnl.toFixed(2)+'</span>'+
-        (m.reason?' &middot; '+escq(m.reason):'');
-      tip.style.display='block';
-      tip.style.left=Math.min(plot.cursor.left+14, Math.max(0,node.clientWidth-260))+'px';
-      tip.style.top=(plot.cursor.top+12)+'px';
-    }});
-    plot.over.addEventListener('mouseleave', ()=>{{ tip.style.display='none'; }});
+    if(plot && plotEra===era){{
+      // Same era, chart exists: flicker-free data swap. The points-fill and
+      // tooltip closures read the global eqMeta (already updated above).
+      plot.setData([d.t,d.v]);
+      // setData resets the x scale to the full range — restore the zoom.
+      if(eqZoomed && eqXMin!=null){{ plot.setScale('x', {{min:eqXMin, max:eqXMax}}); }}
+    }}else{{
+      const opts={{width:node.clientWidth||800,
+        height:180, scales:{{x:{{time:true}}}},
+        series:[{{}}, {{label:'NET PnL', stroke:'#f0a500', width:1.5,
+          points:{{show:true, size:5,
+            fill:(u,si,i)=> eqMeta[i] && eqMeta[i].win ? '#4af626' : '#ff5555'}}}}],
+        axes:[{{stroke:'#5a6b5a',grid:{{stroke:'#1a2412'}}}},{{stroke:'#5a6b5a',grid:{{stroke:'#1a2412'}}}}],
+        cursor:{{drag:{{x:true,y:false}}}}, legend:{{show:false}},
+        plugins:[wheelZoomPlugin()]}};
+      if(plot){{ plot.destroy(); plot=null; }}
+      node.innerHTML='';
+      plot=new uPlot(opts,[d.t,d.v],node);
+      plotEra=era;
+      // Preserve a user's zoom window across the rebuild.
+      if(eqZoomed && eqXMin!=null){{ plot.setScale('x', {{min:eqXMin, max:eqXMax}}); }}
+      // tooltip: absolutely-positioned div fed from meta at the cursor's idx
+      const tip=document.createElement('div'); tip.id='eqtip'; node.appendChild(tip);
+      plot.over.addEventListener('mousemove', ()=>{{
+        const i=plot.cursor.idx;
+        if(i==null || !eqMeta[i]){{ tip.style.display='none'; return; }}
+        const m=eqMeta[i], sign=m.pnl>=0?'+':'';
+        tip.innerHTML=escq(m.time_pt)+' &middot; '+escq(m.sym)+' &middot; '+escq(m.strat)+
+          ' &middot; <span class="'+(m.win?'pos':'neg')+'">'+sign+m.pnl.toFixed(2)+'</span>'+
+          (m.reason?' &middot; '+escq(m.reason):'');
+        tip.style.display='block';
+        tip.style.left=Math.min(plot.cursor.left+14, Math.max(0,node.clientWidth-260))+'px';
+        tip.style.top=(plot.cursor.top+12)+'px';
+      }});
+      plot.over.addEventListener('mouseleave', ()=>{{ tip.style.display='none'; }});
+    }}
     document.getElementById('era-sentinel').classList.toggle('active', era==='sentinel');
     document.getElementById('era-all').classList.toggle('active', era==='all');
     title.textContent='EQUITY — CUMULATIVE NET PNL ('+era.toUpperCase()+' · '+d.t.length+' trades)';
   }}catch(e){{ title.textContent='EQUITY — chart assets missing'; }}
 }}
 function setEra(e){{ era=e; loadEquity(); }}
-loadEquity(); setInterval(loadEquity, 30000);
+loadEquity(); setInterval(loadEquity, 10000);
 </script>
 </body>
 </html>"""
