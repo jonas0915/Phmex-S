@@ -600,3 +600,8 @@ live: the running bot keeps the old in-memory code until a /pre-restart-audit'd 
 - **Fix**: tests/conftest.py force-blanks TELEGRAM_TOKEN/TELEGRAM_CHAT_ID (direct assignment before any import; load_dotenv doesn't override existing keys, so the blanks win).
 - **Rule**: any test that reaches a notification path must run with credentials blanked at conftest level — mocking individual call sites is not enough, new tests will forget. Same principle for ANY external side effect (email, orders, files outside tmp).
 - **Rule**: a "recurring alert with impossible data" (XLM at $100!) = suspect a NON-live sender first (tests, sims, replays) — grep the alert copy in the codebase, check test_run.log timestamps against suite runs, BEFORE hunting a live-trading bug.
+
+## Bot Downtime Must Be Measured From Cycle Gaps, Not pmset (Jul 8)
+- 7/7: told Jonas the bot was "sleep-suspended most of the day" based on pmset dark-wake events. Cycle-gap analysis (Cycle #N timestamps in bot.log) showed only ~2.9-3.6h of actual suspension — the bot ran steadily through midday, INCLUDING the 11 AM dump I'd blamed on sleep. The miss was signal-side, not sleep-side. Wrong windows also contaminated a market-timing agent's ASLEEP/AWAKE labels downstream.
+- **Rule**: pmset log shows what the OS did; only bot.log cycle gaps show what the BOT experienced. Quantify suspension as sum of inter-cycle gaps > ~5 min BEFORE attributing any missed trading to sleep. pmset is corroboration, not the measurement.
+- Related fix same session: lid-open does NOT prevent battery idle sleep (pmset -b sleep was 1 MINUTE; now 15) — see feedback_host_sleep_suspends_bot.

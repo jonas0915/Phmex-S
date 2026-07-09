@@ -125,14 +125,20 @@ def build_digest(watch_state: dict) -> tuple[str | None, dict]:
                     continue
             except ValueError:
                 pass
-        if "[MAKER] Limit" in line:
-            attempts += 1
         if "[SLOT LIVE] 5m_mean_revert" in line and "ENTRY" in line:
             fills += 1
         if "no fill (PostOnly miss)" in line:
             misses += 1
-        if "[MR REQUOTE]" in line:
+        # only the retry-PLACEMENT line is a re-quote event — FILLED/abort/
+        # zombie/still-resting lines share the [MR REQUOTE] tag (2026-07-08 fix)
+        if "[MR REQUOTE]" in line and " attempt " in line:
             requotes += 1
+    # [MAKER] Limit lines carry no slot tag (the line-117 filter drops them all),
+    # so attempts was structurally 0 forever — worse, it made nothing_new True on
+    # plain first-touch fills/misses, silently skipping the digest (2026-07-08
+    # fix; e.g. the 7/8 4:49 AM SOL fill sent nothing). Same convention as
+    # adjudicate.parse_mr_log: every attempt ends as exactly one fill or miss.
+    attempts = fills + misses
 
     nothing_new = (not new_trades and not counter_deltas
                    and attempts == 0 and requotes == 0)

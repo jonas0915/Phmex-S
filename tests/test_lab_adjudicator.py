@@ -184,11 +184,28 @@ MR_LOG = """\
 2026-07-04 14:00:00 [INFO] [SLOT LIVE] other_slot ENTRY BTC long filled
 """
 
+# A filled re-quote emits TWO [MR REQUOTE] lines (attempt + FILLED, real shapes
+# from bot.log 2026-07-07 5:21 AM XRP) — only the " attempt " line is the event.
+# Abort/zombie/resting lines also carry the tag and must not count either.
+MR_LOG_FILLED_REQUOTE = """\
+2026-07-07 05:21:10 [INFO] [SLOT LIVE] [MR REQUOTE] 5m_mean_revert XRP/USDT:USDT short attempt 1/1 @ 1.1293 (drift +0.053%)
+2026-07-07 05:21:50 [INFO] [SLOT LIVE] [MR REQUOTE] 5m_mean_revert XRP/USDT:USDT short FILLED on re-quote
+2026-07-07 05:21:54 [INFO] [SLOT LIVE] 5m_mean_revert ENTRY XRP short filled
+2026-07-07 06:00:00 [INFO] [SLOT LIVE] [MR REQUOTE] 5m_mean_revert ADA/USDT:USDT long abort — adverse drift 0.210% > cap
+"""
+
 
 def test_parse_mr_log_counts_and_since_filter():
     since = 1_783_000_000.0  # 2026-07-02 6:46 AM PT — excludes the 7/01 miss
     act = adj.parse_mr_log(MR_LOG, since)
     assert act == {"attempts": 2, "fills": 1, "misses": 1, "requotes": 1}
+
+
+def test_parse_mr_log_filled_requote_counts_once():
+    # 2026-07-08 bug: per-line counting reported 3 re-quotes for 2 events —
+    # the FILLED confirmation and abort lines inflated the count.
+    act = adj.parse_mr_log(MR_LOG_FILLED_REQUOTE, 0.0)
+    assert act == {"attempts": 1, "fills": 1, "misses": 0, "requotes": 1}
 
 
 def test_parse_mr_log_requoted_miss_is_one_attempt():

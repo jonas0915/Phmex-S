@@ -331,7 +331,11 @@ def parse_mr_log(log_text: str, since_ts: float) -> dict:
             fills += 1
         if "no fill (PostOnly miss)" in line:
             misses += 1
-        if "[MR REQUOTE]" in line:
+        # only the retry-PLACEMENT line is a re-quote event; the FILLED
+        # confirmation, abort, zombie-check and still-resting lines share the
+        # [MR REQUOTE] tag (a filled re-quote emits 2 tagged lines — counting
+        # per line reported "3 re-quotes" for 2 events on 2026-07-07).
+        if "[MR REQUOTE]" in line and " attempt " in line:
             requotes += 1
     return {"attempts": fills + misses, "fills": fills,
             "misses": misses, "requotes": requotes}
