@@ -8,6 +8,7 @@ Current version: **Sentinel (v11)** — deployed 2026-04-01.
 
 ## Critical Rules
 - **NEVER restart without running `/pre-restart-audit` first.** Real money is at stake.
+- **Editing a file ≠ the bot using it.** When working via the remote tunnel (or any editor), saved changes hit the home Mac's disk instantly, but the live bot keeps running the old code/`.env` until an audited restart. Never start a second instance on another machine. See `docs/remote-access.md`.
 - **NEVER change parameters without checking `memory/lessons.md` first.** Read META-RULES.
 - **NEVER propose new infrastructure without grepping existing code.** L2 orderbook, tape/flow, CVD, divergence systems already exist.
 - **Always verify numbers before presenting.** Deploy verification agents in the first pass.
