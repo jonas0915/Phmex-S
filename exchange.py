@@ -739,6 +739,53 @@ class Exchange:
                 pass
             return 0.0
 
+        def _computed(o: dict) -> float:
+            """Fee = notional x rate, for when the exchange omits fee['cost'].
+
+            Phemex market fills frequently return fee={'cost': None, 'rate': ...},
+            so an explicit cost is unavailable but the rate is not. Prefer the
+            exchange's own rate (exact); fall back to takerOrMaker -> configured
+            taker/maker rate (estimate). Returns 0.0 if no notional is resolvable.
+            """
+            if not isinstance(o, dict):
+                return 0.0
+            notional = o.get("cost")
+            if not notional:
+                try:
+                    filled = float(o.get("filled") or o.get("amount") or 0)
+                    price = float(o.get("average") or o.get("price") or 0)
+                    notional = filled * price
+                except (TypeError, ValueError):
+                    notional = 0.0
+            try:
+                notional = abs(float(notional or 0))
+            except (TypeError, ValueError):
+                notional = 0.0
+            if notional <= 0:
+                return 0.0
+            rate = None
+            fee = o.get("fee")
+            if isinstance(fee, dict) and fee.get("rate") is not None:
+                rate = fee.get("rate")
+            if rate is None:
+                for f in (o.get("fees") or []):
+                    if isinstance(f, dict) and f.get("rate") is not None:
+                        rate = f.get("rate")
+                        break
+            if rate is None:
+                # No exchange rate given -> estimate from taker/maker tier.
+                # Default to taker: extract_order_fee runs on close orders, and
+                # ~92% of live exits fill taker (fee-ground-truth 2026-06-11).
+                if o.get("takerOrMaker") == "maker":
+                    rate = Config.MAKER_FEE_PERCENT / 100.0
+                else:
+                    rate = Config.TAKER_FEE_PERCENT / 100.0
+            try:
+                rate = abs(float(rate or 0))
+            except (TypeError, ValueError):
+                rate = 0.0
+            return notional * rate if rate > 0 else 0.0
+
         cost = _read(order)
         if cost > 0:
             return cost
@@ -747,6 +794,7 @@ class Exchange:
         sym = symbol or (order.get("symbol") if isinstance(order, dict) else None)
 
         # Follow-up fetch_order
+        fetched = None
         if order_id and sym:
             try:
                 fetched = self.client.fetch_order(order_id, sym)
@@ -775,6 +823,17 @@ class Exchange:
                     return total
             except Exception as e:
                 logger.debug(f"extract_order_fee fetch_my_trades failed for {sym}: {e}")
+
+        # Last resort: compute from rate x notional (exchange omitted fee.cost).
+        # Prefer a fetched order (may carry rate), else the original order.
+        for src in (fetched, order):
+            computed = _computed(src) if src else 0.0
+            if computed > 0:
+                logger.debug(
+                    f"extract_order_fee: computed {computed:.5f} USDT from rate x notional "
+                    f"for {sym} (exchange omitted fee.cost)"
+                )
+                return computed
 
         return 0.0
 
