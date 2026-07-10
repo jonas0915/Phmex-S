@@ -81,12 +81,48 @@ def test_live_close_never_uses_simulated_fees(tmp_path):
     assert "fees_pending" not in trade
 
 
-def test_live_close_missing_fee_stays_zero_and_pending(tmp_path):
+def test_live_close_missing_fee_estimates_007_pct_and_stays_pending(tmp_path):
+    """Fee-blind-halt fix (2026-07-10): a live close with no exchange fee must
+    ESTIMATE fees (maker entry 0.01% + taker exit 0.06% = 0.07% of notional, no
+    slippage term — slippage is already in a live fill's price) instead of
+    counting $0. Otherwise the in-memory net_pnl the daily-loss halt sums is
+    gross, and the halt fires late (7/10: −$5.08 true net read as −$4.88, halt
+    never fired). fees_pending stays True so the reconciler still backfills the
+    exact fee into the state file."""
     rm = _live_rm(tmp_path)
-    rm.open_position(SYMBOL, entry_price=0.08, margin=10.0, side="long")
+    pos = rm.open_position(SYMBOL, entry_price=0.08, margin=10.0, side="long")
+    notional = pos.entry_price * pos.amount
     rm.close_position(SYMBOL, exit_price=0.081, reason="take_profit")  # no fee known
     trade = rm.closed_trades[-1]
     gross = (0.081 - 0.08) * trade["amount"]
-    assert trade["fees_usdt"] == 0.0  # NOT simulated for live
-    assert trade["pnl_usdt"] == pytest.approx(gross)
-    assert trade["fees_pending"] is True  # tagged for reconciler backfill
+    expected_est = notional * 0.07 / 100
+    assert trade["fees_usdt"] == pytest.approx(expected_est)
+    assert trade["pnl_usdt"] == pytest.approx(gross)  # live pnl_usdt stays GROSS
+    assert trade["net_pnl"] == pytest.approx(gross - expected_est)
+    assert trade["fees_pending"] is True  # reconciler backfill still owns truth
+
+
+def test_live_close_extractor_zero_fee_estimates_too(tmp_path):
+    """extract_order_fee returning 0.0 on a live trade (silent failure, I7) must
+    take the same estimate path as a missing fee."""
+    rm = _live_rm(tmp_path)
+    pos = rm.open_position(SYMBOL, entry_price=0.08, margin=10.0, side="long")
+    notional = pos.entry_price * pos.amount
+    rm.close_position(SYMBOL, exit_price=0.081, reason="take_profit", fees_usdt=0.0)
+    trade = rm.closed_trades[-1]
+    expected_est = notional * 0.07 / 100
+    assert trade["fees_usdt"] == pytest.approx(expected_est)
+    assert trade["fees_pending"] is True
+
+
+def test_live_partial_close_missing_fee_estimates_on_half_notional(tmp_path):
+    rm = _live_rm(tmp_path)
+    pos = rm.open_position(SYMBOL, entry_price=0.08, margin=10.0, side="long")
+    half_notional = pos.entry_price * (pos.amount / 2)
+    rm.partial_close_position(SYMBOL, exit_price=0.08)  # no fee known
+    trade = rm.closed_trades[-1]
+    expected_est = half_notional * 0.07 / 100
+    assert trade["reason"] == "partial_tp"
+    assert trade["fees_usdt"] == pytest.approx(expected_est)
+    assert trade["net_pnl"] == pytest.approx(-expected_est)
+    assert trade["fees_pending"] is True

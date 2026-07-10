@@ -627,6 +627,18 @@ class RiskManager:
         if open_positions:
             self._save_state()
 
+    def _estimate_live_fees(self, notional: float) -> float:
+        """Conservative live-fee estimate for when the exchange fee is unknown at
+        close time (extract_order_fee failed or returned 0): maker entry leg +
+        taker exit leg = 0.07% of notional. No slippage term — a live fill's
+        slippage is already in its price. The estimate goes into fees_usdt/net_pnl
+        so the daily-loss halt, which sums the in-memory closed_trades list the
+        reconciler can never reach, is not fee-blind (2026-07-10: $0-fee counting
+        read −$5.08 true net as −$4.88 and the $5-floor halt never fired). The
+        record keeps fees_pending=True; the reconciler still overwrites the state
+        file with the exact fee."""
+        return notional * (Config.MAKER_FEE_PERCENT + Config.TAKER_FEE_PERCENT) / 100
+
     def close_position(self, symbol: str, exit_price: float, reason: str, fees_usdt: float = None, mode: str = None):
         if symbol not in self.positions:
             return
@@ -648,10 +660,12 @@ class RiskManager:
                            + Config.TAKER_FEE_PERCENT + Config.SLIPPAGE_PERCENT) / 100
                 fees_usdt = notional * fee_pct
             else:
-                fees_usdt = 0.0  # unknown — treat as 0 rather than crash
+                # Unknown live fee — estimate instead of counting $0 (fee-blind halt fix)
+                fees_usdt = self._estimate_live_fees(pos.entry_price * pos.amount)
                 fees_pending = True  # tag for reconciler/daily report backfill
         elif (not self.is_paper) and fees_usdt == 0:
             # Live trade with zero fees from extract_order_fee — likely silent failure (I7)
+            fees_usdt = self._estimate_live_fees(pos.entry_price * pos.amount)
             fees_pending = True
         # Live mode keeps pnl_usdt as GROSS for backward compat; paper continues
         # to subtract sim fees from pnl_usdt so historical paper records stay consistent.
@@ -781,9 +795,11 @@ class RiskManager:
                 fees_usdt = notional * (Config.MAKER_FEE_PERCENT
                                         + Config.TAKER_FEE_PERCENT + Config.SLIPPAGE_PERCENT) / 100
             else:
-                fees_usdt = 0.0
+                # Unknown live fee — estimate on the half notional (fee-blind halt fix)
+                fees_usdt = self._estimate_live_fees(pos.entry_price * half_amount)
                 fees_pending = True
         elif (not self.is_paper) and fees_usdt == 0:
+            fees_usdt = self._estimate_live_fees(pos.entry_price * half_amount)
             fees_pending = True
         net_pnl = gross - fees_usdt
         pnl = (gross - fees_usdt) if self.is_paper else gross

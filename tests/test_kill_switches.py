@@ -14,6 +14,33 @@ def test_compute_today_net_pnl_sums_only_today():
     assert _compute_today_net_pnl(trades) == -1.5
 
 
+def test_halt_not_fee_blind_on_failed_fee_extraction(tmp_path):
+    """Regression for 2026-07-10: three live losses closed with fee extraction
+    failing summed to −$5.08 true net but −$4.88 in-memory (fees counted $0),
+    so the $5-floor halt never fired. With close-time fee estimation, the
+    in-memory net the halt sums must cross the line."""
+    from bot import _compute_today_net_pnl, _should_halt_daily_loss
+    from risk_manager import RiskManager
+    rm = RiskManager(state_file=str(tmp_path / "live_state.json"))
+    rm.is_paper = False
+    rm._log_prefix = ""
+    # Three ~$15-margin/10x losers mirroring 7/10's XLM/AVAX/AAVE gross PnLs;
+    # every close hits the failed-fee path (no fees_usdt).
+    for sym, entry, exit_p, gross in [
+        ("XLM/USDT:USDT", 0.19227, 0.18989, -1.854),
+        ("AVAX/USDT:USDT", 6.773, 6.728, -0.9945),
+        ("AAVE/USDT:USDT", 95.86, 94.52, -2.010),
+    ]:
+        pos = rm.open_position(sym, entry_price=entry, margin=15.0, side="long")
+        pos.amount = abs(gross) / (entry - exit_p)  # pin gross to the real value
+        rm.close_position(sym, exit_price=exit_p, reason="stop_loss")
+    today_net = _compute_today_net_pnl(rm.closed_trades)
+    gross_sum = -1.854 - 0.9945 - 2.010
+    assert today_net < gross_sum  # estimates actually subtracted
+    # The real-money assertion: at a $56 balance ($5 floor) the halt must fire.
+    assert _should_halt_daily_loss(today_net, balance=56.18) is True
+
+
 def test_daily_loss_halt_triggers_at_3_percent_above_floor():
     from bot import _should_halt_daily_loss
     # Large balance: 3% ($6) exceeds the $5 floor, so percent governs
