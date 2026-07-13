@@ -357,6 +357,7 @@ class BlindMonitor:
         self.blind_alerted = False               # [BLIND] sent for current episode
         self.last_blind_alert_ts = 0.0           # cooldown anchor (spans episodes)
         self.last_cycle_ts: float | None = None  # previous cycle start
+        self.last_stall_notice_ts = 0.0          # [BLIND-RECOVERED] cooldown anchor
 
     @staticmethod
     def _fmt_pt(ts: float, with_date: bool = False) -> str:
@@ -380,6 +381,12 @@ class BlindMonitor:
         prev, self.last_cycle_ts = self.last_cycle_ts, now
         if prev is None or (now - prev) <= self.STALL_GAP_S:
             return False
+        # Debounce: a flapping link produces many separate >STALL_GAP_S stalls
+        # back-to-back (2026-07-13 DNS flap sent four [BLIND-RECOVERED] in ~2h).
+        # Collapse them — at most one recovery notice per REALERT_COOLDOWN_S, the
+        # same window the WS-blind path uses. Baseline still updates every call.
+        if (now - self.last_stall_notice_ts) < self.REALERT_COOLDOWN_S:
+            return False
         from zoneinfo import ZoneInfo
         pt = ZoneInfo("America/Los_Angeles")
         cross_day = (datetime.datetime.fromtimestamp(prev, tz=pt).date()
@@ -391,6 +398,7 @@ class BlindMonitor:
             f"({self._fmt_pt(prev, cross_day)}–{self._fmt_pt(now, cross_day)} PT), now resumed.\n"
             f"Entries were paused during the stall; exchange SL stayed armed."
         )
+        self.last_stall_notice_ts = now
         return True
 
     def check_ws_blind(self, all_stale: bool, now: float) -> None:

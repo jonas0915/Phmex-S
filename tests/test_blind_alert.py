@@ -180,6 +180,34 @@ def test_cycle_gap_cross_midnight_includes_date(monitor):
     assert "Jul 5" in sent[0] and "Jul 6" in sent[0]
 
 
+def test_cycle_gap_flapping_debounced(monitor):
+    """A flapping link produces many separate >STALL_GAP_S stalls back-to-back
+    (2026-07-13 DNS flap sent four [BLIND-RECOVERED] in ~2h). Only the first
+    within the cooldown window may notify; the rest are suppressed."""
+    mon, sent = monitor
+    mon.check_cycle_gap(T0)                            # baseline
+    assert mon.check_cycle_gap(T0 + 600) is True       # stall #1 → notice
+    assert mon.check_cycle_gap(T0 + 1200) is False     # stall #2, inside cooldown
+    assert mon.check_cycle_gap(T0 + 1800) is False     # stall #3, inside cooldown
+    assert len(sent) == 1
+
+
+def test_cycle_gap_realerts_after_cooldown(monitor):
+    """Two genuinely separate stalls more than REALERT_COOLDOWN_S apart, with a
+    healthy run between them, both notify — the debounce only collapses a flap."""
+    mon, sent = monitor
+    mon.check_cycle_gap(T0)
+    assert mon.check_cycle_gap(T0 + 600) is True       # stall #1 → notice
+    # Healthy 60s cycles across the whole cooldown window keep the baseline fresh
+    t = T0 + 660
+    while t < T0 + 600 + mon.REALERT_COOLDOWN_S + 120:
+        assert mon.check_cycle_gap(t) is False
+        t += 60
+    assert len(sent) == 1                              # silent while healthy
+    assert mon.check_cycle_gap(t + 600) is True        # fresh stall past cooldown
+    assert len(sent) == 2
+
+
 # ── overwatch bot.log freshness check ───────────────────────────────────
 
 class _FakeProc:
