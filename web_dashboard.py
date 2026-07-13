@@ -107,6 +107,7 @@ def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
     cutoff = datetime.now(CA_TZ) - timedelta(hours=max_age_hours)
     counts = {}
     label_map = [
+        ("Drift gate",     "[DRIFT GATE]"),
         ("Tape gate",      "[TAPE GATE]"),
         ("OB gate",        "[OB GATE]"),
         ("Ensemble <4/7",  "ENSEMBLE SKIP"),

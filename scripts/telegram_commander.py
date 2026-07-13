@@ -336,6 +336,7 @@ async def cmd_gates(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from datetime import datetime, timedelta, timezone
     log_file = os.path.join(BOT_DIR, "logs", "bot.log")
     label_map = [
+        ("Drift gate",     "[DRIFT GATE]"),
         ("Tape gate",      "[TAPE GATE]"),
         ("OB gate",        "[OB GATE]"),
         ("Ensemble <4/7",  "ENSEMBLE SKIP"),

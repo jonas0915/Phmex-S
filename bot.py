@@ -172,6 +172,52 @@ def _pause_sentinel_is_daily_loss(path: str = ".pause_trading") -> bool:
     return reason.startswith("DAILY LOSS HALT")
 
 
+def _underwater_positions(positions: dict, price_lookup) -> list:
+    """[(symbol, drift_pct)] for open positions whose side-signed drift from
+    entry is negative right now.
+
+    Drives the concurrent-entry drift gate (r1 A.3, OOS-confirmed 2026-07-12:
+    htf_l2 entries opened onto an underwater book ran 11% WR fresh vs 100% on a
+    green book; gate costs ~14% of flow). price_lookup(sym) -> (price, age_s)
+    or None; positions with missing or stale (>120s) prices are treated as NOT
+    underwater — fail-open so a WS outage can't freeze entries.
+    """
+    out = []
+    # list() snapshot — the live-exit watcher thread pops from this dict
+    for sym, pos in list(positions.items()):
+        try:
+            lp = price_lookup(sym)
+            if not lp:
+                continue
+            price, age_s = lp
+            if age_s > 120 or not price or not getattr(pos, "entry_price", 0):
+                continue
+            drift = (price - pos.entry_price) / pos.entry_price
+            if getattr(pos, "side", "long") == "short":
+                drift = -drift
+            if drift < 0:
+                out.append((sym, drift * 100))
+        except Exception:
+            continue
+    return out
+
+
+def _tape_gate_blocks_buy_ratio(strat_name: str, direction: str, buy_ratio: float) -> bool:
+    """Slot tape-gate buy_ratio check, with the bb_mean_reversion SHORT carve-out.
+
+    Fading a buying frenzy IS the MR short thesis. Replay of all 25 tape-blocked
+    MR signals (2026-07-12, validated sim): buy_ratio-blocked shorts n=10 +$6.19
+    CI [+0.11, +1.08]; blocked longs were net NEGATIVE — so longs keep the gate.
+    """
+    if strat_name == "bb_mean_reversion" and direction == "short":
+        return False
+    if direction == "long" and buy_ratio < 0.45:
+        return True
+    if direction == "short" and buy_ratio > 0.55:
+        return True
+    return False
+
+
 # ExpressVPN server rotation list — cycled through on each CDN ban
 _VPN_SERVERS = [
     "usa-new-york",
@@ -1712,6 +1758,23 @@ class Phmex2Bot:
                     logger.info(f"[HTF THROTTLE] {symbol} {direction} skipped — htf entry {(time.time() - self._last_htf_entry_time)/60:.0f}min ago, need 30min gap")
                     continue
 
+                # Concurrent-entry drift gate (r1 A.3; OOS 2026-07-12): don't add a
+                # new htf_l2 entry while any open position is underwater — fresh-data
+                # underwater-book entries ran 11% WR (9/9 of the 7/10-7/11 chain losers).
+                # Blocks ~14% of flow; sim net saved +$14.22 CI [+4.36, +23.37].
+                if (Config.DRIFT_GATE_ENABLED and strat_name == "htf_l2_anticipation"
+                        and self.risk.positions and self._ws_feed):
+                    _uw = _underwater_positions(self.risk.positions, self._ws_feed.last_price)
+                    if _uw:
+                        _uw_sym, _uw_drift = _uw[0]
+                        self._log_gotaway("drift_gate", symbol, direction, strat_name,
+                                          signal.strength, confidence, price, ob, flow, df)
+                        logger.info(
+                            f"[DRIFT GATE] {symbol} {direction.upper()} blocked — "
+                            f"{_uw_sym.split('/')[0]} underwater {_uw_drift:.2f}%"
+                        )
+                        continue
+
                 # Phase 2b Gate A: pullback per-hour bleed filter (30d data-driven)
                 # UTC {5,8,13,14,16} = 10PM/1AM/6AM/7AM/9AM PT — 5 unblocked hours where pullback runs 22% WR vs 47% breakeven
                 # Shadow-log when PULLBACK_SESSION_GATE=false; hard-block when true
@@ -2271,14 +2334,13 @@ class Phmex2Bot:
                         cvd_slope = flow.get("cvd_slope", 0.0)
                         divergence = flow.get("divergence")
                         lt_bias = flow.get("large_trade_bias", 0.0)
-                        if direction == "long" and buy_ratio < 0.45:
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — buy_ratio {buy_ratio:.0%}")
-                            continue
-                        if direction == "short" and buy_ratio > 0.55:
-                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} SHORT blocked — buy_ratio {buy_ratio:.0%}")
+                        _paper_strat = _extract_strategy_name(signal.reason)
+                        # buy_ratio check via helper — bb_mean_reversion SHORTS exempt
+                        # (replay-gated carve-out 2026-07-12, see _tape_gate_blocks_buy_ratio)
+                        if _tape_gate_blocks_buy_ratio(_paper_strat, direction, buy_ratio):
+                            logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} {direction.upper()} blocked — buy_ratio {buy_ratio:.0%}")
                             continue
                         # CVD slope gate — carve-out for pullback/reversion (matches live bot line 1037)
-                        _paper_strat = _extract_strategy_name(signal.reason)
                         if _paper_strat not in ("htf_confluence_pullback", "bb_mean_reversion"):
                             if direction == "long" and cvd_slope < -0.3:
                                 logger.debug(f"[PAPER] [TAPE GATE] {slot.slot_id} {symbol} LONG blocked — CVD slope {cvd_slope:.2f}")

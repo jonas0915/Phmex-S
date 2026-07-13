@@ -63,6 +63,10 @@ class Config:
     PULLBACK_SESSION_GATE = os.getenv("PULLBACK_SESSION_GATE", "false").lower() == "true"
     PULLBACK_VOLATILE_GATE = os.getenv("PULLBACK_VOLATILE_GATE", "false").lower() == "true"
 
+    # Concurrent-entry drift gate (2026-07-12, r1 A.3 OOS-confirmed): block new
+    # htf_l2 entries while any open position is underwater. Set false to revert.
+    DRIFT_GATE_ENABLED = os.getenv("DRIFT_GATE_ENABLED", "true").lower() == "true"
+
     # 5m_mean_revert RSI floor (2026-07-02): block slot LONGS when RSI(7) is
     # below this value (falling-knife cohort per reports/mr_replay_90d.json).
     # 0.0 disables the gate. Applies ONLY to the 5m_mean_revert slot.
