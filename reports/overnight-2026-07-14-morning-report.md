@@ -41,8 +41,13 @@ No rebate tiers reachable at our size (MM program needs >0.08% of exchange maker
   (proposal staged in TASKS.md after verification). Rollback = one .env/param revert.
 
 ## Web-research hypotheses (literature, URL-cited, fabrication-guarded)
-- H1 (MED): requote should reprice to the BAND/mean anchor, not chase last price (2 papers).
-- H2 (MED): posting DEEPER than the band lowers fill rate but raises per-fill expectancy.
+- H1 (anchor requote at band, don't chase) — REFUTED ON OWN DATA: the current requote reprices
+  to the live touch (bot.py:2508-2530, drift-capped), and that chase produced the only real
+  requote fill (XRP 7/7 +$2.34). Anchoring at the band = resting longer at the limit, which the
+  fill-capture study showed converts ~zero and skews toxic. Current design stays.
+- H2 (MED, untested): posting DEEPER than the band lowers fill rate but raises per-fill
+  expectancy. Only testable live (simulated fills are poor proxies). Parked as a possible
+  future A/B; not built tonight.
 - H3 (turn-of-15m-candle) — TESTED: replay NULL (diff CI [−0.195,+0.150]); real-money
   UNDERPOWERED (n=6 turn cohort, point estimate +$1.31/trade hypothesis-consistent, all 5
   just-before-turn fills winners — but 6 trades is not evidence). NO ACTION; passive re-check
@@ -66,9 +71,41 @@ No rebate tiers reachable at our size (MM program needs >0.08% of exchange maker
 - Receipts: scripts/slot_lab/mr_rest_extension_study.py, reports/mr_rest_extension.json.
   Forward-test to confirm would need 3-5 months for a CI centered near zero — not justified.
 
+## Candidate #2 — VERIFICATION VERDICT: REFUTED as a remove decision. GATE STAYS.
+Adversarial verifier reproduced all 9 decisive sims exactly (independent engine, fresh data) —
+the arithmetic is right, the INFERENCE is not: (1) "CI excl 0" at 4/4 winners is vacuous (all-
+positive bootstrap can't include 0; sign test p=6.25% fails); (2) the "5/5 OB-unique winners"
+cohort had a double-counted episode + one cohort assignment resting on a 70s-late snapshot;
+(3) the two corroborating findings were 75% the same trades; (4) at real fill rates the removal
+is worth ~$1/month upper bound. ACTION: keep gate ON (free — logging already exists), re-run
+counterfactual at n≥10 imbalance episodes (~6-8 weeks), bar = mixed-sign CI or ≥9/10 wins.
+Original screening finding preserved below for the record:
+
+## [superseded screening finding] remove OB-IMBALANCE gate for MR entries only
+- Counterfactual study (38 episodes 6/25-7/13, pipeline self-validated by reproducing both
+  adjudicated 7/12 cohorts; 3 fresh-data spot-checks exact):
+  · ob_imbalance blocks: n=4, ALL winners, +$0.75/trade, CI [+0.33,+1.30] excl 0.
+  · Structural split of all 12 OB blocks: tape-redundant cohort = real losers −$4.73 (already
+    caught by tape gate); OB-UNIQUE cohort = 5/5 winners +$4.30 CI [+0.53,+1.24].
+  · OB gate = redundant-where-right, costly-where-unique. ob_wall + tape_divergence: KEEP
+    (NULL). ob_spread: unadjudicatable (n=1, phantom-win trap).
+- HONESTY: n=4 and n=5 cohorts — thinner than anything shipped before (7/12 exemption was
+  n=10). 4/4 winners doesn't clear p<0.05 on sign alone. ⏳ adversarial verification running.
+- Your call in the morning: ship live-bounded (no-shadow directive) vs shadow-tag to n≥15.
+- Receipts: scripts/slot_lab/gate_block_counterfactual.py + scratchpad dump (verified).
+
+## Symbol edge map — DATA ONLY, no proposal
+- Only CI-excludes-zero positive: 1000PEPE (+$0.41/trade, 92% WR, n=13). Bleed side: ONDO
+  −$6.45, BTC 35% WR −$3.64 (data only — do-not-blacklist-BTC directive respected), AAVE −$4.12.
+- Discriminator NULL: MR edge not predictable from ATR%/band-boundness/ADX (all rho≈0).
+- Expansion: SUI/BNB modestly positive (CIs straddle), OP reject, blind-add dilutes.
+- Curated book (−5 bleeders +SUI/BNB): exp +$0.101 CI [+0.007,+0.195] — but selection-biased
+  AND the most recent fold is flat-to-negative. NOT proposed; hypothesis-generation only.
+- Receipts: reports/mr_symbol_map.json, reports/mr_expansion_90d.json.
+
 ## ⏳ Pending sections (agents running)
-- Gate counterfactuals (OB gate 26% of MR kills — protecting or strangling?).
-- Symbol edge map + expansion candidates (waiting on its 90d replay of new symbols).
+- Phase 2 adversarial verification: V17 attacker + OB-imbalance attacker.
+- Phase 3 build/stage decision follows verification.
 - Phase 2 adversarial verification of all SHIP/forward-test candidates.
 - Phase 3 build + tests + pre-restart audit (only for what survives).
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 import logging
+import os
 import pandas as pd
 
 _log = logging.getLogger("DegenCryt")
@@ -103,7 +104,15 @@ def bb_mean_reversion_strategy(df: pd.DataFrame, orderbook: dict = None) -> Trad
             return TradeSignal(Signal.HOLD,
                 f"BB reversion SHORT blocked — uptrend (EMA={ema_bullish}, >200={above_ema200}, DI={di_bullish})",
                 0.0)
-        if rsi_fast > 70 and vol_ok:
+        # SHORT RSI threshold parameterized 2026-07-14 (V17 forward-test candidate,
+        # overnight study + adversarial verification: 90d replay 1.47x signals,
+        # added trades +$0.090/tr but diff-CI straddles 0 — WEAK/screening grade).
+        # Default 70 = behavior identical to the hardcoded original. Set
+        # MR_SHORT_RSI_MIN=65 in .env (+ audited restart) to arm the forward test.
+        # Longs deliberately NOT parameterized — blocked/loosened longs verified losers.
+        # Call-time getenv: import-order-safe (dotenv fills os.environ), negligible cost.
+        _short_rsi_min = float(os.getenv("MR_SHORT_RSI_MIN", "70"))
+        if rsi_fast > _short_rsi_min and vol_ok:
             strength = 0.85
             if rsi_fast > 85:
                 strength += 0.05
