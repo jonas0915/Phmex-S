@@ -1,0 +1,934 @@
+{
+ "generated_utc": "2026-07-14T05:22:45.841233+00:00",
+ "method": "see script header \u2014 scripts/slot_lab/mr_rest_extension_study.py",
+ "horizons_s": [
+  60,
+  90,
+  120,
+  300
+ ],
+ "live_rest_s": 45.0,
+ "requote_drift_cap_pct": 0.15,
+ "miss_rows": [
+  {
+   "sym": "AVAX/USDT:USDT",
+   "side": "short",
+   "px": 5.962,
+   "rsi": null,
+   "ts": 1781907893,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": null,
+   "src": "bot.log.5: 2026-06-19 18:24:53 [MAKER] Limit sell 16.7 AVAX @ 5.962",
+   "prior_sim_net": 1.58,
+   "prior_sim_reason": "take_profit",
+   "status": "OK",
+   "strict_delay": null,
+   "strict_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "NO",
+    "300": "NO"
+   },
+   "touch_delay": null,
+   "touch_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "NO",
+    "300": "NO"
+   }
+  },
+  {
+   "sym": "XRP/USDT:USDT",
+   "side": "long",
+   "px": 1.1454,
+   "rsi": null,
+   "ts": 1781960207,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": null,
+   "src": "bot.log.5: 2026-06-20 08:56:47 [MAKER] Limit buy 87.3 XRP @ 1.1454",
+   "prior_sim_net": 0.4482,
+   "prior_sim_reason": "trailing_stop",
+   "status": "OK",
+   "strict_delay": [
+    1393,
+    1453
+   ],
+   "strict_ambiguous_pre_placement": false,
+   "strict_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "NO",
+    "300": "NO"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 1.1513356000000001,
+    "reason": "trailing_stop",
+    "held_s": 7260,
+    "net": 0.4482
+   },
+   "sim_arm8": {
+    "exit": 1.1501808,
+    "reason": "trailing_stop",
+    "held_s": 7260,
+    "net": 0.3474
+   },
+   "strict_cross_ts": 1781961600,
+   "touch_delay": [
+    20,
+    73
+   ],
+   "touch_ambiguous_pre_placement": false,
+   "touch_class": {
+    "60": "POSSIBLE",
+    "90": "CERTAIN",
+    "120": "CERTAIN",
+    "300": "CERTAIN"
+   }
+  },
+  {
+   "sym": "ADA/USDT:USDT",
+   "side": "short",
+   "px": 0.1617,
+   "rsi": 70.9,
+   "ts": 1782035586,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": null,
+   "src": "bot.log.4/5: 2026-06-21 05:53:06 [MAKER] Limit sell 618.42 ADA @ 0.1617",
+   "prior_sim_net": 0.2503,
+   "prior_sim_reason": "trailing_stop",
+   "status": "OK",
+   "strict_delay": [
+    114,
+    174
+   ],
+   "strict_ambiguous_pre_placement": false,
+   "strict_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "POSSIBLE",
+    "300": "CERTAIN"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 0.1611821,
+    "reason": "trailing_stop",
+    "held_s": 5040,
+    "net": 0.2503
+   },
+   "sim_arm8": {
+    "exit": 0.1608408,
+    "reason": "trailing_stop",
+    "held_s": 10680,
+    "net": 0.4614
+   },
+   "strict_cross_ts": 1782035700,
+   "touch_delay": [
+    20,
+    54
+   ],
+   "touch_ambiguous_pre_placement": true,
+   "touch_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "POSSIBLE",
+    "300": "POSSIBLE"
+   }
+  },
+  {
+   "sym": "XLM/USDT:USDT",
+   "side": "long",
+   "px": 0.21313,
+   "rsi": 27.6,
+   "ts": 1782138205,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": null,
+   "src": "bot.log.4: 2026-06-22 10:23:25 [MAKER] Limit buy 468.0 XLM @ 0.21313",
+   "prior_sim_net": -1.27,
+   "prior_sim_reason": "stop_loss",
+   "status": "OK",
+   "strict_delay": [
+    35,
+    95
+   ],
+   "strict_ambiguous_pre_placement": false,
+   "strict_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "CERTAIN",
+    "300": "CERTAIN"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 0.21057243999999997,
+    "reason": "stop_loss",
+    "held_s": 1860,
+    "net": -1.27
+   },
+   "sim_arm8": {
+    "exit": 0.21057243999999997,
+    "reason": "stop_loss",
+    "held_s": 1860,
+    "net": -1.27
+   },
+   "strict_cross_ts": 1782138240,
+   "touch_delay": [
+    35,
+    95
+   ],
+   "touch_ambiguous_pre_placement": false,
+   "touch_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "CERTAIN",
+    "300": "CERTAIN"
+   }
+  },
+  {
+   "sym": "LTC/USDT:USDT",
+   "side": "long",
+   "px": 41.93,
+   "rsi": 22.2,
+   "ts": 1782296883,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": null,
+   "src": "bot.log.3: 2026-06-24 03:28:03 [MAKER] Limit buy 2.38 LTC @ 41.93",
+   "prior_sim_net": 0.7713,
+   "prior_sim_reason": "trailing_stop",
+   "status": "OK",
+   "strict_delay": [
+    20,
+    57
+   ],
+   "strict_ambiguous_pre_placement": true,
+   "strict_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "POSSIBLE",
+    "300": "POSSIBLE"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 42.28277,
+    "reason": "trailing_stop",
+    "held_s": 4980,
+    "net": 0.7713
+   },
+   "sim_arm8": {
+    "exit": 42.240359999999995,
+    "reason": "trailing_stop",
+    "held_s": 4980,
+    "net": 0.6702
+   },
+   "strict_cross_ts": 1782296880,
+   "touch_delay": [
+    20,
+    57
+   ],
+   "touch_ambiguous_pre_placement": true,
+   "touch_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "POSSIBLE",
+    "300": "POSSIBLE"
+   }
+  },
+  {
+   "sym": "XLM/USDT:USDT",
+   "side": "short",
+   "px": 0.17752,
+   "rsi": 80.0,
+   "ts": 1782423896,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": null,
+   "src": "bot.log.2: 2026-06-25 14:44:56 [MAKER] Limit sell 563.0 XLM @ 0.17752",
+   "prior_sim_net": 1.58,
+   "prior_sim_reason": "take_profit",
+   "status": "OK",
+   "strict_delay": [
+    20,
+    64
+   ],
+   "strict_ambiguous_pre_placement": false,
+   "strict_class": {
+    "60": "POSSIBLE",
+    "90": "CERTAIN",
+    "120": "CERTAIN",
+    "300": "CERTAIN"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 0.17467968,
+    "reason": "take_profit",
+    "held_s": 13800,
+    "net": 1.58
+   },
+   "sim_arm8": {
+    "exit": 0.17467968,
+    "reason": "take_profit",
+    "held_s": 13800,
+    "net": 1.58
+   },
+   "strict_cross_ts": 1782423900,
+   "touch_delay": [
+    20,
+    64
+   ],
+   "touch_ambiguous_pre_placement": false,
+   "touch_class": {
+    "60": "POSSIBLE",
+    "90": "CERTAIN",
+    "120": "CERTAIN",
+    "300": "CERTAIN"
+   }
+  },
+  {
+   "sym": "ADA/USDT:USDT",
+   "side": "short",
+   "px": 0.1434,
+   "rsi": 72.0,
+   "ts": 1782423928,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": "second concurrent signal; live slot max_positions=1 -> could not coexist with XLM short 32s earlier",
+   "src": "bot.log.2: 2026-06-25 14:45:28 [MAKER] Limit sell 697.35 ADA @ 0.1434",
+   "prior_sim_net": 0.1896,
+   "prior_sim_reason": "trailing_stop",
+   "status": "OK",
+   "strict_delay": [
+    92,
+    152
+   ],
+   "strict_ambiguous_pre_placement": false,
+   "strict_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "POSSIBLE",
+    "300": "CERTAIN"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 0.14302779999999998,
+    "reason": "trailing_stop",
+    "held_s": 12540,
+    "net": 0.1896
+   },
+   "sim_arm8": {
+    "exit": 0.1419,
+    "reason": "st2_hold",
+    "held_s": 14400,
+    "net": 1.026
+   },
+   "strict_cross_ts": 1782424020,
+   "touch_delay": [
+    92,
+    152
+   ],
+   "touch_ambiguous_pre_placement": false,
+   "touch_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "POSSIBLE",
+    "300": "CERTAIN"
+   }
+  },
+  {
+   "sym": "XLM/USDT:USDT",
+   "side": "long",
+   "px": 0.17789,
+   "rsi": 26.7,
+   "ts": 1782500643,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": null,
+   "src": "bot.log.2: 2026-06-26 12:04:03 [MAKER] Limit buy 561.0 XLM @ 0.17789",
+   "prior_sim_net": 0.5379,
+   "prior_sim_reason": "trailing_stop",
+   "status": "OK",
+   "strict_delay": [
+    20,
+    57
+   ],
+   "strict_ambiguous_pre_placement": true,
+   "strict_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "POSSIBLE",
+    "300": "POSSIBLE"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 0.17897147,
+    "reason": "trailing_stop",
+    "held_s": 960,
+    "net": 0.5379
+   },
+   "sim_arm8": {
+    "exit": 0.17879196,
+    "reason": "trailing_stop",
+    "held_s": 1140,
+    "net": 0.437
+   },
+   "strict_cross_ts": 1782500640,
+   "touch_delay": [
+    20,
+    57
+   ],
+   "touch_ambiguous_pre_placement": true,
+   "touch_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "POSSIBLE",
+    "300": "POSSIBLE"
+   }
+  },
+  {
+   "sym": "XLM/USDT:USDT",
+   "side": "short",
+   "px": 0.17611,
+   "rsi": 73.6,
+   "ts": 1782535156,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": null,
+   "src": "bot.log.2: 2026-06-26 21:39:16 [MAKER] Limit sell 567.0 XLM @ 0.17611",
+   "prior_sim_net": 0.5469,
+   "prior_sim_reason": "trailing_stop",
+   "status": "OK",
+   "strict_delay": null,
+   "strict_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "NO",
+    "300": "NO"
+   },
+   "touch_delay": null,
+   "touch_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "NO",
+    "300": "NO"
+   }
+  },
+  {
+   "sym": "LTC/USDT:USDT",
+   "side": "long",
+   "px": 42.9,
+   "rsi": 28.7,
+   "ts": 1782652177,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": null,
+   "src": "bot.log.1: 2026-06-28 06:09:37 [MAKER] Limit buy 2.33 LTC @ 42.9",
+   "prior_sim_net": 0.1878,
+   "prior_sim_reason": "trailing_stop",
+   "status": "OK",
+   "strict_delay": [
+    20,
+    23
+   ],
+   "strict_ambiguous_pre_placement": true,
+   "strict_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "POSSIBLE",
+    "300": "POSSIBLE"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 43.01058,
+    "reason": "trailing_stop",
+    "held_s": 1620,
+    "net": 0.1878
+   },
+   "sim_arm8": {
+    "exit": 42.84,
+    "reason": "st2_hold",
+    "held_s": 14400,
+    "net": -0.1599
+   },
+   "strict_cross_ts": 1782652140,
+   "touch_delay": [
+    20,
+    23
+   ],
+   "touch_ambiguous_pre_placement": true,
+   "touch_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "POSSIBLE",
+    "300": "POSSIBLE"
+   }
+  },
+  {
+   "sym": "DOGE/USDT:USDT",
+   "side": "long",
+   "px": 0.07205,
+   "rsi": 26.1,
+   "ts": 1782886457,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "overlap": null,
+   "src": "bot.log.1: 2026-06-30 23:14:17 [MAKER] Limit buy 1388.0 DOGE @ 0.07205",
+   "prior_sim_net": -1.27,
+   "prior_sim_reason": "stop_loss",
+   "status": "OK",
+   "strict_delay": [
+    20,
+    43
+   ],
+   "strict_ambiguous_pre_placement": true,
+   "strict_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "POSSIBLE",
+    "300": "POSSIBLE"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 0.0711854,
+    "reason": "stop_loss",
+    "held_s": 1620,
+    "net": -1.27
+   },
+   "sim_arm8": {
+    "exit": 0.0711854,
+    "reason": "stop_loss",
+    "held_s": 1620,
+    "net": -1.27
+   },
+   "strict_cross_ts": 1782886440,
+   "touch_delay": [
+    20,
+    43
+   ],
+   "touch_ambiguous_pre_placement": true,
+   "touch_class": {
+    "60": "POSSIBLE",
+    "90": "POSSIBLE",
+    "120": "POSSIBLE",
+    "300": "POSSIBLE"
+   }
+  },
+  {
+   "sym": "LTC/USDT:USDT",
+   "side": "short",
+   "px": 42.85,
+   "rsi": 75.3,
+   "ts": 1782982199,
+   "rest_s": 20.0,
+   "rq_ts": null,
+   "rq_px": null,
+   "src": "bot.log.3:30940 2026-07-02 01:49:59 [MAKER] Limit sell 2.33 LTC @ 42.85 (pre-45s/pre-requote era; FILL MISS 'in 20s' at 01:50:30)",
+   "status": "OK",
+   "strict_delay": [
+    121,
+    181
+   ],
+   "strict_ambiguous_pre_placement": false,
+   "strict_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "NO",
+    "300": "CERTAIN"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 43.364200000000004,
+    "reason": "stop_loss",
+    "held_s": 6600,
+    "net": -1.27
+   },
+   "sim_arm8": {
+    "exit": 43.364200000000004,
+    "reason": "stop_loss",
+    "held_s": 6600,
+    "net": -1.27
+   },
+   "strict_cross_ts": 1782982320,
+   "touch_delay": [
+    20,
+    61
+   ],
+   "touch_ambiguous_pre_placement": false,
+   "touch_class": {
+    "60": "POSSIBLE",
+    "90": "CERTAIN",
+    "120": "CERTAIN",
+    "300": "CERTAIN"
+   }
+  },
+  {
+   "sym": "LTC/USDT:USDT",
+   "side": "long",
+   "px": 45.14,
+   "rsi": 27.8,
+   "ts": 1783192770,
+   "rest_s": 45.0,
+   "rq_ts": 1783192842,
+   "rq_px": 45.15,
+   "src": "bot.log.2:~18226 2026-07-04 12:19:30 [MAKER] Limit buy 3.32 LTC @ 45.14; requote @45.15 12:20:42 (drift +0.000%) also missed",
+   "status": "OK",
+   "strict_delay": [
+    450,
+    510
+   ],
+   "strict_ambiguous_pre_placement": false,
+   "strict_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "NO",
+    "300": "NO"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 44.81,
+    "reason": "st2_hold",
+    "held_s": 14400,
+    "net": -0.7511
+   },
+   "sim_arm8": {
+    "exit": 44.81,
+    "reason": "st2_hold",
+    "held_s": 14400,
+    "net": -0.7511
+   },
+   "strict_cross_ts": 1783193220,
+   "touch_delay": [
+    450,
+    510
+   ],
+   "touch_ambiguous_pre_placement": false,
+   "touch_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "NO",
+    "300": "NO"
+   }
+  },
+  {
+   "sym": "SOL/USDT:USDT",
+   "side": "long",
+   "px": 78.87,
+   "rsi": 24.0,
+   "ts": 1783688500,
+   "rest_s": 45.0,
+   "rq_ts": 1783688575,
+   "rq_px": 78.93,
+   "src": "bot.log.1:~89147 2026-07-10 06:01:40 [MAKER] Limit buy 1.9 SOL @ 78.87; requote @78.93 06:02:55 (drift +0.025%) also missed",
+   "status": "OK",
+   "strict_delay": [
+    560,
+    620
+   ],
+   "strict_ambiguous_pre_placement": false,
+   "strict_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "NO",
+    "300": "NO"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 79.03219,
+    "reason": "trailing_stop",
+    "held_s": 2760,
+    "net": 0.1356
+   },
+   "sim_arm8": {
+    "exit": 77.92356000000001,
+    "reason": "stop_loss",
+    "held_s": 4020,
+    "net": -1.27
+   },
+   "strict_cross_ts": 1783689060,
+   "touch_delay": [
+    560,
+    620
+   ],
+   "touch_ambiguous_pre_placement": false,
+   "touch_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "NO",
+    "300": "NO"
+   }
+  },
+  {
+   "sym": "XRP/USDT:USDT",
+   "side": "short",
+   "px": 1.0936,
+   "rsi": 70.2,
+   "ts": 1783844063,
+   "rest_s": 45.0,
+   "rq_ts": 1783844136,
+   "rq_px": 1.0936,
+   "src": "bot.log:28994 2026-07-12 01:14:23 [MAKER] Limit sell 137.26 XRP @ 1.0936; requote @1.0936 01:15:36 (drift -0.073%) also missed",
+   "status": "OK",
+   "strict_delay": [
+    97,
+    157
+   ],
+   "strict_ambiguous_pre_placement": false,
+   "strict_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "POSSIBLE",
+    "300": "CERTAIN"
+   },
+   "captured_by_live_45s": false,
+   "sim_arm5": {
+    "exit": 1.0991,
+    "reason": "st2_hold",
+    "held_s": 14400,
+    "net": -0.5229
+   },
+   "sim_arm8": {
+    "exit": 1.0991,
+    "reason": "st2_hold",
+    "held_s": 14400,
+    "net": -0.5229
+   },
+   "strict_cross_ts": 1783844160,
+   "touch_delay": [
+    97,
+    157
+   ],
+   "touch_ambiguous_pre_placement": false,
+   "touch_class": {
+    "60": "NO",
+    "90": "NO",
+    "120": "POSSIBLE",
+    "300": "CERTAIN"
+   }
+  }
+ ],
+ "fill_conversion": {
+  "60": {
+   "strict_certain": 0,
+   "strict_possible": 6,
+   "touch_certain": 0,
+   "touch_possible": 9,
+   "n": 15
+  },
+  "90": {
+   "strict_certain": 1,
+   "strict_possible": 5,
+   "touch_certain": 3,
+   "touch_possible": 6,
+   "n": 15
+  },
+  "120": {
+   "strict_certain": 2,
+   "strict_possible": 7,
+   "touch_certain": 4,
+   "touch_possible": 7,
+   "n": 15
+  },
+  "300": {
+   "strict_certain": 6,
+   "strict_possible": 4,
+   "touch_certain": 6,
+   "touch_possible": 5,
+   "n": 15
+  }
+ },
+ "marginal_fill_expectancy": {
+  "60": {
+   "events": [
+    "XLM/USDT:USDT Jun 22 7:23:25 AM PT",
+    "LTC/USDT:USDT Jun 24 3:28:03 AM PT",
+    "XLM/USDT:USDT Jun 25 2:44:56 PM PT",
+    "XLM/USDT:USDT Jun 26 12:04:03 PM PT",
+    "LTC/USDT:USDT Jun 28 6:09:37 AM PT",
+    "DOGE/USDT:USDT Jun 30 11:14:17 PM PT"
+   ],
+   "sim_arm5": {
+    "n": 6,
+    "net": 0.537,
+    "wins": 4,
+    "losses": 2,
+    "avg": 0.0895,
+    "boot_ci_mean": [
+     -0.7257,
+     0.9047
+    ]
+   },
+   "sim_arm8": {
+    "n": 6,
+    "net": -0.0127,
+    "wins": 3,
+    "losses": 3,
+    "avg": -0.0021,
+    "boot_ci_mean": [
+     -0.8005,
+     0.8017
+    ]
+   }
+  },
+  "90": {
+   "events": [
+    "XLM/USDT:USDT Jun 22 7:23:25 AM PT",
+    "LTC/USDT:USDT Jun 24 3:28:03 AM PT",
+    "XLM/USDT:USDT Jun 25 2:44:56 PM PT",
+    "XLM/USDT:USDT Jun 26 12:04:03 PM PT",
+    "LTC/USDT:USDT Jun 28 6:09:37 AM PT",
+    "DOGE/USDT:USDT Jun 30 11:14:17 PM PT"
+   ],
+   "sim_arm5": {
+    "n": 6,
+    "net": 0.537,
+    "wins": 4,
+    "losses": 2,
+    "avg": 0.0895,
+    "boot_ci_mean": [
+     -0.7257,
+     0.9047
+    ]
+   },
+   "sim_arm8": {
+    "n": 6,
+    "net": -0.0127,
+    "wins": 3,
+    "losses": 3,
+    "avg": -0.0021,
+    "boot_ci_mean": [
+     -0.8005,
+     0.8017
+    ]
+   }
+  },
+  "120": {
+   "events": [
+    "ADA/USDT:USDT Jun 21 2:53:06 AM PT",
+    "XLM/USDT:USDT Jun 22 7:23:25 AM PT",
+    "LTC/USDT:USDT Jun 24 3:28:03 AM PT",
+    "XLM/USDT:USDT Jun 25 2:44:56 PM PT",
+    "ADA/USDT:USDT Jun 25 2:45:28 PM PT",
+    "XLM/USDT:USDT Jun 26 12:04:03 PM PT",
+    "LTC/USDT:USDT Jun 28 6:09:37 AM PT",
+    "DOGE/USDT:USDT Jun 30 11:14:17 PM PT",
+    "XRP/USDT:USDT Jul 12 1:14:23 AM PT"
+   ],
+   "sim_arm5": {
+    "n": 9,
+    "net": 0.454,
+    "wins": 6,
+    "losses": 3,
+    "avg": 0.0504,
+    "boot_ci_mean": [
+     -0.5333,
+     0.6189
+    ]
+   },
+   "sim_arm8": {
+    "n": 9,
+    "net": 0.9518,
+    "wins": 5,
+    "losses": 4,
+    "avg": 0.1058,
+    "boot_ci_mean": [
+     -0.5091,
+     0.707
+    ]
+   }
+  },
+  "300": {
+   "events": [
+    "ADA/USDT:USDT Jun 21 2:53:06 AM PT",
+    "XLM/USDT:USDT Jun 22 7:23:25 AM PT",
+    "LTC/USDT:USDT Jun 24 3:28:03 AM PT",
+    "XLM/USDT:USDT Jun 25 2:44:56 PM PT",
+    "ADA/USDT:USDT Jun 25 2:45:28 PM PT",
+    "XLM/USDT:USDT Jun 26 12:04:03 PM PT",
+    "LTC/USDT:USDT Jun 28 6:09:37 AM PT",
+    "DOGE/USDT:USDT Jun 30 11:14:17 PM PT",
+    "LTC/USDT:USDT Jul 2 1:49:59 AM PT",
+    "XRP/USDT:USDT Jul 12 1:14:23 AM PT"
+   ],
+   "sim_arm5": {
+    "n": 10,
+    "net": -0.816,
+    "wins": 6,
+    "losses": 4,
+    "avg": -0.0816,
+    "boot_ci_mean": [
+     -0.6644,
+     0.4956
+    ]
+   },
+   "sim_arm8": {
+    "n": 10,
+    "net": -0.3182,
+    "wins": 5,
+    "losses": 5,
+    "avg": -0.0318,
+    "boot_ci_mean": [
+     -0.6365,
+     0.5806
+    ]
+   }
+  }
+ },
+ "second_requote": [
+  {
+   "sym": "LTC/USDT:USDT",
+   "ts_2nd": 1783192877,
+   "proxy_touch": 45.17,
+   "drift_vs_signal_pct": 0.0665,
+   "outcome": "still no fill in 35s window"
+  },
+  {
+   "sym": "SOL/USDT:USDT",
+   "ts_2nd": 1783688610,
+   "proxy_touch": 78.93,
+   "drift_vs_signal_pct": 0.0761,
+   "outcome": "FILL (bar-overlap, coarse)",
+   "sim_arm5": {
+    "exit": 77.98284000000001,
+    "reason": "stop_loss",
+    "held_s": 4500,
+    "net": -1.27
+   }
+  },
+  {
+   "sym": "XRP/USDT:USDT",
+   "ts_2nd": 1783844171,
+   "proxy_touch": 1.0935,
+   "drift_vs_signal_pct": 0.0091,
+   "outcome": "FILL (bar-overlap, coarse)",
+   "sim_arm5": {
+    "exit": 1.0991,
+    "reason": "st2_hold",
+    "held_s": 14400,
+    "net": -0.5321
+   }
+  }
+ ],
+ "rescue_real": {
+  "sym": "XRP/USDT:USDT",
+  "side": "short",
+  "px": 1.1293,
+  "ts": 1783426912,
+  "real_net": 2.3420681899999978,
+  "src": "trading_state_5m_mean_revert.json opened_at=1783426912.9442282; bot.log.2:90432 requote FILLED 2026-07-07 05:21:50"
+ },
+ "caveat": "n=15 misses, 1m-bar granularity (CERTAIN/POSSIBLE bands), screening-grade; positive read = forward-test candidate only"
+}
