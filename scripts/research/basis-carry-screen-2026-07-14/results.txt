@@ -1,0 +1,90 @@
+==============================================================================
+Q1 — SPOT MARKET ACCESSIBILITY via ccxt phemex
+==============================================================================
+market-type counts: {'spot': 1018, 'swap': 1031}
+spot markets: 1018  |  swap markets: 1031
+active spot USDT markets: 496
+sample spot USDT (symbol, maker, taker):
+        BTC/USDT  maker=0.001  taker=0.001
+        ETH/USDT  maker=0.001  taker=0.001
+        XRP/USDT  maker=0.001  taker=0.001
+       LINK/USDT  maker=0.001  taker=0.001
+        XTZ/USDT  maker=0.001  taker=0.001
+        LTC/USDT  maker=0.001  taker=0.001
+        ADA/USDT  maker=0.001  taker=0.001
+        TRX/USDT  maker=0.001  taker=0.001
+sample swap USDT fees (symbol, maker, taker):
+       BTC/USDT:USDT  maker=None  taker=None
+       ETH/USDT:USDT  maker=None  taker=None
+       XRP/USDT:USDT  maker=None  taker=None
+
+resolved 18 perp symbols for funding query
+
+==============================================================================
+Q2 — CURRENT funding rates (fetch_funding_rate per symbol)
+==============================================================================
+    sym   fund%/8h   bps/8h     APR%  interval_h
+    BTC    -0.0044    -0.44    -4.83         8.0
+    ETH    -0.0132    -1.32   -14.42         8.0
+    SOL     0.0062     0.62     6.74         8.0
+    BNB     0.0059     0.59     6.47         8.0
+    XRP     0.0032     0.32     3.54         8.0
+   DOGE     0.0100     1.00    10.95         8.0
+    ADA    -0.0061    -0.61    -6.73         8.0
+   AVAX     0.0048     0.48     5.24         8.0
+   LINK     0.0100     1.00    10.95         8.0
+    LTC     0.0100     1.00    10.95         8.0
+    ARB     0.0100     1.00    10.95         8.0
+     OP     0.0100     1.00    10.95         8.0
+    SUI    -0.0218    -2.18   -23.84         8.0
+    APT     0.0065     0.65     7.08         8.0
+    TIA     0.0050     0.50     5.48         8.0
+    SEI     0.0100     1.00    10.95         8.0
+   NEAR     0.0100     1.00    10.95         8.0
+    INJ    -0.0078    -0.78    -8.57         8.0
+
+CURRENT: n=18  positive=13  negative=5  zero=0
+  |funding| bps/8h: median=0.89  mean=0.86  max=2.18
+
+==============================================================================
+Q3 — funding-rate HISTORY (fetch_funding_rate_history)
+==============================================================================
+    sym     n  span_d  mean_bps  std_bps   %pos  medAPR%
+    BTC   100    33.0     0.380    0.400   85.0     4.07
+    ETH   100    33.0     0.177    0.388   73.0     2.50
+    SOL   100    33.0     0.156    0.619   66.0     2.60
+    XRP   100    33.0     0.184    0.635   65.0     2.34
+   DOGE   100    33.0     0.665    0.351   94.0     8.22
+    ARB   100    33.0     0.995    0.049  100.0    10.95
+     OP   100    33.0     0.646    0.673   86.0    10.95
+    SUI   100    33.0    -0.035    0.819   49.0    -0.26
+
+(endpoint limit param used: limit=1000; actual rows returned above under n)
+
+==============================================================================
+Q4/Q5 — COST MODEL + SIZE REALITY
+==============================================================================
+per-leg notional at $46.36 split 50/50: $23.18
+observed fees: spot maker=0.001 taker=0.001 | perp maker=0.0001 taker=0.0006
+
+ETH median funding = 0.23 bps/8h:
+  [all-maker] fund=0.23bps/8h  RT_fee=22.0bps  breakeven=96.3 periods (32.1 days)  gross $0.048/mo  net(1 RT) $-0.003/mo
+  [all-taker] fund=0.23bps/8h  RT_fee=32.0bps  breakeven=140.0 periods (46.7 days)  gross $0.048/mo  net(1 RT) $-0.026/mo
+
+BTC median funding = 0.37 bps/8h:
+  [all-maker] fund=0.37bps/8h  RT_fee=22.0bps  breakeven=59.2 periods (19.7 days)  gross $0.078/mo  net(1 RT) $0.027/mo
+  [all-taker] fund=0.37bps/8h  RT_fee=32.0bps  breakeven=86.1 periods (28.7 days)  gross $0.078/mo  net(1 RT) $0.003/mo
+
+OP median funding = 1.00 bps/8h:
+  [all-maker] fund=1.00bps/8h  RT_fee=22.0bps  breakeven=22.0 periods (7.3 days)  gross $0.209/mo  net(1 RT) $0.158/mo
+  [all-taker] fund=1.00bps/8h  RT_fee=32.0bps  breakeven=32.0 periods (10.7 days)  gross $0.209/mo  net(1 RT) $0.134/mo
+
+ARB median funding = 1.00 bps/8h:
+  [all-maker] fund=1.00bps/8h  RT_fee=22.0bps  breakeven=22.0 periods (7.3 days)  gross $0.209/mo  net(1 RT) $0.158/mo
+  [all-taker] fund=1.00bps/8h  RT_fee=32.0bps  breakeven=32.0 periods (10.7 days)  gross $0.209/mo  net(1 RT) $0.134/mo
+
+SUI median funding = -0.02 bps/8h:
+  [all-maker] funding<=0, skip
+  [all-taker] funding<=0, skip
+
+saved out.json

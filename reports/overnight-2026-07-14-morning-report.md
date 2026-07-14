@@ -1,5 +1,22 @@
 # Overnight Program — Morning Report (2026-07-14)
-**Status: DRAFT — agents still running; sections marked ⏳ update as results land.**
+**Status: FINAL (~1:30 AM PT). 12 agents run: 6 research + 2 live-web + 2 adversarial
+verification + 1 code review + 1 follow-up test. One change STAGED (inert), nothing deployed.**
+
+## TL;DR — your 3 morning decisions
+1. **PT fee toggle** (guaranteed +, your manual action): PT into futures wallet, flip toggle.
+   10% off maker AND taker, officially confirmed.
+2. **Arm the V17 forward test?** Staged & audited: add `MR_SHORT_RSI_MIN=65` to .env →
+   /pre-restart-audit → restart. MR shorts fire at RSI>65 (now hardcode-70). Evidence:
+   CONFIRMED-WITH-CAVEATS — real replay math, no significance (needs ~334 fills to prove),
+   worth ~$1-2/mo at current size. A scaling-rights test with kill criteria (TASKS.md).
+3. Everything else tested tonight is CLOSED — 9 levers adjudicated dead/null with receipts
+   below. No re-mining.
+
+**The blunt truth about "profitable bot by morning":** no overnight lever manufactures edge.
+The MR slot's expectancy upper bound is +$0.025/trade (CI straddles 0) at ~2.6 signals/day.
+Tonight hardened the slot's evidence base, closed every cheap lever honestly, and staged the
+one defensible knob. Consistency at meaningful scale still runs through the structural
+decisions in memory/project_main_scalper_halt_2026-07-13.md.
 
 Goal (Jonas, 7/13 ~10 PM PT): improve 5m_mean_revert's trading + bot consistent profitability.
 Method: 7 research agents (4 data replays on own 90d history, 2 live-web, 1 follow-up test),
@@ -32,13 +49,19 @@ No rebate tiers reachable at our size (MM program needs >0.08% of exchange maker
 - **Signal scarcity is by design:** ~2.6 qualified signals/day → gates 72% → maker misses 71%
   → ~8% conversion. A few trades/week is the structural ceiling of THIS signal.
 
-## Candidate #1 (WEAK, forward-test proposal): V17 — MR short RSI 70→65, longs untouched
-- 90d replay: 1.47x signals, all 3 folds beat baseline, added 151 trades at +$0.090/trade,
-  69.5% win, 15 symbols, not outlier-driven. Rhymes with the validated 7/12 "MR shorts carry
-  the edge" finding. BUT diff-CI vs baseline [−0.083,+0.127] straddles zero; picked after
-  peeking at side-splits; grade WEAK. ⏳ pending adversarial verification pass.
-- If you want it: bounded live forward test under no-shadow directive, with kill criteria
-  (proposal staged in TASKS.md after verification). Rollback = one .env/param revert.
+## Candidate #1: V17 — MR short RSI 70→65 — VERIFIED (with caveats) and STAGED
+- 90d replay: 1.47x signals, added 151 trades +$0.090/trade, 69.5% win. Adversarial verifier
+  re-derived everything from raw rows AND stress-tested the grid against a line-faithful port
+  of the live strategy: 455/455 signals exact, no lookahead, no overgeneration. Survives
+  outlier trims and best-symbol removal.
+- Honest size: fold-1 "win" is $0.003 noise; 2 weeks carry 78% of added dollars; diff-CI
+  straddles zero; ~334 fills (≈2 yrs) needed for significance; ~$1-2/mo expected at current
+  size. This is a scaling-rights forward test, not a P&L needle-mover.
+- STAGED (inert): strategies.py threshold now `MR_SHORT_RSI_MIN` env knob, default 70 =
+  bit-identical to today (compile OK, 430/430 tests, independent review clean, default-
+  invariance + dotenv chain verified). Blast radius = 5m_mean_revert slot only (confluence
+  culled its bb call in April). ARM: `MR_SHORT_RSI_MIN=65` in .env + audited restart.
+  KILL CRITERIA in TASKS.md. REVERT: set 70 / delete line + restart.
 
 ## Web-research hypotheses (literature, URL-cited, fabrication-guarded)
 - H1 (anchor requote at band, don't chase) — REFUTED ON OWN DATA: the current requote reprices
@@ -103,15 +126,25 @@ Original screening finding preserved below for the record:
   AND the most recent fold is flat-to-negative. NOT proposed; hypothesis-generation only.
 - Receipts: reports/mr_symbol_map.json, reports/mr_expansion_90d.json.
 
-## ⏳ Pending sections (agents running)
-- Phase 2 adversarial verification: V17 attacker + OB-imbalance attacker.
-- Phase 3 build/stage decision follows verification.
-- Phase 2 adversarial verification of all SHIP/forward-test candidates.
-- Phase 3 build + tests + pre-restart audit (only for what survives).
+## Verification pass (Phase 2) — both candidates attacked by independent agents
+- V17: CONFIRMED-WITH-CAVEATS → staged (see Candidate #1).
+- OB-imbalance removal: REFUTED → gate stays (see Candidate #2 section).
+- Method note: both verifiers rebuilt the math independently (one wrote its own exit engine
+  and matched 9/9 sims to the cent; the other ported the live strategy line-by-line and
+  matched 455/455 signals). First-pass agent numbers were arithmetically right both times;
+  one INFERENCE survived, one didn't. The verification layer earned its cost.
 
-## The honest bottom line (will be finalized at morning)
-The bot's consistent profitability does not hinge on any single overnight lever — the MR slot is
-a low-frequency, marginal-expectancy strategy (+$0.025/trade upper bound, CI straddles 0). The
-levers above can incrementally raise trade count and fill quality; none of them turn it into a
-strong edge. Structural options (scale, strategy class) were adjudicated earlier tonight — see
-memory/project_main_scalper_halt_2026-07-13.md.
+## Bot state at report close (~1:30 AM PT)
+PID 7730, zero errors since 9:14 PM restart, 0 open positions, main entries halted, MR slot +
+ETH-TSM active, no MR signals overnight (normal at ~2.6/day). Staged strategies.py change is
+INERT until restart — running bot unaffected.
+
+## The honest bottom line
+The bot's consistent profitability does not hinge on any overnight lever — the MR slot is a
+low-frequency, marginal-expectancy strategy (+$0.025/trade upper bound, CI straddles 0, ~2.6
+signals/day). Tonight closed every cheap lever with receipts, corrected one prior finding
+(the "misses were winners" study partly priced fills that never happened), staged the one
+defensible knob (V17), and queued the one honest re-adjudication (OB-imbalance at n≥10,
+~6-8 weeks). None of this turns MR into a strong edge. Consistency at meaningful scale still
+runs through the structural decisions in memory/project_main_scalper_halt_2026-07-13.md —
+and the single highest-EV action available this morning remains the PT fee toggle.

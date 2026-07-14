@@ -1,3 +1,37 @@
+# TASK: Overnight research program (2026-07-13 10 PM → 7-14 ~1:30 AM PT) — COMPLETE
+
+Goal: improve 5m_mean_revert trading + consistency. 11 agents (6 research, 2 web, 2 adversarial
+verify, 1 review) + 1 follow-up test. Full results: reports/overnight-2026-07-14-morning-report.md
+
+## Staged (inert until your go — nothing deployed)
+- [x] V17 knob: strategies.py SHORT RSI threshold parameterized as MR_SHORT_RSI_MIN (default 70
+      = today's behavior). Compile OK, 430/430 tests, review agent clean, verified CONFIRMED-
+      WITH-CAVEATS (adversarial). TO ARM: add `MR_SHORT_RSI_MIN=65` to .env → /pre-restart-audit
+      → restart. Expected ~$1-2/mo at current size (scaling-rights test, NOT a needle-mover).
+      KILL CRITERIA: cohort = live MR shorts w/ entry RSI(7) in (65,70] (RSI is in signal reason);
+      hard kill at cohort net ≤ −$5 or 3 consecutive cohort SL losers; review at 30 cohort fills
+      (~2 mo, net<0 → revert); adjudicator CI at 60. REVERT: set 70 / remove line + restart.
+
+## Adjudicated tonight — do NOT revisit (receipts in morning report)
+- [x] Taker fills for MR: DEAD (maker +$7.83 vs taker −$24.22, 3/3 folds negative)
+- [x] Loosening confluence/ADX/longs: DEAD; strength gate 0.80 INERT (emits ≥0.85)
+- [x] Rest extension 60-300s + 2nd requote: DEAD (late fills toxic, monotonic decay; watchdog
+      blocker; prior "misses were winners" partly a placement-price artifact — corrected)
+- [x] OB-imbalance gate removal: REFUTED by verification (4/4-wins CI vacuous, p=0.0625,
+      double-count in cohorts) — GATE STAYS; re-run gate_block_counterfactual.py at n≥10 (~6-8 wk)
+- [x] H1 chase-vs-anchor requote: refuted on own data; H3 candle-turn: NULL/underpowered
+      (passive re-check at 60-80 real trades); H2 depth + LimitIfTouched: parked (live-only A/B)
+- [x] Amend-preserves-queue on Phemex: undocumented, assume NO
+- [x] Symbol map: 1000PEPE only CI+ symbol; curated book fails most-recent fold — data only
+
+## Jonas actions (morning)
+- [ ] PT fee toggle (10% off maker+taker, confirmed official) — PT into futures wallet + flip
+- [ ] Decide: arm MR_SHORT_RSI_MIN=65 forward test? (staged, one .env line + audited restart)
+- [ ] Held from last night: min-margin $20 (needs TRADE_AMOUNT_USDT too + weekend cap literal
+      bot.py:1830; MIN_TRADE_MARGIN alone only tightens crumb guard — see forensics in chat)
+
+---
+
 # TASK: Halt main-bot entries, keep 5m_mean_revert + ETH-TSM (2026-07-13)
 
 ## Why
