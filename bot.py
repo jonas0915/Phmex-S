@@ -1452,6 +1452,27 @@ class Phmex2Bot:
         if getattr(self, '_trading_paused', False):
             return  # exits already processed above, skip entries
 
+        # Operator halt of MAIN-BOT entries only (2026-07-13). Stops the
+        # confluence/htf_l2 scalper (gross-negative — see session audit / TASKS.md)
+        # while the live 5m_mean_revert slot and the ETH-TSM paper probe keep trading
+        # and ALL exits keep firing. Distinct from .pause_trading, whose return above
+        # fires BEFORE the slot evaluators and would freeze slot software-exits.
+        # Reversible with no restart: delete the .halt_main_entries file.
+        if os.path.exists(".halt_main_entries"):
+            if not getattr(self, '_halt_main_logged', False):
+                logger.warning("[SENTINEL] .halt_main_entries active — main-bot entries "
+                               "halted; slots + exits still run")
+                try:
+                    notifier.send("⛔ <b>Main-bot entries HALTED</b> (.halt_main_entries) — "
+                                  "5m_mean_revert + ETH-TSM still running, exits intact")
+                except Exception:
+                    pass
+                self._halt_main_logged = True
+            self._evaluate_all_slots(prices)
+            return  # skip main entry loop; slots (incl. their exits) serviced above
+        else:
+            self._halt_main_logged = False
+
         # --- Extended kill switches (daily loss + consecutive loss) ---
         today_net = _compute_today_net_pnl(self.risk.closed_trades)
         if _should_halt_daily_loss(today_net, real_balance):
@@ -2018,18 +2039,9 @@ class Phmex2Bot:
                 )
 
         # Evaluate strategy slots (paper slots simulate; live slots place real orders)
-        try:
-            self._evaluate_slots(self.active_pairs, prices)
-        except Exception as e:
-            logger.debug(f"[PAPER] Slot evaluation error: {e}")
-
-        # ETH-TSM-28 daily evaluator (2026-07-06): once-per-cycle state machine —
-        # daily signal at the UTC day roll, entry/exit intents, leverage restore.
-        # ERROR (not debug) on failure: this slot has no other evaluation path.
-        try:
-            self._evaluate_eth_tsm(prices)
-        except Exception as e:
-            logger.error(f"[TSM] evaluation error: {e}", exc_info=True)
+        # + ETH-TSM daily evaluator. Extracted to _evaluate_all_slots so the
+        # .halt_main_entries path can service slots identically (2026-07-13).
+        self._evaluate_all_slots(prices)
 
         # Log slot status
         for slot in self.slots:
@@ -2063,6 +2075,23 @@ class Phmex2Bot:
             except Exception as e:
                 logger.debug(f"[L2_LIVE] writer tick failed: {e}")
             time.sleep(interval_sec)
+
+    def _evaluate_all_slots(self, prices: dict):
+        """Run both slot evaluators (generic strategy slots + the ETH-TSM daily state
+        machine). Extracted 2026-07-13 so the .halt_main_entries path can service slots
+        and their exits identically to the normal end-of-cycle call. Exception handling
+        and log levels are preserved verbatim from the original inline call sites."""
+        try:
+            self._evaluate_slots(self.active_pairs, prices)
+        except Exception as e:
+            logger.debug(f"[PAPER] Slot evaluation error: {e}")
+        # ETH-TSM-28 daily evaluator (2026-07-06): once-per-cycle state machine —
+        # daily signal at the UTC day roll, entry/exit intents, leverage restore.
+        # ERROR (not debug) on failure: this slot has no other evaluation path.
+        try:
+            self._evaluate_eth_tsm(prices)
+        except Exception as e:
+            logger.error(f"[TSM] evaluation error: {e}", exc_info=True)
 
     def _evaluate_slots(self, active_pairs: list, prices: dict):
         """Evaluate strategy slots — paper slots simulate; live (promoted) slots place real orders."""

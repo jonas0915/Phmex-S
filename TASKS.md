@@ -1,38 +1,38 @@
-# TASKS — 5m_mean_revert improvement: taker-vs-maker fill replay (2026-06-29)
+# TASK: Halt main-bot entries, keep 5m_mean_revert + ETH-TSM (2026-07-13)
 
-Goal: improve `5m_mean_revert`. First study: does the maker-only (PostOnly) entry
-cost the slot real edge? Build a screening-grade OHLCV replay that regenerates 90d
-of signals and compares maker-fill vs taker-fill net edge.
+## Why
+Session audit (5 agents, cross-verified against state files): main bot is gross-negative
+(gross WR 53.9% < 58.8% break-even) and never had a profitable month (lifetime ≈ −$110).
+Owner directive: halt everything except the 5m_mean_revert live slot and the ETH-TSM paper
+probe. Runtime check confirmed the ONLY real-money exposure is (a) the main bot scalper
+(Config.STRATEGY=confluence → confluence_strategy wrapper → htf_l2_anticipation signals) and
+(b) 5m_mean_revert (live). Everything else already paper (ST2.0/liq_cascade/narrow/ETH-TSM).
 
-Context (verified this session):
-- Slot is LIVE/ACTIVE, identical maker-only entry path as main bot
-  (bot.py:2007 -> exchange.open_long/open_short -> _try_limit_entry, PostOnly, no taker fallback).
-- Only 2 live trades ever (+$0.17 net); 5 PostOnly misses since Jun 24.
-- Botwide maker fill rate ~27% (48 fills / 176 attempts, 7d) -> 0-for-5 is normal variance.
-- ST2.0 taker-fallback verdict does NOT transfer (different signal shape); but edge-hunt
-  lessons say taker fees kill thin edges -> must quantify in NET PnL.
-- ATR-adaptive SL/TP collapses to flat 1.2%/1.6% under live config (risk_manager.py:519-528).
+## Mechanism
+`.pause_trading` is WRONG: its `return` at bot.py:1452 fires BEFORE the slot evaluators
+(_evaluate_slots @2022, _evaluate_eth_tsm @2030), freezing slot software-exits. Instead add a
+`.halt_main_entries` sentinel that skips only the main entry loop but still services slots +
+their exits. Reversible: delete the file (no restart needed to toggle).
 
-## Plan
-- [ ] Build `scripts/slot_lab/mean_revert_replay.py` reusing:
-  - [ ] `backtest.fetch_ohlcv_full` (90d 5m signals + 1m exit path)
-  - [ ] `add_all_indicators` + `strategies.bb_mean_reversion_strategy` (bar-by-bar signal regen)
-  - [ ] `st2_lab.exit_replay._simulate` (exit engine, params sl_pct=1.2/tp_pct=1.6/hold_secs=14400)
-  - [ ] own `_net` with per-leg fee (maker 0.01% vs taker 0.06% entry; slippage 0.05% on taker)
-  - [ ] `st2_lab.stats.bootstrap_diff_ci` for CI; walk-forward split
-- [ ] Decision matrix output (maker net x taker net)
-- [ ] Runtime honesty caveats printed
-- [ ] Verify: smoke run (2 pairs / short window) + cross-check regenerated signals vs real logged misses
+## Changes (bot.py)
+- [ ] 1. Add helper `_evaluate_all_slots(self, prices)` wrapping the two existing slot-eval
+      try/except blocks verbatim (same exception handling / log levels).
+- [ ] 2. Replace the inline slot-eval block (~2020-2032) with `self._evaluate_all_slots(prices)`.
+- [ ] 3. At the entry gate (after the `_trading_paused` return, ~1454), add:
+      if `.halt_main_entries` exists → log once (+Telegram once), run `_evaluate_all_slots(prices)`,
+      then `return`. Reset the one-shot log flag when the file is absent.
 
-## Verification
-- [x] Compiles + imports clean (py_compile; bootstrap_diff_ci confirmed = bug-fixed independent-resample version)
-- [x] Smoke run 2 pairs/14d — full pipeline OK (regen -> path -> simulate -> CI -> walk-forward -> verdict)
-- [x] Faithfulness cross-check vs real logged misses (by RSI fingerprint):
-      EXACT matches — ADA short RSI 72.0/vol 1.3x; XLM short RSI 73.8 vs live 73.6. Logs confirmed PT (UTC-7).
-      CAVEAT: ~half of checkable live signals reproduced; misses due to backtest-vs-live gap
-      (live evaluates the FORMING 5m candle intrabar; replay uses closed-bar values). Screening-grade
-      on the signal DISTRIBUTION, not a per-trade audit — as scoped.
-- [ ] Full 90d/15-pair run (PID 74890 -> reports/mr_replay_90d.json) — IN PROGRESS
+## Known tradeoff
+While halted, the `[STATS]` log line (bot.py:2007) is skipped — identical to existing
+regime-pause / daily-halt early-return windows, just longer. Dashboard reads trading_state.json
+directly for balance, so this is cosmetic. Documented, accepted.
+
+## Rollout
+- [ ] py_compile check
+- [ ] /pre-restart-audit (deploy review agent — real money)
+- [ ] Create `.halt_main_entries`, then restart (rm -rf __pycache__)
+- [ ] Verify in log: main/htf_l2 entries halted; 5m_mean_revert + ETH-TSM still evaluating; exits fire
+- [ ] Update MEMORY.md
 
 ## Review
-(pending)
+(to be filled after audit)
