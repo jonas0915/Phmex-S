@@ -1,0 +1,265 @@
+{
+ "full_sl": {
+  "n": 12,
+  "mean_net": -2.0037,
+  "frac_of_margin": 0.13358,
+  "source": "trading_state.json closed_trades, margin 14.5-15.5, big-loss stop exits"
+ },
+ "mr_live_record": {
+  "n": 26,
+  "net": 8.8439,
+  "symbols": [
+   "AAVE/USDT:USDT",
+   "ADA/USDT:USDT",
+   "ARB/USDT:USDT",
+   "AVAX/USDT:USDT",
+   "BTC/USDT:USDT",
+   "LTC/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "RENDER/USDT:USDT",
+   "SOL/USDT:USDT",
+   "SUI/USDT:USDT",
+   "TAO/USDT:USDT",
+   "WLD/USDT:USDT",
+   "XLM/USDT:USDT",
+   "XRP/USDT:USDT",
+   "ZEC/USDT:USDT"
+  ],
+  "source": "trading_state_5m_mean_revert.json"
+ },
+ "mr_90d_v0": {
+  "net": 7.83356718416284,
+  "n": 309,
+  "ci_per_trade": [
+   -0.05117745670554369,
+   0.10421564586029151
+  ],
+  "win_rate": 0.686084142394822,
+  "source": "reports/mr_variant_grid_90d.json V0_baseline"
+ },
+ "eth_tsm_paper": {
+  "n_closed": 1,
+  "trades": [
+   {
+    "net": 0.09002264000000118,
+    "margin": 5.8826,
+    "reason": "signal_exit",
+    "days_held": 6.79
+   }
+  ],
+  "open_positions": [],
+  "source": "trading_state_ETH_TSM_28.json"
+ },
+ "live_balance_usdt": 41.267385626438,
+ "live_balance_free": 41.267385626438,
+ "fees": {
+  "perp_maker": null,
+  "perp_taker": null,
+  "source": "ccxt phemex market('ETH/USDT:USDT') maker/taker fields (live)",
+  "ccxt_fee_struct": {
+   "tierBased": false,
+   "percentage": true,
+   "taker": 0.001,
+   "maker": 0.001
+  }
+ },
+ "halt_math": [
+  {
+   "balance": 41.27,
+   "halt_thr": 5.0,
+   "halt_branch": "$5 floor",
+   "full_sl_at_15margin": -2.004,
+   "n_full_15margin_SLs_under_halt": 2,
+   "margin_proportional": 15.0,
+   "sl_cost_at_prop_margin": -2.004,
+   "n_prop_SLs_under_halt": 2,
+   "margin_keeping_2_SLs": 18.72,
+   "mr_90d_naive_at_prop_margin": 7.83,
+   "mr_90d_naive_at_2sl_margin": 9.77,
+   "concurrency_3x_prop_margin_pct_bal": 109.0,
+   "concurrency_3x_2sl_margin_pct_bal": 136.1
+  },
+  {
+   "balance": 250.0,
+   "halt_thr": 7.5,
+   "halt_branch": "3%",
+   "full_sl_at_15margin": -2.004,
+   "n_full_15margin_SLs_under_halt": 3,
+   "margin_proportional": 90.87,
+   "sl_cost_at_prop_margin": -12.139,
+   "n_prop_SLs_under_halt": 0,
+   "margin_keeping_2_SLs": 28.07,
+   "mr_90d_naive_at_prop_margin": 47.46,
+   "mr_90d_naive_at_2sl_margin": 14.66,
+   "concurrency_3x_prop_margin_pct_bal": 109.0,
+   "concurrency_3x_2sl_margin_pct_bal": 33.7
+  },
+  {
+   "balance": 500.0,
+   "halt_thr": 15.0,
+   "halt_branch": "3%",
+   "full_sl_at_15margin": -2.004,
+   "n_full_15margin_SLs_under_halt": 7,
+   "margin_proportional": 181.74,
+   "sl_cost_at_prop_margin": -24.277,
+   "n_prop_SLs_under_halt": 0,
+   "margin_keeping_2_SLs": 56.15,
+   "mr_90d_naive_at_prop_margin": 94.91,
+   "mr_90d_naive_at_2sl_margin": 29.32,
+   "concurrency_3x_prop_margin_pct_bal": 109.0,
+   "concurrency_3x_2sl_margin_pct_bal": 33.7
+  }
+ ],
+ "halt_crossover_balance": 166.66666666666669,
+ "carry": {
+  "41.27": 0.14,
+  "250.0": 0.87,
+  "500.0": 1.74
+ },
+ "carry_source": "reference_basis_carry_screen_2026-07-14.md best-case $0.16/mo @ $46, linear",
+ "order_notionals": {
+  "today_$15m_10x": 150.0,
+  "prop_$250": 909.0,
+  "2slsafe_$250": 281.0,
+  "prop_$500": 1817.0,
+  "2slsafe_$500": 561.0
+ },
+ "order_books": {
+  "AAVE/USDT:USDT": {
+   "best_bid": 99.43,
+   "best_ask": 99.47,
+   "spread_bps": 4.02,
+   "top_bid_usd": 497.0,
+   "top_ask_usd": 1890.0,
+   "bid5_usd": 2107.0,
+   "ask5_usd": 35665.0
+  },
+  "ADA/USDT:USDT": {
+   "best_bid": 0.1679,
+   "best_ask": 0.1681,
+   "spread_bps": 11.9,
+   "top_bid_usd": 5868.0,
+   "top_ask_usd": 12587.0,
+   "bid5_usd": 110188.0,
+   "ask5_usd": 154565.0
+  },
+  "ARB/USDT:USDT": {
+   "best_bid": 0.091,
+   "best_ask": 0.0912,
+   "spread_bps": 21.95,
+   "top_bid_usd": 8882.0,
+   "top_ask_usd": 11514.0,
+   "bid5_usd": 80180.0,
+   "ask5_usd": 90332.0
+  },
+  "AVAX/USDT:USDT": {
+   "best_bid": 6.76,
+   "best_ask": 6.762,
+   "spread_bps": 2.96,
+   "top_bid_usd": 1670.0,
+   "top_ask_usd": 185.0,
+   "bid5_usd": 9375.0,
+   "ask5_usd": 5855.0
+  },
+  "BTC/USDT:USDT": {
+   "best_bid": 65308.4,
+   "best_ask": 65308.5,
+   "spread_bps": 0.02,
+   "top_bid_usd": 57537.0,
+   "top_ask_usd": 58582.0,
+   "bid5_usd": 106446.0,
+   "ask5_usd": 119716.0
+  },
+  "LTC/USDT:USDT": {
+   "best_bid": 45.7,
+   "best_ask": 45.73,
+   "spread_bps": 6.56,
+   "top_bid_usd": 3853.0,
+   "top_ask_usd": 7444.0,
+   "bid5_usd": 27371.0,
+   "ask5_usd": 78545.0
+  },
+  "ONDO/USDT:USDT": {
+   "best_bid": 0.337,
+   "best_ask": 0.3376,
+   "spread_bps": 17.79,
+   "top_bid_usd": 1014.0,
+   "top_ask_usd": 391.0,
+   "bid5_usd": 67646.0,
+   "ask5_usd": 4425.0
+  },
+  "RENDER/USDT:USDT": {
+   "best_bid": 1.554,
+   "best_ask": 1.555,
+   "spread_bps": 6.43,
+   "top_bid_usd": 2872.0,
+   "top_ask_usd": 204.0,
+   "bid5_usd": 16359.0,
+   "ask5_usd": 17260.0
+  },
+  "SOL/USDT:USDT": {
+   "best_bid": 78.68,
+   "best_ask": 78.7,
+   "spread_bps": 2.54,
+   "top_bid_usd": 10054.0,
+   "top_ask_usd": 6796.0,
+   "bid5_usd": 414354.0,
+   "ask5_usd": 117796.0
+  },
+  "SUI/USDT:USDT": {
+   "best_bid": 0.7649,
+   "best_ask": 0.7652,
+   "spread_bps": 3.92,
+   "top_bid_usd": 6464.0,
+   "top_ask_usd": 509.0,
+   "bid5_usd": 53497.0,
+   "ask5_usd": 10622.0
+  },
+  "TAO/USDT:USDT": {
+   "best_bid": 200.85,
+   "best_ask": 201.29,
+   "spread_bps": 21.88,
+   "top_bid_usd": 1922.0,
+   "top_ask_usd": 1675.0,
+   "bid5_usd": 9285.0,
+   "ask5_usd": 6473.0
+  },
+  "WLD/USDT:USDT": {
+   "best_bid": 0.4203,
+   "best_ask": 0.4205,
+   "spread_bps": 4.76,
+   "top_bid_usd": 500.0,
+   "top_ask_usd": 394.0,
+   "bid5_usd": 13116.0,
+   "ask5_usd": 19370.0
+  },
+  "XLM/USDT:USDT": {
+   "best_bid": 0.19026,
+   "best_ask": 0.19034,
+   "spread_bps": 4.2,
+   "top_bid_usd": 125.0,
+   "top_ask_usd": 333.0,
+   "bid5_usd": 28167.0,
+   "ask5_usd": 30011.0
+  },
+  "XRP/USDT:USDT": {
+   "best_bid": 1.1234,
+   "best_ask": 1.1237,
+   "spread_bps": 2.67,
+   "top_bid_usd": 5551.0,
+   "top_ask_usd": 930.0,
+   "bid5_usd": 243912.0,
+   "ask5_usd": 12494.0
+  },
+  "ZEC/USDT:USDT": {
+   "best_bid": 583.55,
+   "best_ask": 584.07,
+   "spread_bps": 8.91,
+   "top_bid_usd": 531.0,
+   "top_ask_usd": 4480.0,
+   "bid5_usd": 2042.0,
+   "ask5_usd": 12770.0
+  }
+ },
+ "order_books_ts": "2026-07-15T13:04:53.269Z"
+}

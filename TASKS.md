@@ -26,7 +26,9 @@ verify, 1 review) + 1 follow-up test. Full results: reports/overnight-2026-07-14
 
 ## Jonas actions (morning)
 - [ ] PT fee toggle (10% off maker+taker, confirmed official) — PT into futures wallet + flip
-- [ ] Decide: arm MR_SHORT_RSI_MIN=65 forward test? (staged, one .env line + audited restart)
+- [x] Decide: arm MR_SHORT_RSI_MIN=65 forward test? → **JONAS 7/15: DO NOT ARM, leave as is.**
+      (2nd independent adversarial verify concurred: diff-CI straddles 0, double selection bias,
+      most-recent fold breakeven, kill-gate ~4 mo away at ~8% live fills. Knob stays dormant @70.)
 - [ ] Held from last night: min-margin $20 (needs TRADE_AMOUNT_USDT too + weekend cap literal
       bot.py:1830; MIN_TRADE_MARGIN alone only tightens crumb guard — see forensics in chat)
 

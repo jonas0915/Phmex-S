@@ -1,0 +1,62 @@
+LIVE BALANCE: $41.27 (free $41.27)
+Full-SL cost @$15 margin: mean -2.004 over n=12 -> 13.36% of margin
+Halt crossover (3% overtakes $5): $166.67
+MR live: n=26 net +8.84 | MR 90d V0: net +7.83 n=309
+{"balance": 41.27, "halt_thr": 5.0, "halt_branch": "$5 floor", "full_sl_at_15margin": -2.004, "n_full_15margin_SLs_under_halt": 2, "margin_proportional": 15.0, "sl_cost_at_prop_margin": -2.004, "n_prop_SLs_under_halt": 2, "margin_keeping_2_SLs": 18.72, "mr_90d_naive_at_prop_margin": 7.83, "mr_90d_naive_at_2sl_margin": 9.77, "concurrency_3x_prop_margin_pct_bal": 109.0, "concurrency_3x_2sl_margin_pct_bal": 136.1}
+{"balance": 250.0, "halt_thr": 7.5, "halt_branch": "3%", "full_sl_at_15margin": -2.004, "n_full_15margin_SLs_under_halt": 3, "margin_proportional": 90.87, "sl_cost_at_prop_margin": -12.139, "n_prop_SLs_under_halt": 0, "margin_keeping_2_SLs": 28.07, "mr_90d_naive_at_prop_margin": 47.46, "mr_90d_naive_at_2sl_margin": 14.66, "concurrency_3x_prop_margin_pct_bal": 109.0, "concurrency_3x_2sl_margin_pct_bal": 33.7}
+{"balance": 500.0, "halt_thr": 15.0, "halt_branch": "3%", "full_sl_at_15margin": -2.004, "n_full_15margin_SLs_under_halt": 7, "margin_proportional": 181.74, "sl_cost_at_prop_margin": -24.277, "n_prop_SLs_under_halt": 0, "margin_keeping_2_SLs": 56.15, "mr_90d_naive_at_prop_margin": 94.91, "mr_90d_naive_at_2sl_margin": 29.32, "concurrency_3x_prop_margin_pct_bal": 109.0, "concurrency_3x_2sl_margin_pct_bal": 33.7}
+CARRY $/mo: {41.27: 0.14, 250.0: 0.87, 500.0: 1.74}
+ORDER NOTIONALS: {'today_$15m_10x': 150.0, 'prop_$250': 909.0, '2slsafe_$250': 281.0, 'prop_$500': 1817.0, '2slsafe_$500': 561.0}
+FEES: maker=None taker=None
+AAVE/USDT:USDT {"best_bid": 99.43, "best_ask": 99.47, "spread_bps": 4.02, "top_bid_usd": 497.0, "top_ask_usd": 1890.0, "bid5_usd": 2107.0, "ask5_usd": 35665.0}
+ADA/USDT:USDT {"best_bid": 0.1679, "best_ask": 0.1681, "spread_bps": 11.9, "top_bid_usd": 5868.0, "top_ask_usd": 12587.0, "bid5_usd": 110188.0, "ask5_usd": 154565.0}
+ARB/USDT:USDT {"best_bid": 0.091, "best_ask": 0.0912, "spread_bps": 21.95, "top_bid_usd": 8882.0, "top_ask_usd": 11514.0, "bid5_usd": 80180.0, "ask5_usd": 90332.0}
+AVAX/USDT:USDT {"best_bid": 6.76, "best_ask": 6.762, "spread_bps": 2.96, "top_bid_usd": 1670.0, "top_ask_usd": 185.0, "bid5_usd": 9375.0, "ask5_usd": 5855.0}
+BTC/USDT:USDT {"best_bid": 65308.4, "best_ask": 65308.5, "spread_bps": 0.02, "top_bid_usd": 57537.0, "top_ask_usd": 58582.0, "bid5_usd": 106446.0, "ask5_usd": 119716.0}
+LTC/USDT:USDT {"best_bid": 45.7, "best_ask": 45.73, "spread_bps": 6.56, "top_bid_usd": 3853.0, "top_ask_usd": 7444.0, "bid5_usd": 27371.0, "ask5_usd": 78545.0}
+ONDO/USDT:USDT {"best_bid": 0.337, "best_ask": 0.3376, "spread_bps": 17.79, "top_bid_usd": 1014.0, "top_ask_usd": 391.0, "bid5_usd": 67646.0, "ask5_usd": 4425.0}
+RENDER/USDT:USDT {"best_bid": 1.554, "best_ask": 1.555, "spread_bps": 6.43, "top_bid_usd": 2872.0, "top_ask_usd": 204.0, "bid5_usd": 16359.0, "ask5_usd": 17260.0}
+SOL/USDT:USDT {"best_bid": 78.68, "best_ask": 78.7, "spread_bps": 2.54, "top_bid_usd": 10054.0, "top_ask_usd": 6796.0, "bid5_usd": 414354.0, "ask5_usd": 117796.0}
+SUI/USDT:USDT {"best_bid": 0.7649, "best_ask": 0.7652, "spread_bps": 3.92, "top_bid_usd": 6464.0, "top_ask_usd": 509.0, "bid5_usd": 53497.0, "ask5_usd": 10622.0}
+TAO/USDT:USDT {"best_bid": 200.85, "best_ask": 201.29, "spread_bps": 21.88, "top_bid_usd": 1922.0, "top_ask_usd": 1675.0, "bid5_usd": 9285.0, "ask5_usd": 6473.0}
+WLD/USDT:USDT {"best_bid": 0.4203, "best_ask": 0.4205, "spread_bps": 4.76, "top_bid_usd": 500.0, "top_ask_usd": 394.0, "bid5_usd": 13116.0, "ask5_usd": 19370.0}
+XLM/USDT:USDT {"best_bid": 0.19026, "best_ask": 0.19034, "spread_bps": 4.2, "top_bid_usd": 125.0, "top_ask_usd": 333.0, "bid5_usd": 28167.0, "ask5_usd": 30011.0}
+XRP/USDT:USDT {"best_bid": 1.1234, "best_ask": 1.1237, "spread_bps": 2.67, "top_bid_usd": 5551.0, "top_ask_usd": 930.0, "bid5_usd": 243912.0, "ask5_usd": 12494.0}
+ZEC/USDT:USDT {"best_bid": 583.55, "best_ask": 584.07, "spread_bps": 8.91, "top_bid_usd": 531.0, "top_ask_usd": 4480.0, "bid5_usd": 2042.0, "ask5_usd": 12770.0}
+Book snapshot: 2026-07-15T13:04:53.269Z
+Order notionals tested: {'today_$15m_10x': 150.0, 'prop_$250': 909.0, '2slsafe_$250': 281.0, 'prop_$500': 1817.0, '2slsafe_$500': 561.0}
+
+sym       sprd  topThin$   L5thin$ | order as % of thin top-of-book / thin 5-level
+AAVE       4.0       497      2107 | toda$150:30%/7% prop$909:183%/43% 2sls$281:57%/13% prop$1817:366%/86% 2sls$561:113%/27%
+ADA       11.9      5868    110188 | toda$150:3%/0% prop$909:15%/1% 2sls$281:5%/0% prop$1817:31%/2% 2sls$561:10%/1%
+ARB       21.9      8882     80180 | toda$150:2%/0% prop$909:10%/1% 2sls$281:3%/0% prop$1817:20%/2% 2sls$561:6%/1%
+AVAX       3.0       185      5855 | toda$150:81%/3% prop$909:491%/16% 2sls$281:152%/5% prop$1817:982%/31% 2sls$561:303%/10%
+BTC        0.0     57537    106446 | toda$150:0%/0% prop$909:2%/1% 2sls$281:0%/0% prop$1817:3%/2% 2sls$561:1%/1%
+LTC        6.6      3853     27371 | toda$150:4%/1% prop$909:24%/3% 2sls$281:7%/1% prop$1817:47%/7% 2sls$561:15%/2%
+ONDO      17.8       391      4425 | toda$150:38%/3% prop$909:232%/21% 2sls$281:72%/6% prop$1817:465%/41% 2sls$561:143%/13%
+RENDER     6.4       204     16359 | toda$150:74%/1% prop$909:446%/6% 2sls$281:138%/2% prop$1817:891%/11% 2sls$561:275%/3%
+SOL        2.5      6796    117796 | toda$150:2%/0% prop$909:13%/1% 2sls$281:4%/0% prop$1817:27%/2% 2sls$561:8%/0%
+SUI        3.9       509     10622 | toda$150:29%/1% prop$909:179%/9% 2sls$281:55%/3% prop$1817:357%/17% 2sls$561:110%/5%
+TAO       21.9      1675      6473 | toda$150:9%/2% prop$909:54%/14% 2sls$281:17%/4% prop$1817:108%/28% 2sls$561:33%/9%
+WLD        4.8       394     13116 | toda$150:38%/1% prop$909:231%/7% 2sls$281:71%/2% prop$1817:461%/14% 2sls$561:142%/4%
+XLM        4.2       125     28167 | toda$150:120%/1% prop$909:727%/3% 2sls$281:225%/1% prop$1817:1454%/6% 2sls$561:449%/2%
+XRP        2.7       930     12494 | toda$150:16%/1% prop$909:98%/7% 2sls$281:30%/2% prop$1817:195%/15% 2sls$561:60%/4%
+ZEC        8.9       531      2042 | toda$150:28%/7% prop$909:171%/45% 2sls$281:53%/14% prop$1817:342%/89% 2sls$561:106%/27%
+
+today_$15m_10x ($150): exceeds thin top-of-book on 1/15 symbols; >50% of thin 5-level depth on 0/15
+prop_$250 ($909): exceeds thin top-of-book on 8/15 symbols; >50% of thin 5-level depth on 0/15
+2slsafe_$250 ($281): exceeds thin top-of-book on 3/15 symbols; >50% of thin 5-level depth on 0/15
+prop_$500 ($1817): exceeds thin top-of-book on 10/15 symbols; >50% of thin 5-level depth on 2/15
+2slsafe_$500 ($561): exceeds thin top-of-book on 8/15 symbols; >50% of thin 5-level depth on 0/15
+
+Projected 30d futures volume (MR only, n from 90d grid V0):
+  today_$15m_10x: 103 trades x $150 x 2 legs = $30,900/30d
+  prop_$250: 103 trades x $909 x 2 legs = $187,254/30d
+  2slsafe_$250: 103 trades x $281 x 2 legs = $57,886/30d
+  prop_$500: 103 trades x $1817 x 2 legs = $374,302/30d
+  2slsafe_$500: 103 trades x $561 x 2 legs = $115,566/30d
+Phemex VIP1 requires >= $8M 30d futures volume (help-center page, fetched 7/15).
+ETH-TSM leverage check: 3.000x
+B=$250: halt $7.50; one -8% stop-out loses 24.0% of margin -> max margin $31.25 (5.31x paper size); paper trade (+$0.0900) scaled = +$0.48/trade
+B=$500: halt $15.00; one -8% stop-out loses 24.0% of margin -> max margin $62.50 (10.62x paper size); paper trade (+$0.0900) scaled = +$0.96/trade
+prop margin using $46 base: 15*250/46 = $81.52; one full SL = -$10.89 vs $7.50 halt
