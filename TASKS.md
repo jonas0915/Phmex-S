@@ -1,3 +1,19 @@
+# TASK: Donchian Ensemble Slot build (2026-07-16) — IN PROGRESS
+Owner go: Jonas "build it". Spec: docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md
+Evidence: reports/2026-07-16-wake-report.md §0.4 (OOS SIDESTEPPED verdict).
+
+- [ ] 1. `donchian_slot.py` module (frozen constants, pure signal math, atomic state, replica sidecars)
+- [ ] 2. bot.py wiring: 2 paper slots (DONCHIAN_BTC/ETH) + `_evaluate_donchian(prices)` called
+      from `_evaluate_all_slots` (after `_evaluate_eth_tsm`), TSM-pattern rails opt-out
+- [ ] 3. Unit tests (signal math golden cases from the validated replay; state roundtrip;
+      day-roll trigger; whitelist-legal fetch)
+- [ ] 4. Reporting propagation verified: [SLOT] lines, daily_report, notifier, dashboard
+- [ ] 5. Full suite green + independent code review + /pre-restart-audit
+- [ ] 6. Jonas "go" → restart → verify first daily eval, replica agreement, dashboards
+- [ ] Rollback: `.kill_DONCHIAN_*` / revert (paper-only, zero market risk)
+
+---
+
 # TASK: Overnight research program (2026-07-13 10 PM → 7-14 ~1:30 AM PT) — COMPLETE
 
 Goal: improve 5m_mean_revert trading + consistency. 11 agents (6 research, 2 web, 2 adversarial
