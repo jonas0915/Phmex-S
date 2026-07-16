@@ -25,6 +25,11 @@ ST2_HOLD_CYCLES_BY_SLOT = {"ST2.0": 20}
 import tsm_slot
 from tsm_slot import (TSM_SLOT_ID, TSM_SYMBOL, TSM_AMOUNT_ETH, TSM_LEVERAGE,
                       TSM_STOP_PCT, TSM_OHLCV_LIMIT, TSM_TAKER_FALLBACK_S)
+# Donchian-ensemble slots (2026-07-16 build). Signal math + frozen spec
+# constants live in donchian_slot.py; bot.py only orchestrates (see
+# _evaluate_donchian). Referenced via the module namespace — the constants are
+# per-coin maps, not scalars like the TSM ones.
+import donchian_slot
 from scanner import scan_top_gainers, volatility_scan, start_background_scan, get_scan_result
 from logger import setup_logger
 from ws_feed import WSDataFeed
@@ -581,6 +586,42 @@ class Phmex2Bot:
                                           # 48%-deployment strategy is noise to that rail)
                 durable_trail_enabled=False,  # spec: NO trail — signal exit or −8% stop only
             ),
+            # DONCHIAN_BTC / DONCHIAN_ETH — Concretum 9-lookback Donchian trend
+            # ensemble (close-only channels, ratcheting midline stops, 25% vol
+            # target), long/flat, paper $100 base notional × weight. Spec (frozen):
+            # docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md.
+            # strategy_name is deliberately NOT in STRATEGIES: _evaluate_slots skips
+            # the whole slot (strategy_fn None → continue BEFORE its exit block), so
+            # NO scalper exit (SL/TP/time/flat/adverse/trail/st2_hold) can ever touch
+            # these positions. All entries/exits/stops run in _evaluate_donchian on
+            # daily closes instead — same trick as ETH_TSM_28 above.
+            StrategySlot(
+                slot_id="DONCHIAN_BTC",
+                strategy_name="donchian_ensemble",  # not a STRATEGIES key — see note above
+                timeframe="1d",
+                max_positions=1,
+                capital_pct=0.0,
+                paper_mode=True,          # ships paper-safe; promote via .promote_DONCHIAN_BTC
+                trade_amount_usdt=None,   # unused — sizing is BASE_NOTIONAL × w, no Kelly
+                loss_cap_usdt=-999.0,     # rails opt-out: kill criteria are spec-tracked
+                                          # (paper net −$15 line, fidelity vs replica series)
+                kelly_min_trades=10**9,   # neg-Kelly auto-demote never arms (rebalance
+                                          # close-and-reopens would feed it paper noise)
+                durable_trail_enabled=False,  # spec: the ratcheting Donchian stop IS the
+                                              # exit — close-only, evaluated at the daily eval
+            ),
+            StrategySlot(
+                slot_id="DONCHIAN_ETH",
+                strategy_name="donchian_ensemble",  # not a STRATEGIES key — see note above
+                timeframe="1d",
+                max_positions=1,
+                capital_pct=0.0,
+                paper_mode=True,          # ships paper-safe; promote via .promote_DONCHIAN_ETH
+                trade_amount_usdt=None,   # unused — sizing is BASE_NOTIONAL × w, no Kelly
+                loss_cap_usdt=-999.0,     # rails opt-out (same as DONCHIAN_BTC)
+                kelly_min_trades=10**9,   # neg-Kelly auto-demote never arms
+                durable_trail_enabled=False,  # spec: close-only Donchian stop, no trail
+            ),
         ]
         # ETH-TSM-28 runtime state: sidecar mirror + per-cycle entry-in-flight flag
         # (read by _tsm_locks_symbol so the main bot never grabs ETH mid-entry).
@@ -589,6 +630,11 @@ class Phmex2Bot:
         # Ownership-interaction Telegram dedup: {kind: "YYYY-MM-DD"} — owner sees
         # every interaction once per UTC day per kind (owner directive 2026-07-06).
         self._tsm_ownership_notified: dict[str, str] = {}
+        # Donchian-ensemble runtime state: per-coin persisted ensemble state
+        # (sub-model stops/positions, executed weight, day-roll guard) + one-shot
+        # per-day dedup for the not-implemented-live warning.
+        self._donchian_state = donchian_slot.load_state()
+        self._donchian_live_warned: dict[str, str] = {}
 
     def _fetch_htf_data(self, symbol: str):
         """Fetch 1h candle data with 5-minute cache. Returns indicator-enriched DataFrame or None."""
@@ -901,6 +947,18 @@ class Phmex2Bot:
                     slot.enabled = False
                     for sym in list(slot.risk.positions.keys()):
                         pos = slot.risk.positions[sym]
+                        # PAPER slots must never touch the exchange (2026-07-16 review
+                        # finding): the old unconditional close_long/close_short sent a
+                        # real reduceOnly order that could REDUCE a REAL position if the
+                        # main bot happened to hold the same symbol. Close in the paper
+                        # book instead, at the freshest price available this early in
+                        # the cycle (WS cache; entry price as last resort).
+                        if slot.paper_mode:
+                            _lp = self.ws_feed.last_price(sym) if self.ws_feed else None
+                            _px = _lp[0] if _lp else pos.entry_price
+                            self._close_slot_position(slot, sym, pos, _px, "killed")
+                            logger.info(f"[SENTINEL] Paper position {sym} closed in book for killed slot {slot_id} @ {_px}")
+                            continue
                         if pos.side == "long":
                             order = self.exchange.close_long(sym, pos.amount)
                         else:
@@ -2077,8 +2135,9 @@ class Phmex2Bot:
             time.sleep(interval_sec)
 
     def _evaluate_all_slots(self, prices: dict):
-        """Run both slot evaluators (generic strategy slots + the ETH-TSM daily state
-        machine). Extracted 2026-07-13 so the .halt_main_entries path can service slots
+        """Run the slot evaluators (generic strategy slots + the ETH-TSM and
+        Donchian-ensemble daily state machines). Extracted 2026-07-13 so the
+        .halt_main_entries path can service slots
         and their exits identically to the normal end-of-cycle call. Exception handling
         and log levels are preserved verbatim from the original inline call sites."""
         try:
@@ -2092,6 +2151,13 @@ class Phmex2Bot:
             self._evaluate_eth_tsm(prices)
         except Exception as e:
             logger.error(f"[TSM] evaluation error: {e}", exc_info=True)
+        # Donchian-ensemble daily evaluator (2026-07-16): per-coin ensemble advance
+        # at the UTC day roll + paper position sizing to BASE_NOTIONAL × w.
+        # ERROR (not debug) on failure: these slots have no other evaluation path.
+        try:
+            self._evaluate_donchian(prices)
+        except Exception as e:
+            logger.error(f"[DONCHIAN] evaluation error: {e}", exc_info=True)
 
     def _evaluate_slots(self, active_pairs: list, prices: dict):
         """Evaluate strategy slots — paper slots simulate; live (promoted) slots place real orders."""
@@ -3652,6 +3718,181 @@ class Phmex2Bot:
             )
         except Exception:
             pass
+
+    # ── Donchian ensemble slots (2026-07-16 build) ──────────────────────────
+    # Spec: docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md
+    # (frozen). All signal math is in donchian_slot.py (pure, reference-parity
+    # verified against the validated replay); these methods only orchestrate.
+    # No threads, no cron: _evaluate_donchian runs once per main cycle and does
+    # the daily work when the UTC date rolls — same trigger as _evaluate_eth_tsm.
+    # Paper-only build: fills simulate at the current cycle price; ALL exits
+    # (ratcheting close-only stops, flat signal, rebalances) are computed on
+    # COMPLETE daily closes inside the daily eval — no resting orders, and the
+    # scalper exit engine never sees these slots (strategy_fn is None by design).
+
+    def _donchian_slot(self, slot_id: str):
+        for slot in self.slots:
+            if slot.slot_id == slot_id:
+                return slot
+        return None
+
+    def _donchian_price(self, symbol: str, prices: dict):
+        """Best current price: cycle price map, else one REST ticker."""
+        price = prices.get(symbol)
+        if price:
+            return float(price)
+        try:
+            t = self.exchange.get_ticker(symbol)
+            if t and t.get("last"):
+                return float(t["last"])
+        except Exception as e:
+            logger.debug(f"[DONCHIAN] ticker fetch failed for {symbol}: {e}")
+        return None
+
+    def _evaluate_donchian(self, prices: dict):
+        """Per-cycle driver: for each coin, run the daily evaluation when the
+        UTC date rolls (epoch/UTC-derived — never the local clock; the Mac's
+        timezone travels). Per-coin isolation: one coin's failure must not
+        starve the other. On failure the day is NOT stamped, so the eval
+        retries every cycle until the signal is computed and the paper book
+        matches it (mirrors the TSM retry shape)."""
+        today = donchian_slot.utc_date_str()
+        for symbol in donchian_slot.SYMBOLS:
+            slot = self._donchian_slot(donchian_slot.SLOT_IDS[symbol])
+            if slot is None:
+                continue
+            st = self._donchian_state.setdefault(symbol, donchian_slot.default_coin_state())
+            if st.get("last_eval_utc_date") == today:
+                continue
+            try:
+                self._donchian_daily_eval(slot, symbol, st, today, prices)
+            except Exception as e:
+                logger.error(f"[DONCHIAN] {slot.slot_id} daily eval error: {e} — "
+                             f"retrying next cycle", exc_info=True)
+
+    def _donchian_daily_eval(self, slot, symbol: str, st: dict, today: str, prices: dict):
+        """Fold the newly completed daily close(s) into the persisted ensemble
+        state, write the pure-rule replica record(s), then express the executed
+        weight as the slot's paper position (notional = BASE_NOTIONAL × w).
+        last_eval_utc_date is stamped ONLY once the book matches the weight, so
+        any failure retries next cycle — advance_state is idempotent (closes
+        already folded in are never re-processed)."""
+        df = self.exchange.get_ohlcv(symbol, "1d", limit=donchian_slot.OHLCV_LIMIT)
+        dates, closes = donchian_slot.complete_daily_bars(df)
+        if len(closes) < donchian_slot.MIN_BARS:
+            logger.warning(f"[DONCHIAN] {slot.slot_id} daily eval {today}: insufficient "
+                           f"history ({len(closes)} complete candles < "
+                           f"{donchian_slot.MIN_BARS}) — retrying next cycle")
+            return
+        infos = donchian_slot.advance_state(st, dates, closes)
+        if any(i.get("stop_fired") for i in infos):
+            # Latched until the book syncs: a failed cycle between the fold and
+            # the position adjustment must not demote a stop-driven close to a
+            # generic signal_exit on the retry (advance_state re-returns nothing).
+            st["stop_fired_pending"] = True
+        donchian_slot.save_state(self._donchian_state)  # persist the fold before book work
+        donchian_slot.append_signal_days(symbol, [
+            {"date": i["date"],
+             "w": round(i["w"], 8),
+             "w_target": round(i["w_target"], 8),
+             "submodel_pos": i["submodel_pos"],
+             "n_long": i["n_long"],
+             "vol_scalar": round(i["vol_scalar"], 8) if i["vol_scalar"] is not None else None,
+             "close": i["close"],
+             "stop_fired": i["stop_fired"],
+             **({"note": i["note"]} if i.get("note") else {})}
+            for i in infos])
+
+        w = float(st.get("w") or 0.0)
+        n_long = int(sum(st.get("submodel_pos") or []))
+        stop_fired = bool(st.get("stop_fired_pending"))
+
+        price = self._donchian_price(symbol, prices)
+        if price is None:
+            logger.warning(f"[DONCHIAN] {slot.slot_id} daily eval {today}: no price for "
+                           f"{symbol} — retrying next cycle")
+            return
+        note = self._donchian_adjust_position(slot, symbol, w, price, stop_fired, today)
+        if note is None:
+            return  # book not in line yet — retry next cycle, day stays unstamped
+        st["stop_fired_pending"] = False  # book synced — latch released
+        st["last_eval_utc_date"] = today
+        donchian_slot.save_state(self._donchian_state)
+        logger.info(f"[DONCHIAN] {slot.slot_id} daily eval {today}: w={w:.4f} "
+                    f"({n_long}/9 long) close={closes[-1]:.2f} | {note}")
+
+    def _donchian_adjust_position(self, slot, symbol: str, w: float, price: float,
+                                  stop_fired: bool, today: str):
+        """Make the slot's paper book express notional = BASE_NOTIONAL × w.
+        Resizes are close-and-reopen at the new size — the simplest faithful
+        paper expression of a weight change (the realized PnL slice at each
+        rebalance is a book artifact, not a strategy event; the sidecar w
+        series is the fidelity benchmark per the spec's kill criteria).
+        Returns a status note on success, None when the book could not be
+        brought in line (caller retries next cycle)."""
+        if not slot.paper_mode:
+            # Live sizing is decided AT promotion (spec non-goal: not in this
+            # build) — never place real orders from this path. One warning per
+            # UTC day per slot; the signal series keeps accruing regardless.
+            if self._donchian_live_warned.get(slot.slot_id) != today:
+                self._donchian_live_warned[slot.slot_id] = today
+                logger.error(f"[DONCHIAN] {slot.slot_id} is LIVE but live execution is "
+                             f"not implemented — no orders placed; demote with "
+                             f".demote_{slot.slot_id}")
+            return "LIVE mode unsupported — book untouched"
+
+        target = donchian_slot.BASE_NOTIONAL_USDT * w
+        pos = slot.risk.positions.get(symbol)
+
+        if pos is None:
+            if target <= 0:
+                return "flat — no position"
+            if not slot.is_active:
+                return f"w={w:.4f} but slot disabled/killed — no entry"
+            self._donchian_open_paper(slot, symbol, price, target, w)
+            return f"opened ${target:.2f} notional"
+
+        if target <= 0:
+            # All sub-models flat. Stop-driven (a ratcheting Donchian stop fired
+            # on a folded close) vs vol/history-driven flat — distinct exit tags.
+            reason = "donchian_stop" if stop_fired else "signal_exit"
+            if self._close_slot_position(slot, symbol, pos, price, reason):
+                return f"closed ({reason})"
+            return None
+
+        current = pos.margin  # 1x paper: margin == notional recorded at (re)open
+        if abs(target - current) <= 1e-9:
+            return f"holding ${current:.2f} notional"
+        if not self._close_slot_position(slot, symbol, pos, price, "donchian_rebalance"):
+            return None
+        if not slot.is_active:
+            return f"rebalance closed ${current:.2f} but slot disabled/killed — no reopen"
+        self._donchian_open_paper(slot, symbol, price, target, w)
+        return f"rebalanced ${current:.2f} → ${target:.2f} notional"
+
+    def _donchian_open_paper(self, slot, symbol: str, price: float,
+                             notional: float, w: float):
+        """Paper fill at the current price. 1x sizing (spec: no leverage in
+        paper): margin is recorded AS the notional, so ROI% == price move %,
+        matching the unlevered weight semantics of the validated replay."""
+        n_long = int(sum(self._donchian_state[symbol].get("submodel_pos") or []))
+        pos = slot.risk.open_position(symbol, price, notional, side="long",
+                                      atr=0.0, regime="medium",
+                                      cycle=self.cycle_count,
+                                      strategy="donchian_ensemble")
+        pos.amount = notional / price
+        pos.margin = notional
+        pos.stop_loss = 0.0     # no intraday/resting stop — the ensemble's close-only
+                                # stops are evaluated in _donchian_daily_eval
+        pos.take_profit = None  # spec: no TP; exits are w→0 / rebalance only
+        slot.risk._save_state()
+        slot.total_entries += 1
+        notifier.notify_paper_entry(symbol, "long", price, notional, w,
+                                    f"Donchian ensemble w={w:.3f} ({n_long}/9 long)",
+                                    slot=slot.slot_id)
+        logger.info(f"[PAPER] {slot.slot_id} ENTRY LONG {symbol} @ {price:.2f} "
+                    f"| ${notional:.2f} notional (w={w:.4f}, {n_long}/9 long) "
+                    f"| no TP, close-only daily stops")
 
     def _close_slot_position(self, slot, symbol, pos, price, reason):
         """Close a slot position — simulated for paper, real market order for live.

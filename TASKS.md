@@ -2,15 +2,25 @@
 Owner go: Jonas "build it". Spec: docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md
 Evidence: reports/2026-07-16-wake-report.md §0.4 (OOS SIDESTEPPED verdict).
 
-- [ ] 1. `donchian_slot.py` module (frozen constants, pure signal math, atomic state, replica sidecars)
-- [ ] 2. bot.py wiring: 2 paper slots (DONCHIAN_BTC/ETH) + `_evaluate_donchian(prices)` called
-      from `_evaluate_all_slots` (after `_evaluate_eth_tsm`), TSM-pattern rails opt-out
-- [ ] 3. Unit tests (signal math golden cases from the validated replay; state roundtrip;
-      day-roll trigger; whitelist-legal fetch)
-- [ ] 4. Reporting propagation verified: [SLOT] lines, daily_report, notifier, dashboard
-- [ ] 5. Full suite green + independent code review + /pre-restart-audit
-- [ ] 6. Jonas "go" → restart → verify first daily eval, replica agreement, dashboards
-- [ ] Rollback: `.kill_DONCHIAN_*` / revert (paper-only, zero market risk)
+- [x] 1. `donchian_slot.py` (321 lines): frozen constants, pure math, atomic state, replica
+      sidecars. GOLDEN FIDELITY: max |w_prod − w_replay| = 2.9e-15 over 518 days; incremental
+      advance bit-exact vs batch fold.
+- [x] 2. bot.py wiring: DONCHIAN_BTC/ETH paper slots + `_evaluate_donchian` in
+      `_evaluate_all_slots` after TSM; per-coin isolation; live-order path REFUSES even if
+      promoted (paper-only invariant in code).
+- [x] 3. Tests: 30 new (golden micro-cases, rebalance rules, state roundtrip/idempotency/
+      reseed, CSV regression anchors, wiring) — tests/test_donchian_slot.py.
+- [x] 4. Reporting: dashboard + daily_report glob trading_state_* generically (verified
+      static); sidecars deliberately non-trading_state-named (no phantom slots). Live-surface
+      check after restart.
+- [x] 5. Adversarial review: 9/9 PASS, zero issues ≥80. BONUS FINDING FIXED: pre-existing
+      `.kill_*` handler sent real exchange orders for PAPER slots (could reduce a real
+      overlapping position); now routes paper slots through _close_slot_position (paper book,
+      WS-price/entry fallback) — +3 targeted tests (tests/test_kill_paper_slot.py).
+      FULL SUITE: 463 passed. py_compile clean.
+- [ ] 6. Jonas "go" → restart (rm -rf __pycache__) → verify first daily eval, replica
+      agreement, [SLOT] lines, dashboards
+- [x] Rollback: `.kill_DONCHIAN_*` now genuinely zero-market-risk (fix above) / revert commit
 
 ---
 
