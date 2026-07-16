@@ -1,5 +1,4 @@
-# Wake Report — Thursday 2026-07-16 (compiled ~6:30 AM PT)
-**STATUS: SKELETON — overnight sections fill in at compile time.**
+# Wake Report — Thursday 2026-07-16 — FINAL (compiled 6:35 AM PT)
 
 ## 0. THE NO-BARRIERS STRATEGY SEARCH (your 7/15 mandate) — results
 5 web agents, ~100+ fetched primary sources, everything URL-cited and tier-labeled. One
@@ -83,11 +82,31 @@ at $500-5k per your stated willingness, it's the first strategy all week whose e
 justifies the capital. Replay scripts preserved in scratchpad; can be productionized in a
 day. ETH-TSM-28 can retire into it or run alongside for comparison.
 
-## 1. Bot right now
-⏳ (status, balance, open positions, uptime at compile)
+## 1. Bot right now (6:35 AM PT)
+- PID 7730, uptime 2d 9h, ZERO errors since midnight. Main entries still halted.
+- **Live balance (exchange-verified): $39.35** ($24.21 free + $15.14 in position margin).
+- 1 open position: MR slot **SHORT 1000PEPE** (opened 6:35 AM, $15 margin — notably the ONE
+  symbol the map found CI-positive for MR, and a short = the validated exempted side).
+- ETH-TSM paper: holding ETH long, RT#2 in progress, signal ON.
 
-## 2. Overnight 7/15→16 (~8 PM → 6:30 AM PT)
-⏳ (monitor events, MR signals/fills, TSM eval, errors)
+## 2. Overnight 7/15→16
+- MR slot round trip: LONG SOL 12:28 AM (RSI 29.4, vol 1.6x, maker fill, SL+TP resting with
+  order IDs verified) → resting SL fired 1:10 AM, **−$1.80** (full stop, exchange_close).
+  Machinery worked exactly as designed. Slot ≈ +$4.6 net since 6/12 promotion (auto-demote
+  rail −$5: clear).
+- MR SHORT 1000PEPE opened 6:35 AM (in flight at report time).
+- No other events. No errors. Monitors ran all night.
+
+## 2b. BUILT OVERNIGHT (on your "build it"): Donchian Ensemble slots — READY, awaiting GO
+- `donchian_slot.py` + DONCHIAN_BTC/ETH paper slots wired (ETH-TSM pattern). Golden fidelity
+  vs the validated replay: max diff 2.9e-15. **463/463 tests green.** Adversarial review 9/9
+  PASS. Kill criteria pre-registered (fidelity tracking, −$15 paper line, 90-day review).
+- BONUS: review caught + we fixed a pre-existing live-money bug — `.kill_*` on a PAPER slot
+  sent real exchange orders (could reduce a real overlapping position). Now paper-book-only,
+  +3 tests.
+- **Needs your GO to restart** (paper-only slots; procedure verified; open MR position is
+  protected by resting SL/TP through the restart). Optional add: 3-line daily_report.py
+  false-$0 guard.
 
 ## 3. Interim recap 7/14–7/15 (verified from state files)
 - Main bot: **0 trades since the 7/13 9:14 PM halt** — halt integrity confirmed (~2 days).
