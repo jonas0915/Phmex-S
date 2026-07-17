@@ -44,6 +44,12 @@ class Position:
     # (bot.py). Prevents a second scale-out; the runner half stays under normal
     # trail/TP management.
     scaled_out: bool = False
+    # Provenance (F4 2026-07-17): True when this record was ADOPTED (startup
+    # sync / orphan scan) rather than opened by a signal — opened_at is then
+    # the adoption time, NOT the true entry time (which is unknowable).
+    # Prevents restart adoptions masquerading as entries in forensics (6/14).
+    adopted: bool = False
+    adopted_at: float = 0.0
 
     def update_trailing_stop(self, current_price: float):
         """Tiered trailing stop — the bigger the winner, the tighter the trail.
@@ -317,6 +323,9 @@ class RiskManager:
                     pos.exchange_sl_price = pd.get("exchange_sl_price")  # absent in old state files
                     pos.sl_ratcheted = pd.get("sl_ratcheted", False)
                     pos.scaled_out = pd.get("scaled_out", False)  # absent in old state files
+                    pos.adopted = pd.get("adopted", False)  # absent in old state files (F4)
+                    pos.adopted_at = pd.get("adopted_at", 0.0)
+                    pos.gate_tags = pd.get("gate_tags", None)  # forensic attr must survive restart (2026-07-17 audit)
                     self.positions[sym] = pos
                 if pos_data:
                     logger.info(f"Restored {len(pos_data)} open positions from state")
@@ -342,6 +351,9 @@ class RiskManager:
                     "exchange_sl_price": pos.exchange_sl_price,
                     "sl_ratcheted": pos.sl_ratcheted,
                     "scaled_out": getattr(pos, "scaled_out", False),
+                    "adopted": getattr(pos, "adopted", False),
+                    "adopted_at": getattr(pos, "adopted_at", 0.0),
+                    "gate_tags": getattr(pos, "gate_tags", None),
                 }
             with open(self.state_file, "w") as f:
                 json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades, "trade_results": self.trade_results, "positions": pos_data}, f)
@@ -617,6 +629,8 @@ class RiskManager:
                 strategy="synced",
                 entry_snapshot=preserved_snapshot,
                 scaled_out=preserved_scaled_out,
+                adopted=True,
+                adopted_at=time.time(),
             )
             self.positions[symbol] = position
             logger.info(
@@ -706,6 +720,8 @@ class RiskManager:
             "entry_snapshot": getattr(pos, "entry_snapshot", {}),
             "duration_s": time.time() - pos.opened_at,
             "gate_tags": getattr(pos, "gate_tags", None),
+            "adopted": getattr(pos, "adopted", False),
+            "adopted_at": getattr(pos, "adopted_at", 0.0),
             # Max-favorable-excursion proxy: the high-water mark the trailing stop
             # tracked. Persisted on every close so MFE/runner analysis no longer
             # needs log archaeology (2026-06-19 audit gap). 0.0 if never updated.
@@ -830,6 +846,8 @@ class RiskManager:
             "entry_snapshot": getattr(pos, "entry_snapshot", {}),
             "duration_s": time.time() - pos.opened_at,
             "gate_tags": getattr(pos, "gate_tags", None),
+            "adopted": getattr(pos, "adopted", False),
+            "adopted_at": getattr(pos, "adopted_at", 0.0),
             "peak_price": getattr(pos, "peak_price", 0.0),
             "scaled_out": True,
         }

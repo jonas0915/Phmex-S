@@ -67,6 +67,21 @@ class Config:
     # htf_l2 entries while any open position is underwater. Set false to revert.
     DRIFT_GATE_ENABLED = os.getenv("DRIFT_GATE_ENABLED", "true").lower() == "true"
 
+    # F5 (2026-07-17): block htf_l2 entries in the thin-tape ∧ high-1h-ADX cell —
+    # debug-verified toxic cohort (lifetime −$29.22 @ 47% WR; 99% of July 2026
+    # bleed −$21.09/26t). Thin-only (+$6.86 lifetime) and high-ADX-on-active-tape
+    # stay ALLOWED — this blocks only the conjunction. IN-SAMPLE evidence:
+    # pre-registered forward grading required on any un-halt. Rollback:
+    # HTF_THIN_ADX_BLOCK_ENABLED=false + restart.
+    HTF_THIN_ADX_BLOCK_ENABLED = os.getenv("HTF_THIN_ADX_BLOCK_ENABLED", "true").lower() == "true"
+    HTF_BLOCK_ADX_MIN = float(os.getenv("HTF_BLOCK_ADX_MIN", "35"))
+    HTF_BLOCK_TAPE_MAX = int(os.getenv("HTF_BLOCK_TAPE_MAX", "20"))
+
+    # F2 (2026-07-17): on pause/halt activation, cancel resting NON-reduce-only
+    # (entry) orders once — a resting entry that fills mid-halt creates a ghost
+    # position (4/13 + 6/14 incident class). Set false for instant revert.
+    CANCEL_ENTRIES_ON_PAUSE = os.getenv("CANCEL_ENTRIES_ON_PAUSE", "true").lower() == "true"
+
     # 5m_mean_revert RSI floor (2026-07-02): block slot LONGS when RSI(7) is
     # below this value (falling-knife cohort per reports/mr_replay_90d.json).
     # 0.0 disables the gate. Applies ONLY to the 5m_mean_revert slot.

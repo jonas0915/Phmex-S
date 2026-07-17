@@ -1,3 +1,34 @@
+# TASK: htf_l2 debug fix program (2026-07-17, Jonas: "fix those issues") — IN PROGRESS
+
+Scope confirmed by owner: fix the issues found in the 3-round debug. Strategy fixes are
+INERT while .halt_main_entries stands; un-halt remains Jonas's call. Full evidence:
+reports/2026-07-17-htf-l2-action-plan.md + memory reference_htf_l2_diagnosis_2026-07-16.md.
+
+Order (safety first, then strategy defects, one TDD cycle each, batch audited fixes → ONE restart):
+- [x] F1 (LIVE MONEY): pause branch services slots before return + `_slot_entries_blocked()`
+      helper on BOTH slot entry branches (paper gap closed) — 4 tests
+- [x] F2: `cancel_entry_orders` (reduceOnly-safe) + one-shot pause-edge sweep, flag
+      CANCEL_ENTRIES_ON_PAUSE=true, Telegram alert — 6 tests
+- [x] F3: `_pending_cancel_sweep` registry + `sweep_pending_cancels()` per cycle beside
+      reconcile; 24h TTL → Telegram; sweep never adopts — 8 tests
+- [x] F4: Position.adopted/adopted_at set by sync_positions + orphan-adopt, wired through
+      save/load + both closed-trade sites — 7 tests
+- [x] F5: `_thin_adx_blocked()` conjunction gate (HTF_BLOCK_ADX_MIN=35, HTF_BLOCK_TAPE_MAX=20,
+      HTF_THIN_ADX_BLOCK_ENABLED=true), gotAway reason "thin_adx", inert while halted — 6 tests
+- [x] F6: ensemble blocks → gotAway("ensemble_confidence"); main-path pos.gate_tags written
+      (sg_htf_adx_hi / sg_thin_tape / shadow axes; "none" when clean) — 3 tests
+- [x] Full suite 505 passed, py_compile clean, __pycache__ cleared; all RED phases watched fail
+- [x] Audit agent on total diff: clean on all 6 fixes + 3 findings (gate_tags not persisted,
+      THIN-ADX invisible on dashboard label_map, TSM/Donchian paper paths pause-blind) —
+      ALL 3 FIXED + tested (tests/test_audit_findings_0717.py, 4 tests; Donchian guard blocks
+      only exposure INCREASES so de-risking still runs; helper hardened for early-startup)
+- [x] Suite: 509 passed. py_compile clean. __pycache__ cleared.
+- [ ] Jonas "go" → restart → verify (sentinel honored, slots serviced, no errors)
+NOT in scope (standing directives): exit-geometry changes, existing-gate removals (quiet_regime
+stays), throttle redesign (deliberate cluster-risk design, PnL impact unquantified), un-halt.
+
+---
+
 # TASK: STATS line halt-proof fix (2026-07-16 evening) — COMPLETE ✅
 
 Bug (confirmed by 4-agent debug): the every-10-cycles `=== STATS ===` log line

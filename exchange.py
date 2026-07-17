@@ -23,6 +23,7 @@ class Exchange:
         self.paper_balances: dict = {}
         self.paper_orders: list = []
         self._reduce_only_aborts: dict = {}  # symbol -> ts of last 11011/TE_REDUCE_ONLY_ABORT close failure
+        self._pending_cancel_sweep: dict = {}  # symbol -> {order_id, ts}: entry orders whose cancel FAILED (F3 2026-07-17)
         self._last_balance: dict = {}   # value cache for failed fetches
         self._balance_fetch_ts: float = 0  # timestamp of last successful fetch
         self._BALANCE_TTL: float = 30.0    # only hit the API every 30 seconds
@@ -426,6 +427,7 @@ class Exchange:
                     logger.debug(f"[POLL] fetch_order failed for {symbol} id={order_id}: {e}")
 
             # Not filled within patience_s — cancel and skip (no market fallback)
+            _cancel_unconfirmed = False  # set True when a failed cancel leaves the order possibly live (F3)
             try:
                 self.client.cancel_order(order_id, symbol)
                 # Check for race: filled between our last poll and cancel
@@ -444,6 +446,7 @@ class Exchange:
             except Exception as e:
                 # Cancel failed — check if filled via fetch_order, then ground truth
                 logger.warning(f"[CANCEL FAIL] {symbol} id={order_id}: {e}")
+                _cancel_unconfirmed = True
                 try:
                     fetched = self.client.fetch_order(order_id, symbol)
                     if fetched.get("status") == "closed":
@@ -452,6 +455,8 @@ class Exchange:
                     if _filled_cf > 0:
                         logger.info(f"[FILL] {symbol} {order_side} — MAKER partial {_filled_cf}/{amount} (cancel failed)")
                         return fetched
+                    if fetched.get("status") in ("canceled", "cancelled"):
+                        _cancel_unconfirmed = False  # exchange confirms it's dead
                 except Exception as e2:
                     logger.warning(f"[CANCEL FAIL] fetch_order also failed for {symbol} id={order_id}: {e2} — falling through to ground-truth check")
 
@@ -460,6 +465,14 @@ class Exchange:
             gt = self._position_ground_truth(symbol, side, pre_amount=pre_amount)
             if gt:
                 return gt
+
+            # F3 (2026-07-17): if the cancel FAILED and nothing confirms the order
+            # dead, it may still be resting live — register for the per-cycle sweep
+            # (sweep only retries the cancel; a late fill is adopted by the existing
+            # orphan scan, never here, so the two mechanisms can't double-adopt).
+            if _cancel_unconfirmed and order_id:
+                self._pending_cancel_sweep[symbol] = {"order_id": order_id, "ts": time.time()}
+                logger.warning(f"[CANCEL SWEEP] {symbol} id={order_id} registered — cancel unconfirmed, will retry each cycle")
 
             logger.info(f"[FILL MISS] {symbol} {order_side} — limit not filled in {patience_s:.0f}s, skipping entry")
             return None
@@ -1035,6 +1048,57 @@ class Exchange:
                     logger.warning(f"Could not cancel order {order['id']} for {symbol}: {e}")
         except Exception as e:
             logger.warning(f"Could not fetch open orders for {symbol}: {e}")
+
+    def sweep_pending_cancels(self) -> list:
+        """Retry cancels that failed during entry (F3 2026-07-17). Resolves an
+        entry when the retry succeeds or the exchange says OrderNotFound. Never
+        adopts positions — late fills surface via the existing orphan scan.
+        Returns records dropped after the 24h TTL so the caller can alert."""
+        expired = []
+        for symbol in list(self._pending_cancel_sweep.keys()):
+            rec = self._pending_cancel_sweep[symbol]
+            try:
+                self.client.cancel_order(rec["order_id"], symbol)
+                logger.info(f"[CANCEL SWEEP] {symbol} id={rec['order_id']} cancelled on retry — resolved")
+                self._pending_cancel_sweep.pop(symbol, None)
+                continue
+            except Exception as e:
+                if isinstance(e, ccxt.OrderNotFound) or "not found" in str(e).lower():
+                    logger.info(f"[CANCEL SWEEP] {symbol} id={rec['order_id']} already gone — resolved")
+                    self._pending_cancel_sweep.pop(symbol, None)
+                    continue
+                logger.warning(f"[CANCEL SWEEP] retry failed {symbol} id={rec['order_id']}: {e}")
+            if time.time() - rec.get("ts", 0) > 86400:
+                self._pending_cancel_sweep.pop(symbol, None)
+                expired.append({**rec, "symbol": symbol})
+                logger.error(f"[CANCEL SWEEP] {symbol} id={rec['order_id']} unresolved >24h — dropped, manual check needed")
+        return expired
+
+    def cancel_entry_orders(self, symbol: str) -> int:
+        """Cancel open NON-reduce-only orders (entry orders) for a symbol,
+        leaving reduceOnly SL/TP protective orders resting. Returns count
+        cancelled. F2 (2026-07-17): halts must sweep resting entry orders or a
+        late fill mid-halt creates a ghost position (4/13, 6/14 incidents).
+        Full order dict logged at INFO so a reduceOnly misclassification on
+        Phemex trigger orders would be caught fast."""
+        if not Config.is_live():
+            return 0
+        cancelled = 0
+        try:
+            open_orders = self.client.fetch_open_orders(symbol)
+        except Exception as e:
+            logger.warning(f"[ENTRY SWEEP] Could not fetch open orders for {symbol}: {e}")
+            return 0
+        for order in open_orders:
+            if order.get("reduceOnly") or (order.get("info") or {}).get("reduceOnly"):
+                continue  # protective SL/TP — must keep resting
+            try:
+                self.client.cancel_order(order["id"], symbol)
+                logger.info(f"[ENTRY SWEEP] Cancelled entry order for {symbol}: {order}")
+                cancelled += 1
+            except Exception as e:
+                logger.warning(f"[ENTRY SWEEP] Could not cancel {order.get('id')} for {symbol}: {e}")
+        return cancelled
 
     def ensure_leverage(self, symbol: str):
         """Set leverage for a symbol if not already configured."""

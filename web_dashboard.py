@@ -110,6 +110,9 @@ def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
         ("Drift gate",     "[DRIFT GATE]"),
         ("Tape gate",      "[TAPE GATE]"),
         ("OB gate",        "[OB GATE]"),
+        # Must outrank the bare "ADX" pattern below (first-match-wins) —
+        # "[THIN-ADX]" lines contain the substring "ADX".
+        ("Thin ADX",       "[THIN-ADX]"),
         ("Ensemble <4/7",  "ENSEMBLE SKIP"),
         # "No confluence" MUST outrank "ADX": every idle HOLD line reads
         # "No confluence signal (1h ADX=...)" and first-match-wins was

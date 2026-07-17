@@ -929,9 +929,28 @@ class Phmex2Bot:
                     logger.info("[SENTINEL] .pause_trading active — skipping all entries (exits still processed)")
                     self._pause_logged = True
                 self._trading_paused = True
+                # F2 (2026-07-17): one-shot sweep of resting ENTRY orders on the
+                # pause transition edge — a resting PostOnly entry that fills
+                # mid-halt creates a ghost position. reduceOnly SL/TP untouched.
+                if (Config.CANCEL_ENTRIES_ON_PAUSE
+                        and not getattr(self, "_pause_orders_swept", False)):
+                    self._pause_orders_swept = True
+                    _swept = 0
+                    for _sym in list(getattr(self, "active_pairs", []) or []):
+                        try:
+                            _swept += self.exchange.cancel_entry_orders(_sym)
+                        except Exception as _e:
+                            logger.warning(f"[ENTRY SWEEP] sweep failed for {_sym}: {_e}")
+                    if _swept:
+                        logger.warning(f"[ENTRY SWEEP] Cancelled {_swept} resting entry order(s) on pause")
+                        try:
+                            notifier.send(f"🧹 Cancelled {_swept} resting entry order(s) on halt/pause")
+                        except Exception:
+                            pass
         else:
             self._trading_paused = False
             self._pause_logged = False
+            self._pause_orders_swept = False
 
         # Reset the override one-shot notice whenever the override is not active,
         # so a fresh override on a later PT day notifies again (and never spams).
@@ -1337,6 +1356,19 @@ class Phmex2Bot:
         # because the orphan case by definition means bot thinks there are none.
         if Config.is_live():
             self._sync_exchange_closes(prices)
+            # F3 (2026-07-17): retry entry-order cancels that failed at entry
+            # time — an unconfirmed-dead resting order can fill mid-halt and
+            # create a ghost position (4/13 / 6/14 incident class).
+            try:
+                for _rec in self.exchange.sweep_pending_cancels():
+                    try:
+                        notifier.send(f"⚠️ Resting entry order {_rec.get('order_id')} on "
+                                      f"{_rec.get('symbol')} unresolved for >24h — "
+                                      f"cancel manually on Phemex and verify no ghost position")
+                    except Exception:
+                        pass
+            except Exception as _e:
+                logger.warning(f"[CANCEL SWEEP] cycle sweep failed: {_e}")
 
         # Verify SL orders still active — re-place if cancelled (skip software-managed)
         for symbol, pos in list(self.risk.positions.items()):
@@ -1514,7 +1546,14 @@ class Phmex2Bot:
             indicator_cache[sym] = df_ind
 
         if getattr(self, '_trading_paused', False):
-            return  # exits already processed above, skip entries
+            # F1 (2026-07-17): service slots (their software exits + SL ratchet)
+            # before returning — mirrors the .halt_main_entries branch below.
+            # Without this, a global pause froze the LIVE slot's exit stack for
+            # the pause duration (only the exchange-resting SL protected it).
+            # Slot ENTRIES stay blocked: both entry branches in _evaluate_slots
+            # check _slot_entries_blocked().
+            self._evaluate_all_slots(prices)
+            return  # main exits already processed above, skip main entries
 
         # Operator halt of MAIN-BOT entries only (2026-07-13). Stops the
         # confluence/htf_l2 scalper (gross-negative — see session audit / TASKS.md)
@@ -1727,6 +1766,10 @@ class Phmex2Bot:
                         f"[ENSEMBLE SKIP] {symbol} {direction} — BLOCKED: ensemble confidence {confidence}/7 "
                         f"< {min_confidence}/7 minimum (strat={strat_name})"
                     )
+                    # F6 (2026-07-17): gotAway-log ensemble blocks — they were
+                    # invisible to every prior gate analysis (never logged there).
+                    self._log_gotaway("ensemble_confidence", symbol, direction, strat_name,
+                                      signal.strength, confidence, price, ob, flow, df)
                     continue
 
                 # Divergence cooldown — require 3 clean cycles OR 10 min after a divergence block
@@ -1867,6 +1910,19 @@ class Phmex2Bot:
                             f"{_uw_sym.split('/')[0]} underwater {_uw_drift:.2f}%"
                         )
                         continue
+
+                # F5 (2026-07-17): htf_l2 thin-tape ∧ high-1h-ADX toxic-cell block
+                _f5_adx = (float(htf_df.iloc[-1].get("adx", 0))
+                           if htf_df is not None and len(htf_df) > 0 else None)
+                if self._thin_adx_blocked(strat_name, flow, _f5_adx):
+                    self._log_gotaway("thin_adx", symbol, direction, strat_name,
+                                      signal.strength, confidence, price, ob, flow, df)
+                    logger.info(
+                        f"[THIN-ADX] {symbol} {direction.upper()} blocked — "
+                        f"htf_adx {_f5_adx:.1f} >= {Config.HTF_BLOCK_ADX_MIN:.0f} on thin tape "
+                        f"(tc={(flow or {}).get('trade_count', 0)} <= {Config.HTF_BLOCK_TAPE_MAX})"
+                    )
+                    continue
 
                 # Phase 2b Gate A: pullback per-hour bleed filter (30d data-driven)
                 # UTC {5,8,13,14,16} = 10PM/1AM/6AM/7AM/9AM PT — 5 unblocked hours where pullback runs 22% WR vs 47% breakeven
@@ -2022,6 +2078,16 @@ class Phmex2Bot:
                     logger.info(f"[ENTRY] {direction.upper()} {symbol} | Fill: {fill_price:.4f} | Margin: ${pos.margin:.2f} | Conf: {confidence}/7 | {signal.reason} | Strength: {signal.strength:.2f}")
                     _htf_adx_val = float(htf_df.iloc[-1].get("adx", 0)) if htf_df is not None and len(htf_df) > 0 else None
                     pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, fill_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df, htf_adx=_htf_adx_val, extra_tags=_shadow_gates or None)
+                    # F6 (2026-07-17): tag entered trades — gate_tags was None on
+                    # every main-path trade (all 235 htf_l2), blinding forensics.
+                    # "none" (not None) when clean, so 'no active tags' is
+                    # distinguishable from 'telemetry missing'.
+                    _active_tags = [k for k, v in (_shadow_gates or {}).items() if v]
+                    if _htf_adx_val is not None and _htf_adx_val >= Config.HTF_BLOCK_ADX_MIN:
+                        _active_tags.append("sg_htf_adx_hi")
+                    if (flow or {}).get("trade_count", 0) <= Config.HTF_BLOCK_TAPE_MAX:
+                        _active_tags.append("sg_thin_tape")
+                    pos.gate_tags = ",".join(_active_tags) if _active_tags else "none"
                     try:
                         self.risk._save_state()
                     except Exception as _e:
@@ -2100,6 +2166,35 @@ class Phmex2Bot:
             mode = "PAPER" if slot.paper_mode else "LIVE"
             status = "KILLED" if slot.is_killed else "ACTIVE" if slot.is_active else "DISABLED"
             logger.info(f"[SLOT] {slot.slot_id} ({mode}/{status}) | {s['trades']} trades | WR: {s['wr']}% | PnL: ${s['pnl']}")
+
+    def _thin_adx_blocked(self, strat_name: str, flow: dict | None,
+                          htf_adx: float | None) -> bool:
+        """F5 (2026-07-17): htf_l2 toxic-cell block — thin tape (trade_count
+        <= HTF_BLOCK_TAPE_MAX) AND extended 1h trend (htf_adx >=
+        HTF_BLOCK_ADX_MIN). Only the CONJUNCTION blocks: thin-only was +$6.86
+        lifetime, high-ADX on an active tape only mildly negative; the
+        conjunction was −$29.22 lifetime and 99% of July 2026's bleed
+        (verified, in-sample — forward grading pre-registered for any
+        un-halt). Missing tape data counts as thin (conservative); missing
+        ADX allows (can't confirm the toxic half)."""
+        if not Config.HTF_THIN_ADX_BLOCK_ENABLED:
+            return False
+        if strat_name != "htf_l2_anticipation":
+            return False
+        if htf_adx is None:
+            return False
+        return (htf_adx >= Config.HTF_BLOCK_ADX_MIN
+                and (flow or {}).get("trade_count", 0) <= Config.HTF_BLOCK_TAPE_MAX)
+
+    def _slot_entries_blocked(self) -> bool:
+        """Fresh (per-call) global entry block for ALL slot entries, paper AND
+        live: the .pause_trading sentinel or the main drawdown pause. Fresh
+        file check on purpose — a sentinel written mid-cycle blocks the same
+        cycle's slot entries, unlike the once-per-cycle _trading_paused flag."""
+        _rm = getattr(self, "risk", None)
+        return (os.path.exists(".pause_trading")
+                or (_rm is not None
+                    and getattr(_rm, "_drawdown_pause_until", 0) > time.time()))
 
     def _maybe_print_stats(self, real_balance: float, available: float,
                            margin_in_use: float) -> None:
@@ -2515,6 +2610,13 @@ class Phmex2Bot:
                     _block_label = f" [WOULD BLOCK: {_tag_str}]" if _would_block else ""
 
                     if slot.paper_mode:
+                        # F1: global pause blocks ALL entries, paper included —
+                        # the sentinel's own log line says "skipping all
+                        # entries", and paper entries during a pause would
+                        # pollute paper ledgers and slot stats.
+                        if self._slot_entries_blocked():
+                            logger.info(f"[PAPER] {slot.slot_id} {symbol} entry blocked — account halt")
+                            continue
                         slot.risk.open_position(
                             symbol, price, margin, side=direction,
                             atr=atr_val, regime="medium",
@@ -2532,7 +2634,7 @@ class Phmex2Bot:
                     else:
                         # --- LIVE slot entry (spec 2026-06-12) ---
                         # account halts: pause sentinel + main drawdown pause (risk_manager.py:351)
-                        if os.path.exists(".pause_trading") or self.risk._drawdown_pause_until > time.time():
+                        if self._slot_entries_blocked():
                             logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} entry blocked — account halt")
                             continue
                         # ETH ownership rule (ETH-TSM-28, 2026-07-06): same skip the main
@@ -3583,6 +3685,12 @@ class Phmex2Bot:
             return
 
         if slot.paper_mode:
+            # F1 follow-up (2026-07-17 audit): paper entries honor the global
+            # pause too — sentinel promises "skipping all entries". The
+            # pending-entry machinery retries after the pause clears.
+            if self._slot_entries_blocked():
+                logger.info("[TSM] paper entry blocked — account halt")
+                return
             # Paper: fill at current price, sim book only. Margin recorded at the
             # spec's 3x so ROI% matches what live would report.
             margin = TSM_AMOUNT_ETH * price / TSM_LEVERAGE
@@ -3857,6 +3965,16 @@ class Phmex2Bot:
         target = donchian_slot.BASE_NOTIONAL_USDT * w
         pos = slot.risk.positions.get(symbol)
 
+        # F1 follow-up (2026-07-17 audit): during a global pause never INCREASE
+        # paper exposure (open/up-size); reductions and closes still run so the
+        # book can de-risk. Deferred adjustments retry next cycle — fidelity
+        # |w−replica| tolerates sub-day lag (kill needs >0.10 for >3d of 14d).
+        if self._slot_entries_blocked():
+            _cur_notional = (pos.amount * price) if pos is not None else 0.0
+            if target > _cur_notional:
+                logger.info(f"[DONCHIAN] {slot.slot_id} up-size deferred — account halt")
+                return None
+
         if pos is None:
             if target <= 0:
                 return "flat — no position"
@@ -3985,6 +4103,10 @@ class Phmex2Bot:
         pos = self.risk.positions[symbol]
         pos.amount = amount
         pos.margin = margin
+        # F4 provenance: this is an ADOPTION, not a signal entry — opened_at is
+        # discovery time, the true entry time is unknowable post-hoc.
+        pos.adopted = True
+        pos.adopted_at = time.time()
 
         # Place SL/TP on the exchange so the broker protects this position
         try:
