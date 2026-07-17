@@ -1141,13 +1141,15 @@ def build_trade_detail(trade_id: str, sym: str = None) -> dict:
 
 # ── Ticker helpers (Terminal Pro shell) ─────────────────────────────────
 def _latest_balance(lines: list = None) -> float:
-    """Last 'Balance: X USDT' from the bot-log STATS lines (the state JSON has
-    no balance field). 0.0 if unavailable.
+    """Last balance-bearing bot-log line: '=== STATS === ... Balance: X USDT'
+    (every 10 cycles) or the boot line 'Starting balance: X USDT' (bot.py:751).
+    Without the boot line, every restart left a <=10-cycle window showing
+    $0.00 (2026-07-16). The state JSON has no balance field. 0.0 if unavailable.
     Pass pre-fetched log lines to avoid a redundant tail_log call."""
     try:
         src = lines if lines is not None else tail_log(2000)
         for line in reversed(src):
-            m = re.search(r'Balance: ([\d.]+) USDT', line)
+            m = re.search(r'[Bb]alance: ([\d.]+) USDT', line)
             if m:
                 return float(m.group(1))
     except Exception:

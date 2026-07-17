@@ -1,3 +1,50 @@
+# TASK: STATS line halt-proof fix (2026-07-16 evening) — COMPLETE ✅
+
+Bug (confirmed by 4-agent debug): the every-10-cycles `=== STATS ===` log line
+(risk_manager.py:900) is emitted at the END of `_run_cycle` (bot.py:2086), after
+three early returns — regime pause (~1496), `_trading_paused` (~1511), and
+`.halt_main_entries` (~1530). Since the 7/13 main-entries halt, zero STATS lines
+printed → web_dashboard `_latest_balance` (:1143), trading_desk stats parser (:98),
+scripts/daily_report.py (:144), and monitor_daemon all read balance $0 /
+drawdown 0% or 100%.
+
+Fix: extract the STATS block into `_maybe_print_stats()` and call it once, right
+after `update_peak_balance(real_balance)` (~bot.py:1488), BEFORE all early
+returns. Remove the old inline block at 2086-2097. Content is identical:
+print_stats reads only closed_trades (finalized before the balance fetch) and the
+passed-in real_balance. The 2026-04-26 API-failure guard (skip when available==0
+with margin in use) is preserved verbatim.
+
+## Plan
+- [x] Preflight (lessons.md META-RULES, MEMORY.md) — done at session start
+- [x] Root cause verified with file:line evidence (dashboard-debug agent)
+- [x] RED: tests/test_stats_halt_visibility.py — 4 tests, all watched fail (AttributeError + ordering assert)
+- [x] GREEN: `_maybe_print_stats` added (bot.py:2104), call moved to bot.py:1494, old block deleted
+- [x] Full suite 467 passed (463 + 4 new) + py_compile clean + __pycache__ cleared
+- [x] Review agent: PASS, zero findings ≥80; guard semantics, single call site, cadence all confirmed
+- [x] Lessons crosscheck: no numeric params changed; no STATS/print_stats conflicts in memory
+- [x] Restart on Jonas "go" — 9:00 PM PT, PID 83245, boot clean (3 paper positions
+      restored, balance 41.90, sentinel honored)
+- [x] FOLLOW-UP FIX (Jonas "fix it" 9:05 PM): web_dashboard `_latest_balance` regex
+      only matched STATS `Balance:` — blind for <=10 cycles after every restart.
+      Widened to `[Bb]alance:` so the boot line `Starting balance: X USDT`
+      (bot.py:751) also counts; most-recent-wins. TDD: 2 red -> green, 15 dashboard
+      tests pass. Dashboard-only restart (PID 86987, 9:06 PM PT); stdout now logs to
+      ~/Library/Logs/Phmex-S/web_dashboard.log (was /dev/null). VERIFIED live:
+      ticker BAL $41.90 / DD 9.6% at 9:07 PM PT.
+- [x] Confirmed: first post-restart STATS line 9:13 PM PT WITH halt sentinel active
+      (`=== STATS === ... Balance: 41.90 USDT | Drawdown: 9.6%`) — fix proven live;
+      dashboard ticker matches ($41.90 / 9.6%)
+
+## Review
+- Diff: bot.py only (+ this file + new test file). reports/2026-07-16.md diff is the
+  bot's own 8:22 PM report regeneration, not part of this change.
+- Reviewer's minor note (~55 conf, immaterial): rare `min_margin_skip` close at
+  bot.py:2001 now lands after the STATS print instead of before — consumers parse
+  only the Balance field, so no impact on the fix target.
+
+---
+
 # TASK: Donchian Ensemble Slot build (2026-07-16) — DEPLOYED (paper) ✅
 Restart 7/16 7:39 PM PT (PID 47206, Jonas go). Halt honored; 0 errors. DAY-ONE FIDELITY
 PERFECT: paper book == pure-rule replica to 1e-8 (BTC w=0.2336 = $23.36 @ 1x, SL 0/no TP;

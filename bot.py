@@ -1487,6 +1487,12 @@ class Phmex2Bot:
         real_balance = _equity_for_drawdown(_exchange_equity, available + margin_in_use)
         self.risk.update_peak_balance(real_balance)
 
+        # STATS must print BEFORE the regime-pause/_trading_paused/.halt_main_entries
+        # early returns: monitor_daemon, web_dashboard, trading_desk, and
+        # daily_report all parse this line for balance/drawdown, and the 7/13
+        # entries halt starved them to $0 when it lived at end-of-cycle (2026-07-16).
+        self._maybe_print_stats(real_balance, available, margin_in_use)
+
         # Regime filter — pause all entries after consecutive losses
         if time.time() < self._regime_pause_until:
             remaining = int(self._regime_pause_until - time.time())
@@ -2083,19 +2089,6 @@ class Phmex2Bot:
                             continue
                     logger.error(f"[ENTRY] Order FAILED for {direction.upper()} {symbol} — signal lost")
 
-        if self.cycle_count % 10 == 0:
-            # Skip STATS when get_balance returned 0 with open positions —
-            # almost certainly an API failure (401 / network). Logging
-            # real_balance = 0 + margin_in_use causes false drawdown alerts
-            # downstream (monitor_daemon parses STATS Balance — 2026-04-26 incident).
-            if available > 0 or margin_in_use == 0:
-                self.risk.print_stats(real_balance)
-            else:
-                logger.warning(
-                    f"[STATS] Skipping log — get_balance returned 0 with "
-                    f"${margin_in_use:.2f} margin in use (likely API failure)"
-                )
-
         # Evaluate strategy slots (paper slots simulate; live slots place real orders)
         # + ETH-TSM daily evaluator. Extracted to _evaluate_all_slots so the
         # .halt_main_entries path can service slots identically (2026-07-13).
@@ -2107,6 +2100,26 @@ class Phmex2Bot:
             mode = "PAPER" if slot.paper_mode else "LIVE"
             status = "KILLED" if slot.is_killed else "ACTIVE" if slot.is_active else "DISABLED"
             logger.info(f"[SLOT] {slot.slot_id} ({mode}/{status}) | {s['trades']} trades | WR: {s['wr']}% | PnL: ${s['pnl']}")
+
+    def _maybe_print_stats(self, real_balance: float, available: float,
+                           margin_in_use: float) -> None:
+        """Every-10-cycles `=== STATS ===` log line. Called early in _run_cycle,
+        before any entry-halt early return, because four consumers parse it for
+        balance/drawdown (monitor_daemon, web_dashboard, trading_desk,
+        daily_report)."""
+        if self.cycle_count % 10 != 0:
+            return
+        # Skip STATS when get_balance returned 0 with open positions —
+        # almost certainly an API failure (401 / network). Logging
+        # real_balance = 0 + margin_in_use causes false drawdown alerts
+        # downstream (monitor_daemon parses STATS Balance — 2026-04-26 incident).
+        if available > 0 or margin_in_use == 0:
+            self.risk.print_stats(real_balance)
+        else:
+            logger.warning(
+                f"[STATS] Skipping log — get_balance returned 0 with "
+                f"${margin_in_use:.2f} margin in use (likely API failure)"
+            )
 
     def _l2_live_writer_loop(self, interval_sec: float = 5.0) -> None:
         """Daemon thread: writes l2_snapshot.json every `interval_sec` from in-memory caches.
