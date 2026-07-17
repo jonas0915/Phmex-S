@@ -324,10 +324,14 @@ def build_slot_truth() -> list:
     """Per-slot truth for desk monitors. Net basis; live slots add guardrail fields."""
     import glob as _g
     out = []
-    for path in sorted(_g.glob(os.path.join(BASE_DIR, "trading_state_5m_*.json"))):
+    # 2026-07-16: glob widened from "trading_state_5m_*" — that pre-slow-horizon prefix
+    # silently hid ETH_TSM_28, ST2.0 and the new DONCHIAN_* slots from the desk.
+    for path in sorted(_g.glob(os.path.join(BASE_DIR, "trading_state_*.json"))):
         base = os.path.basename(path)
         if base.endswith("_mode.json") or base.endswith("_blocked.json"):
             continue
+        if base == "trading_state_v8_245trades.json":
+            continue  # stale Mar-2026 snapshot, 100% duplicate of the main book — not a slot
         slot_id = base.replace("trading_state_", "").replace(".json", "")
         try:
             with open(path) as f:

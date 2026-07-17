@@ -1,0 +1,1 @@
+{"days": [{"date": "2026-07-16", "w": 0.23502606, "w_target": 0.22710256, "submodel_pos": [1, 1, 1, 1, 0, 0, 0, 0, 0], "n_long": 4, "vol_scalar": 0.51098076, "close": 1863.78, "stop_fired": false, "note": "bootstrap over 500 bars"}]}

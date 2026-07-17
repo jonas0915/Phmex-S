@@ -1,4 +1,8 @@
-# TASK: Donchian Ensemble Slot build (2026-07-16) — IN PROGRESS
+# TASK: Donchian Ensemble Slot build (2026-07-16) — DEPLOYED (paper) ✅
+Restart 7/16 7:39 PM PT (PID 47206, Jonas go). Halt honored; 0 errors. DAY-ONE FIDELITY
+PERFECT: paper book == pure-rule replica to 1e-8 (BTC w=0.2336 = $23.36 @ 1x, SL 0/no TP;
+ETH w=0.2350). Both = legitimate 3-4/9 fast-lookback probes, vol-scaled. Known cosmetic:
+generic entry log prints 10x/SL/TP pre-overwrite — final state verified correct.
 Owner go: Jonas "build it". Spec: docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md
 Evidence: reports/2026-07-16-wake-report.md §0.4 (OOS SIDESTEPPED verdict).
 
