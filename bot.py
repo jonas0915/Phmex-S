@@ -140,6 +140,45 @@ def _should_halt_consecutive_losses(loss_streak: int, threshold: int = 5) -> boo
     return loss_streak >= threshold
 
 
+def _snap_val(row, col: str):
+    """F7 snapshot helper: numeric value from an indicator row, None-safe."""
+    try:
+        if row is None:
+            return None
+        v = row.get(col)
+        return round(float(v), 3) if v is not None else None
+    except Exception:
+        return None
+
+
+def _snap_dist_pct(row, col: str, price: float):
+    """F7 snapshot helper: signed % distance of price from the row's level
+    (negative = price below level). None when the level is missing/zero."""
+    try:
+        if row is None:
+            return None
+        level = row.get(col)
+        if not level:
+            return None
+        return round((float(price) - float(level)) / float(level) * 100, 4)
+    except Exception:
+        return None
+
+
+def _first_wall_price(walls):
+    """F7 snapshot helper: price of the first wall entry ([price, size] pair or
+    dict), None when absent."""
+    try:
+        if not walls:
+            return None
+        w = walls[0]
+        if isinstance(w, dict):
+            return w.get("price")
+        return float(w[0])
+    except Exception:
+        return None
+
+
 def _daily_loss_override_active(path: str = ".daily_loss_override") -> bool:
     """True only on the PT calendar date written in the override file.
 
@@ -3097,6 +3136,12 @@ class Phmex2Bot:
                 "bid_walls": len(ob.get("bid_walls", [])),
                 "ask_walls": len(ob.get("ask_walls", [])),
                 "spread_pct": round(ob.get("spread_pct", 0), 4),
+                # F7 (2026-07-17): raw depths + first wall PRICES — wall counts
+                # alone made depth/wall questions unanswerable in the signal R&D.
+                "bid_depth_usdt": ob.get("bid_depth_usdt"),
+                "ask_depth_usdt": ob.get("ask_depth_usdt"),
+                "first_bid_wall": _first_wall_price(ob.get("bid_walls")),
+                "first_ask_wall": _first_wall_price(ob.get("ask_walls")),
             } if ob else None,
             "flow": {
                 "buy_ratio": round(flow.get("buy_ratio", 0), 3),
@@ -3107,6 +3152,15 @@ class Phmex2Bot:
             } if flow else None,
             "regime": self._classify_regime(ohlcv_last, ohlcv_df) if ohlcv_last is not None else None,
             "htf_adx": round(htf_adx, 1) if htf_adx is not None else None,
+            # F7 (2026-07-17): RSI + pullback-geometry axes — absent from every
+            # historical snapshot, which made the signal R&D's RSI-band and
+            # pullback-depth hypotheses UNVERIFIABLE. Distances are % of the
+            # reference level, signed (negative = price below it).
+            "rsi": _snap_val(ohlcv_last, "rsi"),
+            "rsi_fast": _snap_val(ohlcv_last, "rsi_fast"),
+            "ema21_dist_pct": _snap_dist_pct(ohlcv_last, "ema_21", price),
+            "ema50_dist_pct": _snap_dist_pct(ohlcv_last, "ema_50", price),
+            "vwap_dist_pct": _snap_dist_pct(ohlcv_last, "vwap", price),
         }
         if extra_tags:
             snapshot.update(extra_tags)
