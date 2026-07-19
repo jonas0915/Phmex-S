@@ -662,6 +662,11 @@ class Phmex2Bot:
                 durable_trail_enabled=False,  # spec: close-only Donchian stop, no trail
             ),
         ]
+        # HTF_L2_PAPER (2026-07-18): registered conditionally — builder returns
+        # None when Config.HTF_L2_PAPER_ENABLED is false (env kill, no code edit).
+        _htf_l2_paper = self._build_htf_l2_paper_slot()
+        if _htf_l2_paper is not None:
+            self.slots.append(_htf_l2_paper)
         # ETH-TSM-28 runtime state: sidecar mirror + per-cycle entry-in-flight flag
         # (read by _tsm_locks_symbol so the main bot never grabs ETH mid-entry).
         self._tsm_state = tsm_slot.load_state()
@@ -674,6 +679,34 @@ class Phmex2Bot:
         # per-day dedup for the not-implemented-live warning.
         self._donchian_state = donchian_slot.load_state()
         self._donchian_live_warned: dict[str, str] = {}
+
+    @staticmethod
+    def _build_htf_l2_paper_slot():
+        """HTF_L2_PAPER — htf_l2_anticipation resurrected as a PAPER probe (2026-07-18).
+        Main path stays HALTED (.halt_main_entries); this slot is the pre-registered
+        forward test of the F5 thin∧ADX gate (action plan D1). strategy_name IS a
+        STRATEGIES key, so unlike TSM/Donchian this slot runs the full generic
+        scalper path: paper SL/TP, trend-flip (already wired for htf_l2 at the
+        slot exit block), hard-240 time exit. Kill criteria are ADJUDICATOR-graded.
+        PROMOTION NOT AUTHORIZED on current evidence (breakeven residual book,
+        CI incl 0) — adjudicator verdict + explicit owner go required.
+        Returns None when Config.HTF_L2_PAPER_ENABLED is false (slot absent)."""
+        if not Config.HTF_L2_PAPER_ENABLED:
+            return None
+        return StrategySlot(
+            slot_id="HTF_L2_PAPER",
+            strategy_name="htf_l2_anticipation",   # STRATEGIES key — strategies.py:939
+            timeframe="5m",
+            max_positions=2,
+            capital_pct=0.0,
+            paper_mode=True,
+            trade_amount_usdt=None,                # None → Config.TRADE_AMOUNT_USDT
+            loss_cap_usdt=-999.0,                  # rails opt-out — kill lines live in adjudicator
+            kelly_min_trades=10**9,
+            durable_trail_enabled=False,
+            sl_percent=Config.HTF_L2_PAPER_SL_PCT,
+            tp_percent=Config.HTF_L2_PAPER_TP_PCT,
+        )
 
     def _fetch_htf_data(self, symbol: str):
         """Fetch 1h candle data with 5-minute cache. Returns indicator-enriched DataFrame or None."""
@@ -2460,6 +2493,10 @@ class Phmex2Bot:
                         # ST2.0 needs BOTH book (ob) and tape (flow) — the generic
                         # call path doesn't pass flow, so build the signal directly.
                         candidate_signals.append(st2_absorption(df, ob, _flow_for_strat))
+                    elif slot.strategy_name == "htf_l2_anticipation":
+                        # htf_l2 needs tape (flow) — the generic call path doesn't
+                        # pass it (same gap ST2.0 hit above).
+                        candidate_signals.append(strategy_fn(df, ob, htf_df=htf_df, flow=_flow_for_strat))
                     else:
                         try:
                             _s = strategy_fn(df, ob, htf_df=htf_df)
@@ -2549,6 +2586,26 @@ class Phmex2Bot:
                                          f"RSI(7)={_mr_rsi:.1f} < {Config.MEAN_REVERT_LONG_RSI_MIN:.1f}")
                             continue
 
+                    # 1h ADX for this signal — used by the HTF_L2_PAPER thin∧ADX
+                    # gate below and carried into the entry snapshot for EVERY
+                    # slot (telemetry parity with the main path, 2026-07-18).
+                    _slot_htf_adx = (float(htf_df.iloc[-1].get("adx", 0))
+                                     if htf_df is not None and len(htf_df) > 0 else None)
+
+                    # --- HTF_L2_PAPER ACTIVE thin-tape ∧ high-1h-ADX gate
+                    # (2026-07-18): the F5 block the halted main path carries,
+                    # ACTIVE here so the paper probe forward-tests the residual
+                    # book (toxic cell excluded), not the known loss engine. ---
+                    if slot.slot_id == "HTF_L2_PAPER":
+                        if self._thin_adx_blocked("htf_l2_anticipation", _flow_for_strat, _slot_htf_adx):
+                            slot.bump_blocked("thin_adx")
+                            self._log_gotaway("thin_adx_paper_slot", symbol, direction,
+                                              "htf_l2_anticipation", signal.strength, 0, price,
+                                              ob, _flow_for_strat, df)
+                            logger.info(f"[PAPER] [THIN-ADX] HTF_L2_PAPER {symbol} {direction.upper()} blocked "
+                                        f"(adx={_slot_htf_adx}, tc={(_flow_for_strat or {}).get('trade_count', 0)})")
+                            continue
+
                     margin = (slot.trade_amount_usdt if slot.trade_amount_usdt is not None
                               else Config.TRADE_AMOUNT_USDT)
                     atr_val = df.iloc[-2].get("atr", 0) if len(df) > 1 else 0
@@ -2620,6 +2677,14 @@ class Phmex2Bot:
                         hurst_val=None, funding_data=None,
                         strategy=_strat_name, flow=flow
                     )
+                    # HTF_L2_PAPER ensemble HARD block (2026-07-18): the main
+                    # path enforces conf>=4 before entry — the probe must trade
+                    # the same book, so conf<4 blocks here (not shadow-tagged).
+                    if slot.slot_id == "HTF_L2_PAPER" and _conf < 4:
+                        slot.bump_blocked("ensemble_confidence")
+                        logger.info(f"[PAPER] [ENSEMBLE] HTF_L2_PAPER {symbol} {direction.upper()} "
+                                    f"blocked — confidence {_conf}/7 < 4")
+                        continue
                     if _conf < 4:
                         _gate_tags.append(f"confidence:{_conf}/7<4")
                     _utc_hr = datetime.datetime.now(datetime.timezone.utc).hour
@@ -2640,6 +2705,15 @@ class Phmex2Bot:
                         if direction == "short" and flow["divergence"] == "bullish":
                             _gate_tags.append("divergence_bullish")
                     _would_block = len(_gate_tags) > 0
+                    # F6 cell tags for HTF_L2_PAPER entered trades (2026-07-18):
+                    # mirror the main-path convention (sg_htf_adx_hi/sg_thin_tape)
+                    # AFTER _would_block — these are cell markers, not gates, so
+                    # they must not print a [WOULD BLOCK] label.
+                    if slot.slot_id == "HTF_L2_PAPER":
+                        if _slot_htf_adx is not None and _slot_htf_adx >= Config.HTF_BLOCK_ADX_MIN:
+                            _gate_tags.append("sg_htf_adx_hi")
+                        if (flow or {}).get("trade_count", 0) <= Config.HTF_BLOCK_TAPE_MAX:
+                            _gate_tags.append("sg_thin_tape")
                     _tag_str = ",".join(_gate_tags) if _gate_tags else "none"
 
                     # For 5m_narrow, record the actual routed sub-strategy, not the slot's
@@ -2660,7 +2734,8 @@ class Phmex2Bot:
                             symbol, price, margin, side=direction,
                             atr=atr_val, regime="medium",
                             cycle=self.cycle_count,
-                            strategy=_entry_strategy_name
+                            strategy=_entry_strategy_name,
+                            sl_pct=slot.sl_percent, tp_pct=slot.tp_percent
                         )
                         notifier.notify_paper_entry(
                             symbol, direction, price, margin,
@@ -2766,7 +2841,8 @@ class Phmex2Bot:
                             slot.risk.open_position(symbol, fill_price, margin, side=direction,
                                                     atr=atr_val, regime="medium",
                                                     cycle=self.cycle_count,
-                                                    strategy=_entry_strategy_name)
+                                                    strategy=_entry_strategy_name,
+                                                    sl_pct=slot.sl_percent, tp_pct=slot.tp_percent)
                             live_pos = slot.risk.positions[symbol]
                             fill_amount = self._extract_fill_amount(order, live_pos.amount)
                             actual_margin = (fill_amount * fill_price) / Config.LEVERAGE
@@ -2819,7 +2895,10 @@ class Phmex2Bot:
                     # ob (fetched at the top of this symbol loop, used by the OB gate +
                     # confidence calc) MUST be passed here — a hardcoded None was the
                     # ob:null bug that blinded the ST2.0 lab (Phase 0 fix 2026-06-19).
-                    snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, _entry_strategy_name, signal.strength, entry_px, 0, ob, flow, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None)
+                    # Telemetry parity (2026-07-18): slot snapshots used to log a
+                    # literal confidence=0 and no htf_adx — the computed _conf and
+                    # the 1h ADX now flow through, matching the main path.
+                    snap = self._log_entry_snapshot(symbol, direction, slot.slot_id, _entry_strategy_name, signal.strength, entry_px, _conf, ob, flow, ohlcv_last=df.iloc[-1] if len(df) > 0 else None, ohlcv_df=df if len(df) >= 20 else None, htf_adx=_slot_htf_adx)
                     if symbol in slot.risk.positions:
                         slot.risk.positions[symbol].entry_snapshot = snap
                         slot.risk.positions[symbol].gate_tags = _tag_str

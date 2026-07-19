@@ -717,6 +717,12 @@ _SIGNAL_BOXES = [
      "Shorts a bid-heavy book being aggressively bought into (imbalance &ge; 0.35 &amp; "
      "buy-ratio 0.60&ndash;0.85), cvd/spread filtered. DEMOTED TO PAPER 2026-06-29 "
      "(35 live trades, no edge &mdash; execution adverse selection); paper sims only."),
+    ("HTF_L2_PAPER",   "HTF_L2_PAPER &mdash; PAPER PROBE",
+     "htf_l2_anticipation resurrected as a PAPER slot (2026-07-18, action plan "
+     "D1) while the main path stays HALTED. Same signal, plus an ACTIVE "
+     "thin-tape &and; 1h-ADX&ge;35 gate (F5 forward test) and a conf&ge;4 "
+     "ensemble hard block. Kill lines adjudicator-graded (owner-set pending); "
+     "promotion NOT authorized without an explicit owner go."),
     ("ETH_TSM_28",     "ETH-TSM-28 &mdash; SLOW TREND (PAPER)",
      "Daily-horizon time-series momentum: long 0.01 ETH when the 28-day return is "
      "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "

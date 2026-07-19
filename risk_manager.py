@@ -515,7 +515,11 @@ class RiskManager:
             return 0.0
         return (wr * avg_win - (1 - wr) * avg_loss) / avg_win
 
-    def open_position(self, symbol: str, entry_price: float, margin: float, side: str, atr: float = 0.0, regime: str = "medium", cycle: int = 0, strategy: str = "") -> Position:
+    def open_position(self, symbol: str, entry_price: float, margin: float, side: str, atr: float = 0.0, regime: str = "medium", cycle: int = 0, strategy: str = "", sl_pct: float = None, tp_pct: float = None) -> Position:
+        # Per-slot exit-geometry override (2026-07-18, HTF_L2_PAPER): None (every
+        # pre-existing caller) resolves to the Config values — behavior identical.
+        _slp = Config.STOP_LOSS_PERCENT if sl_pct is None else sl_pct
+        _tpp = Config.TAKE_PROFIT_PERCENT if tp_pct is None else tp_pct
         coin_amount = (margin * Config.LEVERAGE) / entry_price
 
         if atr > 0:
@@ -530,11 +534,11 @@ class RiskManager:
             sl_dist = mults["sl"] * atr
             tp_dist = sl_dist * mults["tp_ratio"]
             # Floor = configured SL%, Cap = 3× floor so ATR can breathe
-            min_sl_dist = entry_price * (Config.STOP_LOSS_PERCENT / 100)
-            max_sl_dist = entry_price * (Config.STOP_LOSS_PERCENT / 100) * 3
+            min_sl_dist = entry_price * (_slp / 100)
+            max_sl_dist = entry_price * (_slp / 100) * 3
             sl_dist = max(min_sl_dist, min(sl_dist, max_sl_dist))
             # Cap SL so R:R never goes below 1:1
-            max_tp_dist = entry_price * (Config.TAKE_PROFIT_PERCENT / 100)
+            max_tp_dist = entry_price * (_tpp / 100)
             max_sl_for_rr = max_tp_dist / mults["tp_ratio"]
             sl_dist = min(sl_dist, max(min_sl_dist, max_sl_for_rr))
             tp_dist = sl_dist * mults["tp_ratio"]
@@ -548,11 +552,11 @@ class RiskManager:
                 take_profit = entry_price - tp_dist
         else:
             if side == "long":
-                stop_loss   = entry_price * (1 - Config.STOP_LOSS_PERCENT / 100)
-                take_profit = entry_price * (1 + Config.TAKE_PROFIT_PERCENT / 100)
+                stop_loss   = entry_price * (1 - _slp / 100)
+                take_profit = entry_price * (1 + _tpp / 100)
             else:
-                stop_loss   = entry_price * (1 + Config.STOP_LOSS_PERCENT / 100)
-                take_profit = entry_price * (1 - Config.TAKE_PROFIT_PERCENT / 100)
+                stop_loss   = entry_price * (1 + _slp / 100)
+                take_profit = entry_price * (1 - _tpp / 100)
 
         position = Position(
             symbol=symbol,

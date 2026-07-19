@@ -38,6 +38,9 @@ class StrategySlot:
     adverse_exit_roi: float = None   # per-slot adverse-exit ROI threshold (e.g. ST2.0 -6.0 loss-cut);
                                      # None = global Config.ADVERSE_EXIT_THRESHOLD (-999 = disabled)
     adverse_exit_cycles: int = None  # cycles before the per-slot adverse-exit arms; None = Config default
+    sl_percent: float = None         # per-slot SL % override passed to open_position (2026-07-18,
+                                     # HTF_L2_PAPER); None = inherit Config.STOP_LOSS_PERCENT
+    tp_percent: float = None         # per-slot TP % override; None = inherit Config.TAKE_PROFIT_PERCENT
     durable_trail_enabled: bool = False  # per-slot opt-in: ratchet the resting exchange SL up as the
                                          # trail arms (Config.TRAIL_ARM_ROI), mirroring the main-bot durable trail.
                                          # The amend rests on Phemex, so the profit-lock survives a host

@@ -28,6 +28,10 @@ Experiments graded (registry below is the single source of truth):
                slot's own rails are opted out: net vs the −$10 kill line,
                disaster-stop count (2 = revert), replica-tracking error from
                eth_tsm_28_signal.json (>0.1%/day over a full 14d window).
+  htf_l2_paper HTF_L2_PAPER probe (2026-07-18, action plan D1): htf_l2 as a
+               paper slot with the F5 thin∧ADX gate ACTIVE. REPORT-ONLY —
+               n, WR vs the 58.8% breakeven, net paper $, thin_adx blocks.
+               Kill lines are OWNER-SET pending (go-gate); never auto-trips.
 
 Statistics reuse scripts/st2_lab/stats.py: bootstrap_diff_ci resamples the two
 sides INDEPENDENTLY and sorts the diffs (house lesson — sorting per-side means
@@ -125,10 +129,24 @@ EXPERIMENTS = {
         "tracking_err_daily": 0.001,   # 0.1%/day, spec §9
         "tracking_window_days": 14,
     },
+    # HTF_L2_PAPER probe (2026-07-18): htf_l2_anticipation resurrected as a
+    # PAPER slot per the 7/17 action plan D1 while the main path stays HALTED.
+    # REPORT-ONLY: kill lines are OWNER-SET pending — the owner sets them at
+    # the go-gate; nothing here auto-trips, and no threshold is invented.
+    # breakeven_wr 58.8% = the fee-inclusive breakeven WR from the 7/16
+    # diagnosis (reference_htf_l2_diagnosis_2026-07-16).
+    "htf_l2_paper": {
+        "deployed_ts": _pt_ts(2026, 7, 18, 0, 0),  # window anchor only — the
+        # state file is born at the first post-registration restart, so every
+        # trade in it belongs to the probe (no ts filtering needed)
+        "breakeven_wr": 0.588,
+    },
 }
 
 TSM_STATE_FILE = BOT_DIR / "trading_state_ETH_TSM_28.json"
 TSM_SIGNAL_FILE = BOT_DIR / "eth_tsm_28_signal.json"
+HTF_L2_STATE_FILE = BOT_DIR / "trading_state_HTF_L2_PAPER.json"
+HTF_L2_COUNTERS_FILE = BOT_DIR / "trading_state_HTF_L2_PAPER_blocked.json"
 
 
 # ── shared helpers ────────────────────────────────────────────────────────
@@ -446,6 +464,36 @@ def grade_eth_tsm(slot_state: dict, signal_state: dict, cfg: dict) -> dict:
             "last_day": (days[-1] if days else None)}
 
 
+def grade_htf_l2_paper(slot_state: dict, counters: dict, cfg: dict) -> dict:
+    """HTF_L2_PAPER probe grader — REPORT-ONLY (follows grade_eth_tsm's shape).
+    Reports n accrued, WR vs the 58.8% fee-inclusive breakeven, net paper $,
+    and the thin_adx blocked-counter accrual (the F5 gate firing in the slot).
+    Kill lines are OWNER-SET pending: no REVERT/PASS is ever emitted here —
+    inventing a threshold the owner never set is exactly the failure mode the
+    registry comment forbids."""
+    trades = slot_state.get("closed_trades", []) or []
+    nets = [n for t in trades for n in [_net(t)] if n is not None]
+    wins = sum(1 for n in nets if n > 0)
+    wr = (wins / len(nets)) if nets else None
+    net = sum(nets) if nets else 0.0
+    thin_blocked = int((counters or {}).get("thin_adx", 0) or 0)
+    conf_blocked = int((counters or {}).get("ensemble_confidence", 0) or 0)
+
+    if not trades and not thin_blocked and not conf_blocked:
+        status, note = WATCH, "n=0 — no verdict"
+    else:
+        status = WATCH  # report-only: kill lines OWNER-SET pending (go-gate)
+        note = "accruing — kill lines OWNER-SET pending, no auto-trip"
+
+    return {"experiment": "htf_l2_paper", "status": status, "note": note,
+            "n_trades": len(trades), "wins": wins,
+            "wr": round(wr, 4) if wr is not None else None,
+            "breakeven_wr": cfg["breakeven_wr"],
+            "net_usd": round(net, 4),
+            "thin_adx_blocked": thin_blocked,
+            "ensemble_blocked": conf_blocked}
+
+
 # ── digest ────────────────────────────────────────────────────────────────
 def _line_trail(r) -> str:
     avg = (f"avg win ${r['avg_win_usd']:.2f} vs ${r['baseline_avg_win_usd']:.2f} "
@@ -498,6 +546,15 @@ def _line_tsm(r) -> str:
             f"{r['signal_days']} days · {r['divergence_days_window']} div | {err} | {sig}")
 
 
+def _line_htf_l2(r) -> str:
+    wr = (f"WR {r['wr']*100:.1f}% vs {r['breakeven_wr']*100:.1f}% BE"
+          if r["wr"] is not None else f"WR n/a vs {r['breakeven_wr']*100:.1f}% BE")
+    return (f"[htf_l2_paper] {r['status']} — {r['note']} | "
+            f"paper {r['n_trades']} trades {r['wins']}W ${r['net_usd']:+.2f} | "
+            f"{wr} | thin_adx blocked {r['thin_adx_blocked']} · "
+            f"conf<4 blocked {r['ensemble_blocked']}")
+
+
 def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     now = now or time.time()
     trades = load_closed_trades()
@@ -511,6 +568,9 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
         grade_eth_tsm(load_json(TSM_STATE_FILE, {}),
                       load_json(TSM_SIGNAL_FILE, {}),
                       EXPERIMENTS["eth_tsm_28"]),
+        grade_htf_l2_paper(load_json(HTF_L2_STATE_FILE, {}),
+                           load_json(HTF_L2_COUNTERS_FILE, {}),
+                           EXPERIMENTS["htf_l2_paper"]),
     ]
     stamp = datetime.fromtimestamp(now, tz=PT).strftime("%b %-d %-I:%M %p PT")
     lines = [f"LAB ADJUDICATOR — live forward tests ({stamp})"]
@@ -518,6 +578,7 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     lines.append(_line_sizing(results[1]))
     lines.append(_line_mr(results[2]))
     lines.append(_line_tsm(results[3]))
+    lines.append(_line_htf_l2(results[4]))
     return "\n".join(lines), results
 
 

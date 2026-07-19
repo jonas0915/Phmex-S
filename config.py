@@ -77,6 +77,13 @@ class Config:
     HTF_BLOCK_ADX_MIN = float(os.getenv("HTF_BLOCK_ADX_MIN", "35"))
     HTF_BLOCK_TAPE_MAX = int(os.getenv("HTF_BLOCK_TAPE_MAX", "20"))
 
+    # HTF_L2_PAPER probe (2026-07-18): htf_l2 resurrected as a paper slot per the
+    # 7/17 action plan D1. Disable = slot not registered next restart.
+    HTF_L2_PAPER_ENABLED = os.getenv("HTF_L2_PAPER_ENABLED", "true").lower() == "true"
+    # Optional slot-local exit geometry (unset = inherit STOP_LOSS_PERCENT/TAKE_PROFIT_PERCENT)
+    HTF_L2_PAPER_SL_PCT = float(os.getenv("HTF_L2_PAPER_SL_PCT")) if os.getenv("HTF_L2_PAPER_SL_PCT") else None
+    HTF_L2_PAPER_TP_PCT = float(os.getenv("HTF_L2_PAPER_TP_PCT")) if os.getenv("HTF_L2_PAPER_TP_PCT") else None
+
     # F2 (2026-07-17): on pause/halt activation, cancel resting NON-reduce-only
     # (entry) orders once — a resting entry that fills mid-halt creates a ghost
     # position (4/13 + 6/14 incident class). Set false for instant revert.

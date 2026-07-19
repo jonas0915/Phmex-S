@@ -1,3 +1,45 @@
+# TASK: htf_l2 PAPER slot + exit-geometry redesign (2026-07-18, Jonas: "paper slot it… make it 68% WR, winners > losers") — IN PROGRESS
+
+Owner override noted: exit-geometry levers were closed for LIVE (7/6); this re-opens them for a
+PAPER variant only. Target (68% WR AND avg win > avg loss) is a hypothesis to test in replay —
+pre-register whatever the data actually supports. Main stays HALTED; real money untouched.
+
+- [x] Agent A: implementation spec for HTF_L2_PAPER slot — DONE, all anchors verified. Key:
+      slot needs explicit flow-passing branch (ST2.0 trap); per-slot SL/TP override must be
+      built (minimal ext to StrategySlot + open_position, None=inherit); F5 gate reusable
+      strategy-keyed; halt verified NOT to gate slots; snapshot conf=0 + missing htf_adx
+      parity bugs to fix; 15 tests specced
+- [ ] Agent B: MAE/MFE replay geometry sweep (full ledger + residual book ex thin∧ADX),
+      Pareto set where avg win $ > avg loss $, explicit verdict on 68% target — RUNNING
+- [x] Agent C (Jonas 7/18: "stop entering non-winning trades"): mine reconstructable
+      indicator features (RSI/EMA/VWAP/ATR stretch — the F7 family, never historically
+      recorded) vs winner/loser on the 215-trade ledger + residual book; placebo-guarded,
+      multiple-testing-discounted; survivors → flag-controlled pre-registered slot filter
+      spec. Known-null families excluded (L2 conf, tape, gates, time — receipts). DONE:
+      NO deployable filter — all splits fail family-wise placebo (residual best p=0.617,
+      conjunction p=0.127); one real finding (losers ~1 ATR more stretched past VWAP,
+      Bonferroni-surviving) → pre-registered WATCH-ONLY on F7 telemetry at n≥30; entry-axis
+      now fully exhausted. Orchestrator-verified vs artifacts. Memory:
+      reference_htf_l2_entry_features_2026-07-18.md
+- [ ] Synthesize: pick pre-registered geometry + kill criteria at fixed n; present to Jonas
+- [x] Implement via TDD — DONE: slot registration (env-gated builder), flow-passing branch,
+      ACTIVE thin∧ADX gate (gotAway reason thin_adx_paper_slot), ensemble conf<4 hard-block
+      + counter, snapshot parity fix (real conf + htf_adx, ALL slots), F6 cell tags, per-slot
+      sl_percent/tp_percent (None=inherit, regression-pinned), adjudicator REPORT-ONLY grader
+      (kill lines OWNER-SET pending), dashboard box. Suite 530 passed / 0 failed, py_compile
+      clean. Deviations logged in agent report.
+- [x] Audit agent on diff — GO. Independent suite re-run 530/0; paper purity proven (static
+      trace + tests whose exchange stub would AttributeError on any real order); live-path
+      regression byte-identical (all pre-existing open_position callers keyword-only);
+      F5 gate semantics parity confirmed; results[4] pinned by test; reporting propagation
+      consistent w/ convention. 1 informational: .promote_HTF_L2_PAPER has no code-level
+      refusal (matches existing promotable-slot architecture; promotion not authorized is
+      comment-level) — surface at go-gate.
+- [ ] Pre-restart audit → Jonas "go" → ONE restart → verify slot entries, telemetry, F7 fields
+- [ ] Memory: new project file + MEMORY.md line; grade in lessons.md
+
+---
+
 # TASK: htf_l2 debug fix program (2026-07-17, Jonas: "fix those issues") — IN PROGRESS
 
 Scope confirmed by owner: fix the issues found in the 3-round debug. Strategy fixes are
@@ -23,7 +65,9 @@ Order (safety first, then strategy defects, one TDD cycle each, batch audited fi
       ALL 3 FIXED + tested (tests/test_audit_findings_0717.py, 4 tests; Donchian guard blocks
       only exposure INCREASES so de-risking still runs; helper hardened for early-startup)
 - [x] Suite: 509 passed. py_compile clean. __pycache__ cleared.
-- [ ] Jonas "go" → restart → verify (sentinel honored, slots serviced, no errors)
+- [x] Jonas "go" → restarted 7/17 5:18 PM PT PID 19587 → verified (sentinel honored, slots
+      serviced, no errors); re-restarted 7/18 4:52 PM PT PID 5315 after reboot incident —
+      F7 snapshot extension now live
 NOT in scope (standing directives): exit-geometry changes, existing-gate removals (quiet_regime
 stays), throttle redesign (deliberate cluster-risk design, PnL impact unquantified), un-halt.
 

@@ -122,3 +122,16 @@ def test_sentinel_deploy_ts_matches_2026_04_02_06_01_utc():
     import web_dashboard as wd
     expected = datetime(2026, 4, 2, 6, 1, 0, tzinfo=timezone.utc).timestamp()
     assert wd.SENTINEL_DEPLOY_TS == expected
+
+
+def test_htf_l2_paper_signal_box_present():
+    """HTF_L2_PAPER probe (2026-07-18) must surface on the dashboard (project
+    rule: every bot update propagates to Telegram AND dashboard). The box maps
+    slot_id -> trading_state_HTF_L2_PAPER.json via the generic signal-card
+    loop, and its title must stay distinct from the MAIN LIVE htf_l2 box."""
+    import web_dashboard as wd
+    boxes = {b[0]: b[1] for b in wd._SIGNAL_BOXES}
+    assert "HTF_L2_PAPER" in boxes
+    assert "PAPER" in boxes["HTF_L2_PAPER"]
+    assert boxes["HTF_L2_PAPER"] != boxes["5m_scalp"]   # main-live box untouched
+    assert "MAIN LIVE" in boxes["5m_scalp"]

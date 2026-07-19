@@ -57,6 +57,8 @@ def test_slot_entry_call_passes_ob_not_none():
                   src, re.DOTALL)
     assert m, "could not locate the slot entry _log_entry_snapshot call"
     call = m.group(0)
-    # The positional args end with `... strength, entry_px, 0, <ob>, flow,`
-    assert re.search(r"entry_px,\s*0,\s*ob,\s*flow", call), \
+    # The positional args end with `... strength, entry_px, <conf>, <ob>, flow,`
+    # (<conf> was a literal 0 until the 2026-07-18 telemetry-parity fix passed
+    # the computed _conf through; this guard only pins the ob arg).
+    assert re.search(r"entry_px,\s*_conf,\s*ob,\s*flow", call), \
         "slot entry must pass `ob` (not None) as the orderbook arg — ob:null regression"
