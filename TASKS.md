@@ -9,8 +9,15 @@ pre-register whatever the data actually supports. Main stays HALTED; real money 
       built (minimal ext to StrategySlot + open_position, None=inherit); F5 gate reusable
       strategy-keyed; halt verified NOT to gate slots; snapshot conf=0 + missing htf_adx
       parity bugs to fix; 15 tests specced
-- [ ] Agent B: MAE/MFE replay geometry sweep (full ledger + residual book ex thin∧ADX),
-      Pareto set where avg win $ > avg loss $, explicit verdict on 68% target — RUNNING
+- [x] Agent B: geometry sweep DONE (agent stalled post-compute; orchestrator synthesized from
+      artifacts + verified sim code). 240 configs × 2 books, 1m-path replay, live trail/partial
+      mechanics mirrored, conservative SL-first. VERDICT: 0/240 configs reach WR≥68 on either
+      book (max ~63%) — 68%∧winners>losers unreachable, trade-off confirmed. BUT 154/240
+      residual configs get avgW>avgL; best: SL−10%/TP+24% ROI no-partial no-trail → WR 47.7%,
+      ratio 1.40, net +$20.60 (vs baseline +$8.15); SL12/TP16 no-partial → ratio 1.04,
+      +$21.65. ALL CIs include 0 (in-sample). Slot structurally has no partial/trail → configs
+      directly realizable via env. Caveats: sim 24h cap vs slot 240-min hard exit truncation;
+      sim optimistic ~$10 vs actual baseline (no SL slippage).
 - [x] Agent C (Jonas 7/18: "stop entering non-winning trades"): mine reconstructable
       indicator features (RSI/EMA/VWAP/ATR stretch — the F7 family, never historically
       recorded) vs winner/loser on the 215-trade ledger + residual book; placebo-guarded,
@@ -21,7 +28,7 @@ pre-register whatever the data actually supports. Main stays HALTED; real money 
       Bonferroni-surviving) → pre-registered WATCH-ONLY on F7 telemetry at n≥30; entry-axis
       now fully exhausted. Orchestrator-verified vs artifacts. Memory:
       reference_htf_l2_entry_features_2026-07-18.md
-- [ ] Synthesize: pick pre-registered geometry + kill criteria at fixed n; present to Jonas
+- [x] Synthesize: recommendation = HTF_L2_PAPER_SL_PCT=1.0, HTF_L2_PAPER_TP_PCT=2.4 (−10%/+24% ROI), presented to Jonas w/ kill-criteria shape (numbers owner-set)
 - [x] Implement via TDD — DONE: slot registration (env-gated builder), flow-passing branch,
       ACTIVE thin∧ADX gate (gotAway reason thin_adx_paper_slot), ensemble conf<4 hard-block
       + counter, snapshot parity fix (real conf + htf_adx, ALL slots), F6 cell tags, per-slot
