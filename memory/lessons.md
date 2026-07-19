@@ -447,7 +447,7 @@
 - MEMORY.md line 38 (written 2026-05-01) explicitly said: "No more parameter sweeps — opened research path: build calibrated backtest harness, simulate 90 days OHLCV with realistic fees+slippage, deploy only with positive simulated edge. Bot currently stopped, capital preserved at $68.51."
 - 2026-05-02 session: Jonas opened with "go to phmex-s and start bot." I ran preflight, read MEMORY.md, but did not flag the conflict between his ask and the documented research-path pause. Started the bot, ran an investigation, made a parameter-tweak proposal — exactly the thing the research-path note said NOT to do.
 - He proceeded knowing the implications (he wrote that note), so it's his call to override. But the friction-free override means I never made him affirm "yes, override the 05-01 plan" — a small audit trail miss.
-- **Rule:** at session-start preflight, if MEMORY.md or SESSION_HANDOFF.md contains an active "do not do X" / "bot stopped pending Y" / "no more Z" directive, surface it BEFORE accepting any tactical request that conflicts. One line: "Heads up — 05-01 note says X. Override?" That's enough.
+- **Rule:** at session-start preflight, if MEMORY.md contains an active "do not do X" / "bot stopped pending Y" / "no more Z" directive, surface it BEFORE accepting any tactical request that conflicts. One line: "Heads up — 05-01 note says X. Override?" That's enough.
 - **Rule:** scan MEMORY.md for stop-words on session start: "stopped", "paused", "no more", "do not", "research path", "halt", "pending". Flag any that conflict with the user's first ask.
 
 ### Phmex-S Bot: AE feature is dollar-negative at every threshold tested (2026-05-02)
