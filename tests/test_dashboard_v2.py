@@ -136,3 +136,16 @@ def test_htf_l2_signal_box_present():
     assert "LIVE SLOT" in boxes["HTF_L2"]
     assert boxes["HTF_L2"] != boxes["5m_scalp"]   # main-live box untouched
     assert "HALTED" in boxes["5m_scalp"]      # legacy main path, renamed 7/20
+
+
+def test_main_path_status_halted(tmp_path, monkeypatch):
+    """5m_scalp badge must show HALTED while .halt_main_entries exists —
+    the process being alive must not render the halted main book as LIVE."""
+    import web_dashboard as wd
+    monkeypatch.setattr(wd, "PROJECT_DIR", str(tmp_path))
+    (tmp_path / ".halt_main_entries").touch()
+    html = wd._slot_status_html("5m_scalp", [], {"5m_scalp"}, {})
+    assert "HALTED" in html and "LIVE" not in html
+    (tmp_path / ".halt_main_entries").unlink()
+    html = wd._slot_status_html("5m_scalp", [], {"5m_scalp"}, {})
+    assert "LIVE" in html

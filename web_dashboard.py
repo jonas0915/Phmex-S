@@ -752,6 +752,11 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
     """
     if os.path.exists(os.path.join(PROJECT_DIR, f".demote_{slot_id}")):
         return "<span class='neg'>&#9679; DEMOTED</span>"
+    # Main-path book: the halt sentinel stops its entries even though the bot
+    # process (and thus _live_slot_ids) is live — badge must say so (2026-07-21,
+    # Jonas mistook the green LIVE for an un-halt).
+    if slot_id == "5m_scalp" and os.path.exists(os.path.join(PROJECT_DIR, ".halt_main_entries")):
+        return "<span class='amb'>&#9679; HALTED (entries)</span>"
     # Status is driven by the mode sidecar (trading_state_<slot>_mode.json) via
     # _live_slot_ids(): LIVE only while the sidecar has paper_mode=False. ST2.0
     # follows the same rule — it was previously hardcoded LIVE here, which
