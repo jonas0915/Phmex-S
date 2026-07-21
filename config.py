@@ -80,9 +80,12 @@ class Config:
     # HTF_L2_PAPER probe (2026-07-18): htf_l2 resurrected as a paper slot per the
     # 7/17 action plan D1. Disable = slot not registered next restart.
     HTF_L2_PAPER_ENABLED = os.getenv("HTF_L2_PAPER_ENABLED", "true").lower() == "true"
-    # Optional slot-local exit geometry (unset = inherit STOP_LOSS_PERCENT/TAKE_PROFIT_PERCENT)
-    HTF_L2_PAPER_SL_PCT = float(os.getenv("HTF_L2_PAPER_SL_PCT")) if os.getenv("HTF_L2_PAPER_SL_PCT") else None
-    HTF_L2_PAPER_TP_PCT = float(os.getenv("HTF_L2_PAPER_TP_PCT")) if os.getenv("HTF_L2_PAPER_TP_PCT") else None
+    # Slot-local exit geometry, pre-registered from the 2026-07-18 replay sweep
+    # (SL -10% ROI / TP +24% ROI at 10x; winners ~1.4x losers on the residual
+    # book, in-sample, CI incl 0 — forward test decides). Owner go-live 7/20.
+    # Env overrides; defaults below are the registered config.
+    HTF_L2_PAPER_SL_PCT = float(os.getenv("HTF_L2_PAPER_SL_PCT")) if os.getenv("HTF_L2_PAPER_SL_PCT") else 1.0
+    HTF_L2_PAPER_TP_PCT = float(os.getenv("HTF_L2_PAPER_TP_PCT")) if os.getenv("HTF_L2_PAPER_TP_PCT") else 2.4
 
     # F2 (2026-07-17): on pause/halt activation, cancel resting NON-reduce-only
     # (entry) orders once — a resting entry that fills mid-halt creates a ghost

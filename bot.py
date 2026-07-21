@@ -682,14 +682,15 @@ class Phmex2Bot:
 
     @staticmethod
     def _build_htf_l2_paper_slot():
-        """HTF_L2_PAPER — htf_l2_anticipation resurrected as a PAPER probe (2026-07-18).
-        Main path stays HALTED (.halt_main_entries); this slot is the pre-registered
-        forward test of the F5 thin∧ADX gate (action plan D1). strategy_name IS a
-        STRATEGIES key, so unlike TSM/Donchian this slot runs the full generic
-        scalper path: paper SL/TP, trend-flip (already wired for htf_l2 at the
-        slot exit block), hard-240 time exit. Kill criteria are ADJUDICATOR-graded.
-        PROMOTION NOT AUTHORIZED on current evidence (breakeven residual book,
-        CI incl 0) — adjudicator verdict + explicit owner go required.
+        """HTF_L2_PAPER — htf_l2_anticipation resurrected as a slot probe (2026-07-18).
+        Main path stays HALTED (.halt_main_entries); this slot carries the F5
+        thin∧ADX gate + slot-local exit geometry (action plan D1). strategy_name
+        IS a STRATEGIES key, so unlike TSM/Donchian this slot runs the full
+        generic scalper path: slot SL/TP, trend-flip (already wired for htf_l2
+        at the slot exit block), hard-240 time exit. Kill criteria are
+        ADJUDICATOR-graded; loss cap is the hard live rail (owner go-live
+        2026-07-20 — promoted via .promote_HTF_L2_PAPER, 5m_mean_revert
+        precedent: auto-demote to paper at -$5 slot net).
         Returns None when Config.HTF_L2_PAPER_ENABLED is false (slot absent)."""
         if not Config.HTF_L2_PAPER_ENABLED:
             return None
@@ -701,7 +702,7 @@ class Phmex2Bot:
             capital_pct=0.0,
             paper_mode=True,
             trade_amount_usdt=None,                # None → Config.TRADE_AMOUNT_USDT
-            loss_cap_usdt=-999.0,                  # rails opt-out — kill lines live in adjudicator
+            loss_cap_usdt=-5.0,                    # hard rail: auto-demote at -$5 net (live precedent)
             kelly_min_trades=10**9,
             durable_trail_enabled=False,
             sl_percent=Config.HTF_L2_PAPER_SL_PCT,

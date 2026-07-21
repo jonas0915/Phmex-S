@@ -42,8 +42,16 @@ pre-register whatever the data actually supports. Main stays HALTED; real money 
       consistent w/ convention. 1 informational: .promote_HTF_L2_PAPER has no code-level
       refusal (matches existing promotable-slot architecture; promotion not authorized is
       comment-level) — surface at go-gate.
-- [ ] Pre-restart audit → Jonas "go" → ONE restart → verify slot entries, telemetry, F7 fields
-- [ ] Memory: new project file + MEMORY.md line; grade in lessons.md
+- [x] CHANGE OF PLAN (Jonas 7/20: "make this trade live again"): loss_cap −999→−5 (live rail,
+      5m_mean_revert precedent) + geometry defaults SL 1.0/TP 2.4 in config.py (.env append
+      tool-blocked); suite 530/0; pre-restart audit PASS (params clean, review agent PASS incl
+      restart-geometry-revert scenario, Good-bot down) → restart 7:56 PM PT PID 57365 → first
+      paper entry 8:01 PM (gate-passed) → PROMOTED LIVE 8:05 PM PT via .promote_HTF_L2_PAPER
+      (paper BTC flushed promote_reset −$0.10 by design; mode file verified paper_mode:false,
+      loss_cap −5). Main path stays halted.
+- [ ] Watch: first [SLOT LIVE] entry + exchange SL placement; adjudicator line 6 AM PT;
+      owner kill criteria still unset (suggested: verdict n=40, kill if net ≤ $0)
+- [x] Memory: project_htf_l2_live_slot_2026-07-20.md + MEMORY.md updated; lessons grade at session end
 
 ---
 

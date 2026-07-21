@@ -131,7 +131,7 @@ def test_slot_registered_paper(sandbox):
     assert slot.paper_mode is True
     assert slot.strategy_name == "htf_l2_anticipation"
     assert slot.strategy_name in STRATEGIES          # generic scalper path runs
-    assert slot.loss_cap_usdt == -999.0              # rails opt-out
+    assert slot.loss_cap_usdt == -5.0                # hard rail: auto-demote at -$5 (owner go-live 7/20)
     assert slot.kelly_min_trades == 10**9
     assert slot.durable_trail_enabled is False
     assert slot.timeframe == "5m" and slot.max_positions == 2
