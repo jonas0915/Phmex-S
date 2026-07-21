@@ -77,8 +77,10 @@ class Config:
     HTF_BLOCK_ADX_MIN = float(os.getenv("HTF_BLOCK_ADX_MIN", "35"))
     HTF_BLOCK_TAPE_MAX = int(os.getenv("HTF_BLOCK_TAPE_MAX", "20"))
 
-    # HTF_L2_PAPER probe (2026-07-18): htf_l2 resurrected as a paper slot per the
-    # 7/17 action plan D1. Disable = slot not registered next restart.
+    # HTF_L2 slot (2026-07-18; "PAPER" in the id is legacy from its paper-probe
+    # birth): went LIVE 7/20 8:05 PM PT (owner order); killed and immediately
+    # reinstated same evening (owner reversal — kill closed BTC/SOL +$0.79).
+    # Mode sidecar carries live/paper across restarts. Disable = env false + restart.
     HTF_L2_PAPER_ENABLED = os.getenv("HTF_L2_PAPER_ENABLED", "true").lower() == "true"
     # Slot-local exit geometry, pre-registered from the 2026-07-18 replay sweep
     # (SL -10% ROI / TP +24% ROI at 10x; winners ~1.4x losers on the residual
