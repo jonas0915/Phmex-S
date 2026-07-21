@@ -77,17 +77,27 @@ class Config:
     HTF_BLOCK_ADX_MIN = float(os.getenv("HTF_BLOCK_ADX_MIN", "35"))
     HTF_BLOCK_TAPE_MAX = int(os.getenv("HTF_BLOCK_TAPE_MAX", "20"))
 
-    # HTF_L2 slot (2026-07-18; "PAPER" in the id is legacy from its paper-probe
-    # birth): went LIVE 7/20 8:05 PM PT (owner order); killed and immediately
-    # reinstated same evening (owner reversal — kill closed BTC/SOL +$0.79).
+    # HTF_L2 slot (2026-07-18, born as paper probe HTF_L2_PAPER; renamed
+    # HTF_L2 2026-07-20 when it went LIVE — owner objected to the misleading
+    # "PAPER" in dashboards/Telegram): went LIVE 7/20 8:05 PM PT (owner order);
+    # killed and immediately reinstated same evening (owner reversal — kill
+    # closed BTC/SOL +$0.79).
     # Mode sidecar carries live/paper across restarts. Disable = env false + restart.
-    HTF_L2_PAPER_ENABLED = os.getenv("HTF_L2_PAPER_ENABLED", "true").lower() == "true"
+    HTF_L2_ENABLED = os.getenv("HTF_L2_ENABLED", "true").lower() == "true"
     # Slot-local exit geometry, pre-registered from the 2026-07-18 replay sweep
     # (SL -10% ROI / TP +24% ROI at 10x; winners ~1.4x losers on the residual
     # book, in-sample, CI incl 0 — forward test decides). Owner go-live 7/20.
     # Env overrides; defaults below are the registered config.
-    HTF_L2_PAPER_SL_PCT = float(os.getenv("HTF_L2_PAPER_SL_PCT")) if os.getenv("HTF_L2_PAPER_SL_PCT") else 1.0
-    HTF_L2_PAPER_TP_PCT = float(os.getenv("HTF_L2_PAPER_TP_PCT")) if os.getenv("HTF_L2_PAPER_TP_PCT") else 2.4
+    HTF_L2_SL_PCT = float(os.getenv("HTF_L2_SL_PCT")) if os.getenv("HTF_L2_SL_PCT") else 1.0
+    HTF_L2_TP_PCT = float(os.getenv("HTF_L2_TP_PCT")) if os.getenv("HTF_L2_TP_PCT") else 2.4
+
+    # VWAP_CROSS slot (2026-07-20): owner-designed strategy, paper forward
+    # test — 9/15 SMA cross + dual session-VWAP filter (5m + 15m, same
+    # midnight-UTC anchor). PAPER-only; kill lines OWNER-SET pending,
+    # adjudicator grades report-only. Disable = env false + restart.
+    VWAP_CROSS_ENABLED = os.getenv("VWAP_CROSS_ENABLED", "true").lower() == "true"
+    VWAP_CROSS_SL_PCT = float(os.getenv("VWAP_CROSS_SL_PCT")) if os.getenv("VWAP_CROSS_SL_PCT") else 1.0
+    VWAP_CROSS_TP_PCT = float(os.getenv("VWAP_CROSS_TP_PCT")) if os.getenv("VWAP_CROSS_TP_PCT") else 2.4
 
     # F2 (2026-07-17): on pause/halt activation, cancel resting NON-reduce-only
     # (entry) orders once — a resting entry that fills mid-halt creates a ghost

@@ -91,6 +91,8 @@ def _extract_strategy_name(reason: str) -> str:
         return "momentum_continuation"
     if "vwap reversion" in r or "vwap_reversion" in r:
         return "vwap_reversion"
+    if "vwap cross" in r:
+        return "vwap_sma_cross"
     if "l2 anticipation" in r:
         return "htf_l2_anticipation"
     if "confluence pullback" in r:
@@ -662,11 +664,18 @@ class Phmex2Bot:
                 durable_trail_enabled=False,  # spec: close-only Donchian stop, no trail
             ),
         ]
-        # HTF_L2_PAPER (2026-07-18): registered conditionally — builder returns
-        # None when Config.HTF_L2_PAPER_ENABLED is false (env kill, no code edit).
-        _htf_l2_paper = self._build_htf_l2_paper_slot()
-        if _htf_l2_paper is not None:
-            self.slots.append(_htf_l2_paper)
+        # HTF_L2 (2026-07-18, renamed from HTF_L2_PAPER at 7/20 go-live):
+        # registered conditionally — builder returns
+        # None when Config.HTF_L2_ENABLED is false (env kill, no code edit).
+        _htf_l2 = self._build_htf_l2_slot()
+        if _htf_l2 is not None:
+            self.slots.append(_htf_l2)
+        # VWAP_CROSS (2026-07-20): owner-designed strategy, PAPER forward
+        # test — registered conditionally, builder returns None when
+        # Config.VWAP_CROSS_ENABLED is false (env kill, no code edit).
+        _vwap_cross = self._build_vwap_cross_slot()
+        if _vwap_cross is not None:
+            self.slots.append(_vwap_cross)
         # ETH-TSM-28 runtime state: sidecar mirror + per-cycle entry-in-flight flag
         # (read by _tsm_locks_symbol so the main bot never grabs ETH mid-entry).
         self._tsm_state = tsm_slot.load_state()
@@ -681,21 +690,22 @@ class Phmex2Bot:
         self._donchian_live_warned: dict[str, str] = {}
 
     @staticmethod
-    def _build_htf_l2_paper_slot():
-        """HTF_L2_PAPER — htf_l2_anticipation resurrected as a slot probe (2026-07-18).
+    def _build_htf_l2_slot():
+        """HTF_L2 — htf_l2_anticipation resurrected as a slot probe (2026-07-18,
+        born HTF_L2_PAPER; renamed HTF_L2 at the 7/20 go-live).
         Main path stays HALTED (.halt_main_entries); this slot carries the F5
         thin∧ADX gate + slot-local exit geometry (action plan D1). strategy_name
         IS a STRATEGIES key, so unlike TSM/Donchian this slot runs the full
         generic scalper path: slot SL/TP, trend-flip (already wired for htf_l2
         at the slot exit block), hard-240 time exit. Kill criteria are
         ADJUDICATOR-graded; loss cap is the hard live rail (owner go-live
-        2026-07-20 — promoted via .promote_HTF_L2_PAPER, 5m_mean_revert
+        2026-07-20 — promoted via the promote sentinel, 5m_mean_revert
         precedent: auto-demote to paper at -$5 slot net).
-        Returns None when Config.HTF_L2_PAPER_ENABLED is false (slot absent)."""
-        if not Config.HTF_L2_PAPER_ENABLED:
+        Returns None when Config.HTF_L2_ENABLED is false (slot absent)."""
+        if not Config.HTF_L2_ENABLED:
             return None
         return StrategySlot(
-            slot_id="HTF_L2_PAPER",
+            slot_id="HTF_L2",
             strategy_name="htf_l2_anticipation",   # STRATEGIES key — strategies.py:939
             timeframe="5m",
             max_positions=2,
@@ -705,8 +715,37 @@ class Phmex2Bot:
             loss_cap_usdt=-5.0,                    # hard rail: auto-demote at -$5 net (live precedent)
             kelly_min_trades=10**9,
             durable_trail_enabled=False,
-            sl_percent=Config.HTF_L2_PAPER_SL_PCT,
-            tp_percent=Config.HTF_L2_PAPER_TP_PCT,
+            sl_percent=Config.HTF_L2_SL_PCT,
+            tp_percent=Config.HTF_L2_TP_PCT,
+        )
+
+    @staticmethod
+    def _build_vwap_cross_slot():
+        """VWAP_CROSS — owner-designed strategy (2026-07-20), PAPER forward
+        test. 9/15 SMA cross + dual session-VWAP filter (5m + 15m, same
+        midnight-UTC anchor; see strategies.vwap_sma_cross). strategy_name IS
+        a STRATEGIES key, so the slot runs the full generic scalper path (slot
+        SL/TP, hard-240 time exit) under the STANDARD generic slot gates only
+        — the thin∧ADX gate and ensemble hard block are htf_l2-specific and
+        deliberately NOT applied here (this slot tests the owner's rule as
+        designed). Kill lines are OWNER-SET pending; the adjudicator grades
+        REPORT-ONLY, so rails are opted out (loss cap -999, Kelly never arms).
+        Returns None when Config.VWAP_CROSS_ENABLED is false (slot absent)."""
+        if not Config.VWAP_CROSS_ENABLED:
+            return None
+        return StrategySlot(
+            slot_id="VWAP_CROSS",
+            strategy_name="vwap_sma_cross",        # STRATEGIES key — strategies.py
+            timeframe="5m",
+            max_positions=2,
+            capital_pct=0.0,
+            paper_mode=True,
+            trade_amount_usdt=None,                # None → Config.TRADE_AMOUNT_USDT
+            loss_cap_usdt=-999.0,                  # paper — rails via adjudicator
+            kelly_min_trades=10**9,
+            durable_trail_enabled=False,
+            sl_percent=Config.VWAP_CROSS_SL_PCT,
+            tp_percent=Config.VWAP_CROSS_TP_PCT,
         )
 
     def _fetch_htf_data(self, symbol: str):
@@ -2587,23 +2626,23 @@ class Phmex2Bot:
                                          f"RSI(7)={_mr_rsi:.1f} < {Config.MEAN_REVERT_LONG_RSI_MIN:.1f}")
                             continue
 
-                    # 1h ADX for this signal — used by the HTF_L2_PAPER thin∧ADX
+                    # 1h ADX for this signal — used by the HTF_L2 thin∧ADX
                     # gate below and carried into the entry snapshot for EVERY
                     # slot (telemetry parity with the main path, 2026-07-18).
                     _slot_htf_adx = (float(htf_df.iloc[-1].get("adx", 0))
                                      if htf_df is not None and len(htf_df) > 0 else None)
 
-                    # --- HTF_L2_PAPER ACTIVE thin-tape ∧ high-1h-ADX gate
+                    # --- HTF_L2 ACTIVE thin-tape ∧ high-1h-ADX gate
                     # (2026-07-18): the F5 block the halted main path carries,
-                    # ACTIVE here so the paper probe forward-tests the residual
+                    # ACTIVE here so the slot forward-tests the residual
                     # book (toxic cell excluded), not the known loss engine. ---
-                    if slot.slot_id == "HTF_L2_PAPER":
+                    if slot.slot_id == "HTF_L2":
                         if self._thin_adx_blocked("htf_l2_anticipation", _flow_for_strat, _slot_htf_adx):
                             slot.bump_blocked("thin_adx")
-                            self._log_gotaway("thin_adx_paper_slot", symbol, direction,
+                            self._log_gotaway("thin_adx_slot", symbol, direction,
                                               "htf_l2_anticipation", signal.strength, 0, price,
                                               ob, _flow_for_strat, df)
-                            logger.info(f"[PAPER] [THIN-ADX] HTF_L2_PAPER {symbol} {direction.upper()} blocked "
+                            logger.info(f"[PAPER] [THIN-ADX] HTF_L2 {symbol} {direction.upper()} blocked "
                                         f"(adx={_slot_htf_adx}, tc={(_flow_for_strat or {}).get('trade_count', 0)})")
                             continue
 
@@ -2678,12 +2717,12 @@ class Phmex2Bot:
                         hurst_val=None, funding_data=None,
                         strategy=_strat_name, flow=flow
                     )
-                    # HTF_L2_PAPER ensemble HARD block (2026-07-18): the main
-                    # path enforces conf>=4 before entry — the probe must trade
+                    # HTF_L2 ensemble HARD block (2026-07-18): the main
+                    # path enforces conf>=4 before entry — the slot must trade
                     # the same book, so conf<4 blocks here (not shadow-tagged).
-                    if slot.slot_id == "HTF_L2_PAPER" and _conf < 4:
+                    if slot.slot_id == "HTF_L2" and _conf < 4:
                         slot.bump_blocked("ensemble_confidence")
-                        logger.info(f"[PAPER] [ENSEMBLE] HTF_L2_PAPER {symbol} {direction.upper()} "
+                        logger.info(f"[PAPER] [ENSEMBLE] HTF_L2 {symbol} {direction.upper()} "
                                     f"blocked — confidence {_conf}/7 < 4")
                         continue
                     if _conf < 4:
@@ -2706,11 +2745,11 @@ class Phmex2Bot:
                         if direction == "short" and flow["divergence"] == "bullish":
                             _gate_tags.append("divergence_bullish")
                     _would_block = len(_gate_tags) > 0
-                    # F6 cell tags for HTF_L2_PAPER entered trades (2026-07-18):
+                    # F6 cell tags for HTF_L2 entered trades (2026-07-18):
                     # mirror the main-path convention (sg_htf_adx_hi/sg_thin_tape)
                     # AFTER _would_block — these are cell markers, not gates, so
                     # they must not print a [WOULD BLOCK] label.
-                    if slot.slot_id == "HTF_L2_PAPER":
+                    if slot.slot_id == "HTF_L2":
                         if _slot_htf_adx is not None and _slot_htf_adx >= Config.HTF_BLOCK_ADX_MIN:
                             _gate_tags.append("sg_htf_adx_hi")
                         if (flow or {}).get("trade_count", 0) <= Config.HTF_BLOCK_TAPE_MAX:

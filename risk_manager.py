@@ -516,7 +516,7 @@ class RiskManager:
         return (wr * avg_win - (1 - wr) * avg_loss) / avg_win
 
     def open_position(self, symbol: str, entry_price: float, margin: float, side: str, atr: float = 0.0, regime: str = "medium", cycle: int = 0, strategy: str = "", sl_pct: float = None, tp_pct: float = None) -> Position:
-        # Per-slot exit-geometry override (2026-07-18, HTF_L2_PAPER): None (every
+        # Per-slot exit-geometry override (2026-07-18, HTF_L2): None (every
         # pre-existing caller) resolves to the Config values — behavior identical.
         _slp = Config.STOP_LOSS_PERCENT if sl_pct is None else sl_pct
         _tpp = Config.TAKE_PROFIT_PERCENT if tp_pct is None else tp_pct

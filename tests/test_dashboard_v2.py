@@ -124,14 +124,15 @@ def test_sentinel_deploy_ts_matches_2026_04_02_06_01_utc():
     assert wd.SENTINEL_DEPLOY_TS == expected
 
 
-def test_htf_l2_paper_signal_box_present():
-    """HTF_L2_PAPER probe (2026-07-18) must surface on the dashboard (project
-    rule: every bot update propagates to Telegram AND dashboard). The box maps
-    slot_id -> trading_state_HTF_L2_PAPER.json via the generic signal-card
-    loop, and its title must stay distinct from the MAIN LIVE htf_l2 box."""
+def test_htf_l2_signal_box_present():
+    """HTF_L2 slot (2026-07-18, renamed from HTF_L2_PAPER at the 7/20 go-live)
+    must surface on the dashboard (project rule: every bot update propagates
+    to Telegram AND dashboard). The box maps
+    slot_id -> trading_state_HTF_L2.json via the generic signal-card
+    loop, and its title must stay distinct from the legacy main-path htf_l2 box."""
     import web_dashboard as wd
     boxes = {b[0]: b[1] for b in wd._SIGNAL_BOXES}
-    assert "HTF_L2_PAPER" in boxes
-    assert "PAPER" in boxes["HTF_L2_PAPER"]
-    assert boxes["HTF_L2_PAPER"] != boxes["5m_scalp"]   # main-live box untouched
-    assert "MAIN LIVE" in boxes["5m_scalp"]
+    assert "HTF_L2" in boxes
+    assert "LIVE SLOT" in boxes["HTF_L2"]
+    assert boxes["HTF_L2"] != boxes["5m_scalp"]   # main-live box untouched
+    assert "HALTED" in boxes["5m_scalp"]      # legacy main path, renamed 7/20

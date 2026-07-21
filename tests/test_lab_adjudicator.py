@@ -264,19 +264,19 @@ def test_drift_classify_tiny_n_no_verdict():
     assert status2 == "NO-DATA"
 
 
-# ── HTF_L2_PAPER probe grader (2026-07-18, report-only) ───────────────────
-def test_grade_htf_l2_paper_zero_is_no_verdict():
-    r = adj.grade_htf_l2_paper({}, {}, adj.EXPERIMENTS["htf_l2_paper"])
-    assert r["experiment"] == "htf_l2_paper"
+# ── HTF_L2 slot grader (2026-07-18, report-only) ──────────────────────────
+def test_grade_htf_l2_zero_is_no_verdict():
+    r = adj.grade_htf_l2({}, {}, adj.EXPERIMENTS["htf_l2"])
+    assert r["experiment"] == "htf_l2"
     assert r["status"] == adj.WATCH
     assert "n=0" in r["note"]
 
 
-def test_grade_htf_l2_paper_reports_wr_net_and_counter():
+def test_grade_htf_l2_reports_wr_net_and_counter():
     state = {"closed_trades": [{"net_pnl": 0.5}, {"net_pnl": -0.3},
                                {"pnl_usdt": 0.2}]}  # gross fallback counts too
     counters = {"thin_adx": 4, "ensemble_confidence": 2}
-    r = adj.grade_htf_l2_paper(state, counters, adj.EXPERIMENTS["htf_l2_paper"])
+    r = adj.grade_htf_l2(state, counters, adj.EXPERIMENTS["htf_l2"])
     assert r["status"] == adj.WATCH          # report-only: kill lines OWNER-SET pending
     assert r["n_trades"] == 3
     assert abs(r["wr"] - 2 / 3) < 1e-4   # grader rounds to 4 dp
@@ -286,8 +286,10 @@ def test_grade_htf_l2_paper_reports_wr_net_and_counter():
     assert "OWNER-SET" in r["note"]
 
 
-def test_htf_l2_paper_wired_into_digest():
+def test_htf_l2_wired_into_digest():
     digest, results = adj.build_digest(now=1_784_000_000.0)
-    assert len(results) == 5                 # positional registry grew by one
-    assert results[4]["experiment"] == "htf_l2_paper"
-    assert "[htf_l2_paper]" in digest
+    assert len(results) == 6                 # positional registry grew by one (vwap_cross)
+    assert results[4]["experiment"] == "htf_l2"
+    assert "[htf_l2]" in digest
+    assert results[5]["experiment"] == "vwap_cross"
+    assert "[vwap_cross]" in digest

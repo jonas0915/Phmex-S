@@ -704,11 +704,11 @@ def _st2_fill_stats() -> dict:
 # A .demote_<slot_id> flag file always overrides to DEMOTED (rollback latch).
 # (slot_id, title, one-line description of what the strategy does)
 _SIGNAL_BOXES = [
-    ("5m_scalp",       "HTF_L2_ANTICIPATION &mdash; MAIN LIVE",
-     "The main live bot's (only) strategy since the 2026-05-02 cull: HTF (1h) "
-     "trend + VWAP context, entry confirmed by live L2 order-book &amp; tape "
-     "rather than a closed candle. Stats below are htf_l2 trades only &mdash; "
-     "retired strategies' history lives in the blotter/equity, not here."),
+    ("5m_scalp",       "HTF_L2 MAIN PATH &mdash; HALTED (LEGACY)",
+     "The original main-path htf_l2 book, HALTED since 2026-07-13 &mdash; old "
+     "exit geometry, kept for its trade history. The strategy now trades live "
+     "through the HTF_L2 slot below with new geometry and gates. Stats here "
+     "are the legacy main-path trades only."),
     ("5m_mean_revert", "5M_MEAN_REVERT &mdash; LIVE FORWARD TEST",
      "Bollinger-Band mean-reversion scalp &mdash; fades lower-BB bounces / upper-BB "
      "rejections in ranging (low-ADX) markets. LIVE since 2026-06-12; running the "
@@ -717,12 +717,18 @@ _SIGNAL_BOXES = [
      "Shorts a bid-heavy book being aggressively bought into (imbalance &ge; 0.35 &amp; "
      "buy-ratio 0.60&ndash;0.85), cvd/spread filtered. DEMOTED TO PAPER 2026-06-29 "
      "(35 live trades, no edge &mdash; execution adverse selection); paper sims only."),
-    ("HTF_L2_PAPER",   "HTF_L2_PAPER &mdash; PAPER PROBE",
-     "htf_l2_anticipation resurrected as a PAPER slot (2026-07-18, action plan "
-     "D1) while the main path stays HALTED. Same signal, plus an ACTIVE "
-     "thin-tape &and; 1h-ADX&ge;35 gate (F5 forward test) and a conf&ge;4 "
-     "ensemble hard block. Kill lines adjudicator-graded (owner-set pending); "
-     "promotion NOT authorized without an explicit owner go."),
+    ("HTF_L2",         "HTF_L2 &mdash; LIVE SLOT",
+     "htf_l2_anticipation resurrected as a slot (2026-07-18, action plan D1, "
+     "born paper; LIVE since 2026-07-20 owner go) while the main path stays "
+     "HALTED. Same signal, plus an ACTIVE thin-tape &and; 1h-ADX&ge;35 gate "
+     "(F5 forward test) and a conf&ge;4 ensemble hard block. Kill lines "
+     "adjudicator-graded (owner-set pending)."),
+    ("VWAP_CROSS",     "VWAP_CROSS &mdash; PAPER (OWNER STRATEGY)",
+     "Owner-designed 9/15 SMA cross + dual VWAP filter: LONG when SMA9 crossed "
+     "above SMA15 within the last 3 bars and price is above BOTH the 5m session "
+     "VWAP and the 15m VWAP (same midnight-UTC anchor); SHORT mirrored. PAPER "
+     "forward test since 2026-07-20; kill lines owner-set pending "
+     "(adjudicator-graded, report-only)."),
     ("ETH_TSM_28",     "ETH-TSM-28 &mdash; SLOW TREND (PAPER)",
      "Daily-horizon time-series momentum: long 0.01 ETH when the 28-day return is "
      "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "

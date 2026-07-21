@@ -1,11 +1,11 @@
-"""HTF_L2_PAPER paper probe (2026-07-18, action plan D1).
+"""HTF_L2 slot (2026-07-18, action plan D1; born HTF_L2_PAPER, renamed
+HTF_L2 at the 2026-07-20 go-live).
 
-htf_l2_anticipation resurrected as a PAPER slot while the main path stays
+htf_l2_anticipation resurrected as a slot while the main path stays
 HALTED (.halt_main_entries). The slot runs the full generic scalper path
-(paper SL/TP, trend-flip, hard-240) with an ACTIVE thin-tape ∧ ADX>=35 gate
+(slot SL/TP, trend-flip, hard-240) with an ACTIVE thin-tape ∧ ADX>=35 gate
 (F5 forward test) and an ensemble conf>=4 hard block. Kill criteria are
 ADJUDICATOR-graded (report-only until the owner sets them); rails opted out.
-PROMOTION NOT AUTHORIZED on current evidence (breakeven residual book).
 """
 import inspect
 import json
@@ -77,11 +77,11 @@ def _ob():
 
 def _paper_slot():
     return StrategySlot(
-        slot_id="HTF_L2_PAPER", strategy_name="htf_l2_anticipation",
+        slot_id="HTF_L2", strategy_name="htf_l2_anticipation",
         timeframe="5m", max_positions=2, capital_pct=0.0, paper_mode=True,
         trade_amount_usdt=None, loss_cap_usdt=-999.0, kelly_min_trades=10**9,
         durable_trail_enabled=False,
-        sl_percent=Config.HTF_L2_PAPER_SL_PCT, tp_percent=Config.HTF_L2_PAPER_TP_PCT,
+        sl_percent=Config.HTF_L2_SL_PCT, tp_percent=Config.HTF_L2_TP_PCT,
     )
 
 
@@ -115,8 +115,8 @@ def _run_entries(b):
 def _reset_state(sandbox):
     """Drop the slot's persisted book so a fresh StrategySlot starts empty
     (state files are keyed by slot_id and reload on construction)."""
-    for name in ("trading_state_HTF_L2_PAPER.json",
-                 "trading_state_HTF_L2_PAPER_blocked.json"):
+    for name in ("trading_state_HTF_L2.json",
+                 "trading_state_HTF_L2_blocked.json"):
         p = sandbox / name
         if p.exists():
             p.unlink()
@@ -125,9 +125,9 @@ def _reset_state(sandbox):
 # ── 1-2: registration ──────────────────────────────────────────────────────
 
 def test_slot_registered_paper(sandbox):
-    slot = botmod.Phmex2Bot._build_htf_l2_paper_slot()
+    slot = botmod.Phmex2Bot._build_htf_l2_slot()
     assert slot is not None
-    assert slot.slot_id == "HTF_L2_PAPER"
+    assert slot.slot_id == "HTF_L2"
     assert slot.paper_mode is True
     assert slot.strategy_name == "htf_l2_anticipation"
     assert slot.strategy_name in STRATEGIES          # generic scalper path runs
@@ -135,18 +135,18 @@ def test_slot_registered_paper(sandbox):
     assert slot.kelly_min_trades == 10**9
     assert slot.durable_trail_enabled is False
     assert slot.timeframe == "5m" and slot.max_positions == 2
-    assert slot.risk.state_file.endswith("trading_state_HTF_L2_PAPER.json")
+    assert slot.risk.state_file.endswith("trading_state_HTF_L2.json")
     # wired into __init__ right after the slots literal
     src = inspect.getsource(botmod.Phmex2Bot.__init__)
-    assert "_build_htf_l2_paper_slot()" in src
+    assert "_build_htf_l2_slot()" in src
     assert "self.slots.append" in src
 
 
 def test_env_flag_removes_slot(sandbox, monkeypatch):
-    monkeypatch.setattr(Config, "HTF_L2_PAPER_ENABLED", False)
-    assert botmod.Phmex2Bot._build_htf_l2_paper_slot() is None
-    monkeypatch.setattr(Config, "HTF_L2_PAPER_ENABLED", True)
-    assert botmod.Phmex2Bot._build_htf_l2_paper_slot() is not None
+    monkeypatch.setattr(Config, "HTF_L2_ENABLED", False)
+    assert botmod.Phmex2Bot._build_htf_l2_slot() is None
+    monkeypatch.setattr(Config, "HTF_L2_ENABLED", True)
+    assert botmod.Phmex2Bot._build_htf_l2_slot() is not None
 
 
 # ── 3: flow plumbing ───────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ def test_thin_adx_blocks_paper_entry(sandbox, monkeypatch):
     assert SYM not in slot.risk.positions
     assert slot.blocked_counts.get("thin_adx") == 1
     lines = [json.loads(l) for l in open(sandbox / "logs" / "gotAway.jsonl")]
-    assert any(r["reason"] == "thin_adx_paper_slot" for r in lines)
+    assert any(r["reason"] == "thin_adx_slot" for r in lines)
 
 
 def test_thin_adx_allows_active_tape(sandbox, monkeypatch):
@@ -200,7 +200,7 @@ def test_paper_entry_during_main_halt(sandbox, monkeypatch):
     slot = _paper_slot()
     b = _bare_bot(slot, monkeypatch=monkeypatch)
     _run_entries(b)
-    assert SYM in slot.risk.positions        # paper probe trades through the halt
+    assert SYM in slot.risk.positions        # slot trades through the halt
     assert b.risk.positions == {}            # main book untouched
 
 
@@ -336,7 +336,7 @@ def test_kill_sentinel_paper_close_in_book(sandbox, monkeypatch):
     b._trading_paused = False
     b._pause_logged = False
     b._halt_main_logged = False
-    open(".kill_HTF_L2_PAPER", "w").close()
+    open(".kill_HTF_L2", "w").close()
 
     b._process_sentinels()
 
@@ -344,7 +344,7 @@ def test_kill_sentinel_paper_close_in_book(sandbox, monkeypatch):
     assert slot.risk.positions == {}                  # closed in the paper book
     assert slot.risk.closed_trades[-1]["reason"] == "killed"
     assert slot.enabled is False
-    assert not os.path.exists(".kill_HTF_L2_PAPER")
+    assert not os.path.exists(".kill_HTF_L2")
 
 
 # ── 15: trend-flip exit ────────────────────────────────────────────────────

@@ -4,6 +4,8 @@ import logging
 import os
 import pandas as pd
 
+from indicators import vwap as _session_vwap  # house session-anchored VWAP (midnight-UTC reset)
+
 _log = logging.getLogger("DegenCryt")
 
 
@@ -930,6 +932,103 @@ def st2_absorption(df: pd.DataFrame, orderbook: dict = None, flow: dict = None) 
     return TradeSignal(Signal.HOLD, f"ST2.0: no absorption (imb={imb:.2f} br={br:.2f})", 0.0)
 
 
+def vwap_sma_cross(
+    df: pd.DataFrame,
+    orderbook: dict = None,
+    htf_df: pd.DataFrame = None,
+    flow: dict = None,
+) -> TradeSignal:
+    """Owner-designed strategy (2026-07-20), PAPER forward test via the
+    VWAP_CROSS slot.
+
+    LONG: SMA9 crossed ABOVE SMA15 recently (K=3 bar recency window: above
+    now, was <= at any of the prior 3 closed bars) AND close is above BOTH
+    the 5m session VWAP and the 15m VWAP. SHORT mirrored.
+
+    VWAP anchoring: the house session VWAP (indicators.vwap — midnight-UTC
+    reset). 5m VWAP = the pipeline's df["vwap"] column when present, else
+    computed here with the same function. 15m VWAP = the same session anchor
+    on a 3:1 resample of the 5m frame. htf_df/flow are accepted for call-path
+    compatibility and unused.
+    """
+    if df is None or len(df) < 60:
+        return TradeSignal(Signal.HOLD, "vwap_cross: not enough data", 0.0)
+
+    closes = df["close"]
+    sma9 = closes.rolling(9).mean()
+    sma15 = closes.rolling(15).mean()
+    s9, s15 = sma9.iloc[-1], sma15.iloc[-1]
+    if pd.isna(s9) or pd.isna(s15):
+        return TradeSignal(Signal.HOLD, "vwap_cross: SMAs warming up", 0.0)
+
+    # Recency window K=3: cross counted only if the fast SMA sat on the other
+    # side (or level) at any of the prior 3 bars. An older cross → HOLD.
+    cross_up = cross_dn = False
+    for k in range(2, 5):
+        a, b = sma9.iloc[-k], sma15.iloc[-k]
+        if pd.isna(a) or pd.isna(b):
+            continue
+        if s9 > s15 and a <= b:
+            cross_up = True
+            break
+        if s9 < s15 and a >= b:
+            cross_dn = True
+            break
+    if not (cross_up or cross_dn):
+        return TradeSignal(
+            Signal.HOLD,
+            f"vwap_cross: no recent 9/15 cross (SMA9={s9:.4f} SMA15={s15:.4f})",
+            0.0)
+
+    close = float(closes.iloc[-1])
+
+    # 5m session VWAP — reuse the indicator pipeline's column; recompute with
+    # the same house function only if the column is absent (direct calls).
+    v5 = df.iloc[-1].get("vwap", float("nan"))
+    if pd.isna(v5) or v5 <= 0:
+        try:
+            v5 = float(_session_vwap(df["high"], df["low"], df["close"],
+                                     df["volume"]).iloc[-1])
+        except (TypeError, KeyError, AttributeError):
+            return TradeSignal(Signal.HOLD, "vwap_cross: no 5m VWAP", 0.0)
+    if pd.isna(v5) or v5 <= 0:
+        return TradeSignal(Signal.HOLD, "vwap_cross: no 5m VWAP", 0.0)
+
+    # 15m VWAP — same session anchor on a 3:1 resample of the 5m frame
+    # (needs the standard DatetimeIndex; anything else can't be resampled).
+    try:
+        df15 = pd.DataFrame({
+            "high": df["high"].resample("15min").max(),
+            "low": df["low"].resample("15min").min(),
+            "close": df["close"].resample("15min").last(),
+            "volume": df["volume"].resample("15min").sum(),
+        }).dropna(subset=["close"])
+        v15 = float(_session_vwap(df15["high"], df15["low"], df15["close"],
+                                  df15["volume"]).iloc[-1])
+    except (TypeError, KeyError, AttributeError, ValueError):
+        return TradeSignal(Signal.HOLD, "vwap_cross: no 15m VWAP (resample failed)", 0.0)
+    if pd.isna(v15) or v15 <= 0:
+        return TradeSignal(Signal.HOLD, "vwap_cross: no 15m VWAP", 0.0)
+
+    if cross_up and close > v5 and close > v15:
+        direction, dir_str = Signal.BUY, "LONG"
+    elif cross_dn and close < v5 and close < v15:
+        direction, dir_str = Signal.SELL, "SHORT"
+    else:
+        return TradeSignal(
+            Signal.HOLD,
+            f"vwap_cross: cross without dual-VWAP confirm "
+            f"(close={close:.4f} vwap5m={v5:.4f} vwap15m={v15:.4f})",
+            0.0)
+
+    reason = (
+        f"VWAP CROSS {dir_str} | SMA9={s9:.4f} SMA15={s15:.4f}"
+        f" | close={close:.4f} vwap5m={v5:.4f} vwap15m={v15:.4f}"
+    )
+    # 0.82 matches the htf_l2 base so the generic 0.80 slot floor passes.
+    return TradeSignal(direction, reason, 0.82)
+
+
 STRATEGIES = {
     "bb_mean_reversion":        bb_mean_reversion_strategy,
     "momentum_continuation":    momentum_continuation_strategy,
@@ -938,4 +1037,5 @@ STRATEGIES = {
     "liq_cascade":              liquidation_cascade_strategy,
     "htf_l2_anticipation":      htf_l2_anticipation,
     "ST2.0":                    st2_absorption,
+    "vwap_sma_cross":           vwap_sma_cross,
 }

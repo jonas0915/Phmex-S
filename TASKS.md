@@ -1,3 +1,17 @@
+# TASK: VWAP_CROSS owner-strategy paper slot (2026-07-20, Jonas: "build my vwap strategy as a paper slot") — IN PROGRESS
+
+Jonas's rule as its own $0 forward test: 9/15 SMA cross (K=3 recency) + price beyond 5m & 15m
+session VWAP, both sides; SL 1.0/TP 2.4 (same as HTF_L2 slot, effective 2:1 via TP cap);
+paper-only, adjudicator report-only. Prior receipts stand: as a FILTER on htf_l2 = rejected
+7/20; as a standalone SCAN = DOA 7/6. This is the forward-test adjudication of the idea.
+
+- [ ] TDD build agent (strategies.py fn + slot + config + adjudicator + dashboard + tests) — RUNNING
+- [ ] Full suite + audit pass on diff
+- [ ] Pre-restart audit -> restart -> verify slot paper entries
+- [ ] Memory + MEMORY.md
+
+---
+
 # TASK: htf_l2 PAPER slot + exit-geometry redesign (2026-07-18, Jonas: "paper slot it… make it 68% WR, winners > losers") — IN PROGRESS
 
 Owner override noted: exit-geometry levers were closed for LIVE (7/6); this re-opens them for a
