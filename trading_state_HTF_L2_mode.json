@@ -1,1 +1,1 @@
-{"paper_mode": false, "capital_pct": 0.1, "promoted_at": 1784603114.268738, "loss_cap_usdt": -5.0, "trade_amount_usdt": null, "kelly_min_trades": 1000000000}
+{"paper_mode": true, "capital_pct": 0.0, "promoted_at": 1784603114.268738, "loss_cap_usdt": -5.0, "trade_amount_usdt": null, "kelly_min_trades": 1000000000}
