@@ -1,3 +1,26 @@
+# TASK: Safety + audit-rules bundle → HTF_L2 LIVE re-promotion (2026-07-23, Jonas GO "but not paper — live testing") — IN PROGRESS
+
+U1 quiet_regime hard-block HTF_L2 slot (57% of slot loss, 0 quiet winners) · U2 cross-book
+ownership + shared daily cap (ETH chase −$1.48) · U3 account-wide daily $5 halt + hoist above
+early returns · U4 DD peak persistence + hysteresis + MAX_DRAWDOWN=20 wired (forward peak,
+NOT retro-46.36) · U5 telemetry (slot peak_price, paper fee subtraction; funding/fee-est = ship
+or spec) · U6 era-based loss cap (fresh −$5 budget per promotion; lifetime −$6.22 would
+insta-demote otherwise).
+
+- [x] TDD build — 590 passed (+43), all 6 units; U5b paper-fee claim DISPROVEN (recon agent
+      double-subtracted — memory corrected); U5c (funding + fee-est) SPECCED not shipped
+- [x] Audit agent — GO, independent 590/0; false-halt risk cleared vs on-disk state; caught
+      that old halt path would have Telegram-spammed (new code writes sentinel once);
+      flags: ghost-slot-position could block main (pre-existing, new consequence — follow-up),
+      cap day-boundary UTC vs halt PT (pre-existing), 2 substring-only wiring tests (harden later)
+- [x] Restart 7/23 9:53 PM PT PID 84738 — no false halts, peak preserved 33.96, ADA short
+      restored ($18.85 free = total ~$33.85 minus locked margin)
+- [x] .promote_HTF_L2 processed 9:54:36 PM — LIVE, fresh era budget (promoted_at stamped),
+      paper BTC flushed promote_reset −$0.53
+- [x] Memory + MEMORY.md updated
+
+---
+
 # TASK: VWAP_CROSS owner-strategy paper slot (2026-07-20, Jonas: "build my vwap strategy as a paper slot") — IN PROGRESS
 
 Jonas's rule as its own $0 forward test: 9/15 SMA cross (K=3 recency) + price beyond 5m & 15m

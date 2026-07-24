@@ -1011,6 +1011,144 @@ class Phmex2Bot:
         except Exception as e:
             logger.warning(f"Failed to write pause sentinel: {e}")
 
+    def _update_slot_peaks(self, real_balance: float) -> None:
+        """U4 (2026-07-23): feed account equity into every LIVE slot's
+        RiskManager peak so _drawdown_percent works there (slot peaks were 0 →
+        their DD guard was dead). Paper slots stay untouched — their books are
+        simulated. Peaks only ever ratchet up (update_peak_balance), so this
+        also initializes a fresh slot on its first balance update."""
+        for slot in getattr(self, "slots", []) or []:
+            try:
+                if not slot.paper_mode:
+                    slot.risk.update_peak_balance(real_balance)
+            except Exception as e:
+                logger.debug(f"[SLOT] {slot.slot_id} peak update failed: {e}")
+
+    def _check_max_dd_halt(self, real_balance: float) -> bool:
+        """U4 (2026-07-23): Config.MAX_DRAWDOWN_PERCENT (.env 20.0) wired in as
+        a hard entry halt — it was dead config referenced nowhere. When main
+        _drawdown_percent ≥ threshold: write the .max_dd_halt sentinel (also
+        read by _slot_entries_blocked and the dashboard badge), Telegram once,
+        and block ALL entries (main + slots; exits keep running) until either
+        the owner drops a .clear_dd_halt sentinel or DD recovers below the
+        threshold. .clear_dd_halt is kept on disk as a re-arm latch (no
+        instant re-trip while DD is still past the line) and is consumed once
+        DD recovers. Returns True while the halt is in force."""
+        thr = Config.MAX_DRAWDOWN_PERCENT
+        if thr <= 0:
+            return False
+        _dd_fn = getattr(self.risk, "_drawdown_percent", None)
+        dd = _dd_fn(real_balance) if _dd_fn else 0.0
+        halted = os.path.exists(".max_dd_halt")
+        if os.path.exists(".clear_dd_halt"):
+            # Owner clear: lift the halt now; keep the clear file as the latch.
+            if halted:
+                try:
+                    os.remove(".max_dd_halt")
+                except OSError:
+                    pass
+                msg = (f"MAX-DD halt CLEARED by owner (.clear_dd_halt) at DD "
+                       f"{dd:.1f}% — re-arms when DD < {thr:.1f}%")
+                logger.warning(f"[MAX DD] {msg}")
+                try:
+                    notifier.send(f"✅ {msg}")
+                except Exception:
+                    pass
+            if dd < thr:
+                try:
+                    os.remove(".clear_dd_halt")  # recovered — latch consumed
+                    logger.info(f"[MAX DD] DD {dd:.1f}% < {thr:.1f}% — re-armed")
+                except OSError:
+                    pass
+            return False
+        if dd >= thr:
+            if not halted:
+                try:
+                    with open(".max_dd_halt", "w") as f:
+                        f.write(f"{int(time.time())}\nDD {dd:.1f}% >= "
+                                f"MAX_DRAWDOWN_PERCENT {thr:.1f}%\n")
+                except Exception as e:
+                    logger.warning(f"[MAX DD] could not write sentinel: {e}")
+                msg = (f"MAX-DD HALT: drawdown {dd:.1f}% ≥ {thr:.1f}% "
+                       f"(peak {getattr(self.risk, 'peak_balance', 0.0):.2f} → "
+                       f"${real_balance:.2f}) — ALL entries blocked, exits still "
+                       f"serviced. Clear: touch .clear_dd_halt, or recover above "
+                       f"the line.")
+                logger.warning(f"[MAX DD] {msg}")
+                try:
+                    notifier.send(f"⛔ {msg}")
+                except Exception:
+                    pass
+            return True
+        if halted:  # recovered below threshold — auto-clear
+            try:
+                os.remove(".max_dd_halt")
+            except OSError:
+                pass
+            msg = f"MAX-DD halt cleared — DD {dd:.1f}% back below {thr:.1f}%"
+            logger.warning(f"[MAX DD] {msg}")
+            try:
+                notifier.send(f"✅ {msg}")
+            except Exception:
+                pass
+        return False
+
+    def _today_net_all_books(self) -> float:
+        """U3 (2026-07-23): today's PT-date net PnL across the WHOLE account —
+        main book closed_trades (unchanged semantics) PLUS every slot's
+        mode=="live" records. Slots are scanned regardless of their CURRENT
+        mode: a slot demoted mid-day (HTF_L2 7/22, −$6.22 then auto-demoted at
+        11:34 AM PT) still lost real money today. Paper records (mode missing
+        or !="live") never count."""
+        total = _compute_today_net_pnl(getattr(self.risk, "closed_trades", []) or [])
+        for slot in getattr(self, "slots", []) or []:
+            live = [t for t in slot.risk.closed_trades if t.get("mode") == "live"]
+            total += _compute_today_net_pnl(live)
+        return total
+
+    def _maybe_daily_loss_halt(self, real_balance: float) -> bool:
+        """U3 (2026-07-23): account-wide daily-loss kill switch. Returns True
+        when entries must halt this cycle. Called ABOVE the _trading_paused /
+        .halt_main_entries early returns in _run_cycle — the old call site sat
+        below them, so the halt was unreachable during any pause/halt and read
+        the MAIN book only (live-slot losses invisible: 100% of the 7/20-7/23
+        bleed). Threshold formula (max(3%, $5 floor)) and .daily_loss_override
+        semantics unchanged. The halt action is the existing daily-halt
+        pathway: write the .pause_trading sentinel (reason prefixed
+        "DAILY LOSS HALT" so the override recognizes it), which
+        _slot_entries_blocked() already enforces for ALL slot entries. An
+        existing sentinel is never clobbered (its reason may be a manual
+        pause the override must NOT neutralize)."""
+        today_net = self._today_net_all_books()
+        if not _should_halt_daily_loss(today_net, real_balance):
+            return False
+        _halt_thr = max(real_balance * 0.03, 5.0)  # mirror _should_halt_daily_loss
+        if _daily_loss_override_active():
+            if not getattr(self, "_daily_loss_override_logged", False):
+                msg = (f"DAILY LOSS OVERRIDE active — today net ${today_net:.2f} "
+                       f"(all books) past -${_halt_thr:.2f} (max of 3% / $5 floor) "
+                       f"of ${real_balance:.2f}, but operator override for today "
+                       f"is set; entries allowed. Auto-expires at midnight PT.")
+                logger.warning(f"[KILL SWITCH] {msg}")
+                try:
+                    notifier.send(f"⚠️ {msg}")
+                except Exception:
+                    pass
+                self._daily_loss_override_logged = True
+            return False
+        if not os.path.exists(".pause_trading"):
+            reason = (f"DAILY LOSS HALT: today net ${today_net:.2f} (all books) "
+                      f"exceeds -${_halt_thr:.2f} (max of 3% / $5 floor) of "
+                      f"${real_balance:.2f}")
+            self._set_pause_sentinel(reason)
+            logger.warning(f"[KILL SWITCH] {reason}")
+            try:
+                notifier.send(f"⛔ {reason}")
+            except Exception:
+                pass
+        self._trading_paused = True
+        return True
+
     def _process_sentinels(self):
         """Check for sentinel files and act on them. One-shot: read, act, delete."""
         import glob as _glob
@@ -1630,12 +1768,38 @@ class Phmex2Bot:
                             if Config.is_live() else 0.0)
         real_balance = _equity_for_drawdown(_exchange_equity, available + margin_in_use)
         self.risk.update_peak_balance(real_balance)
+        # U4 (2026-07-23): live slots track the same equity peak (their DD guard
+        # was dead at peak=0), and the MAX_DRAWDOWN_PERCENT hard halt is
+        # evaluated every cycle (sentinel + Telegram managed inside).
+        self._update_slot_peaks(real_balance)
+        _max_dd_halted = self._check_max_dd_halt(real_balance)
 
         # STATS must print BEFORE the regime-pause/_trading_paused/.halt_main_entries
         # early returns: monitor_daemon, web_dashboard, trading_desk, and
         # daily_report all parse this line for balance/drawdown, and the 7/13
         # entries halt starved them to $0 when it lived at end-of-cycle (2026-07-16).
         self._maybe_print_stats(real_balance, available, margin_in_use)
+
+        # U3 (2026-07-23): account-wide daily-loss halt, evaluated ABOVE every
+        # entry-section early return so slot losses can never hide behind a
+        # pause/halt sentinel (old check sat below them and read main only).
+        # On halt: slot exits are still serviced (F1), then the cycle ends —
+        # slot entries are blocked via the sentinel in _slot_entries_blocked.
+        if self._maybe_daily_loss_halt(real_balance):
+            self._evaluate_all_slots(prices)
+            return
+
+        # U4 (2026-07-23): MAX-DD hard halt — block main entries, service slot
+        # exits (slot ENTRIES are blocked inside via _slot_entries_blocked,
+        # which reads the .max_dd_halt sentinel fresh).
+        if _max_dd_halted:
+            if not getattr(self, "_max_dd_logged", False):
+                logger.warning("[MAX DD] entries blocked — servicing exits only")
+                self._max_dd_logged = True
+            self._evaluate_all_slots(prices)
+            return
+        else:
+            self._max_dd_logged = False
 
         # Regime filter — pause all entries after consecutive losses
         if time.time() < self._regime_pause_until:
@@ -1688,32 +1852,9 @@ class Phmex2Bot:
         else:
             self._halt_main_logged = False
 
-        # --- Extended kill switches (daily loss + consecutive loss) ---
-        today_net = _compute_today_net_pnl(self.risk.closed_trades)
-        if _should_halt_daily_loss(today_net, real_balance):
-            _halt_thr = max(real_balance * 0.03, 5.0)  # mirror _should_halt_daily_loss
-            if _daily_loss_override_active():
-                if not getattr(self, "_daily_loss_override_logged", False):
-                    msg = (f"DAILY LOSS OVERRIDE active — today net ${today_net:.2f} past "
-                           f"-${_halt_thr:.2f} (max of 3% / $5 floor) of ${real_balance:.2f}, "
-                           f"but operator override for today is "
-                           f"set; entries allowed. Auto-expires at midnight PT.")
-                    logger.warning(f"[KILL SWITCH] {msg}")
-                    try:
-                        notifier.send(f"⚠️ {msg}")
-                    except Exception:
-                        pass
-                    self._daily_loss_override_logged = True
-            else:
-                reason = (f"DAILY LOSS HALT: today net ${today_net:.2f} exceeds "
-                          f"-${_halt_thr:.2f} (max of 3% / $5 floor) of ${real_balance:.2f}")
-                self._set_pause_sentinel(reason)
-                logger.warning(f"[KILL SWITCH] {reason}")
-                try:
-                    notifier.send(f"⛔ {reason}")
-                except Exception:
-                    pass
-                return
+        # --- Extended kill switches ---
+        # Daily-loss halt: HOISTED above the early returns (U3, 2026-07-23) —
+        # see _maybe_daily_loss_halt call right after the STATS print.
 
         if _should_halt_consecutive_losses(self._loss_streak):
             reason = f"CONSECUTIVE LOSS HALT: {self._loss_streak} losses in a row — 4h cooldown"
@@ -1739,6 +1880,13 @@ class Phmex2Bot:
                 self._tsm_notify_ownership(
                     "main_skip", f"main-bot ETH entry skipped ({_tsm_lock})")
                 continue
+            # U2a (2026-07-23): cross-book ownership — the LIVE HTF_L2 slot
+            # owns this symbol; a main fill would merge into its position
+            # (one-way mode) and double the shared-margin exposure.
+            if self._htf_l2_slot_holds(symbol):
+                logger.info(f"[CROSS-BOOK] main {symbol} entry skipped — "
+                            f"HTF_L2 slot holds {symbol}")
+                continue
             # Global cooldown: 2 min between any new entry (continue, not break)
             if time.time() - self._last_entry_time < 120:
                 continue
@@ -1747,11 +1895,10 @@ class Phmex2Bot:
                 continue
             # Daily symbol cap — ENFORCED as of 2026-06-11 audit. CLAUDE.md and .env
             # claimed DAILY_SYMBOL_CAP=3 for weeks while this was log-only.
-            day_start = time.time() - (time.time() % 86400)  # midnight UTC
-            daily_trades = sum(1 for t in self.risk.closed_trades
-                               if t.get("symbol") == symbol and t.get("opened_at", 0) > day_start
-                               and t.get("exit_reason") != "min_margin_skip")  # partial-fill ghosts don't consume cap slots (review 2026-06-11)
-            daily_trades += 1 if symbol in self.risk.positions else 0  # count open positions too
+            # U2b (2026-07-23): the count is now the COMBINED main + HTF_L2-slot
+            # live count (see _combined_daily_symbol_count; old main-only math
+            # preserved verbatim inside it, flag HTF_L2_CROSS_BOOK_LOCK).
+            daily_trades = self._combined_daily_symbol_count(symbol)
             if daily_trades >= Config.DAILY_SYMBOL_CAP:
                 logger.info(f"[DAILY CAP] {symbol} — {daily_trades} trades today (cap {Config.DAILY_SYMBOL_CAP}) — entry skipped")
                 continue
@@ -2298,6 +2445,54 @@ class Phmex2Bot:
         return (htf_adx >= Config.HTF_BLOCK_ADX_MIN
                 and (flow or {}).get("trade_count", 0) <= Config.HTF_BLOCK_TAPE_MAX)
 
+    def _htf_l2_slot(self):
+        """The HTF_L2 StrategySlot instance, or None (U2, 2026-07-23)."""
+        for slot in getattr(self, "slots", []) or []:
+            if slot.slot_id == "HTF_L2":
+                return slot
+        return None
+
+    def _htf_l2_slot_holds(self, symbol: str) -> bool:
+        """U2a (2026-07-23): True when the LIVE HTF_L2 slot holds `symbol`, so
+        the main path must not enter it (Phemex one-way mode would merge the
+        fills; both books also contend for the same shared margin — 7/23 loss
+        audit found the two books chasing identical signals). Paper slot
+        positions are simulated and never lock the main book. Flag-gated by
+        HTF_L2_CROSS_BOOK_LOCK (false restores old behavior)."""
+        if not Config.HTF_L2_CROSS_BOOK_LOCK:
+            return False
+        slot = self._htf_l2_slot()
+        return (slot is not None and not slot.paper_mode
+                and symbol in slot.risk.positions)
+
+    def _combined_daily_symbol_count(self, symbol: str) -> int:
+        """U2b (2026-07-23): today's per-symbol entry count across BOTH books —
+        main closed trades opened since midnight UTC (min_margin_skip ghosts
+        excluded, open position counted: verbatim the pre-existing main
+        [DAILY CAP] math) PLUS the HTF_L2 slot's LIVE entries for the same
+        symbol (mode=="live" records + its open live position). Both entry
+        paths enforce DAILY_SYMBOL_CAP against this combined count — 7/22 ETH:
+        the slot chased a signal main was already day-capped out of (−$1.48).
+        With HTF_L2_CROSS_BOOK_LOCK=false this is exactly the old main-only
+        count."""
+        day_start = time.time() - (time.time() % 86400)  # midnight UTC
+        _main_trades = getattr(self.risk, "closed_trades", []) or []
+        count = sum(1 for t in _main_trades
+                    if t.get("symbol") == symbol and t.get("opened_at", 0) > day_start
+                    and t.get("exit_reason") != "min_margin_skip")
+        count += 1 if symbol in self.risk.positions else 0
+        if Config.HTF_L2_CROSS_BOOK_LOCK:
+            slot = self._htf_l2_slot()
+            if slot is not None:
+                count += sum(1 for t in slot.risk.closed_trades
+                             if t.get("symbol") == symbol
+                             and t.get("opened_at", 0) > day_start
+                             and t.get("mode") == "live"
+                             and t.get("exit_reason") != "min_margin_skip")
+                if not slot.paper_mode and symbol in slot.risk.positions:
+                    count += 1
+        return count
+
     def _slot_entries_blocked(self) -> bool:
         """Fresh (per-call) global entry block for ALL slot entries, paper AND
         live: the .pause_trading sentinel or the main drawdown pause. Fresh
@@ -2305,6 +2500,7 @@ class Phmex2Bot:
         cycle's slot entries, unlike the once-per-cycle _trading_paused flag."""
         _rm = getattr(self, "risk", None)
         return (os.path.exists(".pause_trading")
+                or os.path.exists(".max_dd_halt")  # U4: MAX-DD hard halt (2026-07-23)
                 or (_rm is not None
                     and getattr(_rm, "_drawdown_pause_until", 0) > time.time()))
 
@@ -2402,6 +2598,19 @@ class Phmex2Bot:
                     logger.debug(f"[PAPER] {slot.slot_id} no price for {symbol}, skipping exit check")
                     continue
                 pos = slot.risk.positions[symbol]
+
+                # U5a (2026-07-23): keep peak_price fresh for slot positions
+                # (paper AND live) — it stayed == entry on every slot record,
+                # making MFE analysis unrecoverable (7/23 audit). Mirrors the
+                # Position inline-update semantics (risk_manager.py:141-144)
+                # WITHOUT calling update_trailing_stop: slots like HTF_L2 are
+                # structurally trail-free and must never arm one. Runs BEFORE
+                # the exit checks so a same-cycle close records the true peak.
+                if pos.side == "long":
+                    if price > pos.peak_price or pos.peak_price == 0.0:
+                        pos.peak_price = price
+                elif price < pos.peak_price or pos.peak_price == 0.0:
+                    pos.peak_price = price
 
                 # ST2.0: fixed-time hold (the backtested exit) takes priority. Hold is
                 # per-slot via ST2_HOLD_CYCLES_BY_SLOT (ST2.0 = 20 cycles since 2026-06-16).
@@ -2646,6 +2855,29 @@ class Phmex2Bot:
                                         f"(adx={_slot_htf_adx}, tc={(_flow_for_strat or {}).get('trade_count', 0)})")
                             continue
 
+                    # U2 (2026-07-23): cross-book ownership + shared daily cap
+                    # for the HTF_L2 slot (paper mode enforces too, so the paper
+                    # forward-test mirrors live gating). Flag-gated by
+                    # HTF_L2_CROSS_BOOK_LOCK.
+                    if slot.slot_id == "HTF_L2" and Config.HTF_L2_CROSS_BOOK_LOCK:
+                        # (a) main book holds this symbol — slot must stay off
+                        # (one-way-mode merge + shared-margin contention).
+                        if symbol in self.risk.positions:
+                            slot.bump_blocked("cross_book")
+                            logger.info(f"[CROSS-BOOK] HTF_L2 {symbol} entry "
+                                        f"blocked — main book holds {symbol}")
+                            continue
+                        # (b) shared daily symbol cap: main + slot live entries
+                        # count together (7/22 ETH: slot chased a signal main
+                        # was already day-capped out of, −$1.48).
+                        _shared_count = self._combined_daily_symbol_count(symbol)
+                        if _shared_count >= Config.DAILY_SYMBOL_CAP:
+                            slot.bump_blocked("daily_cap")
+                            logger.info(f"[DAILY CAP] HTF_L2 {symbol} — "
+                                        f"{_shared_count} combined trades today "
+                                        f"(cap {Config.DAILY_SYMBOL_CAP}) — entry skipped")
+                            continue
+
                     margin = (slot.trade_amount_usdt if slot.trade_amount_usdt is not None
                               else Config.TRADE_AMOUNT_USDT)
                     atr_val = df.iloc[-2].get("atr", 0) if len(df) > 1 else 0
@@ -2736,6 +2968,22 @@ class Phmex2Bot:
                         _gate_tags.append("global_cooldown")
                     _regime_snap = self._classify_regime(df.iloc[-1], df)
                     if _regime_snap.get("label") == "QUIET":
+                        # U1 (2026-07-23): HTF_L2 slot HARD-BLOCKS quiet_regime —
+                        # same condition source as the main path's [REGIME GATE]
+                        # (self._classify_regime label == "QUIET"), which blocks
+                        # unconditionally since 2026-06-12 while the slot only
+                        # shadow-tagged. 7/23 audit: quiet-tagged slot entries =
+                        # 3/6 losers, −$3.57 (57% of slot loss), 0 winners.
+                        # HTF_L2 ONLY — MR slots may legitimately trade quiet.
+                        # (Log line phrasing feeds the dashboard gate-stats
+                        # "QUIET regime" label — keep "QUIET regime" in it and
+                        # keep bare "ADX"/"cooldown" substrings out.)
+                        if slot.slot_id == "HTF_L2" and Config.HTF_L2_QUIET_BLOCK_ENABLED:
+                            slot.bump_blocked("quiet_regime")
+                            logger.info(f"[REGIME GATE] HTF_L2 {symbol} "
+                                        f"{direction.upper()} blocked — QUIET regime "
+                                        f"(slot hard-block)")
+                            continue
                         # Mirrors the live gate: QUIET blocks unconditionally since
                         # 2026-06-12 (flow-confirmation exemption closed)
                         _gate_tags.append("quiet_regime")
@@ -3421,6 +3669,21 @@ class Phmex2Bot:
                     pos = owner_risk.positions[symbol]
                     # Try to get actual fill price from recent trades
                     exit_price = prices.get(symbol, pos.entry_price)
+                    # TODO(U5c spec, 2026-07-23 — NOT shipped, >1h robust fix):
+                    # exchange_close fees are UNDERESTIMATED two ways: (1) only
+                    # last_trade's fee is summed, so a close split across
+                    # multiple fills undercounts (ADA 7/22: $0.015 recorded vs
+                    # ~$0.10 actual, ~$0.31/week cumulative); (2) a non-zero
+                    # but wrong sync_fee bypasses close_position's zero-fee
+                    # estimator floor. Robust fix: filter post-entry fills to
+                    # the REDUCE side matching pos.side, sum fee across ALL of
+                    # them, and floor at _estimate_live_fees when the exchange
+                    # omits fee.cost — needs careful re-entry disambiguation
+                    # (same-cycle new entry on the symbol would poison the
+                    # sum). The 15-min reconciler (reconcile_phemex --apply)
+                    # remains the exact-fee backstop for the state FILE; the
+                    # in-memory daily-loss sum wears the underestimate until
+                    # then.
                     sync_fee = 0.0
                     try:
                         recent = self.exchange.client.fetch_my_trades(symbol, limit=10)

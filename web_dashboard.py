@@ -113,6 +113,11 @@ def _gate_stats(log_file: str, max_age_hours: int = 24) -> dict:
         # Must outrank the bare "ADX" pattern below (first-match-wins) —
         # "[THIN-ADX]" lines contain the substring "ADX".
         ("Thin ADX",       "[THIN-ADX]"),
+        # U2 (2026-07-23): cross-book ownership + shared daily cap lines (both
+        # books log the bracketed tags). Before the bare "ADX" pattern so
+        # first-match-wins can't mislabel them.
+        ("Cross-book",     "[CROSS-BOOK]"),
+        ("Daily cap",      "[DAILY CAP]"),
         ("Ensemble <4/7",  "ENSEMBLE SKIP"),
         # "No confluence" MUST outrank "ADX": every idle HOLD line reads
         # "No confluence signal (1h ADX=...)" and first-match-wins was
@@ -750,6 +755,11 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
                  (parity with strategy_slot.is_killed / _build_slots_guardrails)
       PAPER    — everything else
     """
+    # U4 (2026-07-23): account-wide MAX-DD hard halt — blocks entries for ALL
+    # books (main + every slot) until .clear_dd_halt or DD recovery, so it
+    # outranks every per-slot badge (mirrors the .halt_main_entries pattern).
+    if os.path.exists(os.path.join(PROJECT_DIR, ".max_dd_halt")):
+        return "<span class='neg'>&#9679; MAX-DD HALT (entries)</span>"
     if os.path.exists(os.path.join(PROJECT_DIR, f".demote_{slot_id}")):
         return "<span class='neg'>&#9679; DEMOTED</span>"
     # Main-path book: the halt sentinel stops its entries even though the bot

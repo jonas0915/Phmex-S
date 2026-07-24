@@ -155,11 +155,22 @@ class StrategySlot:
         return sum(_trade_net(t) for t in self.live_trades())
 
     def should_auto_demote(self) -> tuple:
-        """(demote: bool, reason: str). Checked after every live close."""
+        """(demote: bool, reason: str). Checked after every live close.
+
+        U6 (2026-07-23): ERA-BASED — only live trades closed at/after the
+        current promoted_at (mode sidecar) count, so each promotion era gets a
+        fresh loss_cap budget. Without this, HTF_L2's lifetime live net of
+        −$6.22 ≤ −$5 would insta-demote any re-promotion on its first close.
+        promoted_at == 0 (legacy/never-promoted) keeps the old all-live-trades
+        behavior."""
         trades = self.live_trades()
+        if self.promoted_at > 0:
+            trades = [t for t in trades
+                      if t.get("closed_at", 0) >= self.promoted_at]
         pnl = sum(_trade_net(t) for t in trades)
         if pnl <= self.loss_cap_usdt:
-            return True, f"live loss cap: ${pnl:.2f} <= ${self.loss_cap_usdt:.2f}"
+            return True, (f"live loss cap: ${pnl:.2f} <= ${self.loss_cap_usdt:.2f} "
+                          f"(this promotion era)")
         if len(trades) >= self.kelly_min_trades:
             wins = [_trade_net(t) for t in trades if _trade_net(t) > 0]
             losses = [abs(_trade_net(t)) for t in trades if _trade_net(t) < 0]

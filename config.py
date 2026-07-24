@@ -90,6 +90,19 @@ class Config:
     # Env overrides; defaults below are the registered config.
     HTF_L2_SL_PCT = float(os.getenv("HTF_L2_SL_PCT")) if os.getenv("HTF_L2_SL_PCT") else 1.0
     HTF_L2_TP_PCT = float(os.getenv("HTF_L2_TP_PCT")) if os.getenv("HTF_L2_TP_PCT") else 2.4
+    # U1 (2026-07-23 owner-approved safety bundle): QUIET-regime HARD-BLOCK on
+    # the HTF_L2 slot — parity with the main path's [REGIME GATE], which has
+    # blocked quiet_regime unconditionally since 2026-06-12 while the slot only
+    # shadow-tagged it. 7/23 loss audit: 3/6 slot losers quiet-tagged, −$3.57 =
+    # 57% of slot loss, 0 quiet winners. HTF_L2 slot ONLY (MR strategies may
+    # legitimately trade quiet). Rollback: env false + restart.
+    HTF_L2_QUIET_BLOCK_ENABLED = os.getenv("HTF_L2_QUIET_BLOCK_ENABLED", "true").lower() == "true"
+    # U2 (2026-07-23 owner-approved safety bundle): cross-book ownership lock +
+    # shared daily symbol cap between the MAIN book and the HTF_L2 slot. 7/22
+    # ETH incident: slot chased a signal main was already day-capped out of
+    # (−$1.48); both books also contend for the same ~$34 margin. Controls BOTH
+    # sub-rules (ownership + shared cap). Rollback: env false + restart.
+    HTF_L2_CROSS_BOOK_LOCK = os.getenv("HTF_L2_CROSS_BOOK_LOCK", "true").lower() == "true"
 
     # VWAP_CROSS slot (2026-07-20): owner-designed strategy, paper forward
     # test — 9/15 SMA cross + dual session-VWAP filter (5m + 15m, same

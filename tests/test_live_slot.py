@@ -246,10 +246,13 @@ def test_live_close_triggers_auto_demote_on_loss_cap(slot, monkeypatch):
     """A live cycle exit that breaches the -$5 live loss cap must demote the slot."""
     import bot as bot_mod
     slot.set_live()
-    # Pre-existing live losses just under the cap
+    # Pre-existing live losses just under the cap — closed within THIS
+    # promotion era (U6 2026-07-23: should_auto_demote only sums trades with
+    # closed_at >= promoted_at; era-less/pre-era records no longer count).
+    import time as _time
     slot.risk.closed_trades = [
-        {"pnl_usdt": -2.5, "mode": "live"},
-        {"pnl_usdt": -2.4, "mode": "live"},
+        {"pnl_usdt": -2.5, "mode": "live", "closed_at": _time.time()},
+        {"pnl_usdt": -2.4, "mode": "live", "closed_at": _time.time()},
     ]
     slot.risk.open_position("DOGE/USDT:USDT", 0.08, 10.0, side="long")
     pos = slot.risk.positions["DOGE/USDT:USDT"]

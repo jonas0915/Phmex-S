@@ -293,6 +293,13 @@ class RiskManager:
         self.peak_balance: float = 0.0
         self.closed_trades: list = []
         self._drawdown_pause_until: float = 0  # timestamp when drawdown pause expires
+        # U4 (2026-07-23): drawdown-pause hysteresis. Peak now PERSISTS across
+        # cooldown expiries (the old "fresh start" reset erased lifetime DD
+        # tracking), so a tier may only re-trip once DD worsens by 2.0pts past
+        # the level that fired the pause, or after DD recovers below the tier
+        # boundary (re-arm). In-memory, like _drawdown_pause_until.
+        self._last_dd_pause_level: float = 0.0  # DD % at the moment a pause fired
+        self._last_dd_pause_tier: float = 0.0   # boundary of the tier that fired (8/20/25/30)
         self.trade_results: list = []  # rolling window of last 6 trade results (persisted for bot regime filter)
         self._load_state()
 
@@ -362,9 +369,19 @@ class RiskManager:
 
     def set_initial_balance(self, balance: float):
         self.initial_balance = balance
-        # Reset stale peak_balance if drawdown > 50% — prevents 1.5hr pause on every restart
+        # Reset stale peak_balance if drawdown > 50% — prevents 1.5hr pause on every restart.
+        # U4 (2026-07-23): this is now the ONLY code path that lowers the peak,
+        # and any peak lowering must be loud (WARNING + Telegram) — silent peak
+        # erasure is how the true 30.5% DD on 7/21 read as 0.0%.
         if self.peak_balance > 0 and balance < self.peak_balance * 0.5:
-            logger.info(f"[DRAWDOWN] Resetting stale peak_balance {self.peak_balance:.2f} → {balance:.2f} (was >50% drawdown)")
+            msg = (f"[DRAWDOWN] Resetting stale peak_balance {self.peak_balance:.2f} "
+                   f"→ {balance:.2f} (was >50% drawdown — stale-restart reset)")
+            logger.warning(msg)
+            try:
+                import notifier
+                notifier.send(f"⚠️ {msg}")
+            except Exception:
+                pass
             self.peak_balance = balance
         if balance > self.peak_balance:
             self.peak_balance = balance
@@ -383,30 +400,53 @@ class RiskManager:
                     logger.info(f"[DRAWDOWN] Entries paused — {remaining // 60}m {remaining % 60}s remaining")
                 return False
             else:
-                # Cooldown expired — reset peak to current balance so drawdown = 0% (fresh start)
-                logger.info(f"[DRAWDOWN] Cooldown expired. Resetting peak from {self.peak_balance:.2f} to {balance:.2f} — resuming trading.")
-                self.peak_balance = balance
+                # U4 (2026-07-23): pause expired — clear it but KEEP the peak.
+                # The old "fresh start" (peak = balance) erased lifetime DD
+                # tracking on every expiry (STATS read 0.0% at a true 27% DD).
+                # Hysteresis below prevents the perma-pause the reset avoided.
+                logger.info(f"[DRAWDOWN] Pause expired — resuming; peak kept at "
+                            f"{self.peak_balance:.2f} (re-trip needs DD ≥ "
+                            f"{self._last_dd_pause_level + 2.0:.1f}% or recovery re-arm)")
                 self._drawdown_pause_until = 0
                 self._save_state()
 
         drawdown = self._drawdown_percent(balance)
 
+        # U4 hysteresis re-arm: DD recovered below the boundary of the tier
+        # that fired -> the tiers are live again at their normal thresholds.
+        if self._last_dd_pause_tier > 0 and drawdown < self._last_dd_pause_tier:
+            logger.info(f"[DRAWDOWN] DD {drawdown:.1f}% back below the "
+                        f"{self._last_dd_pause_tier:.0f}% tier — hysteresis re-armed")
+            self._last_dd_pause_level = 0.0
+            self._last_dd_pause_tier = 0.0
+        # A tier may re-trip only 2.0pts past the level that fired the last pause.
+        _retrip_ok = (self._last_dd_pause_level <= 0.0
+                      or drawdown >= self._last_dd_pause_level + 2.0)
+
         # 8% soft drawdown tier — 15min pause (early warning before hard tiers)
         soft_pause = self._soft_dd_tier_pause_seconds(balance)
-        if soft_pause > 0 and self._drawdown_pause_until < time.time():
+        if soft_pause > 0 and self._drawdown_pause_until < time.time() and _retrip_ok:
             self._drawdown_pause_until = time.time() + soft_pause
+            self._last_dd_pause_level = drawdown
+            self._last_dd_pause_tier = 8.0
             logger.warning(f"[DD] Soft 8% drawdown tier ({drawdown:.1f}%) — pausing {soft_pause}s")
 
-        if drawdown >= 30.0:
+        if drawdown >= 30.0 and _retrip_ok:
             self._drawdown_pause_until = time.time() + 5400  # 1.5 hours
+            self._last_dd_pause_level = drawdown
+            self._last_dd_pause_tier = 30.0
             logger.warning(f"[DRAWDOWN] {drawdown:.1f}% — SEVERE. Halting entries for 1.5 hours.")
             return False
-        elif drawdown >= 25.0:
+        elif drawdown >= 25.0 and _retrip_ok:
             self._drawdown_pause_until = time.time() + 3600  # 1 hour
+            self._last_dd_pause_level = drawdown
+            self._last_dd_pause_tier = 25.0
             logger.warning(f"[DRAWDOWN] {drawdown:.1f}% — HIGH. Halting entries for 1 hour.")
             return False
-        elif drawdown >= 20.0:
+        elif drawdown >= 20.0 and _retrip_ok:
             self._drawdown_pause_until = time.time() + 1800  # 30 min
+            self._last_dd_pause_level = drawdown
+            self._last_dd_pause_tier = 20.0
             logger.warning(f"[DRAWDOWN] {drawdown:.1f}% — ELEVATED. Halting entries for 30 min.")
             return False
 
@@ -690,6 +730,15 @@ class RiskManager:
         if self.is_paper:
             pnl -= fees_usdt
         pnl_pct  = pnl / pos.margin * 100 if pos.margin > 0 else 0.0
+        # TODO(U5c spec, 2026-07-23 — NOT shipped, >1h robust fix): funding is
+        # NEVER captured (funding_usdt == 0.0 on every record ever written), so
+        # ~$0.04/day leaks into unexplained balance drift (7/23 recon). Robust
+        # fix: on live close, fetch the position's funding payments
+        # (fetch_funding_history sinceOpen→now per symbol, or Phemex
+        # /api-data/futures/funding-fees) via _call_with_timeout OUTSIDE the
+        # order path, sum into funding_usdt, and teach reconcile_phemex.py to
+        # backfill it like fees. Until then net_pnl slightly overstates on
+        # positions held across 8h funding marks.
         funding_usdt = 0.0  # placeholder for future funding tracking
         gross_pnl = pos.pnl_usdt(exit_price)
         net_pnl = gross_pnl - fees_usdt - funding_usdt
