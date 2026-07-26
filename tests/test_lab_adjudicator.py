@@ -273,17 +273,35 @@ def test_grade_htf_l2_zero_is_no_verdict():
 
 
 def test_grade_htf_l2_reports_wr_net_and_counter():
-    state = {"closed_trades": [{"net_pnl": 0.5}, {"net_pnl": -0.3},
-                               {"pnl_usdt": 0.2}]}  # gross fallback counts too
+    # Registered 7/26 ("let it spend its budget"): grader scores the LIVE ERA
+    # only (mode=="live", closed_at >= promoted_at; no mode file here → era=0).
+    state = {"closed_trades": [
+        {"net_pnl": 0.5, "mode": "live", "closed_at": 1},
+        {"net_pnl": -0.3, "mode": "live", "closed_at": 2},
+        {"pnl_usdt": 0.2, "mode": "live", "closed_at": 3},  # gross fallback counts too
+        {"net_pnl": -9.9, "mode": "paper", "closed_at": 4},  # paper excluded from era
+    ]}
     counters = {"thin_adx": 4, "ensemble_confidence": 2}
-    r = adj.grade_htf_l2(state, counters, adj.EXPERIMENTS["htf_l2"])
-    assert r["status"] == adj.WATCH          # report-only: kill lines OWNER-SET pending
+    r = adj.grade_htf_l2(state, counters, adj.EXPERIMENTS["htf_l2"], promoted_at=0.0)
+    assert r["status"] == adj.WATCH          # under n=40, rail untripped
     assert r["n_trades"] == 3
     assert abs(r["wr"] - 2 / 3) < 1e-4   # grader rounds to 4 dp
     assert abs(r["net_usd"] - 0.4) < 1e-9
     assert r["thin_adx_blocked"] == 4
-    assert abs(r["breakeven_wr"] - 0.588) < 1e-9
-    assert "OWNER-SET" in r["note"]
+    assert "era accruing (n=3/40" in r["note"]
+
+
+def test_grade_htf_l2_registered_verdicts():
+    cfg = adj.EXPERIMENTS["htf_l2"]
+    # rail: era net <= -$5 → KILL
+    state = {"closed_trades": [{"net_pnl": -5.2, "mode": "live", "closed_at": 1}]}
+    assert adj.grade_htf_l2(state, {}, cfg, promoted_at=0.0)["status"] == "KILL"
+    # n>=40, net > 0 → PASS
+    win40 = {"closed_trades": [{"net_pnl": 0.1, "mode": "live", "closed_at": i} for i in range(40)]}
+    assert adj.grade_htf_l2(win40, {}, cfg, promoted_at=0.0)["status"] == "PASS"
+    # n>=40, net <= 0 → KILL
+    flat40 = {"closed_trades": [{"net_pnl": 0.0, "mode": "live", "closed_at": i} for i in range(40)]}
+    assert adj.grade_htf_l2(flat40, {}, cfg, promoted_at=0.0)["status"] == "KILL"
 
 
 def test_htf_l2_wired_into_digest():

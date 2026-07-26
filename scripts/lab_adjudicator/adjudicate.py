@@ -29,10 +29,11 @@ Experiments graded (registry below is the single source of truth):
                disaster-stop count (2 = revert), replica-tracking error from
                eth_tsm_28_signal.json (>0.1%/day over a full 14d window).
   htf_l2       HTF_L2 slot (2026-07-18, action plan D1; born HTF_L2_PAPER,
-               renamed at the 7/20 go-live): htf_l2 as a slot with the F5
-               thin∧ADX gate ACTIVE. REPORT-ONLY —
-               n, WR vs the 58.8% breakeven, net slot $, thin_adx blocks.
-               Kill lines are OWNER-SET pending (go-gate); never auto-trips.
+               renamed 7/20; re-promoted LIVE 7/23 with era-based -$5 cap).
+               VERDICT LINES REGISTERED 2026-07-26 (owner: "let it spend its
+               budget"): KILL at era net <= -$5 (mirrors the auto-demote
+               rail); verdict at n=40 era trades — PASS if era net > 0 else
+               KILL; WATCH before that. Era = live trades since promoted_at.
   vwap_cross   VWAP_CROSS slot (2026-07-20): owner-designed 9/15 SMA cross +
                dual session-VWAP filter, PAPER forward test. REPORT-ONLY —
                n, WR vs the 32.9% geometry breakeven, net slot $, blocked
@@ -137,15 +138,15 @@ EXPERIMENTS = {
     # HTF_L2 slot (2026-07-18, born HTF_L2_PAPER; renamed at the 7/20
     # go-live): htf_l2_anticipation resurrected as a slot per the 7/17 action
     # plan D1 while the main path stays HALTED.
-    # REPORT-ONLY: kill lines are OWNER-SET pending — the owner sets them at
-    # the go-gate; nothing here auto-trips, and no threshold is invented.
-    # breakeven_wr 58.8% = the fee-inclusive breakeven WR from the 7/16
-    # diagnosis (reference_htf_l2_diagnosis_2026-07-16).
+    # Verdict lines registered 2026-07-26 (owner: "let it spend its budget") —
+    # see grade_htf_l2. breakeven_wr = era-geometry BE: slot exits are
+    # SL 1.0% price / TP ~2.0% effective (2:1 cap), fees 0.12% RT ->
+    # win 1.88 / loss 1.12 of notional -> BE = 1.12/3.00 = 0.373. The old
+    # 58.8% main-path figure applied to the partial/trail exit mix, not this.
     "htf_l2": {
-        "deployed_ts": _pt_ts(2026, 7, 18, 0, 0),  # window anchor only — the
-        # state file is born at the first post-registration restart, so every
-        # trade in it belongs to the probe (no ts filtering needed)
-        "breakeven_wr": 0.588,
+        "deployed_ts": _pt_ts(2026, 7, 18, 0, 0),  # window anchor only; the
+        # grader era-filters by promoted_at from the mode sidecar
+        "breakeven_wr": 0.373,
     },
     # VWAP_CROSS slot (2026-07-20): owner-designed strategy, PAPER forward
     # test. REPORT-ONLY — kill lines are OWNER-SET pending; nothing here
@@ -490,26 +491,50 @@ def grade_eth_tsm(slot_state: dict, signal_state: dict, cfg: dict) -> dict:
             "last_day": (days[-1] if days else None)}
 
 
-def grade_htf_l2(slot_state: dict, counters: dict, cfg: dict) -> dict:
-    """HTF_L2 slot grader — REPORT-ONLY (follows grade_eth_tsm's shape).
-    Reports n accrued, WR vs the 58.8% fee-inclusive breakeven, net slot $,
-    and the thin_adx blocked-counter accrual (the F5 gate firing in the slot).
-    Kill lines are OWNER-SET pending: no REVERT/PASS is ever emitted here —
-    inventing a threshold the owner never set is exactly the failure mode the
-    registry comment forbids."""
+def grade_htf_l2(slot_state: dict, counters: dict, cfg: dict, promoted_at: float = None) -> dict:
+    """HTF_L2 slot grader — verdict lines REGISTERED 2026-07-26 (owner: "let it
+    spend its budget", after the 7/23 re-promotion with era-based -$5 loss cap).
+    Era = live trades with closed_at >= promoted_at (mode sidecar). Registered
+    lines, graded on the CURRENT era only:
+      - KILL if era net <= -$5.00 (mirrors the slot's auto-demote rail — by the
+        time this prints, the bot has already self-demoted; the line makes the
+        verdict explicit in the digest)
+      - Verdict no earlier than n=40 era trades: PASS if era net > $0, else KILL
+      - Before n=40 with the rail untripped: WATCH (report-only)
+    The slot uses geometry-based exits (SL -10%/TP ~+20% ROI, no partial/trail),
+    so the old main-path 58.8% breakeven does not apply; era BE-WR ~33%
+    (win ~2x loss) — reported for context, not used as a line."""
     trades = slot_state.get("closed_trades", []) or []
-    nets = [n for t in trades for n in [_net(t)] if n is not None]
+    if promoted_at is None:
+        promoted_at = 0.0
+        try:
+            _mode = json.load(open(BOT_DIR / "trading_state_HTF_L2_mode.json"))
+            promoted_at = float(_mode.get("promoted_at") or 0.0)
+        except Exception:
+            pass
+    era = [t for t in trades
+           if t.get("mode") == "live" and float(t.get("closed_at") or 0) >= promoted_at]
+    nets = [n for t in era for n in [_net(t)] if n is not None]
     wins = sum(1 for n in nets if n > 0)
     wr = (wins / len(nets)) if nets else None
     net = sum(nets) if nets else 0.0
     thin_blocked = int((counters or {}).get("thin_adx", 0) or 0)
     conf_blocked = int((counters or {}).get("ensemble_confidence", 0) or 0)
 
-    if not trades and not thin_blocked and not conf_blocked:
-        status, note = WATCH, "n=0 — no verdict"
+    if net <= -5.0:
+        status, note = "KILL", (f"era net ${net:+.2f} <= -$5.00 rail — slot self-demotes; "
+                                "registered 7/26, owner-approved")
+    elif len(era) >= 40:
+        if net > 0:
+            status, note = "PASS", f"n={len(era)} era trades, net ${net:+.2f} > 0 — registered verdict"
+        else:
+            status, note = "KILL", f"n={len(era)} era trades, net ${net:+.2f} <= 0 — registered verdict"
+    elif not era and not thin_blocked and not conf_blocked:
+        status, note = WATCH, "era n=0 — no verdict"
     else:
-        status = WATCH  # report-only: kill lines OWNER-SET pending (go-gate)
-        note = "accruing — kill lines OWNER-SET pending, no auto-trip"
+        status = WATCH
+        note = f"era accruing (n={len(era)}/40, net ${net:+.2f}, budget rail -$5.00)"
+    trades = era  # downstream fields report the era, matching the verdict basis
 
     return {"experiment": "htf_l2", "status": status, "note": note,
             "n_trades": len(trades), "wins": wins,
