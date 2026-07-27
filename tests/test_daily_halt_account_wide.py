@@ -7,7 +7,8 @@ returns — unreachable during any pause/halt.
 
 After: _today_net_all_books sums today's PT-date net across main PLUS every
 slot's mode=="live" records; _maybe_daily_loss_halt is evaluated ABOVE those
-early returns in _run_cycle. Threshold formula (max(3%, $5 floor)) and
+early returns in _run_cycle. Threshold formula (max(3%, $8 floor — raised
+from $5 on 2026-07-27 with the 5m_mean_revert $30 resize)) and
 .daily_loss_override semantics unchanged. The halt writes the .pause_trading
 sentinel, which _slot_entries_blocked already enforces for slot entries.
 """
@@ -76,9 +77,9 @@ def test_today_net_sums_slot_live_records(sandbox):
 
 def test_slot_losses_alone_trip_halt_and_block_slot_entries(sandbox):
     slot = _mk_slot()
-    slot.risk.closed_trades = [_trade(-6.0, mode="live")]
+    slot.risk.closed_trades = [_trade(-9.0, mode="live")]
     b = _bare_bot(slots=[slot])
-    assert b._maybe_daily_loss_halt(100.0) is True  # floor $5 < $6
+    assert b._maybe_daily_loss_halt(100.0) is True  # floor $8 < $9
     assert os.path.exists(".pause_trading")
     with open(".pause_trading") as f:
         f.readline()
@@ -89,9 +90,9 @@ def test_slot_losses_alone_trip_halt_and_block_slot_entries(sandbox):
 
 def test_split_main_slot_losses_sum_past_threshold(sandbox):
     slot = _mk_slot()
-    slot.risk.closed_trades = [_trade(-3.0, mode="live")]
+    slot.risk.closed_trades = [_trade(-6.0, mode="live")]
     b = _bare_bot(slots=[slot], main_trades=[_trade(-2.5)])
-    assert b._maybe_daily_loss_halt(100.0) is True  # −5.5 <= −5 floor
+    assert b._maybe_daily_loss_halt(100.0) is True  # −8.5 <= −8 floor
 
 
 def test_paper_losses_ignored(sandbox):
@@ -107,7 +108,7 @@ def test_halt_state_set_even_while_paused(sandbox):
     e.g. another pause path just cleared its file), a breaching loss must
     still set the daily-loss halt state."""
     slot = _mk_slot()
-    slot.risk.closed_trades = [_trade(-6.0, mode="live")]
+    slot.risk.closed_trades = [_trade(-9.0, mode="live")]
     b = _bare_bot(slots=[slot])
     b._trading_paused = True
     assert b._maybe_daily_loss_halt(100.0) is True
@@ -118,7 +119,7 @@ def test_existing_sentinel_not_clobbered(sandbox):
     with open(".pause_trading", "w") as f:
         f.write(f"{int(time.time())}\nmanual pause via Telegram\n")
     slot = _mk_slot()
-    slot.risk.closed_trades = [_trade(-6.0, mode="live")]
+    slot.risk.closed_trades = [_trade(-9.0, mode="live")]
     b = _bare_bot(slots=[slot])
     assert b._maybe_daily_loss_halt(100.0) is True  # entries stay halted
     with open(".pause_trading") as f:
@@ -131,7 +132,7 @@ def test_override_still_works(sandbox):
     with open(".daily_loss_override", "w") as f:
         f.write(today + "\n")
     slot = _mk_slot()
-    slot.risk.closed_trades = [_trade(-6.0, mode="live")]
+    slot.risk.closed_trades = [_trade(-9.0, mode="live")]
     b = _bare_bot(slots=[slot])
     assert b._maybe_daily_loss_halt(100.0) is False
     assert not os.path.exists(".pause_trading")

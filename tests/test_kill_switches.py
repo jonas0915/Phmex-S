@@ -37,39 +37,41 @@ def test_halt_not_fee_blind_on_failed_fee_extraction(tmp_path):
     today_net = _compute_today_net_pnl(rm.closed_trades)
     gross_sum = -1.854 - 0.9945 - 2.010
     assert today_net < gross_sum  # estimates actually subtracted
-    # The real-money assertion: at a $56 balance ($5 floor) the halt must fire.
-    assert _should_halt_daily_loss(today_net, balance=56.18) is True
+    # The real-money assertion: at a $56 balance the halt must fire. Floor
+    # pinned to the era's $5 — this test is about fee estimation being
+    # included in today_net, not about the floor value (raised to $8 7/27).
+    assert _should_halt_daily_loss(today_net, balance=56.18, floor_usdt=5.0) is True
 
 
 def test_daily_loss_halt_triggers_at_3_percent_above_floor():
     from bot import _should_halt_daily_loss
-    # Large balance: 3% ($6) exceeds the $5 floor, so percent governs
-    balance = 200.0
-    assert _should_halt_daily_loss(today_net=-5.5, balance=balance) is False
-    assert _should_halt_daily_loss(today_net=-6.0, balance=balance) is True
+    # Large balance: 3% ($9) exceeds the $8 floor, so percent governs
+    balance = 300.0
+    assert _should_halt_daily_loss(today_net=-8.5, balance=balance) is False
     assert _should_halt_daily_loss(today_net=-9.0, balance=balance) is True
+    assert _should_halt_daily_loss(today_net=-12.0, balance=balance) is True
 
 
-def test_daily_loss_halt_floor_5_dollars_at_small_balance():
-    # 2026-07-07 Jonas directive: halt = max(3% x balance, $5.00).
-    # At $59.73 balance, 3% = $1.79 — one full $15-margin SL (~-$2.05)
-    # was ending the whole trading day. Floor lets ~2 stops through;
-    # halt only on a genuinely bad day.
+def test_daily_loss_halt_floor_8_dollars_at_small_balance():
+    # Floor semantics (2026-07-07 Jonas directive, re-based 2026-07-27):
+    # ~2 full stops of the LARGEST book tolerated, halt on the 3rd.
+    # At $30 5m_mean_revert margin a worst stop is ~-$3.86, so the floor
+    # moved $5 -> $8 (2 x $3.86 = $7.72 < $8).
     from bot import _should_halt_daily_loss
-    balance = 59.73  # 3% = $1.79, floor $5 governs
-    assert _should_halt_daily_loss(today_net=-2.05, balance=balance) is False  # 1 full SL
-    assert _should_halt_daily_loss(today_net=-4.10, balance=balance) is False  # 2 full SLs
-    assert _should_halt_daily_loss(today_net=-4.99, balance=balance) is False
-    assert _should_halt_daily_loss(today_net=-5.00, balance=balance) is True
-    assert _should_halt_daily_loss(today_net=-6.15, balance=balance) is True   # 3 full SLs
+    balance = 92.36  # 3% = $2.77, floor $8 governs
+    assert _should_halt_daily_loss(today_net=-3.86, balance=balance) is False  # 1 worst stop
+    assert _should_halt_daily_loss(today_net=-7.72, balance=balance) is False  # 2 worst stops
+    assert _should_halt_daily_loss(today_net=-7.99, balance=balance) is False
+    assert _should_halt_daily_loss(today_net=-8.00, balance=balance) is True
+    assert _should_halt_daily_loss(today_net=-11.58, balance=balance) is True  # 3 worst stops
 
 
 def test_daily_loss_halt_crossover_balance():
-    # Floor governs below $166.67 balance (where 3% == $5), percent above
+    # Floor governs below $266.67 balance (where 3% == $8), percent above
     from bot import _should_halt_daily_loss
-    assert _should_halt_daily_loss(today_net=-5.0, balance=166.0) is True    # floor edge
-    assert _should_halt_daily_loss(today_net=-5.0, balance=167.0) is False   # 3% = $5.01
-    assert _should_halt_daily_loss(today_net=-5.01, balance=167.0) is True
+    assert _should_halt_daily_loss(today_net=-8.0, balance=266.0) is True    # floor edge
+    assert _should_halt_daily_loss(today_net=-8.0, balance=267.0) is False   # 3% = $8.01
+    assert _should_halt_daily_loss(today_net=-8.01, balance=267.0) is True
 
 
 def test_daily_loss_halt_zero_balance_never_halts():

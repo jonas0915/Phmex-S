@@ -125,13 +125,17 @@ def _compute_today_net_pnl(closed_trades: list) -> float:
 
 
 def _should_halt_daily_loss(today_net: float, balance: float, threshold_pct: float = 3.0,
-                            floor_usdt: float = 5.0) -> bool:
+                            floor_usdt: float = 8.0) -> bool:
     """Daily-loss kill switch: halt when today's net <= -max(threshold_pct% of
-    balance, floor_usdt). The $5 floor (Jonas directive 2026-07-07) exists
-    because at $15 margin one full SL (~-$2.05) exceeded 3% of a ~$60 balance
-    (-$1.79) — a single normal stop was ending the whole trading day (r2
-    research 2026-07-06 projected ~32% of days would trip). Floor lets ~2 full
-    stops through; the percent branch takes over above ~$167 balance."""
+    balance, floor_usdt). Floor semantics (Jonas directive 2026-07-07): ~2 full
+    stops of the LARGEST book tolerated, halt on the 3rd — a single normal stop
+    must never end the whole trading day (r2 research 2026-07-06 projected ~32%
+    of days would trip at 3% alone). Raised $5 -> $8 on 2026-07-27 (owner
+    order) after the +$57.58 deposit (bal $92.36) and 5m_mean_revert $18 -> $30
+    resize: worst observed stop -$1.93 @ $15 scales to ~-$3.86 @ $30, so $5
+    had silently become halt-on-the-2nd-stop. $8 restores 2-stops-tolerated
+    (2 x $3.86 = $7.72 < $8) and is 8.7% of balance vs $5 = 14% of the old $35.
+    The percent branch takes over above ~$267 balance."""
     if balance <= 0:
         return False
     threshold = max(balance * threshold_pct / 100.0, floor_usdt)
@@ -187,7 +191,7 @@ def _daily_loss_override_active(path: str = ".daily_loss_override") -> bool:
     Lets an operator authorize trading for the rest of a single day after the
     daily-loss kill switch has fired. Self-expires at PT midnight (the date in
     the file no longer matches), so every future day keeps the full daily-loss
-    protection (max of -3% / -$5 floor) automatically. Reversible at any time
+    protection (max of -3% / -$8 floor) automatically. Reversible at any time
     by deleting the file.
     """
     if not os.path.exists(path):
@@ -541,11 +545,13 @@ class Phmex2Bot:
                 timeframe="5m",
                 max_positions=1,      # conservative — mean reversion is riskier
                 capital_pct=0.3,      # 30% allocation (less than momentum/scalp)
-                trade_amount_usdt=18.0,  # 2026-07-27 owner scale-up ($15 -> $18):
-                                         # size-gating the proven book per the 7/15
-                                         # scale research; $18 = 2-stops-tolerated cap
-                                         # under the account-wide $5 daily halt at
-                                         # ~$35 balance (2 x ~$2.50 full stops).
+                trade_amount_usdt=30.0,  # 2026-07-27 owner scale-up #2 ($18 -> $30,
+                                         # same day as $15 -> $18) after +$57.58
+                                         # deposit (bal $92.36). Halt math at $30:
+                                         # worst observed stop -$1.93 @ $15 scales to
+                                         # ~-$3.86, so the account-wide $5 daily halt
+                                         # tolerates ONE clean stop and fires on the
+                                         # second (was 2-stops-tolerated at $18).
                                          # Sidecar doesn't override this field.
                 paper_mode=True,      # Paper mode first (promoted live via mode sidecar)
                 requote_attempts=1,   # 2026-07-02: one maker re-quote on PostOnly miss
@@ -1126,7 +1132,7 @@ class Phmex2Bot:
         .halt_main_entries early returns in _run_cycle — the old call site sat
         below them, so the halt was unreachable during any pause/halt and read
         the MAIN book only (live-slot losses invisible: 100% of the 7/20-7/23
-        bleed). Threshold formula (max(3%, $5 floor)) and .daily_loss_override
+        bleed). Threshold formula (max(3%, $8 floor)) and .daily_loss_override
         semantics unchanged. The halt action is the existing daily-halt
         pathway: write the .pause_trading sentinel (reason prefixed
         "DAILY LOSS HALT" so the override recognizes it), which
@@ -1136,11 +1142,11 @@ class Phmex2Bot:
         today_net = self._today_net_all_books()
         if not _should_halt_daily_loss(today_net, real_balance):
             return False
-        _halt_thr = max(real_balance * 0.03, 5.0)  # mirror _should_halt_daily_loss
+        _halt_thr = max(real_balance * 0.03, 8.0)  # mirror _should_halt_daily_loss
         if _daily_loss_override_active():
             if not getattr(self, "_daily_loss_override_logged", False):
                 msg = (f"DAILY LOSS OVERRIDE active — today net ${today_net:.2f} "
-                       f"(all books) past -${_halt_thr:.2f} (max of 3% / $5 floor) "
+                       f"(all books) past -${_halt_thr:.2f} (max of 3% / $8 floor) "
                        f"of ${real_balance:.2f}, but operator override for today "
                        f"is set; entries allowed. Auto-expires at midnight PT.")
                 logger.warning(f"[KILL SWITCH] {msg}")
@@ -1152,7 +1158,7 @@ class Phmex2Bot:
             return False
         if not os.path.exists(".pause_trading"):
             reason = (f"DAILY LOSS HALT: today net ${today_net:.2f} (all books) "
-                      f"exceeds -${_halt_thr:.2f} (max of 3% / $5 floor) of "
+                      f"exceeds -${_halt_thr:.2f} (max of 3% / $8 floor) of "
                       f"${real_balance:.2f}")
             self._set_pause_sentinel(reason)
             logger.warning(f"[KILL SWITCH] {reason}")
