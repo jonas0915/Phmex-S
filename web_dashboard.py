@@ -709,11 +709,19 @@ def _st2_fill_stats() -> dict:
 # A .demote_<slot_id> flag file always overrides to DEMOTED (rollback latch).
 # (slot_id, title, one-line description of what the strategy does)
 _SIGNAL_BOXES = [
-    ("5m_scalp",       "HTF_L2 MAIN PATH &mdash; HALTED (LEGACY)",
-     "The original main-path htf_l2 book, HALTED since 2026-07-13 &mdash; old "
-     "exit geometry, kept for its trade history. The strategy now trades live "
-     "through the HTF_L2 slot below with new geometry and gates. Stats here "
-     "are the legacy main-path trades only."),
+    ("5m_scalp",       "HTF_L2 MAIN PATH &mdash; LIVE (GATED, $5)",
+     "The original main-path htf_l2 book. Halted 2026-07-13&ndash;07-21, "
+     "UN-HALTED 2026-07-21 (owner order) with the thin-tape &and; ADX&ge;35 "
+     "and drift gates active; resized $15&rarr;$5 on 2026-07-27 (evidence-"
+     "weighted fleet &mdash; minimum viable forward test of the gated era). "
+     "Stats here are main-path htf_l2 trades only; era window starts June, "
+     "NOT at the un-halt."),
+    ("main_gated",     "MAIN PATH &mdash; GATED ERA (7/21+)",
+     "Subset of the MAIN PATH card: only trades opened since the 2026-07-21 "
+     "9:25 PM PT un-halt &mdash; thin-tape &and; ADX&ge;35 + drift gates "
+     "active the whole window, $5 sizing since 2026-07-27. This is the live "
+     "forward test that decides the main book's fate; the MAIN PATH card's "
+     "era (Jun+) window includes pre-gate July losses and is NOT this test."),
     ("5m_mean_revert", "5M_MEAN_REVERT &mdash; LIVE FORWARD TEST",
      "Bollinger-Band mean-reversion scalp &mdash; fades lower-BB bounces / upper-BB "
      "rejections in ranging (low-ADX) markets. LIVE since 2026-06-12; running the "
@@ -722,24 +730,25 @@ _SIGNAL_BOXES = [
      "Shorts a bid-heavy book being aggressively bought into (imbalance &ge; 0.35 &amp; "
      "buy-ratio 0.60&ndash;0.85), cvd/spread filtered. DEMOTED TO PAPER 2026-06-29 "
      "(35 live trades, no edge &mdash; execution adverse selection); paper sims only."),
-    ("HTF_L2",         "HTF_L2 &mdash; LIVE SLOT",
-     "htf_l2_anticipation resurrected as a slot (2026-07-18, action plan D1, "
-     "born paper; LIVE since 2026-07-20 owner go) while the main path stays "
-     "HALTED. Same signal, plus an ACTIVE thin-tape &and; 1h-ADX&ge;35 gate "
-     "(F5 forward test) and a conf&ge;4 ensemble hard block. Kill lines "
-     "adjudicator-graded (owner-set pending)."),
+    ("HTF_L2",         "HTF_L2 &mdash; SLOT (PAPER)",
+     "htf_l2_anticipation as a slot (2026-07-18, action plan D1). LIVE "
+     "2026-07-20&ndash;07-27 with quiet-regime block + cross-book lock + "
+     "era loss cap; DEMOTED TO PAPER 2026-07-27 by owner order (era "
+     "&minus;$3.48/6t, coin-flip diagnosis &mdash; W/L indistinguishable at "
+     "entry). Accrues paper trades toward F7 snapshot mining at n&ge;30-40."),
     ("VWAP_CROSS",     "VWAP_CROSS &mdash; PAPER (OWNER STRATEGY)",
      "Owner-designed 9/15 SMA cross + dual VWAP filter: LONG when SMA9 crossed "
      "above SMA15 within the last 3 bars and price is above BOTH the 5m session "
      "VWAP and the 15m VWAP (same midnight-UTC anchor); SHORT mirrored. PAPER "
-     "forward test since 2026-07-20; kill lines owner-set pending "
-     "(adjudicator-graded, report-only)."),
+     "forward test 2026-07-20&ndash;07-27; AUTO-KILLED at 50 trades by the "
+     "negative-Kelly switch (38% WR, &minus;$6.81 net) &mdash; forward test "
+     "answered."),
     ("ETH_TSM_28",     "ETH-TSM-28 &mdash; SLOW TREND (PAPER)",
      "Daily-horizon time-series momentum: long 0.01 ETH when the 28-day return is "
      "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "
      "&minus;8% exchange disaster stop only (no trail/TP/Kelly). Built 2026-07-06, "
-     "ships PAPER; promote = .promote_ETH_TSM_28. Kill criteria graded by the "
-     "nightly adjudicator (&minus;$10 net / 2 disaster stops / replica drift)."),
+     "ran PAPER; RETIRED 2026-07-27 by its pre-registered tracking-drift kill "
+     "line (+$0.51 net &mdash; clean, criteria-driven exit)."),
 ]
 # 5m_liq_cascade and 5m_narrow boxes removed 2026-06-13 — both hard-KILLED
 # in paper (neg Kelly), no longer tracked. State files kept; they still surface
@@ -765,8 +774,12 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
     # Main-path book: the halt sentinel stops its entries even though the bot
     # process (and thus _live_slot_ids) is live — badge must say so (2026-07-21,
     # Jonas mistook the green LIVE for an un-halt).
-    if slot_id == "5m_scalp" and os.path.exists(os.path.join(PROJECT_DIR, ".halt_main_entries")):
+    if slot_id in ("5m_scalp", "main_gated") and os.path.exists(os.path.join(PROJECT_DIR, ".halt_main_entries")):
         return "<span class='amb'>&#9679; HALTED (entries)</span>"
+    # main_gated is a filtered VIEW of the main book (5m_scalp), not a slot —
+    # it inherits the main book's live status.
+    if slot_id == "main_gated" and "5m_scalp" in live_ids:
+        return "<span class='pos'>&#9679; LIVE</span>"
     # Status is driven by the mode sidecar (trading_state_<slot>_mode.json) via
     # _live_slot_ids(): LIVE only while the sidecar has paper_mode=False. ST2.0
     # follows the same rule — it was previously hardcoded LIVE here, which
@@ -977,6 +990,21 @@ def _build_signals_section(slot_states: dict = None) -> str:
                                   if t.get("strategy") == "htf_l2_anticipation"
                                   and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"],
                 "positions": state.get("positions") or {},
+            }
+        elif slot_id == "main_gated":
+            # Gated-era card (owner request 2026-07-27): the main book's clean
+            # forward-test window — htf_l2 trades OPENED after the 7/21
+            # 9:25 PM PT un-halt (gates active for every trade in the window).
+            # Same strategy filter as the 5m_scalp card; positions shared with
+            # main (anything open now was opened post-un-halt by definition).
+            GATED_TS = 1784694300  # 2026-07-21 9:25 PM PT = 07-22 04:25 UTC
+            main_state = slot_states.get("5m_scalp") or {}
+            state = {
+                "closed_trades": [t for t in (main_state.get("closed_trades") or [])
+                                  if t.get("strategy") == "htf_l2_anticipation"
+                                  and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"
+                                  and (t.get("opened_at") or 0) >= GATED_TS],
+                "positions": main_state.get("positions") or {},
             }
         fill_stats = (_st2_fill_stats()
                       if slot_id == "ST2.0" and slot_id in live_ids else None)
@@ -1474,8 +1502,21 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
     rows = collect_blotter_rows(limit, slot_states)
     if not rows:
         return "<div class='dim'>no closed trades yet</div>"
-    out = ("<table><tr class='dim'><th>TIME</th><th>SYM</th><th>SIDE</th>"
-           "<th>MODE</th><th>STRAT</th><th>PNL</th><th>REASON</th></tr>")
+    # Strategy filter chips — built from the strategies actually present in the
+    # rendered rows (not hardcoded). "*" = ALL sentinel (can't collide with a
+    # real strategy name); "" tags rows whose trade record has no strategy.
+    # Filtering is client-side (stratFilter/applyStratFilter in the static
+    # script), so it survives the 3s #content swap and needs no round-trip.
+    strats = sorted({r["strat"] for r in rows})
+    out = ("<div class='strat-chips'>"
+           "<span class='chip active' data-strat='*' onclick='stratFilter(this)'>ALL</span>")
+    for s in strats:
+        label = escape(s[:16]) if s else "(none)"
+        out += (f"<span class='chip' data-strat=\"{escape(s)}\" "
+                f"onclick=\"stratFilter(this)\">{label}</span>")
+    out += "</div>"
+    out += ("<table><tr class='dim'><th>TIME</th><th>SYM</th><th>SIDE</th>"
+            "<th>MODE</th><th>STRAT</th><th>PNL</th><th>REASON</th></tr>")
     for r in rows:
         net_cls = "pos" if r["net"] >= 0 else "neg"
         side = r["side"][:1].upper()
@@ -1493,7 +1534,8 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
         # sym passed via data-sym to avoid JS-string escaping issues with special chars.
         out += (
             f"<tr{sim_cls} onclick=\"drill(this,this.dataset.id,this.dataset.sym)\" "
-            f"data-id=\"{r['id']}\" data-sym=\"{escape(r['sym'])}\" style='cursor:pointer'>"
+            f"data-id=\"{r['id']}\" data-sym=\"{escape(r['sym'])}\" "
+            f"data-strat=\"{escape(r['strat'])}\" style='cursor:pointer'>"
             f"<td>{escape(r['time_pt'])}</td>"
             f"<td>{escape(r['sym'])}{badge}</td>"
             f"<td class='{side_cls}'>{side}</td>"
@@ -1819,6 +1861,11 @@ body {{ background:var(--bg); color:var(--txt);
 .era-btn {{ background:none; border:1px solid var(--border); color:var(--dim);
   font:inherit; font-size:9px; letter-spacing:1px; padding:0 6px; cursor:pointer; }}
 .era-btn.active {{ color:var(--amber); border-color:var(--amber); }}
+.strat-chips {{ margin:0 0 5px; line-height:1.9; }}
+.chip {{ display:inline-block; border:1px solid var(--border); color:var(--dim);
+  font-size:9px; letter-spacing:1px; padding:0 6px; margin:0 3px 0 0;
+  cursor:pointer; text-transform:uppercase; }}
+.chip.active {{ color:var(--amber); border-color:var(--amber); }}
 #equity-chart {{ position:relative; }}
 #eqtip {{ position:absolute; display:none; pointer-events:none; z-index:20;
   background:var(--panel); border:1px solid var(--amber); color:var(--txt);
@@ -1876,6 +1923,8 @@ async function poll(){{
         tr.after(row);
       }}
     }}
+    // re-apply the blotter strategy filter — the swap rebuilt chips/rows fresh
+    applyStratFilter();
     document.getElementById('feed').innerHTML = j.feed;
     // live heartbeat: ticks every successful poll so static trade counts don't
     // read as "frozen". A stale time = the poll loop or server actually stopped.
@@ -1883,6 +1932,33 @@ async function poll(){{
   }}catch(e){{}}
 }}
 setInterval(poll, 3000); poll();
+
+// ── Blotter strategy filter. Chips are rebuilt server-side per poll from the
+// strategies present in the rows; the active choice lives here (this script is
+// outside the #content swap) and poll() re-applies it after every swap.
+// "*" = ALL. If the active strategy rotates out of the rows, fall back to ALL.
+let stratActive = '*';
+function stratFilter(chip){{ stratActive = chip.dataset.strat; applyStratFilter(); }}
+function applyStratFilter(){{
+  const panel = document.getElementById('p-blotter');
+  if(!panel) return;
+  if(stratActive !== '*' &&
+     !panel.querySelector('.chip[data-strat="'+CSS.escape(stratActive)+'"]'))
+    stratActive = '*';
+  panel.querySelectorAll('.chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.strat === stratActive));
+  let prevHidden = false;  // hide an open drill row along with its parent row
+  panel.querySelectorAll('tr').forEach(tr => {{
+    if(tr.dataset.drill !== undefined){{
+      tr.style.display = prevHidden ? 'none' : '';
+      return;
+    }}
+    if(tr.dataset.strat === undefined){{ prevHidden = false; return; }}  // header
+    const hide = stratActive !== '*' && tr.dataset.strat !== stratActive;
+    tr.style.display = hide ? 'none' : '';
+    prevHidden = hide;
+  }});
+}}
 
 // ── Blotter drill-down. #content is replaced wholesale every 3s; poll()
 // saves open drill rows by id and re-inserts them after the swap. ──

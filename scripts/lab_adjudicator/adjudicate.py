@@ -166,6 +166,19 @@ EXPERIMENTS = {
         # trade in it belongs to this test (no ts filtering needed)
         "breakeven_wr": 0.329,
     },
+    # MAIN PATH — GATED ERA (verdict line REGISTERED 2026-07-27, owner order).
+    # The main book's clean forward test: htf_l2_anticipation trades OPENED
+    # after the 2026-07-21 9:25 PM PT un-halt (thin-tape∧ADX≥35 + drift gates
+    # active for the whole window; $5 sizing since 7/27). Same trade filter as
+    # the dashboard's GATED ERA card. Verdict at n=40:
+    #   net <= $0 → KILL (owner halts main entries: touch .halt_main_entries)
+    #   net >  $0 → PASS (the book has earned a sizing discussion)
+    # No per-book $ rail on purpose — the account-wide daily $8 halt and the
+    # 20% DD hard halt guard the downside; this grader is REPORT-ONLY.
+    "main_gated": {
+        "deployed_ts": _pt_ts(2026, 7, 21, 21, 25),  # the un-halt moment
+        "verdict_n": 40,
+    },
 }
 
 TSM_STATE_FILE = BOT_DIR / "trading_state_ETH_TSM_28.json"
@@ -433,6 +446,23 @@ def grade_eth_tsm(slot_state: dict, signal_state: dict, cfg: dict) -> dict:
       disaster_stop / stop_loss — the −8% stop is the only exchange-resting
       order this slot ever places, so exchange_close on it IS the stop."""
     trades = slot_state.get("closed_trades", []) or []
+    # RETIRED (2026-07-27): the bot's kill path closes the position with
+    # exit_reason "killed" — once that record exists, the experiment is over
+    # (tracking-drift line fired; owner-confirmed). Freeze the digest line
+    # instead of re-reporting REVERT-TRIPPED every morning forever.
+    _kill_rec = next((t for t in trades
+                      if (t.get("exit_reason") or t.get("reason")) == "killed"), None)
+    if _kill_rec is not None:
+        _total = sum(n for t in trades for n in [_net(t)] if n is not None)
+        return {"experiment": "eth_tsm_28", "status": "RETIRED",
+                "note": (f"killed 2026-07-27 by the pre-registered tracking-drift "
+                         f"line — clean, criteria-driven exit. Final net "
+                         f"${_total:+.2f}. Final."),
+                "n_live_trades": 0, "live_net_usd": round(_total, 4),
+                "kill_net_usd": cfg["kill_net_usd"], "disaster_stops": 0,
+                "signal_days": len((slot_state or {}).get("days", []) or []),
+                "divergence_days_window": None, "tracking_err_daily": None,
+                "tracking_window_full": False, "last_day": None}
     live = [t for t in trades if t.get("mode") == "live"]
     nets = [n for t in live for n in [_net(t)] if n is not None]
     net = sum(nets) if nets else 0.0
@@ -521,7 +551,20 @@ def grade_htf_l2(slot_state: dict, counters: dict, cfg: dict, promoted_at: float
     thin_blocked = int((counters or {}).get("thin_adx", 0) or 0)
     conf_blocked = int((counters or {}).get("ensemble_confidence", 0) or 0)
 
-    if net <= -5.0:
+    # Owner demote (2026-07-27): sidecar back to paper_mode with era trades on
+    # the books = the experiment ended before its registered lines resolved.
+    # Report it as RETIRED with final stats instead of "era accruing" forever.
+    _demoted_mid_era = False
+    try:
+        _mode_now = json.load(open(BOT_DIR / "trading_state_HTF_L2_mode.json"))
+        _demoted_mid_era = bool(_mode_now.get("paper_mode", True)) and bool(era)
+    except Exception:
+        pass
+    if _demoted_mid_era:
+        status, note = "RETIRED", (f"demoted to paper by owner 2026-07-27 — era ended "
+                                   f"at n={len(era)}, net ${net:+.2f} (pre-empted the "
+                                   "-$5.00 rail; coin-flip diagnosis). Final.")
+    elif net <= -5.0:
         status, note = "KILL", (f"era net ${net:+.2f} <= -$5.00 rail — slot self-demotes; "
                                 "registered 7/26, owner-approved")
     elif len(era) >= 40:
@@ -545,6 +588,44 @@ def grade_htf_l2(slot_state: dict, counters: dict, cfg: dict, promoted_at: float
             "ensemble_blocked": conf_blocked}
 
 
+def grade_main_gated(trades: list, cfg: dict) -> dict:
+    """Main-book gated-era grader — verdict line REGISTERED 2026-07-27 (owner
+    order, after the same-day $5 resize). Era = main closed_trades with
+    strategy=="htf_l2_anticipation", exit_reason != "min_margin_skip", and
+    opened_at >= the 7/21 9:25 PM PT un-halt (identical filter to the
+    dashboard's MAIN PATH — GATED ERA card, so the digest and the dashboard
+    can never disagree). Registered lines:
+      - Verdict no earlier than n=40 era trades: PASS if net > $0
+        (sizing discussion earned), else KILL (halt main entries —
+        owner action: touch .halt_main_entries)
+      - Before n=40: WATCH (report-only). No per-book $ rail by design;
+        account-wide daily/DD halts guard the downside."""
+    era = [t for t in (trades or [])
+           if t.get("strategy") == "htf_l2_anticipation"
+           and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"
+           and float(t.get("opened_at") or 0) >= cfg["deployed_ts"]]
+    nets = [n for t in era for n in [_net(t)] if n is not None]
+    wins = sum(1 for n in nets if n > 0)
+    wr = (wins / len(nets)) if nets else None
+    net = sum(nets) if nets else 0.0
+    n = len(era)
+    if n >= cfg["verdict_n"]:
+        if net > 0:
+            status, note = PASS, (f"n={n} gated-era trades, net ${net:+.2f} > 0 "
+                                  "— registered verdict: sizing discussion earned")
+        else:
+            status, note = "KILL", (f"n={n} gated-era trades, net ${net:+.2f} <= 0 "
+                                    "— registered verdict: halt main entries "
+                                    "(touch .halt_main_entries)")
+    else:
+        status, note = WATCH, (f"gated era accruing "
+                               f"(n={n}/{cfg['verdict_n']}, net ${net:+.2f})")
+    return {"experiment": "main_gated", "status": status, "note": note,
+            "n_trades": n, "wins": wins,
+            "wr": round(wr, 4) if wr is not None else None,
+            "net_usd": round(net, 4)}
+
+
 def grade_vwap_cross(slot_state: dict, counters: dict, cfg: dict) -> dict:
     """VWAP_CROSS slot grader — REPORT-ONLY (follows grade_htf_l2's shape).
     Reports n accrued, WR vs the 32.9% geometry breakeven (derived in the
@@ -559,7 +640,21 @@ def grade_vwap_cross(slot_state: dict, counters: dict, cfg: dict) -> dict:
     net = sum(nets) if nets else 0.0
     blocked_total = sum(int(v or 0) for v in (counters or {}).values())
 
-    if not trades and not blocked_total:
+    # Negative-Kelly kill parity (strategy_slot.is_killed: >=50 trades, all-
+    # trades Kelly < 0). The built-in switch fired 2026-07-27 at exactly n=50
+    # — report the experiment as ended instead of "accruing" forever.
+    _kelly = None
+    _win_vals = [n for n in nets if n > 0]
+    _loss_vals = [abs(n) for n in nets if n < 0]
+    if _win_vals and _loss_vals and nets:
+        _wr = len(_win_vals) / len(nets)
+        _rr = (sum(_win_vals) / len(_win_vals)) / (sum(_loss_vals) / len(_loss_vals))
+        _kelly = _wr - (1 - _wr) / _rr
+    if len(trades) >= 50 and _kelly is not None and _kelly < 0:
+        status, note = "KILLED", (f"auto-killed at n={len(trades)} by the negative-"
+                                  f"Kelly switch (Kelly {_kelly:+.3f}) — forward "
+                                  "test answered 2026-07-27. Final.")
+    elif not trades and not blocked_total:
         status, note = WATCH, "n=0 — no verdict"
     else:
         status = WATCH  # report-only: kill lines OWNER-SET pending
@@ -642,6 +737,12 @@ def _line_vwap_cross(r) -> str:
             f"{wr} | blocked {r['blocked_total']}")
 
 
+def _line_main_gated(r) -> str:
+    wr = f"WR {r['wr']*100:.1f}%" if r["wr"] is not None else "WR n/a"
+    return (f"[main_gated]   {r['status']} — {r['note']} | "
+            f"{r['n_trades']} trades {r['wins']}W ${r['net_usd']:+.2f} | {wr}")
+
+
 def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     now = now or time.time()
     trades = load_closed_trades()
@@ -661,6 +762,7 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
         grade_vwap_cross(load_json(VWAP_CROSS_STATE_FILE, {}),
                          load_json(VWAP_CROSS_COUNTERS_FILE, {}),
                          EXPERIMENTS["vwap_cross"]),
+        grade_main_gated(trades, EXPERIMENTS["main_gated"]),
     ]
     stamp = datetime.fromtimestamp(now, tz=PT).strftime("%b %-d %-I:%M %p PT")
     lines = [f"LAB ADJUDICATOR — live forward tests ({stamp})"]
@@ -670,6 +772,7 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     lines.append(_line_tsm(results[3]))
     lines.append(_line_htf_l2(results[4]))
     lines.append(_line_vwap_cross(results[5]))
+    lines.append(_line_main_gated(results[6]))
     return "\n".join(lines), results
 
 
