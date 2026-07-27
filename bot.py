@@ -541,6 +541,12 @@ class Phmex2Bot:
                 timeframe="5m",
                 max_positions=1,      # conservative — mean reversion is riskier
                 capital_pct=0.3,      # 30% allocation (less than momentum/scalp)
+                trade_amount_usdt=18.0,  # 2026-07-27 owner scale-up ($15 -> $18):
+                                         # size-gating the proven book per the 7/15
+                                         # scale research; $18 = 2-stops-tolerated cap
+                                         # under the account-wide $5 daily halt at
+                                         # ~$35 balance (2 x ~$2.50 full stops).
+                                         # Sidecar doesn't override this field.
                 paper_mode=True,      # Paper mode first (promoted live via mode sidecar)
                 requote_attempts=1,   # 2026-07-02: one maker re-quote on PostOnly miss
                                       # (fill rate was 2/13; misses were net winners —
@@ -711,7 +717,15 @@ class Phmex2Bot:
             max_positions=2,
             capital_pct=0.0,
             paper_mode=True,
-            trade_amount_usdt=None,                # None → Config.TRADE_AMOUNT_USDT
+            trade_amount_usdt=5.0,                 # 2026-07-27 owner resize ($15 -> $5):
+                                                   # shrink per-trade risk (~$0.60/full stop)
+                                                   # while the era spends its remaining
+                                                   # budget — more sample per dollar. At
+                                                   # $50 notional BTC's 0.001 min contract
+                                                   # no longer fits (BTC entries will not
+                                                   # fill); ETH/alts unaffected. Slot
+                                                   # partial-fill floor scales with this
+                                                   # (0.5x = $2.50), not MIN_TRADE_MARGIN.
             loss_cap_usdt=-5.0,                    # hard rail: auto-demote at -$5 net (live precedent)
             kelly_min_trades=10**9,
             durable_trail_enabled=False,
