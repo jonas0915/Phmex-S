@@ -2232,7 +2232,10 @@ class Phmex2Bot:
 
                 # Weekend sizing boost: +85-92% weekend returns (p < 0.001)
                 if datetime.datetime.now(datetime.timezone.utc).weekday() in (5, 6):  # Saturday=5, Sunday=6
-                    margin = min(margin * 1.3, 15.0)  # cap at $15 (TRADE_AMOUNT_USDT — keep weekend size equal to weekday, Jonas 2026-07-05)
+                    # Cap at TRADE_AMOUNT_USDT (keep weekend size equal to weekday,
+                    # Jonas 2026-07-05). Was hardcoded 15.0 — broke when the owner
+                    # resized the main book to $5 on 2026-07-27.
+                    margin = min(margin * 1.3, Config.TRADE_AMOUNT_USDT)
 
                 if margin > available:
                     logger.warning(f"Insufficient balance for {symbol}: need {margin:.2f}, have {available:.2f}")
