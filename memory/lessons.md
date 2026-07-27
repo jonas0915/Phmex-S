@@ -605,3 +605,9 @@ live: the running bot keeps the old in-memory code until a /pre-restart-audit'd 
 - 7/7: told Jonas the bot was "sleep-suspended most of the day" based on pmset dark-wake events. Cycle-gap analysis (Cycle #N timestamps in bot.log) showed only ~2.9-3.6h of actual suspension — the bot ran steadily through midday, INCLUDING the 11 AM dump I'd blamed on sleep. The miss was signal-side, not sleep-side. Wrong windows also contaminated a market-timing agent's ASLEEP/AWAKE labels downstream.
 - **Rule**: pmset log shows what the OS did; only bot.log cycle gaps show what the BOT experienced. Quantify suspension as sum of inter-cycle gaps > ~5 min BEFORE attributing any missed trading to sleep. pmset is corroboration, not the measurement.
 - Related fix same session: lid-open does NOT prevent battery idle sleep (pmset -b sleep was 1 MINUTE; now 15) — see feedback_host_sleep_suspends_bot.
+
+### Phmex-S Bot: Test stubs must use REAL attribute names (2026-07-27)
+- **Incident:** the 7/16 paper-kill fix referenced `self.ws_feed` (real attr: `_ws_feed`). Dormant for 11 days — the path only runs when killing a PAPER slot holding an open position. First real execution (ETH_TSM_28 fidelity kill) → AttributeError every cycle → 15 crashes → ban mode.
+- **Why review+tests missed it:** three test files stubbed `b.ws_feed` — the SAME wrong name — so the tests exercised the typo instead of the code path. A stub that mirrors the code's mistake proves nothing.
+- **Rule:** when stubbing attributes on real classes, copy the attribute name FROM THE CLASS DEFINITION (grep `self\.<name> =` in __init__), never from the code under test. Prefer `getattr(self, "_x", None)` guards on rarely-run paths.
+- **Fix:** bot.py kill path → getattr(_ws_feed); 5 test stubs corrected; suite 591 green; restarted PID 90784 10:03 AM PT; ETH_TSM kill re-run clean.

@@ -331,7 +331,7 @@ def test_kill_sentinel_paper_close_in_book(sandbox, monkeypatch):
         close_short=lambda *a, **k: calls.append("close_short"),
         cancel_open_orders=lambda *a, **k: calls.append("cancel"),
     )
-    b.ws_feed = SimpleNamespace(last_price=lambda s: (101.0, 0.0))
+    b._ws_feed = SimpleNamespace(last_price=lambda s: (101.0, 0.0))
     b.risk = SimpleNamespace(positions={}, _drawdown_pause_until=0.0)
     b._trading_paused = False
     b._pause_logged = False

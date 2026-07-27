@@ -35,7 +35,7 @@ def _bare_bot(slot, ws_last=None):
     b = object.__new__(botmod.Phmex2Bot)
     b.slots = [slot]
     b.exchange = KillFakeExchange()
-    b.ws_feed = SimpleNamespace(last_price=lambda s: ws_last)
+    b._ws_feed = SimpleNamespace(last_price=lambda s: ws_last)
     b.risk = SimpleNamespace(positions={}, _drawdown_pause_until=0.0)
     b._trading_paused = False
     b._pause_logged = False

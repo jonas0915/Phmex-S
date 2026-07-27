@@ -1223,7 +1223,13 @@ class Phmex2Bot:
                         # book instead, at the freshest price available this early in
                         # the cycle (WS cache; entry price as last resort).
                         if slot.paper_mode:
-                            _lp = self.ws_feed.last_price(sym) if self.ws_feed else None
+                            # 2026-07-27: attribute is _ws_feed — the bare
+                            # self.ws_feed raised AttributeError every cycle a
+                            # paper kill was pending (ETH_TSM_28 incident: 15
+                            # crashes → ban mode). getattr keeps the entry-price
+                            # fallback even if the feed object is ever absent.
+                            _ws = getattr(self, "_ws_feed", None)
+                            _lp = _ws.last_price(sym) if _ws else None
                             _px = _lp[0] if _lp else pos.entry_price
                             self._close_slot_position(slot, sym, pos, _px, "killed")
                             logger.info(f"[SENTINEL] Paper position {sym} closed in book for killed slot {slot_id} @ {_px}")
