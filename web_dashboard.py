@@ -709,19 +709,20 @@ def _st2_fill_stats() -> dict:
 # A .demote_<slot_id> flag file always overrides to DEMOTED (rollback latch).
 # (slot_id, title, one-line description of what the strategy does)
 _SIGNAL_BOXES = [
-    ("5m_scalp",       "HTF_L2 MAIN PATH &mdash; LIVE (GATED, $5)",
-     "The original main-path htf_l2 book. Halted 2026-07-13&ndash;07-21, "
-     "UN-HALTED 2026-07-21 (owner order) with the thin-tape &and; ADX&ge;35 "
-     "and drift gates active; resized $15&rarr;$5 on 2026-07-27 (evidence-"
-     "weighted fleet &mdash; minimum viable forward test of the gated era). "
-     "Stats here are main-path htf_l2 trades only; era window starts June, "
-     "NOT at the un-halt."),
-    ("main_gated",     "MAIN PATH &mdash; GATED ERA (7/21+)",
-     "Subset of the MAIN PATH card: only trades opened since the 2026-07-21 "
-     "9:25 PM PT un-halt &mdash; thin-tape &and; ADX&ge;35 + drift gates "
-     "active the whole window, $5 sizing since 2026-07-27. This is the live "
-     "forward test that decides the main book's fate; the MAIN PATH card's "
-     "era (Jun+) window includes pre-gate July losses and is NOT this test."),
+    ("5m_scalp",       "MAIN BOOK &mdash; FULL HISTORY (htf_l2)",
+     "ALL of the main book's htf_l2 trades, including the losing pre-gate "
+     "history &mdash; this card answers \"what has this book done overall?\". "
+     "Halted 2026-07-13&ndash;07-21, un-halted with the thin-tape &and; "
+     "ADX&ge;35 + drift gates. The era (Jun+) split includes pre-gate July "
+     "losses; the clean post-gate record lives in the CURRENT TEST card to "
+     "the right &mdash; same book, judged there."),
+    ("main_gated",     "MAIN BOOK &mdash; CURRENT TEST (since 7/21 gates)",
+     "The SAME book as FULL HISTORY (left), showing ONLY trades since the "
+     "2026-07-21 9:25 PM PT un-halt &mdash; every trade in this window was "
+     "taken with the gates active. This card answers \"is the fixed version "
+     "worth keeping?\": adjudicator verdict at n=40 (net &gt; $0 PASS, "
+     "&le; $0 KILL &rarr; halt entries). Not a separate trader &mdash; its "
+     "trades also appear in FULL HISTORY's counts."),
     ("5m_mean_revert", "5M_MEAN_REVERT &mdash; LIVE FORWARD TEST",
      "Bollinger-Band mean-reversion scalp &mdash; fades lower-BB bounces / upper-BB "
      "rejections in ranging (low-ADX) markets. LIVE since 2026-06-12; running the "
@@ -803,6 +804,38 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
     return "<span class='amb'>&#9679; PAPER</span>"
 
 
+def _slot_pin_size(slot_id: str) -> float | None:
+    """Per-slot trade_amount_usdt pin, parsed from bot.py source (read-only —
+    the pin is a constructor literal with no sidecar/env mirror). Returns None
+    if not found so the size row is omitted rather than wrong."""
+    try:
+        src = open(os.path.join(PROJECT_DIR, "bot.py")).read()
+        i = src.index(f'slot_id="{slot_id}"')
+        m = re.search(r"trade_amount_usdt\s*=\s*([0-9.]+)", src[i:i + 1200])
+        return float(m.group(1)) if m else None
+    except Exception:
+        return None
+
+
+def _size_row_html(slot_id: str, live_ids: set) -> str:
+    """'size/trade' table row for cards whose live sizing is known (owner
+    request 2026-07-28). Main-book cards read .env at request time (same as
+    _trade_size_env — a resize + bot restart shows here without a dashboard
+    restart); LIVE slot cards parse the bot.py pin. Paper/killed slots get no
+    size row (they don't trade real money). Empty string = row omitted."""
+    if slot_id in ("5m_scalp", "main_gated"):
+        sz = _trade_size_env()
+        note = " <span class='dim' style='font-size:8px'>margin/trade &middot; BTC auto-bumps to exch min</span>"
+        return f"<tr><td class='dim'>size</td><td>${sz:.0f}{note}</td></tr>"
+    if slot_id not in live_ids:
+        return ""
+    pin = _slot_pin_size(slot_id)
+    if pin is not None:
+        return (f"<tr><td class='dim'>size</td><td>${pin:.0f}"
+                " <span class='dim' style='font-size:8px'>margin/trade &middot; per-slot pin</span></td></tr>")
+    return ""
+
+
 def _build_signal_card(slot_id: str, title: str, state: dict,
                        live_ids: set, modes: dict,
                        fill_stats: dict = None, desc: str = "") -> str:
@@ -828,6 +861,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
     net_cls = "pos" if net > 0 else "neg" if net < 0 else "dim"
 
     status_html = _slot_status_html(slot_id, trades, live_ids, modes)
+    size_row = _size_row_html(slot_id, live_ids)
 
     # Current open position(s) — side @ entry, else flat.
     if positions:
@@ -893,6 +927,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
         pcls = "pos" if pnet > 0 else "neg" if pnet < 0 else "dim"
         stats_rows = (
             f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
+            f"{size_row}"
             f"<tr><td class='dim'>trades</td><td><span class='amb'>{len(live_ts)} live</span>"
             f"<span class='dim' style='font-size:9px'> &middot; {len(paper_ts)} paper sim &middot; {n} total</span></td></tr>"
             f"<tr><td class='dim'>live (real)</td><td>"
@@ -933,6 +968,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
         ocls = "pos" if onet > 0 else "neg" if onet < 0 else "dim"
         stats_rows = (
             f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
+            f"{size_row}"
             f"<tr><td class='dim'>trades</td><td><span class='amb'>{len(era_ts)} current era</span>"
             f"<span class='dim' style='font-size:9px'> &middot; {len(old_ts)} earlier &middot; {n} total</span></td></tr>"
             f"<tr><td class='dim'>era (Jun+)</td><td>"
@@ -948,6 +984,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
     else:
         stats_rows = (
             f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
+            f"{size_row}"
             f"<tr><td class='dim'>trades</td><td>{n}</td></tr>"
             f"<tr><td class='dim'>record</td><td>"
             f"<span class='pos'>{w_all}W</span> / <span class='neg'>{l_all}L</span> "
