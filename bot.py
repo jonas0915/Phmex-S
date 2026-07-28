@@ -688,6 +688,28 @@ class Phmex2Bot:
         _vwap_cross = self._build_vwap_cross_slot()
         if _vwap_cross is not None:
             self.slots.append(_vwap_cross)
+        # SR_BOUNCE (2026-07-28): owner-ordered paper forward test OVERRIDING
+        # the scan's own DO-NOT-BUILD verdict (reports/2026-07-28-sr-bounce-scan.md
+        # holdout net-per-trade <= $0 fee-incl — the pre-registered kill line was
+        # tripped). Owner go-live is documented in
+        # .superpowers/sdd/2026-07-28-sr-bounce-slot/progress.md. strategy_name IS
+        # a STRATEGIES key (strategies.sr_bounce -> sr_bounce.evaluate), so this
+        # slot runs the full generic scalper path under standard slot gates — no
+        # htf_l2-specific gates apply. sl_percent/tp_percent are left at the
+        # StrategySlot default (None): the strategy supplies structural sl_price/
+        # tp_price on every non-HOLD signal, which the entry call sites below
+        # convert to pct-of-entry and use instead (see the sl_price/tp_price shim
+        # in _evaluate_slots). Paper-only; no live promotion path wired yet.
+        self.slots.append(StrategySlot(
+            slot_id="SR_BOUNCE",
+            strategy_name="sr_bounce",             # STRATEGIES key — strategies.py
+            timeframe="5m",
+            max_positions=1,
+            capital_pct=0.0,
+            paper_mode=True,
+            trade_amount_usdt=5.0,
+            entry_patience_s=45.0,
+        ))
         # ETH-TSM-28 runtime state: sidecar mirror + per-cycle entry-in-flight flag
         # (read by _tsm_locks_symbol so the main bot never grabs ETH mid-entry).
         self._tsm_state = tsm_slot.load_state()
@@ -3052,12 +3074,21 @@ class Phmex2Bot:
                         if self._slot_entries_blocked():
                             logger.info(f"[PAPER] {slot.slot_id} {symbol} entry blocked — account halt")
                             continue
+                        _sl_pct, _tp_pct = slot.sl_percent, slot.tp_percent
+                        _sig_sl = getattr(signal, "sl_price", None)
+                        _sig_tp = getattr(signal, "tp_price", None)
+                        if _sig_sl is not None and _sig_tp is not None and price > 0:
+                            # Structural per-trade exits (SR_BOUNCE 2026-07-28): strategy-supplied
+                            # absolute levels convert to pct-of-entry; open_position's None-default
+                            # keeps every other slot on its existing geometry.
+                            _sl_pct = abs(price - _sig_sl) / price * 100.0
+                            _tp_pct = abs(_sig_tp - price) / price * 100.0
                         slot.risk.open_position(
                             symbol, price, margin, side=direction,
                             atr=atr_val, regime="medium",
                             cycle=self.cycle_count,
                             strategy=_entry_strategy_name,
-                            sl_pct=slot.sl_percent, tp_pct=slot.tp_percent
+                            sl_pct=_sl_pct, tp_pct=_tp_pct
                         )
                         notifier.notify_paper_entry(
                             symbol, direction, price, margin,
@@ -3160,11 +3191,20 @@ class Phmex2Bot:
                                     break
                                 continue
                             fill_price = self._extract_fill_price(order, price)
+                            _sl_pct, _tp_pct = slot.sl_percent, slot.tp_percent
+                            _sig_sl = getattr(signal, "sl_price", None)
+                            _sig_tp = getattr(signal, "tp_price", None)
+                            if _sig_sl is not None and _sig_tp is not None and fill_price > 0:
+                                # Structural per-trade exits (SR_BOUNCE 2026-07-28): strategy-supplied
+                                # absolute levels convert to pct-of-entry; open_position's None-default
+                                # keeps every other slot on its existing geometry.
+                                _sl_pct = abs(fill_price - _sig_sl) / fill_price * 100.0
+                                _tp_pct = abs(_sig_tp - fill_price) / fill_price * 100.0
                             slot.risk.open_position(symbol, fill_price, margin, side=direction,
                                                     atr=atr_val, regime="medium",
                                                     cycle=self.cycle_count,
                                                     strategy=_entry_strategy_name,
-                                                    sl_pct=slot.sl_percent, tp_pct=slot.tp_percent)
+                                                    sl_pct=_sl_pct, tp_pct=_tp_pct)
                             live_pos = slot.risk.positions[symbol]
                             fill_amount = self._extract_fill_amount(order, live_pos.amount)
                             actual_margin = (fill_amount * fill_price) / Config.LEVERAGE
