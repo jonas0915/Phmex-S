@@ -509,6 +509,10 @@ class Phmex2Bot:
         self._trade_results: deque = deque(self.risk.trade_results, maxlen=5)  # rolling window of last 5 trade results (True=win, False=loss)
         self._regime_pause_until: float = 0  # timestamp when regime pause expires
         self._htf_cache: dict[str, tuple] = {}  # symbol -> (DataFrame, fetch_timestamp) for 1h candles
+        self._sr_htf_cache: dict[str, tuple] = {}  # symbol -> (hour_bucket, RangeIndex DataFrame) —
+                                                    # SR_BOUNCE's dedicated scan-faithful 1h context,
+                                                    # deliberately separate from _htf_cache/_fetch_htf_data
+                                                    # (see _fetch_sr_bounce_htf docstring, 2026-07-28 review fix)
         self._funding_cache: dict[str, tuple] = {}  # symbol -> (data, fetch_timestamp) for funding rates
         self._divergence_cooldown: dict[str, dict] = {}  # symbol -> {"blocked_at": float, "clean_cycles": int}
         self._ob_depth_cache: dict[str, dict] = {}  # symbol -> depth data, populated by main loop, read by live writer thread
@@ -806,6 +810,41 @@ class Phmex2Bot:
         except Exception as e:
             logger.debug(f"[HTF] Failed to fetch 1h data for {symbol}: {e}")
         return cached[0] if cached else None  # return stale cache over nothing
+
+    def _fetch_sr_bounce_htf(self, symbol: str):
+        """Dedicated 1h context for SR_BOUNCE (2026-07-28 review fix) — deliberately
+        NOT _fetch_htf_data. Two reasons:
+        1. _fetch_htf_data fetches limit=100 then runs add_all_indicators(), whose
+           dropna() eats the leading row(s) needing warmup — 99 rows survive, under
+           sr_bounce.evaluate()'s own `len(htf_df) < 100` floor, so the slot could
+           never see enough history to fire (permanent HOLD).
+        2. sr_bounce's ported count_touches() does `(i - last)` while iterating
+           df.iterrows() — arithmetic that assumes a plain RangeIndex (exactly how
+           the original kill-gate scan built its frames). _fetch_htf_data's frame
+           carries a DatetimeIndex (exchange.get_ohlcv sets timestamp as the index),
+           so that subtraction raises TypeError. Because the generic slot-loop
+           dispatch wraps the whole strategy_fn call in `try: ... except TypeError:
+           strategy_fn(df, ob)` (dropping htf_df entirely), that TypeError was
+           SILENTLY re-dispatched as a call with htf_df=None -> immediate HOLD, no
+           trace of the real failure.
+        This fetches raw OHLCV (no indicator pipeline — sr_bounce computes its own
+        atr/adx) at limit=500 and resets to a RangeIndex, matching the scan engine's
+        frames exactly. Cached per (symbol, UTC hour bucket): one real REST fetch
+        per symbol per hour, not per 60s cycle."""
+        _bucket = int(time.time() // 3600)
+        cached = self._sr_htf_cache.get(symbol)
+        if cached and cached[0] == _bucket:
+            return cached[1]
+        try:
+            df_raw = self.exchange.get_ohlcv(symbol, "1h", limit=500)
+        except Exception as e:
+            logger.debug(f"[SR_BOUNCE] Failed to fetch 1h data for {symbol}: {e}")
+            df_raw = None
+        if df_raw is not None and len(df_raw) >= 100:
+            df_raw = df_raw.reset_index(drop=True)  # RangeIndex — scan-engine-faithful
+            self._sr_htf_cache[symbol] = (_bucket, df_raw)
+            return df_raw
+        return cached[1] if cached else None  # stale cache over nothing (same convention as _fetch_htf_data)
 
     def _fetch_funding_rate(self, symbol: str) -> dict | None:
         """Fetch funding rate with 4-hour cache. Returns stale cache on REST failure."""
@@ -2802,10 +2841,26 @@ class Phmex2Bot:
                         # htf_l2 needs tape (flow) — the generic call path doesn't
                         # pass it (same gap ST2.0 hit above).
                         candidate_signals.append(strategy_fn(df, ob, htf_df=htf_df, flow=_flow_for_strat))
+                    elif slot.strategy_name == "sr_bounce":
+                        # SR_BOUNCE needs a scan-faithful RangeIndex 1h frame, not the
+                        # indicator-enriched/DatetimeIndex frame _fetch_htf_data returns
+                        # (see _fetch_sr_bounce_htf docstring, 2026-07-28 review fix).
+                        _sr_htf = self._fetch_sr_bounce_htf(symbol)
+                        candidate_signals.append(strategy_fn(df, ob, htf_df=_sr_htf))
                     else:
                         try:
                             _s = strategy_fn(df, ob, htf_df=htf_df)
                         except TypeError:
+                            # 2026-07-28 review fix: this used to silently re-dispatch as
+                            # strategy_fn(df, ob) (htf_df dropped) on ANY TypeError raised
+                            # from inside strategy_fn's body, not just a signature mismatch
+                            # — a real bug inside a strategy would masquerade as "doesn't
+                            # take htf_df" and vanish into an unconditional HOLD. Warn so
+                            # that never happens silently again; fallback behavior unchanged.
+                            logger.warning(f"[PAPER] {slot.slot_id} {symbol} {slot.strategy_name} "
+                                           f"raised TypeError on strategy_fn(df, ob, htf_df=...) — "
+                                           f"falling back to strategy_fn(df, ob); if this isn't a "
+                                           f"genuine signature mismatch, htf_df is being silently dropped")
                             _s = strategy_fn(df, ob)
                         candidate_signals.append(_s)
                 except Exception as e:
@@ -3077,15 +3132,32 @@ class Phmex2Bot:
                         _sl_pct, _tp_pct = slot.sl_percent, slot.tp_percent
                         _sig_sl = getattr(signal, "sl_price", None)
                         _sig_tp = getattr(signal, "tp_price", None)
+                        _entry_atr = atr_val
                         if _sig_sl is not None and _sig_tp is not None and price > 0:
                             # Structural per-trade exits (SR_BOUNCE 2026-07-28): strategy-supplied
                             # absolute levels convert to pct-of-entry; open_position's None-default
                             # keeps every other slot on its existing geometry.
                             _sl_pct = abs(price - _sig_sl) / price * 100.0
                             _tp_pct = abs(_sig_tp - price) / price * 100.0
+                            # Stale levels (2026-07-28 review fix): price can drift past the
+                            # structural levels between the signal candle's close and this
+                            # entry decision. Skip rather than open on an inverted/near-zero
+                            # geometry — junk trades were slipping through unguarded.
+                            _levels_ok = ((direction == "long" and _sig_sl < price < _sig_tp) or
+                                          (direction == "short" and _sig_tp < price < _sig_sl))
+                            if not _levels_ok or _sl_pct < 0.05:
+                                logger.info(f"[SR_BOUNCE] stale levels — skipped ({slot.slot_id} "
+                                            f"{symbol} {direction} price={price:.6g} "
+                                            f"sl={_sig_sl:.6g} tp={_sig_tp:.6g})")
+                                continue
+                            # ATR>0 branch (risk_manager.py:565-599) clamps/widens these
+                            # percentages — caps realized R:R at 2:1 and can widen the stop
+                            # up to 1.5x. Force the exact-percentage branch so the structural
+                            # levels apply verbatim.
+                            _entry_atr = 0.0
                         slot.risk.open_position(
                             symbol, price, margin, side=direction,
-                            atr=atr_val, regime="medium",
+                            atr=_entry_atr, regime="medium",
                             cycle=self.cycle_count,
                             strategy=_entry_strategy_name,
                             sl_pct=_sl_pct, tp_pct=_tp_pct
@@ -3113,6 +3185,21 @@ class Phmex2Bot:
                                 f"slot_skip_{slot.slot_id}",
                                 f"slot {slot.slot_id} ETH entry skipped ({_tsm_lock})")
                             continue
+                        # Stale levels (2026-07-28 review fix): same check as the paper
+                        # site, run BEFORE spending a real order attempt — against the
+                        # same pre-fill `price` used for the entry decision (fill_price
+                        # isn't known yet, and by then a real order would already be live).
+                        _sig_sl = getattr(signal, "sl_price", None)
+                        _sig_tp = getattr(signal, "tp_price", None)
+                        if _sig_sl is not None and _sig_tp is not None and price > 0:
+                            _levels_ok = ((direction == "long" and _sig_sl < price < _sig_tp) or
+                                          (direction == "short" and _sig_tp < price < _sig_sl))
+                            _stale_sl_pct = abs(price - _sig_sl) / price * 100.0
+                            if not _levels_ok or _stale_sl_pct < 0.05:
+                                logger.info(f"[SR_BOUNCE] stale levels — skipped ({slot.slot_id} "
+                                            f"{symbol} {direction} price={price:.6g} "
+                                            f"sl={_sig_sl:.6g} tp={_sig_tp:.6g})")
+                                continue
                         try:
                             # Per-slot entry patience (2026-07-03): first attempt may
                             # rest longer than the 20s default; the re-quote below
@@ -3192,16 +3279,20 @@ class Phmex2Bot:
                                 continue
                             fill_price = self._extract_fill_price(order, price)
                             _sl_pct, _tp_pct = slot.sl_percent, slot.tp_percent
-                            _sig_sl = getattr(signal, "sl_price", None)
-                            _sig_tp = getattr(signal, "tp_price", None)
+                            _entry_atr = atr_val
                             if _sig_sl is not None and _sig_tp is not None and fill_price > 0:
                                 # Structural per-trade exits (SR_BOUNCE 2026-07-28): strategy-supplied
                                 # absolute levels convert to pct-of-entry; open_position's None-default
-                                # keeps every other slot on its existing geometry.
+                                # keeps every other slot on its existing geometry. _sig_sl/_sig_tp
+                                # and the staleness check already ran (pre-order) above.
                                 _sl_pct = abs(fill_price - _sig_sl) / fill_price * 100.0
                                 _tp_pct = abs(_sig_tp - fill_price) / fill_price * 100.0
+                                # ATR>0 branch (risk_manager.py:565-599) clamps/widens these
+                                # percentages — force the exact-percentage branch so the
+                                # structural levels apply verbatim.
+                                _entry_atr = 0.0
                             slot.risk.open_position(symbol, fill_price, margin, side=direction,
-                                                    atr=atr_val, regime="medium",
+                                                    atr=_entry_atr, regime="medium",
                                                     cycle=self.cycle_count,
                                                     strategy=_entry_strategy_name,
                                                     sl_pct=_sl_pct, tp_pct=_tp_pct)
