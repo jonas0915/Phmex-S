@@ -777,9 +777,12 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
     if slot_id in ("5m_scalp", "main_gated") and os.path.exists(os.path.join(PROJECT_DIR, ".halt_main_entries")):
         return "<span class='amb'>&#9679; HALTED (entries)</span>"
     # main_gated is a filtered VIEW of the main book (5m_scalp), not a slot —
-    # it inherits the main book's live status.
+    # it inherits the main book's live status. Badge labeled as a view
+    # (owner 2026-07-28: two plain LIVE badges read as two separate books).
     if slot_id == "main_gated" and "5m_scalp" in live_ids:
-        return "<span class='pos'>&#9679; LIVE</span>"
+        return ("<span class='pos'>&#9679; LIVE</span> "
+                "<span class='dim' style='font-size:8px'>view of MAIN PATH — "
+                "same book, not a separate one</span>")
     # Status is driven by the mode sidecar (trading_state_<slot>_mode.json) via
     # _live_slot_ids(): LIVE only while the sidecar has paper_mode=False. ST2.0
     # follows the same rule — it was previously hardcoded LIVE here, which
