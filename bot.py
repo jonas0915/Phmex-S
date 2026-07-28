@@ -1233,7 +1233,12 @@ class Phmex2Bot:
             _kill_failed = False
             for slot in self.slots:
                 if slot.slot_id == slot_id:
-                    slot.enabled = False
+                    # 2026-07-28: persist the kill (sidecar killed_at). Plain
+                    # enabled=False was memory-only — every restart resurrected
+                    # killed slots; ETH_TSM_28 re-entered paper ETH the day
+                    # after its 7/27 kill because nothing survived the 4:08 PM
+                    # restart. set_killed() also sets enabled=False.
+                    slot.set_killed()
                     for sym in list(slot.risk.positions.keys()):
                         pos = slot.risk.positions[sym]
                         # PAPER slots must never touch the exchange (2026-07-16 review
@@ -4018,6 +4023,14 @@ class Phmex2Bot:
                 else:
                     logger.error(f"[TSM] disaster stop STILL missing for {sym} — retrying next cycle")
 
+        # Kill/disable gate (2026-07-28): protective paths above (leverage
+        # restore, disaster-stop replica, SL heal) always run, but a disabled
+        # slot must never SIGNAL or ENTER. Without this, the evaluator ignored
+        # enabled entirely — the 7/27 ETH_TSM_28 kill closed the position and
+        # the next daily roll simply re-entered it.
+        if not slot.enabled:
+            return
+
         # (2) daily evaluation at the UTC day roll (also first cycle after restart)
         today = tsm_slot.utc_date_str()
         if st.get("last_eval_date") != today:
@@ -4346,6 +4359,12 @@ class Phmex2Bot:
         for symbol in donchian_slot.SYMBOLS:
             slot = self._donchian_slot(donchian_slot.SLOT_IDS[symbol])
             if slot is None:
+                continue
+            # Kill/disable gate (2026-07-28): same latent gap as ETH_TSM_28 —
+            # this evaluator never checked enabled, so a killed Donchian slot
+            # would resurrect at the next daily roll. Dormant today (both
+            # Donchian slots enabled); armed for any future kill.
+            if not slot.enabled:
                 continue
             st = self._donchian_state.setdefault(symbol, donchian_slot.default_coin_state())
             if st.get("last_eval_utc_date") == today:

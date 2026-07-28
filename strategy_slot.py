@@ -31,6 +31,12 @@ class StrategySlot:
     max_positions: int = 2
     capital_pct: float = 0.5  # fraction of total balance allocated to this slot
     enabled: bool = True
+    killed_at: float = None  # persisted kill timestamp (2026-07-28): a .kill_
+                             # sentinel used to set enabled=False in MEMORY only,
+                             # so every restart resurrected killed slots
+                             # (ETH_TSM_28 re-entered paper ETH the day after
+                             # its kill). Set via set_killed(); _load_mode
+                             # re-disables the slot on every boot.
     paper_mode: bool = False  # if True, track signals but don't place real orders
     trade_amount_usdt: float = None  # per-slot margin override; None = Config.TRADE_AMOUNT_USDT
     loss_cap_usdt: float = LIVE_LOSS_CAP_USDT  # per-slot auto-demote loss cap
@@ -108,6 +114,10 @@ class StrategySlot:
                 self.paper_mode = bool(data.get("paper_mode", self.paper_mode))
                 self.capital_pct = float(data.get("capital_pct", self.capital_pct))
                 self.promoted_at = float(data.get("promoted_at", 0.0))
+                _ka = data.get("killed_at")
+                if _ka:
+                    self.killed_at = float(_ka)
+                    self.enabled = False  # kill survives restarts
         except Exception as e:
             logger.warning(f"[SLOT] {self.slot_id} mode sidecar load failed: {e}")
         self._sync_risk_semantics()
@@ -129,7 +139,8 @@ class StrategySlot:
                            "promoted_at": self.promoted_at,
                            "loss_cap_usdt": self.loss_cap_usdt,
                            "trade_amount_usdt": self.trade_amount_usdt,
-                           "kelly_min_trades": self.kelly_min_trades}, f)
+                           "kelly_min_trades": self.kelly_min_trades,
+                           "killed_at": self.killed_at}, f)
             os.replace(tmp, self._mode_sidecar)
         except Exception as e:
             logger.warning(f"[SLOT] {self.slot_id} mode sidecar save failed: {e}")
@@ -146,6 +157,12 @@ class StrategySlot:
         self.paper_mode = True
         self.capital_pct = 0.0
         self._sync_risk_semantics()
+        self._save_mode()
+
+    def set_killed(self) -> None:
+        """Persistent kill (2026-07-28): disable now AND across restarts."""
+        self.enabled = False
+        self.killed_at = time.time()
         self._save_mode()
 
     def live_trades(self) -> list:

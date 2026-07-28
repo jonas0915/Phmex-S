@@ -535,11 +535,14 @@ def grade_htf_l2(slot_state: dict, counters: dict, cfg: dict, promoted_at: float
     so the old main-path 58.8% breakeven does not apply; era BE-WR ~33%
     (win ~2x loss) — reported for context, not used as a line."""
     trades = slot_state.get("closed_trades", []) or []
-    if promoted_at is None:
+    _read_sidecar = promoted_at is None  # production path; tests pass promoted_at
+    _sidecar_paper = False
+    if _read_sidecar:
         promoted_at = 0.0
         try:
             _mode = json.load(open(BOT_DIR / "trading_state_HTF_L2_mode.json"))
             promoted_at = float(_mode.get("promoted_at") or 0.0)
+            _sidecar_paper = bool(_mode.get("paper_mode", True))
         except Exception:
             pass
     era = [t for t in trades
@@ -554,12 +557,9 @@ def grade_htf_l2(slot_state: dict, counters: dict, cfg: dict, promoted_at: float
     # Owner demote (2026-07-27): sidecar back to paper_mode with era trades on
     # the books = the experiment ended before its registered lines resolved.
     # Report it as RETIRED with final stats instead of "era accruing" forever.
-    _demoted_mid_era = False
-    try:
-        _mode_now = json.load(open(BOT_DIR / "trading_state_HTF_L2_mode.json"))
-        _demoted_mid_era = bool(_mode_now.get("paper_mode", True)) and bool(era)
-    except Exception:
-        pass
+    # Only on the production path (_read_sidecar) — tests that pass an explicit
+    # promoted_at get the pure registered-lines grader, untouched by disk state.
+    _demoted_mid_era = _read_sidecar and _sidecar_paper and bool(era)
     if _demoted_mid_era:
         status, note = "RETIRED", (f"demoted to paper by owner 2026-07-27 — era ended "
                                    f"at n={len(era)}, net ${net:+.2f} (pre-empted the "

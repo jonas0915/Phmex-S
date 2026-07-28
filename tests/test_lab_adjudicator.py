@@ -306,8 +306,10 @@ def test_grade_htf_l2_registered_verdicts():
 
 def test_htf_l2_wired_into_digest():
     digest, results = adj.build_digest(now=1_784_000_000.0)
-    assert len(results) == 6                 # positional registry grew by one (vwap_cross)
+    assert len(results) == 7                 # + vwap_cross (7/20) + main_gated (7/27)
     assert results[4]["experiment"] == "htf_l2"
     assert "[htf_l2]" in digest
     assert results[5]["experiment"] == "vwap_cross"
     assert "[vwap_cross]" in digest
+    assert results[6]["experiment"] == "main_gated"
+    assert "[main_gated]" in digest
