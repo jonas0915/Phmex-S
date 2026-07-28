@@ -287,10 +287,14 @@ def test_slot_sl_tp_override(sandbox):
                                sl_pct=2.0, tp_pct=3.0)
     # tiny ATR → SL floored at override 2.0%
     assert pos_atr.stop_loss == pytest.approx(98.0)
-    # slot wiring: both slot entry call sites pass the overrides
+    # slot wiring: both slot entry call sites pass the overrides — routed
+    # through the structural-exit shim added 2026-07-28 (SR_BOUNCE), which
+    # defaults _sl_pct/_tp_pct to slot.sl_percent/slot.tp_percent and only
+    # deviates when the strategy supplies sl_price/tp_price (SR_BOUNCE only;
+    # every other slot's geometry is unchanged).
     src = inspect.getsource(botmod.Phmex2Bot._evaluate_slots)
-    assert src.count("sl_pct=slot.sl_percent") == 2
-    assert src.count("tp_pct=slot.tp_percent") == 2
+    assert src.count("_sl_pct, _tp_pct = slot.sl_percent, slot.tp_percent") == 2
+    assert src.count("sl_pct=_sl_pct, tp_pct=_tp_pct") == 2
     # dataclass defaults keep every other slot on Config geometry
     plain = StrategySlot(slot_id="plain_t", strategy_name="bb_mean_reversion",
                          timeframe="5m", paper_mode=True)

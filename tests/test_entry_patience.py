@@ -10,6 +10,7 @@ Wiring: exchange._try_limit_entry gains patience_s (default 20.0 = exact old
 behavior); open_long/open_short pass it through; StrategySlot.entry_patience_s
 (default None = 20s); only 5m_mean_revert sets 45.0 (not 60 — keeps worst-case
 entry stall [45s + 20s re-quote] × 2 signals under the 180s cycle SIGALRM).
+SR_BOUNCE (2026-07-28) also opts in at 45.0 — same rationale, different slot.
 """
 import inspect
 import os
@@ -57,12 +58,17 @@ def test_slot_field_defaults_none(tmp_path, monkeypatch):
     assert s.entry_patience_s is None
 
 
-def test_only_mean_revert_opts_in_at_45():
+def test_only_mean_revert_and_sr_bounce_opt_in_at_45():
     sets = re.findall(r"entry_patience_s\s*=\s*([\d.]+)", BOT_SRC)
-    assert sets == ["45.0"], f"expected exactly one entry_patience_s=45.0, got {sets}"
+    assert sets == ["45.0", "45.0"], (
+        f"expected exactly two entry_patience_s=45.0 opt-ins "
+        f"(5m_mean_revert, SR_BOUNCE), got {sets}")
     inst = re.search(r'slot_id="5m_mean_revert".{0,2500}?entry_patience_s=45\.0',
                      BOT_SRC, re.DOTALL)
     assert inst, "entry_patience_s=45.0 not on the 5m_mean_revert instantiation"
+    inst2 = re.search(r'slot_id="SR_BOUNCE".{0,2500}?entry_patience_s=45\.0',
+                      BOT_SRC, re.DOTALL)
+    assert inst2, "entry_patience_s=45.0 not on the SR_BOUNCE instantiation"
 
 
 def test_slot_live_entry_passes_patience():
