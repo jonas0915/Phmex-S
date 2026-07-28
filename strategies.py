@@ -5,6 +5,7 @@ import os
 import pandas as pd
 
 from indicators import vwap as _session_vwap  # house session-anchored VWAP (midnight-UTC reset)
+import sr_bounce as _sr_bounce_mod
 
 _log = logging.getLogger("DegenCryt")
 
@@ -20,6 +21,8 @@ class TradeSignal:
     signal: Signal
     reason: str
     strength: float  # 0.0 to 1.0
+    sl_price: float = None
+    tp_price: float = None
 
 
 def bb_mean_reversion_strategy(df: pd.DataFrame, orderbook: dict = None) -> TradeSignal:
@@ -1029,6 +1032,17 @@ def vwap_sma_cross(
     return TradeSignal(direction, reason, 0.82)
 
 
+def sr_bounce(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.DataFrame = None) -> TradeSignal:
+    """Wrapper around sr_bounce.evaluate() for the SR_BOUNCE paper slot
+    (owner-ordered forward test; scan verdict was DO-NOT-BUILD). Converts the
+    module's plain-dict return into a TradeSignal."""
+    result = _sr_bounce_mod.evaluate(df, orderbook, htf_df)
+    signal_map = {"buy": Signal.BUY, "sell": Signal.SELL}
+    signal = signal_map.get(result["signal"], Signal.HOLD)
+    return TradeSignal(signal, result["reason"], result["strength"],
+                        sl_price=result.get("sl_price"), tp_price=result.get("tp_price"))
+
+
 STRATEGIES = {
     "bb_mean_reversion":        bb_mean_reversion_strategy,
     "momentum_continuation":    momentum_continuation_strategy,
@@ -1038,4 +1052,5 @@ STRATEGIES = {
     "htf_l2_anticipation":      htf_l2_anticipation,
     "ST2.0":                    st2_absorption,
     "vwap_sma_cross":           vwap_sma_cross,
+    "sr_bounce":                sr_bounce,
 }

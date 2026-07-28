@@ -65,3 +65,21 @@ def test_evaluate_holds_on_trending_adx(monkeypatch):
 def test_evaluate_holds_without_htf():
     fivem = _5m([(1, 1, 1, 1)] * 3)
     assert sb.evaluate(fivem, None, None)["signal"] == "hold"
+
+
+def test_tradesignal_backward_compatible():
+    from strategies import TradeSignal, Signal
+    s = TradeSignal(Signal.HOLD, "x", 0.0)          # old positional form
+    assert s.sl_price is None and s.tp_price is None
+
+
+def test_strategies_registers_sr_bounce():
+    from strategies import STRATEGIES, Signal
+    fn = STRATEGIES["sr_bounce"]
+    df1h = _flat_1h()
+    fivem = _5m([(100.6, 100.7, 100.5, 100.6),
+                 (100.5, 100.6, 98.3, 98.6),
+                 (98.6, 98.7, 98.5, 98.65)])
+    sig = fn(fivem, None, htf_df=df1h)
+    assert sig.signal == Signal.BUY
+    assert sig.sl_price is not None and sig.tp_price is not None
