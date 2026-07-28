@@ -744,6 +744,13 @@ _SIGNAL_BOXES = [
      "forward test 2026-07-20&ndash;07-27; AUTO-KILLED at 50 trades by the "
      "negative-Kelly switch (38% WR, &minus;$6.81 net) &mdash; forward test "
      "answered."),
+    ("SR_BOUNCE",      "SR_BOUNCE &mdash; KILLED PRE-BUILD (SCAN)",
+     "Owner-designed horizontal support/resistance bounce: 1h swing-pivot "
+     "zones (k=3, 0.25&times;ATR cluster, &ge;2 touches), confirmed-rejection "
+     "5m entry, structural stop/target, ADX&lt;30 regime. Killed 2026-07-28 "
+     "by the pre-registered backtest kill-gate BEFORE any slot was built "
+     "&mdash; signal performs worse than a coin flip at its own geometry. "
+     "Cost: one afternoon. Saved: ~8 weeks of paper accrual."),
     ("ETH_TSM_28",     "ETH-TSM-28 &mdash; SLOW TREND (PAPER)",
      "Daily-horizon time-series momentum: long 0.01 ETH when the 28-day return is "
      "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "
@@ -1048,8 +1055,27 @@ def _build_signals_section(slot_states: dict = None) -> str:
             }
         fill_stats = (_st2_fill_stats()
                       if slot_id == "ST2.0" and slot_id in live_ids else None)
-        card = _build_signal_card(slot_id, title, state, live_ids, modes,
-                                  fill_stats, desc)
+        if slot_id == "SR_BOUNCE":
+            # Research-verdict tombstone (owner request 2026-07-28): SR_BOUNCE
+            # was killed PRE-BUILD by the backtest kill-gate — no slot, no
+            # state file, no trades ever. Stats are archival constants from
+            # reports/2026-07-28-sr-bounce-scan.md (one-shot scan; can't drift).
+            card = (
+                f'<div class="ptitle">{title}</div>'
+                f'<div class="sig-desc">{desc}</div>'
+                "<table>"
+                "<tr><td class='dim'>status</td><td><span class='dim'>&#10013; KILLED PRE-BUILD</span>"
+                " <span class='dim' style='font-size:8px'>backtest kill-gate &mdash; never traded</span></td></tr>"
+                "<tr><td class='dim'>scan holdout</td><td>5,084 sim trades &middot; 25.1% WR &middot; <span class='neg'>&minus;$0.0705/trade</span></td></tr>"
+                "<tr><td class='dim'>gross (fee-free)</td><td class='neg'>&minus;$0.0105/trade &mdash; negative BEFORE fees</td></tr>"
+                "<tr><td class='dim'>vs coin flip</td><td>TP-hit ~29.1% vs 32.8% random-walk breakeven</td></tr>"
+                "<tr><td class='dim'>pairs</td><td class='neg'>10 / 10 negative</td></tr>"
+                "<tr><td class='dim'>receipts</td><td class='dim'>reports/2026-07-28-sr-bounce-scan.md</td></tr>"
+                "</table>"
+            )
+        else:
+            card = _build_signal_card(slot_id, title, state, live_ids, modes,
+                                      fill_stats, desc)
         cards += f'<div class="panel sig-box" id="sig-{escape(slot_id)}">{card}</div>'
     return (f'<div id="signals-title">STRATEGIES</div>'
             f'<div id="signals-grid">{cards}</div>')

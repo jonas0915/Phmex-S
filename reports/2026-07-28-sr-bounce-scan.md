@@ -21,3 +21,12 @@
 
 ## Bonus: real-trade zone-proximity diagnostic (report-only)
 - winners n=55 median dist 0.51 ATR | losers n=38 median 0.48 ATR | p=0.3443 | excluded 663
+
+## Receipts (appended post-review 2026-07-28)
+- Data window: ~2026-04-29 → 2026-07-28 (~90d/pair; ~25,920 5m + ~2,160 1h candles/pair, 10 pairs, single fetch run)
+- Simulation: $50 notional/trade ($5 margin × 10x), fee 0.12% of notional round-trip, PostOnly-style strict-through next-candle fills, both-barriers-touched → stop_loss, no-lookahead 1h context
+- Frozen parameters (spec 2026-07-28, never tuned): k=3 pivots, 0.25×ATR(1h) zone cluster, ≥2 touches (gap ≥3), ADX<30 regime gate, SL = zone edge + 0.25×ATR(5m), TP = next opposing zone capped 3× risk, skip if room < 1× risk
+- Test suite: 19/19 green before the run; scan executed once, 1:19–2:38 PM, 2026-07-28
+- Caveats: the per-pair table above is ALL trades (train+holdout pooled per pair); the pre-registered verdict line is pooled-holdout and is what governs. Long/short split and maker fill rate were not logged — the verdict covers the confirmed-rejection bounce WITH PostOnly pullback entry; the unfilled-signal population is unmeasured.
+- Derived gross (fee-free) check: holdout −$0.0705/trade + $0.06 fee = −$0.0105/trade gross — negative before any fee on the pooled holdout, and per-pair (net/trade + $0.06) is negative on all 10 pairs over all trades.
+- Bonus-diagnostic note: "excluded 663" = older trade records with no opened_at field (pre-schema-change), non-scan symbols, trades outside the 90d cache window, and no-opposing-zone cases — excluded rather than mis-analyzed.
