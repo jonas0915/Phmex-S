@@ -306,10 +306,83 @@ def test_grade_htf_l2_registered_verdicts():
 
 def test_htf_l2_wired_into_digest():
     digest, results = adj.build_digest(now=1_784_000_000.0)
-    assert len(results) == 7                 # + vwap_cross (7/20) + main_gated (7/27)
-    assert results[4]["experiment"] == "htf_l2"
+    assert len(results) == 8                 # + vwap_cross (7/20) + main_gated (7/27)
+    assert results[4]["experiment"] == "htf_l2"                      # + sr_bounce (7/28)
     assert "[htf_l2]" in digest
     assert results[5]["experiment"] == "vwap_cross"
     assert "[vwap_cross]" in digest
     assert results[6]["experiment"] == "main_gated"
     assert "[main_gated]" in digest
+    assert results[7]["experiment"] == "sr_bounce"
+    assert "[sr_bounce]" in digest
+
+
+# ── SR_BOUNCE slot grader (2026-07-28, owner-ordered forward test) ────────
+def test_grade_sr_bounce_watch_under_n():
+    cfg = adj.EXPERIMENTS["sr_bounce"]
+    state = {"closed_trades": [
+        {"net_pnl": 0.10, "fees_usdt": 0.06, "mode": "paper"},
+        {"net_pnl": -0.20, "fees_usdt": 0.06, "mode": "paper"},
+    ]}
+    r = adj.grade_sr_bounce(state, cfg)
+    assert r["experiment"] == "sr_bounce"
+    assert r["status"] == adj.WATCH
+    assert r["n_trades"] == 2
+    assert "n=2/50" in r["note"]
+    assert "breakeven_wr" not in r
+
+
+def test_grade_sr_bounce_zero_is_watch():
+    r = adj.grade_sr_bounce({}, adj.EXPERIMENTS["sr_bounce"])
+    assert r["status"] == adj.WATCH
+    assert r["n_trades"] == 0
+    assert "n=0/50" in r["note"]
+
+
+def test_grade_sr_bounce_kill_at_n50_negative_net():
+    cfg = adj.EXPERIMENTS["sr_bounce"]
+    trades = [{"net_pnl": -0.10, "fees_usdt": 0.06, "mode": "paper"}
+              for _ in range(50)]
+    r = adj.grade_sr_bounce({"closed_trades": trades}, cfg)
+    assert r["status"] == "KILL"
+    assert r["n_trades"] == 50
+    assert abs(r["net_usd"] - (-8.0)) < 1e-9    # 50 * (-0.10 - 0.06)
+    assert "registered verdict" in r["note"]
+    assert "kill the slot" in r["note"]
+    assert ".kill_SR_BOUNCE" in r["note"]
+
+
+def test_grade_sr_bounce_pass_eligible_at_n50_positive_net():
+    cfg = adj.EXPERIMENTS["sr_bounce"]
+    trades = [{"net_pnl": 0.50, "fees_usdt": 0.06, "mode": "paper"}
+              for _ in range(50)]
+    r = adj.grade_sr_bounce({"closed_trades": trades}, cfg)
+    assert r["status"] == "PASS-ELIGIBLE"
+    assert r["n_trades"] == 50
+    assert abs(r["net_usd"] - 22.0) < 1e-9       # 50 * (0.50 - 0.06)
+    assert "owner decision required" in r["note"]
+
+
+def test_grade_sr_bounce_fee_adjustment_flips_win_to_loss():
+    # a trade with net_pnl=+0.05, fees_usdt=0.06 must count as a LOSS once
+    # fee-adjusted (paper writer records fees but doesn't deduct them —
+    # dashboard convention).
+    cfg = adj.EXPERIMENTS["sr_bounce"]
+    state = {"closed_trades": [
+        {"net_pnl": 0.05, "fees_usdt": 0.06, "mode": "paper"},
+    ]}
+    r = adj.grade_sr_bounce(state, cfg)
+    assert r["wins"] == 0
+    assert abs(r["net_usd"] - (-0.01)) < 1e-9
+
+
+def test_grade_sr_bounce_live_trades_not_fee_adjusted():
+    # mode == "live" trades already have fee-deducted net_pnl — do not
+    # double-subtract fees_usdt for them.
+    cfg = adj.EXPERIMENTS["sr_bounce"]
+    state = {"closed_trades": [
+        {"net_pnl": 0.05, "fees_usdt": 0.06, "mode": "live"},
+    ]}
+    r = adj.grade_sr_bounce(state, cfg)
+    assert r["wins"] == 1
+    assert abs(r["net_usd"] - 0.05) < 1e-9

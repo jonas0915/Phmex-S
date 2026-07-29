@@ -179,6 +179,18 @@ EXPERIMENTS = {
         "deployed_ts": _pt_ts(2026, 7, 21, 21, 25),  # the un-halt moment
         "verdict_n": 40,
     },
+    # SR_BOUNCE slot (2026-07-28): owner-ordered paper forward test
+    # OVERRIDING the scan's DO-NOT-BUILD (reports/2026-07-28-sr-bounce-scan.md;
+    # holdout −$0.0705/trade, worse than coin flip). The scan measures
+    # backtest-replayed signal quality; it cannot measure real fill
+    # selection (PostOnly queue position, adverse-selection at the touch) —
+    # the forward test measures exactly that, the one thing the scan
+    # couldn't. Verdict at n=50 paper trades.
+    "sr_bounce": {
+        "deployed_ts": _pt_ts(2026, 7, 28, 20, 0),
+        "verdict_n": 50,
+        "scan_prior_per_trade": -0.0705,
+    },
 }
 
 TSM_STATE_FILE = BOT_DIR / "trading_state_ETH_TSM_28.json"
@@ -187,6 +199,7 @@ HTF_L2_STATE_FILE = BOT_DIR / "trading_state_HTF_L2.json"
 HTF_L2_COUNTERS_FILE = BOT_DIR / "trading_state_HTF_L2_blocked.json"
 VWAP_CROSS_STATE_FILE = BOT_DIR / "trading_state_VWAP_CROSS.json"
 VWAP_CROSS_COUNTERS_FILE = BOT_DIR / "trading_state_VWAP_CROSS_blocked.json"
+SR_BOUNCE_STATE_FILE = BOT_DIR / "trading_state_SR_BOUNCE.json"
 
 
 # ── shared helpers ────────────────────────────────────────────────────────
@@ -668,6 +681,56 @@ def grade_vwap_cross(slot_state: dict, counters: dict, cfg: dict) -> dict:
             "blocked_total": blocked_total}
 
 
+def grade_sr_bounce(slot_state: dict, cfg: dict) -> dict:
+    """SR_BOUNCE slot grader — registered verdict line (2026-07-28, owner
+    order OVERRIDING the scan's DO-NOT-BUILD; see the EXPERIMENTS registry
+    comment). All paper trades count. Fee-adjusted like the dashboard: the
+    paper writer records fees_usdt but does not deduct them from net_pnl, so
+    each non-live trade's counted net = (net_pnl or pnl_usdt) - (fees_usdt or
+    0) — a trade can look like a small win pre-fee and grade as a loss.
+    No breakeven_wr is reported: this strategy's per-trade risk/reward is
+    structural (zone-edge SL, next-opposing-zone TP capped 3x risk) and
+    varies trade to trade, so a single BE-WR number would be invented.
+      - n >= 50: KILL if fee-adjusted net <= 0 (scan prior confirmed);
+        PASS-ELIGIBLE if net > 0 (owner decision required — promotion is
+        never automatic)
+      - n < 50: WATCH, accruing toward the registered verdict"""
+    trades = slot_state.get("closed_trades", []) or []
+
+    def _fee_adj_net(t: dict) -> float | None:
+        n = _net(t)
+        if n is None:
+            return None
+        if t.get("mode") != "live":
+            n -= float(t.get("fees_usdt") or 0)
+        return n
+
+    nets = [n for t in trades for n in [_fee_adj_net(t)] if n is not None]
+    wins = sum(1 for n in nets if n > 0)
+    wr = (wins / len(nets)) if nets else None
+    net = sum(nets) if nets else 0.0
+    n = len(trades)
+
+    if n >= cfg["verdict_n"]:
+        if net <= 0:
+            status = "KILL"
+            note = (f"registered verdict: n={n}, fee-adj net ${net:+.2f} <= 0 — "
+                     "scan prior confirmed; kill the slot (touch .kill_SR_BOUNCE)")
+        else:
+            status = "PASS-ELIGIBLE"
+            note = (f"n={n}, fee-adj net ${net:+.2f} > 0 — beats the scan prior; "
+                     "owner decision required (promotion is never automatic)")
+    else:
+        status = WATCH
+        note = (f"paper accruing (n={n}/{cfg['verdict_n']}, fee-adj net "
+                 f"${net:+.2f}; scan prior -$0.07/t)")
+
+    return {"experiment": "sr_bounce", "status": status, "note": note,
+            "n_trades": n, "wins": wins,
+            "wr": round(wr, 4) if wr is not None else None,
+            "net_usd": round(net, 4)}
+
+
 # ── digest ────────────────────────────────────────────────────────────────
 def _line_trail(r) -> str:
     avg = (f"avg win ${r['avg_win_usd']:.2f} vs ${r['baseline_avg_win_usd']:.2f} "
@@ -743,6 +806,12 @@ def _line_main_gated(r) -> str:
             f"{r['n_trades']} trades {r['wins']}W ${r['net_usd']:+.2f} | {wr}")
 
 
+def _line_sr_bounce(r) -> str:
+    wr = f"WR {r['wr']*100:.1f}%" if r["wr"] is not None else "WR n/a"
+    return (f"[sr_bounce]    {r['status']} — {r['note']} | "
+            f"{r['n_trades']} trades {r['wins']}W ${r['net_usd']:+.2f} | {wr}")
+
+
 def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     now = now or time.time()
     trades = load_closed_trades()
@@ -763,6 +832,8 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
                          load_json(VWAP_CROSS_COUNTERS_FILE, {}),
                          EXPERIMENTS["vwap_cross"]),
         grade_main_gated(trades, EXPERIMENTS["main_gated"]),
+        grade_sr_bounce(load_json(SR_BOUNCE_STATE_FILE, {}),
+                        EXPERIMENTS["sr_bounce"]),
     ]
     stamp = datetime.fromtimestamp(now, tz=PT).strftime("%b %-d %-I:%M %p PT")
     lines = [f"LAB ADJUDICATOR — live forward tests ({stamp})"]
@@ -773,6 +844,7 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     lines.append(_line_htf_l2(results[4]))
     lines.append(_line_vwap_cross(results[5]))
     lines.append(_line_main_gated(results[6]))
+    lines.append(_line_sr_bounce(results[7]))
     return "\n".join(lines), results
 
 
