@@ -151,3 +151,38 @@ def test_main_path_status_halted(tmp_path, monkeypatch):
     (tmp_path / ".halt_main_entries").unlink()
     html = wd._slot_status_html("5m_scalp", [], {"5m_scalp"}, {})
     assert "LIVE" in html
+
+
+def test_sr_bounce_signal_box_present():
+    """SR_BOUNCE (Task 5, 2026-07-28): the scan's backtest kill-gate said
+    DO-NOT-BUILD, but the owner ordered a paper forward test anyway to
+    measure real fill selection. The box must be a live-capable card
+    (generic _build_signal_card, reading trading_state_SR_BOUNCE.json via
+    read_all_slot_states), not the old pre-build tombstone."""
+    import web_dashboard as wd
+    boxes = {b[0]: b[1] for b in wd._SIGNAL_BOXES}
+    assert "SR_BOUNCE" in boxes
+    assert "PAPER FORWARD TEST" in boxes["SR_BOUNCE"]
+
+
+def test_sr_bounce_tombstone_branch_removed():
+    """The static KILLED-PRE-BUILD tombstone branch must be gone from the
+    render loop — SR_BOUNCE now goes through the same generic
+    _build_signal_card path as every other slot."""
+    import inspect
+    import web_dashboard as wd
+    src = inspect.getsource(wd._build_signals_section)
+    assert "SR_BOUNCE" not in src
+    assert "KILLED PRE-BUILD" not in src
+
+
+def test_sr_bounce_missing_state_renders_zero_trades():
+    """With no trading_state_SR_BOUNCE.json on disk, the generic card must
+    render an n=0 PAPER card (not crash, not fall back to the old tombstone)."""
+    import web_dashboard as wd
+    slot_states = {}  # no SR_BOUNCE key, mirrors a missing state file
+    live_ids = wd._live_slot_ids()
+    modes = wd._slot_modes()
+    state = slot_states.get("SR_BOUNCE") or {"closed_trades": [], "positions": {}}
+    card = wd._build_signal_card("SR_BOUNCE", "SR_BOUNCE", state, live_ids, modes, None, "")
+    assert ">0<" in card or "trades</td><td>0" in card
