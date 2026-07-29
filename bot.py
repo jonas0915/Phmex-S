@@ -839,11 +839,24 @@ class Phmex2Bot:
            saw CLOSED bars. The forming bar is dropped before caching, and the
            >=100 length gate is applied AFTER the drop so a 100-row fetch
            (99 closed bars) correctly falls through to stale-cache/None
-           instead of caching a short frame."""
+           instead of caching a short frame.
+
+        Returns (df, bucket) — NOT just df (2026-07-28 review re-fix, I1
+        follow-up). sr_bounce.evaluate()'s cache_key fallback keys on
+        len(htf_df) when the frame carries no "ts" column, which this
+        method's frame never does; because the N1 drop always removes
+        exactly one row from a limit=500 fetch, len(df) is CONSTANT (499)
+        in production, so that fallback alone never rotates and zones would
+        freeze after the first computation. The bucket is threaded into the
+        dispatch call site's cache_key (f"{symbol}:{bucket}") so the zone
+        cache rotates hourly regardless of the bar-count fallback. On a
+        stale-cache return the ORIGINAL caching bucket is returned (not the
+        current one) so unchanged content keeps its zone-cache hit instead
+        of forcing a spurious recompute."""
         _bucket = int(time.time() // 3600)
         cached = self._sr_htf_cache.get(symbol)
         if cached and cached[0] == _bucket:
-            return cached[1]
+            return cached[1], _bucket
         try:
             df_raw = self.exchange.get_ohlcv(symbol, "1h", limit=500)
         except Exception as e:
@@ -855,8 +868,10 @@ class Phmex2Bot:
             df_raw = df_raw.iloc[:-1].reset_index(drop=True)  # RangeIndex — scan-engine-faithful
         if df_raw is not None and len(df_raw) >= 100:
             self._sr_htf_cache[symbol] = (_bucket, df_raw)
-            return df_raw
-        return cached[1] if cached else None  # stale cache over nothing (same convention as _fetch_htf_data)
+            return df_raw, _bucket
+        if cached:
+            return cached[1], cached[0]  # stale cache over nothing (same convention as _fetch_htf_data)
+        return None, _bucket
 
     def _fetch_funding_rate(self, symbol: str) -> dict | None:
         """Fetch funding rate with 4-hour cache. Returns stale cache on REST failure."""
@@ -2857,12 +2872,16 @@ class Phmex2Bot:
                         # SR_BOUNCE needs a scan-faithful RangeIndex 1h frame, not the
                         # indicator-enriched/DatetimeIndex frame _fetch_htf_data returns
                         # (see _fetch_sr_bounce_htf docstring, 2026-07-28 review fix).
-                        # cache_key=symbol (2026-07-28 review fix, I1): lets
-                        # sr_bounce.evaluate() reuse validated_zones+adx across the
-                        # ~90s bot cycles that share the same hourly htf bar instead
-                        # of recomputing every call.
-                        _sr_htf = self._fetch_sr_bounce_htf(symbol)
-                        candidate_signals.append(strategy_fn(df, ob, htf_df=_sr_htf, cache_key=symbol))
+                        # cache_key=f"{symbol}:{bucket}" (2026-07-28 review re-fix,
+                        # I1 follow-up): lets sr_bounce.evaluate() reuse
+                        # validated_zones+adx across the ~90s bot cycles that share
+                        # the same hourly htf bar. The bucket MUST be threaded in —
+                        # _fetch_sr_bounce_htf's frame carries no "ts" column, so
+                        # evaluate()'s own len(htf_df) fallback is constant (always
+                        # 499 rows post-N1-drop) and would never rotate on its own.
+                        _sr_htf, _sr_bucket = self._fetch_sr_bounce_htf(symbol)
+                        candidate_signals.append(strategy_fn(df, ob, htf_df=_sr_htf,
+                                                             cache_key=f"{symbol}:{_sr_bucket}"))
                     else:
                         try:
                             _s = strategy_fn(df, ob, htf_df=htf_df)

@@ -27,6 +27,22 @@ def _5m(rows):
     return _mk(rows, start_ts=120 * 3_600_000, step_ms=300_000)
 
 
+def _flat_1h_no_ts(n=150):
+    """Same triangle-wave shape as _flat_1h, but WITHOUT a "ts" column —
+    exactly what bot.py's _fetch_sr_bounce_htf() returns in production
+    (RangeIndex frame, no ts column: get_ohlcv's timestamp is dropped by
+    reset_index(drop=True)). Exercises sr_bounce.evaluate()'s len(htf_df)
+    cache-key fallback branch (2026-07-28 review re-fix, I1 follow-up)."""
+    rows = []
+    for i in range(n):
+        ph = i % 10
+        px = 101 - 0.4 * ph if ph < 5 else 99 + 0.4 * (ph - 5)
+        rows.append((px + 0.2, px + 0.5, px - 0.5, px))
+    df = pd.DataFrame(rows, columns=["open", "high", "low", "close"])
+    df["volume"] = 100.0
+    return df
+
+
 def test_ported_math_matches_scan():
     df1h = _flat_1h()
     zones = sb.validated_zones(df1h)
@@ -198,3 +214,43 @@ def test_zone_cache_capped_at_64_entries():
     for i in range(70):
         sb.evaluate(fivem, None, df1h, cache_key=f"SYM{i}/USDT:USDT")
     assert len(sb._zone_cache) == sb._ZONE_CACHE_MAX == 64
+
+
+def test_evaluate_cache_key_rollover_recomputes_with_len_fallback(monkeypatch):
+    """2026-07-28 review RE-FIX (I1 follow-up, breakage caught in re-review):
+    sr_bounce.evaluate()'s cache key falls back to len(htf_df) when the frame
+    has no "ts" column — exactly the shape bot.py's _fetch_sr_bounce_htf()
+    returns in production. That length is CONSTANT there (always limit-1
+    rows post the N1 forming-bar drop), so relying on it alone would freeze
+    zones forever after the first computation. The fix threads the hourly
+    fetch bucket into the dispatch call site's cache_key
+    (f"{symbol}:{bucket}"). This test proves both halves at the
+    sr_bounce.evaluate layer, using a frame WITHOUT a "ts" column so the
+    len(htf_df) fallback is actually exercised:
+      - same cache_key twice -> second call hits the cache (1 recompute)
+      - different cache_key (simulating an hour rollover) with an
+        IDENTICAL frame/length -> must still force a fresh recompute
+        (2 total) — proving the bucket in cache_key is what rotates the
+        cache, not len(htf_df) alone."""
+    sb._zone_cache.clear()
+    df1h = _flat_1h_no_ts()
+    assert "ts" not in df1h.columns
+    fivem = _5m([(100.6, 100.7, 100.5, 100.6),
+                 (100.5, 100.6, 98.3, 98.6),
+                 (98.6, 98.7, 98.5, 98.65)])
+
+    calls = {"validated_zones": 0}
+    orig_vz = sb.validated_zones
+
+    def counted_vz(df, *a, **k):
+        calls["validated_zones"] += 1
+        return orig_vz(df, *a, **k)
+
+    monkeypatch.setattr(sb, "validated_zones", counted_vz)
+
+    sb.evaluate(fivem, None, df1h, cache_key="ETH/USDT:USDT:100")
+    sb.evaluate(fivem, None, df1h, cache_key="ETH/USDT:USDT:100")
+    assert calls["validated_zones"] == 1
+
+    sb.evaluate(fivem, None, df1h, cache_key="ETH/USDT:USDT:101")
+    assert calls["validated_zones"] == 2

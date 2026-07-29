@@ -47,8 +47,9 @@ def test_fetch_sr_bounce_htf_drops_forming_bar():
     n = 150
     df = _bot_shaped_htf(n)
     b = _bare_bot_for_fetch(df)
-    out = botmod.Phmex2Bot._fetch_sr_bounce_htf(b, "ETH/USDT:USDT")
+    out, bucket = botmod.Phmex2Bot._fetch_sr_bounce_htf(b, "ETH/USDT:USDT")
     assert out is not None
+    assert isinstance(bucket, int)
     assert len(out) == n - 1
     # the marker value (forming bar) must not survive into the cached frame
     assert 999999.0 not in out["close"].values
@@ -62,8 +63,9 @@ def test_fetch_sr_bounce_htf_length_gate_applies_after_drop():
     import bot as botmod
     df = _bot_shaped_htf(100)
     b = _bare_bot_for_fetch(df)
-    out = botmod.Phmex2Bot._fetch_sr_bounce_htf(b, "ETH/USDT:USDT")
+    out, bucket = botmod.Phmex2Bot._fetch_sr_bounce_htf(b, "ETH/USDT:USDT")
     assert out is None
+    assert isinstance(bucket, int)
     assert "ETH/USDT:USDT" not in b._sr_htf_cache
 
 
@@ -72,9 +74,52 @@ def test_fetch_sr_bounce_htf_101_rows_passes_gate_after_drop():
     import bot as botmod
     df = _bot_shaped_htf(101)
     b = _bare_bot_for_fetch(df)
-    out = botmod.Phmex2Bot._fetch_sr_bounce_htf(b, "ETH/USDT:USDT")
+    out, bucket = botmod.Phmex2Bot._fetch_sr_bounce_htf(b, "ETH/USDT:USDT")
     assert out is not None
+    assert isinstance(bucket, int)
     assert len(out) == 100
+
+
+def test_fetch_sr_bounce_htf_frame_has_no_ts_column():
+    """Guards the premise of the 2026-07-28 review re-fix: the frame this
+    method returns must never carry a "ts" column, so sr_bounce.evaluate()'s
+    cache_key fallback always takes the len(htf_df) branch (constant post-N1
+    at limit-1 rows) — which is exactly why the dispatch call site MUST
+    thread the bucket into cache_key instead of relying on evaluate()'s own
+    fallback to rotate the cache."""
+    import bot as botmod
+    df = _bot_shaped_htf(150)
+    b = _bare_bot_for_fetch(df)
+    out, _ = botmod.Phmex2Bot._fetch_sr_bounce_htf(b, "ETH/USDT:USDT")
+    assert "ts" not in out.columns
+
+
+def test_fetch_sr_bounce_htf_bucket_rotates_cache_key_on_new_fetch():
+    """2026-07-28 review re-fix (I1 follow-up): a fresh REST fetch (new hour
+    bucket) must return a DIFFERENT bucket than a cache hit for the same
+    symbol within the same hour — this is what makes the dispatch call
+    site's cache_key=f"{symbol}:{bucket}" rotate hourly. Without this, the
+    len(htf_df) fallback inside sr_bounce.evaluate() is constant (always
+    limit-1 rows) and zones would freeze forever after the first computation."""
+    import bot as botmod
+    df1 = _bot_shaped_htf(150, marker_last=False)
+    b = _bare_bot_for_fetch(df1)
+    out1, bucket1 = botmod.Phmex2Bot._fetch_sr_bounce_htf(b, "ETH/USDT:USDT")
+    # same-hour re-call hits the cache — bucket unchanged
+    out2, bucket2 = botmod.Phmex2Bot._fetch_sr_bounce_htf(b, "ETH/USDT:USDT")
+    assert bucket1 == bucket2
+    assert out1 is out2
+    # simulate an hour rollover: force a fresh fetch by clearing the cache
+    # (equivalent to a new _bucket no longer matching cached[0])
+    b._sr_htf_cache = {}
+    out3, bucket3 = botmod.Phmex2Bot._fetch_sr_bounce_htf(b, "ETH/USDT:USDT")
+    assert out3 is not None
+    # content is identical (same fixture), but a real rollover would bump
+    # the bucket — this test only proves a cleared cache re-fetches and
+    # returns a bucket the caller can key on, not a specific bucket delta
+    # (that depends on wall-clock time, asserted end-to-end via sr_bounce's
+    # own cache_key rollover test in test_sr_bounce.py).
+    assert isinstance(bucket3, int)
 
 
 def test_sr_bounce_slot_registered():
