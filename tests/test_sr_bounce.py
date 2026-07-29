@@ -254,3 +254,21 @@ def test_evaluate_cache_key_rollover_recomputes_with_len_fallback(monkeypatch):
 
     sb.evaluate(fivem, None, df1h, cache_key="ETH/USDT:USDT:101")
     assert calls["validated_zones"] == 2
+
+
+def test_wrapper_accepts_cache_key_like_bot_dispatch():
+    """2026-07-29 deploy regression: the bot dispatch calls
+    STRATEGIES["sr_bounce"](df, ob, htf_df=..., cache_key="SYM:bucket") but the
+    strategies.py wrapper lacked the cache_key param — every live evaluation
+    raised TypeError and the slot was silently dead on first arming. The
+    rollover tests called sb.evaluate() directly and never exercised the
+    wrapper path the bot actually uses."""
+    from strategies import STRATEGIES, Signal
+    df1h = _flat_1h()
+    fivem = _5m([(100.6, 100.7, 100.5, 100.6),
+                 (100.5, 100.6, 98.3, 98.6),
+                 (98.6, 98.7, 98.5, 98.65)])
+    sig = STRATEGIES["sr_bounce"](fivem, None, htf_df=df1h,
+                                  cache_key="TEST/USDT:USDT:490000")
+    assert sig.signal == Signal.BUY          # not a TypeError, real signal
+    assert sig.sl_price is not None and sig.tp_price is not None

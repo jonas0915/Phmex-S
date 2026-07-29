@@ -512,6 +512,8 @@ class Phmex2Bot:
         self._sr_htf_cache: dict[str, tuple] = {}  # symbol -> (hour_bucket, RangeIndex DataFrame) —
                                                     # SR_BOUNCE's dedicated scan-faithful 1h context,
                                                     # deliberately separate from _htf_cache/_fetch_htf_data
+        self._htf_fallback_warned: set[tuple] = set()  # (slot_id, strategy) — once-per-boot warn
+                                                       # for the htf_df TypeError fallback (2026-07-29)
                                                     # (see _fetch_sr_bounce_htf docstring, 2026-07-28 review fix)
         self._funding_cache: dict[str, tuple] = {}  # symbol -> (data, fetch_timestamp) for funding rates
         self._divergence_cooldown: dict[str, dict] = {}  # symbol -> {"blocked_at": float, "clean_cycles": int}
@@ -2892,10 +2894,17 @@ class Phmex2Bot:
                             # — a real bug inside a strategy would masquerade as "doesn't
                             # take htf_df" and vanish into an unconditional HOLD. Warn so
                             # that never happens silently again; fallback behavior unchanged.
-                            logger.warning(f"[PAPER] {slot.slot_id} {symbol} {slot.strategy_name} "
-                                           f"raised TypeError on strategy_fn(df, ob, htf_df=...) — "
-                                           f"falling back to strategy_fn(df, ob); if this isn't a "
-                                           f"genuine signature mismatch, htf_df is being silently dropped")
+                            # Once per (slot, strategy) per boot (2026-07-29): known
+                            # signature mismatches (bb_mean_reversion takes no htf_df)
+                            # spammed this at WARNING every cycle x every symbol.
+                            _tk = (slot.slot_id, slot.strategy_name)
+                            if _tk not in self._htf_fallback_warned:
+                                self._htf_fallback_warned.add(_tk)
+                                logger.warning(f"[PAPER] {slot.slot_id} {slot.strategy_name} "
+                                               f"raised TypeError on strategy_fn(df, ob, htf_df=...) — "
+                                               f"falling back to strategy_fn(df, ob) (warned once/boot); "
+                                               f"if this isn't a genuine signature mismatch, htf_df is "
+                                               f"being silently dropped")
                             _s = strategy_fn(df, ob)
                         candidate_signals.append(_s)
                 except Exception as e:

@@ -1032,11 +1032,15 @@ def vwap_sma_cross(
     return TradeSignal(direction, reason, 0.82)
 
 
-def sr_bounce(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.DataFrame = None) -> TradeSignal:
+def sr_bounce(df: pd.DataFrame, orderbook: dict = None, htf_df: pd.DataFrame = None,
+              cache_key: str = None) -> TradeSignal:
     """Wrapper around sr_bounce.evaluate() for the SR_BOUNCE paper slot
     (owner-ordered forward test; scan verdict was DO-NOT-BUILD). Converts the
-    module's plain-dict return into a TradeSignal."""
-    result = _sr_bounce_mod.evaluate(df, orderbook, htf_df)
+    module's plain-dict return into a TradeSignal. cache_key (2026-07-29
+    deploy fix): the bot dispatch passes "symbol:hourbucket" for the hourly
+    zone cache — the wrapper missing this param made every evaluation raise
+    TypeError and the slot silently dead on first arming."""
+    result = _sr_bounce_mod.evaluate(df, orderbook, htf_df, cache_key=cache_key)
     signal_map = {"buy": Signal.BUY, "sell": Signal.SELL}
     signal = signal_map.get(result["signal"], Signal.HOLD)
     return TradeSignal(signal, result["reason"], result["strength"],
