@@ -684,28 +684,22 @@ def grade_vwap_cross(slot_state: dict, counters: dict, cfg: dict) -> dict:
 def grade_sr_bounce(slot_state: dict, cfg: dict) -> dict:
     """SR_BOUNCE slot grader — registered verdict line (2026-07-28, owner
     order OVERRIDING the scan's DO-NOT-BUILD; see the EXPERIMENTS registry
-    comment). All paper trades count. Fee-adjusted like the dashboard: the
-    paper writer records fees_usdt but does not deduct them from net_pnl, so
-    each non-live trade's counted net = (net_pnl or pnl_usdt) - (fees_usdt or
-    0) — a trade can look like a small win pre-fee and grade as a loss.
-    No breakeven_wr is reported: this strategy's per-trade risk/reward is
-    structural (zone-edge SL, next-opposing-zone TP capped 3x risk) and
-    varies trade to trade, so a single BE-WR number would be invented.
-      - n >= 50: KILL if fee-adjusted net <= 0 (scan prior confirmed);
-        PASS-ELIGIBLE if net > 0 (owner decision required — promotion is
-        never automatic)
+    comment). All paper trades count. net_pnl is used AS-IS: RiskManager
+    already deducts simulated fees from paper net_pnl before it ever hits
+    the state file (risk_manager.py: `if self.is_paper: pnl -= fees_usdt`,
+    then `net_pnl = gross_pnl - fees_usdt - funding_usdt`), so fees are
+    already inside net_pnl. Subtracting fees_usdt again here would
+    double-count them (~$0.06/trade at n=50 verdict — enough to flip a
+    marginal PASS into a KILL). No breakeven_wr is reported: this
+    strategy's per-trade risk/reward is structural (zone-edge SL,
+    next-opposing-zone TP capped 3x risk) and varies trade to trade, so a
+    single BE-WR number would be invented.
+      - n >= 50: KILL if net <= 0 (scan prior confirmed); PASS-ELIGIBLE if
+        net > 0 (owner decision required — promotion is never automatic)
       - n < 50: WATCH, accruing toward the registered verdict"""
     trades = slot_state.get("closed_trades", []) or []
 
-    def _fee_adj_net(t: dict) -> float | None:
-        n = _net(t)
-        if n is None:
-            return None
-        if t.get("mode") != "live":
-            n -= float(t.get("fees_usdt") or 0)
-        return n
-
-    nets = [n for t in trades for n in [_fee_adj_net(t)] if n is not None]
+    nets = [n for t in trades for n in [_net(t)] if n is not None]
     wins = sum(1 for n in nets if n > 0)
     wr = (wins / len(nets)) if nets else None
     net = sum(nets) if nets else 0.0
@@ -714,15 +708,15 @@ def grade_sr_bounce(slot_state: dict, cfg: dict) -> dict:
     if n >= cfg["verdict_n"]:
         if net <= 0:
             status = "KILL"
-            note = (f"registered verdict: n={n}, fee-adj net ${net:+.2f} <= 0 — "
+            note = (f"registered verdict: n={n}, net ${net:+.2f} <= 0 — "
                      "scan prior confirmed; kill the slot (touch .kill_SR_BOUNCE)")
         else:
             status = "PASS-ELIGIBLE"
-            note = (f"n={n}, fee-adj net ${net:+.2f} > 0 — beats the scan prior; "
+            note = (f"n={n}, net ${net:+.2f} > 0 — beats the scan prior; "
                      "owner decision required (promotion is never automatic)")
     else:
         status = WATCH
-        note = (f"paper accruing (n={n}/{cfg['verdict_n']}, fee-adj net "
+        note = (f"paper accruing (n={n}/{cfg['verdict_n']}, net "
                  f"${net:+.2f}; scan prior -$0.07/t)")
 
     return {"experiment": "sr_bounce", "status": status, "note": note,

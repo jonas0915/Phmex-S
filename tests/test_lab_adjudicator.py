@@ -346,7 +346,11 @@ def test_grade_sr_bounce_kill_at_n50_negative_net():
     r = adj.grade_sr_bounce({"closed_trades": trades}, cfg)
     assert r["status"] == "KILL"
     assert r["n_trades"] == 50
-    assert abs(r["net_usd"] - (-8.0)) < 1e-9    # 50 * (-0.10 - 0.06)
+    # net_pnl is already fee-inclusive (RiskManager deducts sim fees before
+    # the paper writer ever sees net_pnl) — fees_usdt must NOT be subtracted
+    # again here. Correct sum = 50 * -0.10 = -5.0, not the double-subtracted
+    # 50 * (-0.10 - 0.06) = -8.0.
+    assert abs(r["net_usd"] - (-5.0)) < 1e-9
     assert "registered verdict" in r["note"]
     assert "kill the slot" in r["note"]
     assert ".kill_SR_BOUNCE" in r["note"]
@@ -359,26 +363,39 @@ def test_grade_sr_bounce_pass_eligible_at_n50_positive_net():
     r = adj.grade_sr_bounce({"closed_trades": trades}, cfg)
     assert r["status"] == "PASS-ELIGIBLE"
     assert r["n_trades"] == 50
-    assert abs(r["net_usd"] - 22.0) < 1e-9       # 50 * (0.50 - 0.06)
+    assert abs(r["net_usd"] - 25.0) < 1e-9       # 50 * 0.50, fees not re-subtracted
     assert "owner decision required" in r["note"]
 
 
-def test_grade_sr_bounce_fee_adjustment_flips_win_to_loss():
-    # a trade with net_pnl=+0.05, fees_usdt=0.06 must count as a LOSS once
-    # fee-adjusted (paper writer records fees but doesn't deduct them —
-    # dashboard convention).
+def test_grade_sr_bounce_net_pnl_used_as_is():
+    # net_pnl is already fee-inclusive (RiskManager: `if self.is_paper: pnl
+    # -= fees_usdt`, then net_pnl = gross - fees - funding). A trade with
+    # net_pnl=+0.05 and fees_usdt=0.06 counts as a WIN at +0.05 — fees are
+    # already inside net_pnl, so fees_usdt must not be subtracted again.
     cfg = adj.EXPERIMENTS["sr_bounce"]
     state = {"closed_trades": [
         {"net_pnl": 0.05, "fees_usdt": 0.06, "mode": "paper"},
     ]}
     r = adj.grade_sr_bounce(state, cfg)
+    assert r["wins"] == 1
+    assert abs(r["net_usd"] - 0.05) < 1e-9
+
+
+def test_grade_sr_bounce_no_fee_double_subtraction():
+    # A losing trade contributes exactly its net_pnl — fees_usdt is never
+    # subtracted a second time, live or paper.
+    cfg = adj.EXPERIMENTS["sr_bounce"]
+    state = {"closed_trades": [
+        {"net_pnl": -0.10, "fees_usdt": 0.06, "mode": "paper"},
+    ]}
+    r = adj.grade_sr_bounce(state, cfg)
     assert r["wins"] == 0
-    assert abs(r["net_usd"] - (-0.01)) < 1e-9
+    assert abs(r["net_usd"] - (-0.10)) < 1e-9
 
 
-def test_grade_sr_bounce_live_trades_not_fee_adjusted():
-    # mode == "live" trades already have fee-deducted net_pnl — do not
-    # double-subtract fees_usdt for them.
+def test_grade_sr_bounce_live_trades_use_net_pnl_directly():
+    # mode == "live" trades already have fee-deducted net_pnl; grading is
+    # identical for live and paper — net_pnl is always used as-is.
     cfg = adj.EXPERIMENTS["sr_bounce"]
     state = {"closed_trades": [
         {"net_pnl": 0.05, "fees_usdt": 0.06, "mode": "live"},

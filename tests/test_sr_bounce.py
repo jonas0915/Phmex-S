@@ -132,3 +132,69 @@ def test_dedicated_context_reset_index_enables_signal():
     sig = STRATEGIES["sr_bounce"](fivem, None, htf_df=df1h_fixed)
     assert sig.signal in (Signal.BUY, Signal.SELL)
     assert sig.sl_price is not None and sig.tp_price is not None
+
+
+def test_evaluate_cache_key_reuses_zones_across_calls(monkeypatch):
+    """2026-07-28 review fix, I1: validated_zones()+adx() were recomputed
+    every ~90s bot cycle per symbol over 500 rows even though htf_df only
+    changes once an hour. With cache_key set and the same htf bar, a second
+    evaluate() call must reuse the cached (zones, htf_adx) instead of
+    recomputing them."""
+    sb._zone_cache.clear()
+    df1h = _flat_1h()
+    fivem = _5m([(100.6, 100.7, 100.5, 100.6),
+                 (100.5, 100.6, 98.3, 98.6),
+                 (98.6, 98.7, 98.5, 98.65)])
+
+    calls = {"validated_zones": 0}
+    orig_vz = sb.validated_zones
+
+    def counted_vz(df, *a, **k):
+        calls["validated_zones"] += 1
+        return orig_vz(df, *a, **k)
+
+    monkeypatch.setattr(sb, "validated_zones", counted_vz)
+
+    r1 = sb.evaluate(fivem, None, df1h, cache_key="ETH/USDT:USDT")
+    r2 = sb.evaluate(fivem, None, df1h, cache_key="ETH/USDT:USDT")
+
+    assert calls["validated_zones"] == 1          # 2nd call hit the cache
+    assert r1["signal"] == r2["signal"] == "buy"   # cache reuse doesn't change output
+
+
+def test_evaluate_cache_key_none_always_recomputes(monkeypatch):
+    """Backward compatibility: cache_key=None (tests, ad-hoc callers) must
+    never cache — every call recomputes, matching pre-I1 behavior."""
+    sb._zone_cache.clear()
+    df1h = _flat_1h()
+    fivem = _5m([(100.6, 100.7, 100.5, 100.6),
+                 (100.5, 100.6, 98.3, 98.6),
+                 (98.6, 98.7, 98.5, 98.65)])
+
+    calls = {"validated_zones": 0}
+    orig_vz = sb.validated_zones
+
+    def counted_vz(df, *a, **k):
+        calls["validated_zones"] += 1
+        return orig_vz(df, *a, **k)
+
+    monkeypatch.setattr(sb, "validated_zones", counted_vz)
+
+    sb.evaluate(fivem, None, df1h)
+    sb.evaluate(fivem, None, df1h)
+
+    assert calls["validated_zones"] == 2
+    assert sb._zone_cache == {}
+
+
+def test_zone_cache_capped_at_64_entries():
+    """The cache pops the oldest entry once it exceeds 64 keys — it must
+    never grow unbounded across many symbols/hours."""
+    sb._zone_cache.clear()
+    df1h = _flat_1h()
+    fivem = _5m([(100.6, 100.7, 100.5, 100.6),
+                 (100.5, 100.6, 100.4, 100.5),
+                 (100.5, 100.6, 100.4, 100.45)])
+    for i in range(70):
+        sb.evaluate(fivem, None, df1h, cache_key=f"SYM{i}/USDT:USDT")
+    assert len(sb._zone_cache) == sb._ZONE_CACHE_MAX == 64

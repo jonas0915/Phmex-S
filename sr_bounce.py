@@ -3,6 +3,16 @@
 test. Parameters FROZEN; edit only with a new spec."""
 import pandas as pd
 
+# Zone/ADX cache (2026-07-28 review fix, I1): the scan this module ports
+# recomputes validated_zones+adx per 1h bar; evaluate() was recomputing them
+# every ~90s bot cycle per symbol over 500 rows even though the underlying
+# htf_df only changes once an hour (see _fetch_sr_bounce_htf's own per-hour
+# cache in bot.py) — scan-parity work wasted 39/40 times an hour. Keyed by
+# (cache_key, htf bar identity); capped so a long-running bot can't leak
+# unbounded symbol/hour combinations.
+_zone_cache: dict = {}
+_ZONE_CACHE_MAX = 64
+
 
 def atr(df: pd.DataFrame, n: int = 14) -> pd.Series:
     prev_close = df["close"].shift(1)
@@ -105,21 +115,44 @@ def _hold(reason: str) -> dict:
             "sl_price": None, "tp_price": None}
 
 
-def evaluate(df: pd.DataFrame, orderbook=None, htf_df: pd.DataFrame = None) -> dict:
+def evaluate(df: pd.DataFrame, orderbook=None, htf_df: pd.DataFrame = None,
+             cache_key=None) -> dict:
     """SR_BOUNCE paper-forward-test signal. Returns a plain dict (no TradeSignal
     import here — strategies.py imports this module, so this module must not
-    import strategies.py). See module docstring for scan provenance."""
+    import strategies.py). See module docstring for scan provenance.
+
+    cache_key (2026-07-28 review fix, I1): when provided (bot.py passes the
+    symbol), validated_zones()+adx() are cached per (cache_key, htf bar
+    identity) instead of recomputed every call — the htf_df this is fed only
+    changes once an hour (bot.py's _fetch_sr_bounce_htf per-hour cache), so
+    recomputing on every ~90s bot cycle was pure waste. cache_key=None
+    (tests, ad-hoc callers) always recomputes, matching prior behavior."""
     if df is None or len(df) < 3:
         return _hold("sr_bounce: insufficient 5m data")
 
     if htf_df is None or len(htf_df) < 100:
         return _hold("sr_bounce: no/short 1h context")
 
-    htf_adx = adx(htf_df).iloc[-1]
+    if cache_key is not None:
+        bar_id = (int(htf_df["ts"].iloc[-1]) if "ts" in htf_df.columns
+                   else len(htf_df))
+        key = (cache_key, bar_id)
+        hit = _zone_cache.get(key)
+        if hit is not None:
+            zones, htf_adx = hit
+        else:
+            htf_adx = adx(htf_df).iloc[-1]
+            zones = validated_zones(htf_df)
+            _zone_cache[key] = (zones, htf_adx)
+            while len(_zone_cache) > _ZONE_CACHE_MAX:
+                _zone_cache.pop(next(iter(_zone_cache)))
+    else:
+        htf_adx = adx(htf_df).iloc[-1]
+        zones = validated_zones(htf_df)
+
     if htf_adx >= 30:
         return _hold(f"sr_bounce: 1h ADX {htf_adx:.1f} >= 30 (trending)")
 
-    zones = validated_zones(htf_df)
     if not zones:
         return _hold("sr_bounce: no validated zones")
 

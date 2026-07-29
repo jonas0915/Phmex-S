@@ -830,7 +830,16 @@ class Phmex2Bot:
         This fetches raw OHLCV (no indicator pipeline — sr_bounce computes its own
         atr/adx) at limit=500 and resets to a RangeIndex, matching the scan engine's
         frames exactly. Cached per (symbol, UTC hour bucket): one real REST fetch
-        per symbol per hour, not per 60s cycle."""
+        per symbol per hour, not per 60s cycle.
+
+        3. (2026-07-28 review fix, N1) The exchange's last returned row is the
+           still-forming current-hour candle — its high/low/close keep moving
+           until the hour closes. Caching it for the whole hour (as the prior
+           version did) deflated ATR/zone width vs the scan, which only ever
+           saw CLOSED bars. The forming bar is dropped before caching, and the
+           >=100 length gate is applied AFTER the drop so a 100-row fetch
+           (99 closed bars) correctly falls through to stale-cache/None
+           instead of caching a short frame."""
         _bucket = int(time.time() // 3600)
         cached = self._sr_htf_cache.get(symbol)
         if cached and cached[0] == _bucket:
@@ -840,8 +849,11 @@ class Phmex2Bot:
         except Exception as e:
             logger.debug(f"[SR_BOUNCE] Failed to fetch 1h data for {symbol}: {e}")
             df_raw = None
+        if df_raw is not None:
+            # Drop the in-progress forming bar BEFORE the length gate — the
+            # scan this slot ports only ever saw closed bars.
+            df_raw = df_raw.iloc[:-1].reset_index(drop=True)  # RangeIndex — scan-engine-faithful
         if df_raw is not None and len(df_raw) >= 100:
-            df_raw = df_raw.reset_index(drop=True)  # RangeIndex — scan-engine-faithful
             self._sr_htf_cache[symbol] = (_bucket, df_raw)
             return df_raw
         return cached[1] if cached else None  # stale cache over nothing (same convention as _fetch_htf_data)
@@ -2845,8 +2857,12 @@ class Phmex2Bot:
                         # SR_BOUNCE needs a scan-faithful RangeIndex 1h frame, not the
                         # indicator-enriched/DatetimeIndex frame _fetch_htf_data returns
                         # (see _fetch_sr_bounce_htf docstring, 2026-07-28 review fix).
+                        # cache_key=symbol (2026-07-28 review fix, I1): lets
+                        # sr_bounce.evaluate() reuse validated_zones+adx across the
+                        # ~90s bot cycles that share the same hourly htf bar instead
+                        # of recomputing every call.
                         _sr_htf = self._fetch_sr_bounce_htf(symbol)
-                        candidate_signals.append(strategy_fn(df, ob, htf_df=_sr_htf))
+                        candidate_signals.append(strategy_fn(df, ob, htf_df=_sr_htf, cache_key=symbol))
                     else:
                         try:
                             _s = strategy_fn(df, ob, htf_df=htf_df)
