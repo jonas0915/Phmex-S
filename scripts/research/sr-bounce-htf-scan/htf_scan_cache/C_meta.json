@@ -1,0 +1,1 @@
+{"min_ts": 1750816800000, "max_ts": 1785369600000, "cut_ts": 1775003760000, "train_days": 279.94166666666666, "train_stats": {"n": 1074, "wr": 25.139664804469273, "net": -132.60901411380723, "net_per_trade": -0.12347208018045366}, "elig": {"freq_per_day": 3.8365135593724884, "cond_net": false, "cond_freq": true, "cond_n": true, "eligible": false}, "holdout_n": 1118}
