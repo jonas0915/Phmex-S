@@ -172,7 +172,18 @@ EXPERIMENTS = {
     # active for the whole window; $5 sizing since 7/27). Same trade filter as
     # the dashboard's GATED ERA card. Verdict at n=40:
     #   net <= $0 → KILL (owner halts main entries: touch .halt_main_entries)
-    #   net >  $0 → PASS (the book has earned a sizing discussion)
+    #   net >  $0 → PASS (sizing per the PRE-REGISTERED LADDER below)
+    # SIZING LADDER (pre-registered 2026-07-29 ~10:30 PM ET, owner order, at
+    # n=17 +$2.99 — BEFORE the verdict; the n=40 decision is mechanical):
+    #   marginal PASS  (net $0..+$2)                     → HOLD $5, extend to n=60
+    #   clear PASS     (net +$2..+$5 AND WR >= BE+5pts)  → $10
+    #   strong PASS    (net > +$5   AND WR >= 75%)       → $15 (old size restored)
+    #   NEVER past $15 on n=40 evidence (5m_MR earned $30 on ~5x the sample;
+    #   this book's BE-WR is ~71% given avg win $0.46 / avg loss $1.15 — more
+    #   fragile). BE reference at grade time = avg_loss/(avg_loss+avg_win) from
+    #   the era's own realized numbers, not the 71% snapshot. Any resize is
+    #   still an owner-gated audited restart, and the shared $8 daily halt
+    #   (5m_MR's 2 worst stops ≈ $7.72 of it) is the ceiling rationale.
     # No per-book $ rail on purpose — the account-wide daily $8 halt and the
     # 20% DD hard halt guard the downside; this grader is REPORT-ONLY.
     "main_gated": {
@@ -624,8 +635,25 @@ def grade_main_gated(trades: list, cfg: dict) -> dict:
     n = len(era)
     if n >= cfg["verdict_n"]:
         if net > 0:
+            # Pre-registered sizing ladder (2026-07-29, owner): rung computed
+            # from era-realized numbers so the digest states the mechanical
+            # outcome; the resize itself stays owner-gated.
+            _wins_v = [x for x in nets if x > 0]
+            _losses_v = [abs(x) for x in nets if x < 0]
+            _aw = sum(_wins_v) / len(_wins_v) if _wins_v else 0.0
+            _al = sum(_losses_v) / len(_losses_v) if _losses_v else 0.0
+            _be = _al / (_al + _aw) if (_al + _aw) > 0 else 1.0
+            if net <= 2.0:
+                _rung = "LADDER: marginal — HOLD $5, extend to n=60"
+            elif net <= 5.0 and wr is not None and wr >= _be + 0.05:
+                _rung = "LADDER: clear PASS — $10 (owner-gated restart)"
+            elif net > 5.0 and wr is not None and wr >= 0.75:
+                _rung = "LADDER: strong PASS — $15 (owner-gated restart)"
+            else:
+                _rung = (f"LADDER: net/WR straddle rungs (WR {wr:.0%} vs BE "
+                         f"{_be:.0%}) — hold $5, owner reads the split")
             status, note = PASS, (f"n={n} gated-era trades, net ${net:+.2f} > 0 "
-                                  "— registered verdict: sizing discussion earned")
+                                  f"— registered verdict. {_rung}")
         else:
             status, note = "KILL", (f"n={n} gated-era trades, net ${net:+.2f} <= 0 "
                                     "— registered verdict: halt main entries "
