@@ -712,7 +712,7 @@ def _st2_fill_stats() -> dict:
 # A .demote_<slot_id> flag file always overrides to DEMOTED (rollback latch).
 # (slot_id, title, one-line description of what the strategy does)
 _SIGNAL_BOXES = [
-    ("5m_scalp",       "MAIN BOOK &mdash; FULL HISTORY (htf_l2)",
+    ("5m_scalp",       "MAIN BOOK &mdash; FULL HISTORY",
      "ALL of the main book's htf_l2 trades, including the losing pre-gate "
      "history &mdash; this card answers \"what has this book done overall?\". "
      "Halted 2026-07-13&ndash;07-21, un-halted with the thin-tape &and; "
@@ -734,12 +734,12 @@ _SIGNAL_BOXES = [
      "Shorts a bid-heavy book being aggressively bought into (imbalance &ge; 0.35 &amp; "
      "buy-ratio 0.60&ndash;0.85), cvd/spread filtered. DEMOTED TO PAPER 2026-06-29 "
      "(35 live trades, no edge &mdash; execution adverse selection); paper sims only."),
-    ("HTF_L2",         "HTF_L2 &mdash; SLOT (PAPER)",
-     "htf_l2_anticipation as a slot (2026-07-18, action plan D1). LIVE "
-     "2026-07-20&ndash;07-27 with quiet-regime block + cross-book lock + "
-     "era loss cap; DEMOTED TO PAPER 2026-07-27 by owner order (era "
-     "&minus;$3.48/6t, coin-flip diagnosis &mdash; W/L indistinguishable at "
-     "entry). Accrues paper trades toward F7 snapshot mining at n&ge;30-40."),
+    ("HTF_L2",         "HTF_L2 EXPERIMENT &mdash; KILLED (was a slot)",
+     "The sealed-box experiment that ran the MAIN BOOK's same entry signal "
+     "with different exits/gates (2026-07-18 build). LIVE 2026-07-20&ndash;"
+     "07-27, lost $9.70/15 trades, demoted; KILLED PERMANENTLY 2026-07-31 "
+     "by owner order (paper sim stopped too; kill survives restarts). NOT "
+     "the main book &mdash; the main book lives in the two MAIN BOOK cards."),
     ("VWAP_CROSS",     "VWAP_CROSS &mdash; PAPER (OWNER STRATEGY)",
      "Owner-designed 9/15 SMA cross + dual VWAP filter: LONG when SMA9 crossed "
      "above SMA15 within the last 3 bars and price is above BOTH the 5m session "
@@ -804,10 +804,15 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
     # .demote_<slot> rollback flag above still wins.
     if slot_id in live_ids:
         return "<span class='pos'>&#9679; LIVE</span>"
+    # Persistent kill (2026-07-31): killed_at in the mode sidecar = the slot is
+    # permanently dead (survives restarts) — outranks DEMOTED, which reads as
+    # "resting" when the owner meant "buried" (HTF_L2 confusion, this date).
+    mode = modes.get(slot_id)
+    if mode and mode.get("killed_at"):
+        return "<span class='dim'>&#10013; KILLED (permanent)</span>"
     # Sidecar demotion (paper_mode=true written by auto/manual demote): a slot
     # with real-money history is DEMOTED, not "killed @<blended count>" — the
     # kill label conflated 35 live + 16 paper trades for ST2.0.
-    mode = modes.get(slot_id)
     n_live_trades = sum(1 for t in trades if t.get("mode") == "live")
     if mode and mode.get("paper_mode", True) and n_live_trades:
         return f"<span class='neg'>&#9679; DEMOTED @{n_live_trades} live</span>"

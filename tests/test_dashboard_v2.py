@@ -133,8 +133,8 @@ def test_htf_l2_signal_box_present():
     import web_dashboard as wd
     boxes = {b[0]: b[1] for b in wd._SIGNAL_BOXES}
     assert "HTF_L2" in boxes
-    # Retitled 2026-07-28 after the owner demote (was "LIVE SLOT")
-    assert "SLOT (PAPER)" in boxes["HTF_L2"]
+    # Retitled 2026-07-31 after the permanent owner kill (was "SLOT (PAPER)")
+    assert "KILLED" in boxes["HTF_L2"]
     assert boxes["HTF_L2"] != boxes["5m_scalp"]   # main-live box untouched
     # Retitled 2026-07-28: main path is LIVE again (un-halted 7/21, $5 gated era)
     assert "FULL HISTORY" in boxes["5m_scalp"]
