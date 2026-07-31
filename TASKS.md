@@ -1,4 +1,4 @@
-# TASK: SR_BOUNCE v2 — fixed geometry era (2026-07-30, owner order "Set 2.5% on 10x leverage and then 1.5% sl" → "SR_Bounce. 25% roi") — IN PROGRESS
+# TASK: SR_BOUNCE v2 — fixed geometry era (2026-07-30, owner order "Set 2.5% on 10x leverage and then 1.5% sl" → "SR_Bounce. 25% roi") — DEPLOYED 7/30 9:52 PM PT PID 63222 (Jonas "Go"; boot verified: slot ACTIVE 0 trades, no halts, 5m_MR LIVE intact)
 
 Re-arm SR_BOUNCE with fixed TP 2.5% price (25% ROI @10x) / SL 1.5% price (−15% ROI),
 replacing structural zone exits. Era 1 (structural) closed KILL at n=50 (net −$0.79,
@@ -13,7 +13,7 @@ fresh ledger, own adjudicator verdict line; era-1 KILL stays final.
 - [x] 6. adjudicator: pin era-1 grader to trading_state_SR_BOUNCE_era1.json (KILL final stays in digest); add sr_bounce_v2 line (verdict n=50, KILL net<=0, net AS-IS fee-inclusive)
 - [x] 7. dashboard: verify SR_BOUNCE card handles fresh era (no code change expected)
 - [x] 8. tests: exact_geometry shim + v2 grader + fix era-1 assertions; FULL suite green
-- [ ] 9. deploy script scripts/rotate_sr_bounce_era.sh: archive ledger → era1, clear killed_at sidecar (run ONLY at restart moment)
+- [x] 9. rotate_sr_bounce_era.sh RAN CLEAN at deploy (era1 archived n=50, killed_at cleared)
 - [x] 10. parallel review agents (code + spec audit)
 - [x] 11. /pre-restart-audit — PASSED; STOPPED at owner "go" gate (other session PID 10880 must be closed before restart)
 
