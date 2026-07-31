@@ -12,6 +12,8 @@ from types import SimpleNamespace
 import pytest
 
 import bot as botmod
+import risk_manager
+import strategy_slot
 from strategy_slot import StrategySlot
 
 
@@ -59,6 +61,13 @@ def _slot(slot_id, paper, tmp_path):
 @pytest.fixture
 def sandbox(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)  # sentinel globs are cwd-relative
+    # Sidecar paths are __file__-relative, NOT cwd-relative — without these
+    # patches every run leaked trading_state_KP_TEST*/KL_TEST* sidecars into
+    # the LIVE project dir (2026-07-31 audit; one claimed paper_mode:false
+    # and silently entered _live_slot_ids). Same pattern as the other
+    # sandbox fixtures (test_daily_halt_account_wide etc).
+    monkeypatch.setattr(strategy_slot, "__file__", str(tmp_path / "strategy_slot.py"))
+    monkeypatch.setattr(risk_manager, "__file__", str(tmp_path / "risk_manager.py"))
     monkeypatch.setattr(botmod.notifier, "send", lambda *a, **k: None)
     monkeypatch.setattr(botmod.notifier, "notify_paper_exit", lambda *a, **k: None)
     return tmp_path

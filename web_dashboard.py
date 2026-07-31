@@ -204,16 +204,17 @@ def _net_pnl(t: dict) -> float:
 
 
 def _sim_net_pnl(t: dict) -> float:
-    """Honest net for a PAPER (sim) trade. The slot paper writer records
-    fees_usdt but does NOT deduct them (net_pnl == pnl_usdt on most sim rows),
-    silently overstating sim results. Deduct at render time when the recorded
-    net clearly never subtracted fees; trust records that did."""
-    net = t.get("net_pnl")
-    pnl = t.get("pnl_usdt", 0)
-    fees = t.get("fees_usdt") or 0
-    if net is not None and abs(net - pnl) > 1e-9:
-        return net          # writer already deducted something — trust it
-    return pnl - fees
+    """Net for a PAPER (sim) trade = the recorded net, unchanged. HISTORY
+    (2026-07-31 audit fix): this used to re-subtract fees_usdt whenever
+    net_pnl == pnl_usdt, on the false premise that the paper writer never
+    deducted fees. risk_manager.close_position deducts fees for is_paper
+    books at close (pnl -= fees_usdt AND net_pnl = gross - fees - funding),
+    which makes net_pnl == pnl_usdt WITH fees already inside — so the old
+    heuristic double-charged every paper trade (~$42 of phantom losses
+    across 12 books; audit receipts 2026-07-31). Same premise-bug family as
+    the adjudicator's grade_sr_bounce fix (2026-07-30). Kept as a named
+    function so future paper-writer changes have one seam to adjust."""
+    return _net_pnl(t)
 
 
 def _real_fee(t: dict) -> float:
@@ -573,7 +574,11 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
     # stays in the blotter but must not render as a phantom slot card.
     ordered += sorted(s for s in slot_states
                       if s not in known_order
-                      and s not in ("v8_245trades", "SR_BOUNCE_era1"))
+                      and s not in ("v8_245trades", "SR_BOUNCE_era1",
+                                    "HTF_L2_PAPER"))  # HTF_L2_PAPER = pre-
+                                    # 2026-07-21-rename orphan of HTF_L2;
+                                    # rendering it made two near-identical
+                                    # rows (2026-07-31 audit)
 
     def _stats_html(subset, pnl_fn=_net_pnl):
         sn = len(subset)
@@ -584,11 +589,8 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
         return f"{sn}t &middot; {swr:.0f}% &middot; <span class='{scls}'>${snet:+.2f}</span>"
 
     def _sim_row_html(sim_rows):
-        # Sim stats are fee-adjusted at render time (the paper writer records
-        # fees but doesn't deduct them) — hence the fee-adj tag.
         return (f"<tr class='dim'><td></td><td>sim</td>"
-                f"<td>{_stats_html(sim_rows, _sim_net_pnl)}"
-                f" <span style='font-size:8px'>fee-adj</span></td></tr>")
+                f"<td>{_stats_html(sim_rows, _sim_net_pnl)}</td></tr>")
 
     rows = ""
     for slot_id in ordered:
@@ -626,6 +628,23 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
                     f"<div class='dim'>${hdrm:.2f} of ${cap:.2f} &middot; neg-Kelly @{kmt} live trades "
                     f"({len(live_trades)} so far)</div>"
                     "</td></tr>")
+        elif modes.get(slot_id, {}).get("killed_at"):
+            # Permanent kill (sidecar killed_at) — same precedence as the
+            # STRATEGIES-card badge; panels disagreed before (2026-07-31
+            # audit: HTF_L2 card said KILLED, this panel said paper).
+            rows += (f"<tr class='dim'><td>&#10013; {name}</td>"
+                     f"<td>killed (permanent)</td>"
+                     f"<td>{('live ' + _stats_html(live_rows)) if live_rows else _stats_html(sim_rows, _sim_net_pnl)}</td></tr>")
+            if live_rows and sim_rows:
+                rows += _sim_row_html(sim_rows)
+        elif (m := modes.get(slot_id)) is not None and m.get("paper_mode", True) and live_rows:
+            # Demoted slot with real-money history: badge parity with the
+            # STRATEGIES card ("DEMOTED @N live") — this panel used to say
+            # "killed @<blended n>" for the same slot (ST2.0).
+            rows += (f"<tr><td><span class='neg'>&#9679;</span> {name}</td>"
+                     f"<td class='neg'>demoted @{len(live_rows)} live</td>"
+                     f"<td>{_stats_html(live_rows)}</td></tr>")
+            rows += _sim_row_html(sim_rows)
         elif n >= 50 and _kelly_wr_rr(trades) < 0:
             # Killed slot — a demoted slot may still hold real-money history
             # (e.g. ST2.0's 35 live trades): show it on its own row, never
@@ -636,8 +655,7 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
                 rows += _sim_row_html(sim_rows)
             else:
                 rows += (f"<tr class='dim'><td>&#10013; {name}</td><td>killed @{n}</td>"
-                         f"<td>{_stats_html(sim_rows, _sim_net_pnl)}"
-                         f" <span style='font-size:8px'>sim fee-adj</span></td></tr>")
+                         f"<td>{_stats_html(sim_rows, _sim_net_pnl)}</td></tr>")
         else:
             if live_rows:
                 # Previously-promoted slot back on paper: keep its real record visible.
@@ -647,8 +665,7 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
             else:
                 rows += (f"<tr><td><span class='amb'>&#9679;</span> {name}</td>"
                          f"<td class='amb'>paper</td>"
-                         f"<td>{_stats_html(sim_rows, _sim_net_pnl)}"
-                         f" <span style='font-size:8px'>sim fee-adj</span></td></tr>")
+                         f"<td>{_stats_html(sim_rows, _sim_net_pnl)}</td></tr>")
 
     if not rows:
         rows = "<tr><td class='dim'>no slot state files found</td></tr>"
@@ -745,8 +762,9 @@ _SIGNAL_BOXES = [
      "above SMA15 within the last 3 bars and price is above BOTH the 5m session "
      "VWAP and the 15m VWAP (same midnight-UTC anchor); SHORT mirrored. PAPER "
      "forward test 2026-07-20&ndash;07-27; AUTO-KILLED at 50 trades by the "
-     "negative-Kelly switch (38% WR, &minus;$6.81 net) &mdash; forward test "
-     "answered."),
+     "negative-Kelly switch &mdash; record AT KILL 2026-07-27: 38% WR, "
+     "&minus;$6.81 net; current totals render live in the table &mdash; "
+     "forward test answered."),
     ("SR_BOUNCE",      "SR_BOUNCE v2 &mdash; FIXED GEOMETRY (PAPER)",
      "Owner-designed horizontal S/R bounce: 1h swing-pivot zones (k=3, "
      "0.25&times;ATR cluster, &ge;2 touches), confirmed-rejection 5m entry, "
@@ -761,7 +779,8 @@ _SIGNAL_BOXES = [
      "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "
      "&minus;8% exchange disaster stop only (no trail/TP/Kelly). Built 2026-07-06, "
      "ran PAPER; RETIRED 2026-07-27 by its pre-registered tracking-drift kill "
-     "line (+$0.51 net &mdash; clean, criteria-driven exit)."),
+     "line (net AT RETIREMENT +$0.51 &mdash; clean, criteria-driven exit); "
+     "killed permanently 2026-07-28, kill survives restarts."),
 ]
 # 5m_liq_cascade and 5m_narrow boxes removed 2026-06-13 — both hard-KILLED
 # in paper (neg Kelly), no longer tracked. State files kept; they still surface
@@ -924,7 +943,6 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
         live_ts = [t for t in trades if t.get("mode") == "live"]
         paper_ts = [t for t in trades if t.get("mode") != "live"]
         lw, ll, lnet = _wl(live_ts)
-        # Sim stats fee-adjusted at render time (paper writer records fees but
         # doesn't deduct them from net_pnl).
         pw, pl, pnet = _wl(paper_ts, _sim_net_pnl)
         # Break-even trades (net==0) are neither W nor L; show them so W/L reconciles
@@ -953,7 +971,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"<span class='dim' style='font-size:9px'> &middot; {len(live_ts)} tr</span></td></tr>"
             f"<tr><td class='dim'>paper (sim)</td><td>"
             f"{pw}W / {pl}L{_pbe} &middot; {pwr:.0f}% WR &middot; <span class='{pcls}'>${pnet:+.2f}</span>"
-            f" <span class='dim' style='font-size:8px'>fee-adj</span></td></tr>"
+            f"</td></tr>"
             f"<tr><td class='dim'>net PnL (live)</td><td class='{lcls}'>${lnet:+.2f}</td></tr>"
             f"<tr><td class='dim'>avg win (live)</td><td class='pos'>${l_avgw:+.2f}</td></tr>"
             f"<tr><td class='dim'>avg loss (live)</td><td class='neg'>${l_avgl:+.2f}</td></tr>"
@@ -1180,7 +1198,6 @@ def collect_blotter_rows(limit: int = 500, slot_states: dict = None) -> list[dic
                 "sym": str(t.get("symbol") or "?").replace("/USDT:USDT", ""),
                 "side": str(t.get("side") or "?"),
                 "strat": str(t.get("strategy") or ""),
-                # Sim rows fee-adjusted at render time (paper writer bug)
                 "net": round(_net_pnl(t) if mode == "live" else _sim_net_pnl(t), 4),
                 "reason": str(t.get("exit_reason") or t.get("reason") or ""),
                 "owner": owner,
