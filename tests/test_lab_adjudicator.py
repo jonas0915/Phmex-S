@@ -306,65 +306,118 @@ def test_grade_htf_l2_registered_verdicts():
 
 def test_htf_l2_wired_into_digest():
     digest, results = adj.build_digest(now=1_784_000_000.0)
-    assert len(results) == 8                 # + vwap_cross (7/20) + main_gated (7/27)
+    assert len(results) == 9                 # + vwap_cross (7/20) + main_gated (7/27)
     assert results[4]["experiment"] == "htf_l2"                      # + sr_bounce (7/28)
-    assert "[htf_l2]" in digest
+    assert "[htf_l2]" in digest                                      # + sr_bounce_v2 (7/30)
     assert results[5]["experiment"] == "vwap_cross"
     assert "[vwap_cross]" in digest
     assert results[6]["experiment"] == "main_gated"
     assert "[main_gated]" in digest
     assert results[7]["experiment"] == "sr_bounce"
     assert "[sr_bounce]" in digest
+    assert results[8]["experiment"] == "sr_bounce_v2"
+    assert "[sr_bounce_v2]" in digest
 
 
-# ── SR_BOUNCE slot grader (2026-07-28, owner-ordered forward test) ────────
-def test_grade_sr_bounce_watch_under_n():
-    cfg = adj.EXPERIMENTS["sr_bounce"]
-    state = {"closed_trades": [
-        {"net_pnl": 0.10, "fees_usdt": 0.06, "mode": "paper"},
-        {"net_pnl": -0.20, "fees_usdt": 0.06, "mode": "paper"},
-    ]}
-    r = adj.grade_sr_bounce(state, cfg)
-    assert r["experiment"] == "sr_bounce"
-    assert r["status"] == adj.WATCH
-    assert r["n_trades"] == 2
-    assert "n=2/50" in r["note"]
-    assert "breakeven_wr" not in r
-
-
-def test_grade_sr_bounce_zero_is_watch():
-    r = adj.grade_sr_bounce({}, adj.EXPERIMENTS["sr_bounce"])
-    assert r["status"] == adj.WATCH
-    assert r["n_trades"] == 0
-    assert "n=0/50" in r["note"]
-
-
-def test_grade_sr_bounce_kill_at_n50_negative_net():
+# ── SR_BOUNCE era-1 grader (final since 2026-07-30; reads the archive) ────
+def test_grade_sr_bounce_era1_killed_final():
+    # The archived era-1 ledger (n=50, net<=0) prints the KILL final forever.
     cfg = adj.EXPERIMENTS["sr_bounce"]
     trades = [{"net_pnl": -0.10, "fees_usdt": 0.06, "mode": "paper"}
               for _ in range(50)]
     r = adj.grade_sr_bounce({"closed_trades": trades}, cfg)
-    assert r["status"] == "KILL"
+    assert r["status"] == "KILLED"
     assert r["n_trades"] == 50
     # net_pnl is already fee-inclusive (RiskManager deducts sim fees before
     # the paper writer ever sees net_pnl) — fees_usdt must NOT be subtracted
     # again here. Correct sum = 50 * -0.10 = -5.0, not the double-subtracted
     # 50 * (-0.10 - 0.06) = -8.0.
     assert abs(r["net_usd"] - (-5.0)) < 1e-9
+    assert "Final" in r["note"]
+    assert "sr_bounce_v2" in r["note"]
+
+
+def test_grade_sr_bounce_era1_missing_archive_is_explicit():
+    # Archive not yet rotated → say so; never fabricate the stats.
+    r = adj.grade_sr_bounce({}, adj.EXPERIMENTS["sr_bounce"])
+    assert r["status"] == "KILLED"
+    assert r["n_trades"] == 0
+    assert "rotation" in r["note"]
+
+
+def test_grade_sr_bounce_era1_unexpected_archive_flags_data():
+    # Anything other than the decided n=50 KILL ledger in the archive is a
+    # data problem to surface, not something to silently grade.
+    cfg = adj.EXPERIMENTS["sr_bounce"]
+    state = {"closed_trades": [
+        {"net_pnl": 0.10, "fees_usdt": 0.06, "mode": "paper"},
+        {"net_pnl": -0.20, "fees_usdt": 0.06, "mode": "paper"},
+    ]}
+    r = adj.grade_sr_bounce(state, cfg)
+    assert r["status"] == "DATA?"
+    assert r["n_trades"] == 2
+    assert "investigate" in r["note"]
+
+
+# ── SR_BOUNCE v2 grader (2026-07-30, fixed-geometry era) ──────────────────
+def test_grade_sr_bounce_v2_watch_under_n():
+    cfg = adj.EXPERIMENTS["sr_bounce_v2"]
+    _ts = cfg["deployed_ts"] + 3600
+    state = {"closed_trades": [
+        {"net_pnl": 0.10, "fees_usdt": 0.06, "mode": "paper", "closed_at": _ts},
+        {"net_pnl": -0.20, "fees_usdt": 0.06, "mode": "paper", "closed_at": _ts},
+    ]}
+    r = adj.grade_sr_bounce_v2(state, cfg)
+    assert r["experiment"] == "sr_bounce_v2"
+    assert r["status"] == adj.WATCH
+    assert r["n_trades"] == 2
+    assert "n=2/50" in r["note"]
+    assert r["breakeven_wr"] == 0.405
+
+
+def test_grade_sr_bounce_v2_zero_is_watch():
+    r = adj.grade_sr_bounce_v2({}, adj.EXPERIMENTS["sr_bounce_v2"])
+    assert r["status"] == adj.WATCH
+    assert r["n_trades"] == 0
+    assert "n=0/50" in r["note"]
+
+
+def test_grade_sr_bounce_v2_kill_at_n50_negative_net():
+    cfg = adj.EXPERIMENTS["sr_bounce_v2"]
+    trades = [{"net_pnl": -0.10, "fees_usdt": 0.06, "mode": "paper",
+               "closed_at": cfg["deployed_ts"] + 3600}
+              for _ in range(50)]
+    r = adj.grade_sr_bounce_v2({"closed_trades": trades}, cfg)
+    assert r["status"] == "KILL"
+    assert r["n_trades"] == 50
+    # Same fee-inclusive rule as era 1: net_pnl AS-IS, no re-subtraction.
+    assert abs(r["net_usd"] - (-5.0)) < 1e-9
     assert "registered verdict" in r["note"]
-    assert "kill the slot" in r["note"]
     assert ".kill_SR_BOUNCE" in r["note"]
 
 
-def test_grade_sr_bounce_pass_eligible_at_n50_positive_net():
-    cfg = adj.EXPERIMENTS["sr_bounce"]
-    trades = [{"net_pnl": 0.50, "fees_usdt": 0.06, "mode": "paper"}
+def test_grade_sr_bounce_v2_pass_eligible_at_n50_positive_net():
+    cfg = adj.EXPERIMENTS["sr_bounce_v2"]
+    trades = [{"net_pnl": 0.50, "fees_usdt": 0.06, "mode": "paper",
+               "closed_at": cfg["deployed_ts"] + 3600}
               for _ in range(50)]
-    r = adj.grade_sr_bounce({"closed_trades": trades}, cfg)
+    r = adj.grade_sr_bounce_v2({"closed_trades": trades}, cfg)
     assert r["status"] == "PASS-ELIGIBLE"
     assert r["n_trades"] == 50
     assert abs(r["net_usd"] - 25.0) < 1e-9       # 50 * 0.50, fees not re-subtracted
     assert "owner decision required" in r["note"]
+
+
+def test_grade_sr_bounce_v2_net_pnl_used_as_is():
+    # Same anti-double-subtraction rule as era 1, asserted for the v2 grader.
+    cfg = adj.EXPERIMENTS["sr_bounce_v2"]
+    state = {"closed_trades": [
+        {"net_pnl": 0.05, "fees_usdt": 0.06, "mode": "paper",
+         "closed_at": cfg["deployed_ts"] + 3600},
+    ]}
+    r = adj.grade_sr_bounce_v2(state, cfg)
+    assert r["wins"] == 1
+    assert abs(r["net_usd"] - 0.05) < 1e-9
 
 
 def test_grade_sr_bounce_net_pnl_used_as_is():
@@ -403,3 +456,16 @@ def test_grade_sr_bounce_live_trades_use_net_pnl_directly():
     r = adj.grade_sr_bounce(state, cfg)
     assert r["wins"] == 1
     assert abs(r["net_usd"] - 0.05) < 1e-9
+
+
+def test_grade_sr_bounce_v2_era_guard_excludes_era1_trades():
+    # Pre-rotation window: the live file still holds era 1's decided ledger.
+    # Trades closed BEFORE the v2 registration ts must not count — the
+    # grader stays WATCH n=0 instead of printing a false v2 KILL.
+    cfg = adj.EXPERIMENTS["sr_bounce_v2"]
+    trades = [{"net_pnl": -0.10, "fees_usdt": 0.06, "mode": "paper",
+               "closed_at": cfg["deployed_ts"] - 3600}
+              for _ in range(50)]
+    r = adj.grade_sr_bounce_v2({"closed_trades": trades}, cfg)
+    assert r["status"] == adj.WATCH
+    assert r["n_trades"] == 0

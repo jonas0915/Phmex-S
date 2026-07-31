@@ -176,3 +176,69 @@ def test_shim_forces_atr0_short_geometry_verbatim():
     assert pos.stop_loss > entry > pos.take_profit
     assert pos.stop_loss == pytest.approx(sig_sl)
     assert pos.take_profit == pytest.approx(sig_tp)
+
+
+# ── v2 fixed-geometry era (2026-07-30 owner order) ─────────────────────────
+def test_sr_bounce_v2_registration_fixed_geometry():
+    """Owner order 2026-07-30 ("SR_Bounce. 25% roi"): TP 2.5% / SL 1.5% of
+    price (25%/−15% ROI at 10x), applied verbatim via exact_geometry."""
+    import bot as botmod
+    src = inspect.getsource(botmod.Phmex2Bot.__init__)
+    block = src[src.index('slot_id="SR_BOUNCE"'):src.index('slot_id="SR_BOUNCE"') + 900]
+    assert "sl_percent=1.5" in block
+    assert "tp_percent=2.5" in block
+    assert "exact_geometry=True" in block
+
+
+def test_exact_geometry_defaults_false_for_other_slots():
+    """The v2 flag must not leak into any other slot's behavior — StrategySlot
+    defaults exact_geometry=False, and no other registration sets it."""
+    import bot as botmod
+    from strategy_slot import StrategySlot
+    s = StrategySlot(slot_id="X", strategy_name="x", timeframe="5m")
+    assert s.exact_geometry is False
+    src = inspect.getsource(botmod.Phmex2Bot.__init__)
+    build_srcs = src + inspect.getsource(botmod.Phmex2Bot._build_htf_l2_slot) \
+        + inspect.getsource(botmod.Phmex2Bot._build_vwap_cross_slot)
+    assert build_srcs.count("exact_geometry=True") == 1  # SR_BOUNCE only
+
+
+def test_paper_shim_exact_geometry_branch_precedes_structural():
+    """The paper entry site must check slot.exact_geometry BEFORE the
+    structural sl_price/tp_price conversion, so fixed-geometry slots ignore
+    strategy-supplied levels (and skip the era-1 stale-levels veto)."""
+    import bot as botmod
+    src = inspect.getsource(botmod.Phmex2Bot._evaluate_slots)
+    i_exact = src.index("if slot.exact_geometry:")
+    i_structural = src.index('elif _sig_sl is not None and _sig_tp is not None and price > 0:')
+    assert i_exact < i_structural
+    # live stale-check is gated off for exact_geometry slots
+    assert "not slot.exact_geometry and _sig_sl is not None" in src
+    # live fill-site mirror exists too
+    assert src.count("if slot.exact_geometry:") >= 2
+
+
+def test_exact_geometry_percentages_apply_verbatim():
+    """atr=0 + sl_pct=1.5/tp_pct=2.5 must produce exactly entry∓1.5%/+2.5%
+    (long) — no ATR clamp, no stop widening (risk_manager exact-pct branch)."""
+    from risk_manager import RiskManager
+
+    entry = 200.0
+    with tempfile.TemporaryDirectory() as tmpdir:
+        rm = RiskManager(state_file=os.path.join(tmpdir, "v2_geom_test.json"))
+        pos = rm.open_position("TEST/USDT:USDT", entry, 5.0, side="long",
+                               atr=0.0, sl_pct=1.5, tp_pct=2.5)
+    assert pos.stop_loss == pytest.approx(entry * (1 - 0.015))
+    assert pos.take_profit == pytest.approx(entry * (1 + 0.025))
+
+
+def test_exact_geometry_requires_both_percentages():
+    """exact_geometry without explicit sl/tp would silently fall back to the
+    global Config geometry in risk_manager — construction must refuse."""
+    from strategy_slot import StrategySlot
+    with pytest.raises(ValueError):
+        StrategySlot(slot_id="BAD", strategy_name="x", timeframe="5m",
+                     exact_geometry=True, sl_percent=1.5)  # tp missing
+    with pytest.raises(ValueError):
+        StrategySlot(slot_id="BAD2", strategy_name="x", timeframe="5m",
+                     exact_geometry=True, tp_percent=2.5)  # sl missing

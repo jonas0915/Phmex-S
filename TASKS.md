@@ -1,3 +1,42 @@
+# TASK: SR_BOUNCE v2 — fixed geometry era (2026-07-30, owner order "Set 2.5% on 10x leverage and then 1.5% sl" → "SR_Bounce. 25% roi") — IN PROGRESS
+
+Re-arm SR_BOUNCE with fixed TP 2.5% price (25% ROI @10x) / SL 1.5% price (−15% ROI),
+replacing structural zone exits. Era 1 (structural) closed KILL at n=50 (net −$0.79,
+23W/27L, neg Kelly −0.076, auto-killed 8:24:54 PM PT 7/30). New era = new experiment,
+fresh ledger, own adjudicator verdict line; era-1 KILL stays final.
+
+- [x] 1. Prereg spec: docs/superpowers/specs/2026-07-30-sr-bounce-v2-fixed-geometry-prereg.md
+- [x] 2. strategy_slot.py: add `exact_geometry: bool = False` field
+- [x] 3. bot.py registration: SR_BOUNCE sl_percent=1.5, tp_percent=2.5, exact_geometry=True
+- [x] 4. bot.py paper entry shim: exact_geometry slots use slot pcts verbatim (atr=0); structural override + stale-skip bypassed for them
+- [x] 5. bot.py live entry site: gate structural stale-check on `not slot.exact_geometry` (consistency; SR_BOUNCE has no live path)
+- [x] 6. adjudicator: pin era-1 grader to trading_state_SR_BOUNCE_era1.json (KILL final stays in digest); add sr_bounce_v2 line (verdict n=50, KILL net<=0, net AS-IS fee-inclusive)
+- [x] 7. dashboard: verify SR_BOUNCE card handles fresh era (no code change expected)
+- [x] 8. tests: exact_geometry shim + v2 grader + fix era-1 assertions; FULL suite green
+- [ ] 9. deploy script scripts/rotate_sr_bounce_era.sh: archive ledger → era1, clear killed_at sidecar (run ONLY at restart moment)
+- [x] 10. parallel review agents (code + spec audit)
+- [x] 11. /pre-restart-audit — PASSED; STOPPED at owner "go" gate (other session PID 10880 must be closed before restart)
+
+## Review
+Spec audit: GO. Geometry verbatim-verified end-to-end (entry 100 → SL 98.5 / TP 102.5);
+era-1 ledger recomputed independently (n=50, net −$0.7915, 23W/27L, −$0.0158/t); BE-WR
+40.5% verified against the real fee model (0.12% RT of notional; paper funding is $0).
+Code review: NO BLOCKERS. Other-slot isolation airtight (exact_geometry=True count==1,
+False path byte-equivalent to old behavior); killed_at=null re-enables via falsy check;
+no .kill_SR_BOUNCE sentinel on disk; auto_lifecycle can't touch SR_BOUNCE; closed_at and
+deployed_ts both epoch-seconds, era guard has ~39 min margin. Fixed from review: prereg
+now records the 240-cycle (~4h) hard time exit as a third exit (era 1 never tripped it —
+all 50 exits SL/TP — but v2's wider target will); timestamps corrected to actuals (kill
+8:24:54 PM PT, last close 8:20:50 PM PT); rotate script refuses undecided ledger
+(killed_at unset); exact_geometry without both pcts now raises at construction;
+SR_BOUNCE_era1 archive skipped as phantom slot in dashboard cards/desk/today-sums but
+kept in blotter (real history, not a v8-style duplicate). Final suite: 639 passed / 0
+failed (my run; agent-reported totals not trusted per 7/29 lesson). Pre-restart audit:
+all .py compile, rotate script zsh -n clean, no lessons.md parameter conflicts,
+Good-bot not running. Restart NOT executed — owner go pending.
+
+---
+
 # TASK: Safety + audit-rules bundle → HTF_L2 LIVE re-promotion (2026-07-23, Jonas GO "but not paper — live testing") — IN PROGRESS
 
 U1 quiet_regime hard-block HTF_L2 slot (57% of slot loss, 0 quiet winners) · U2 cross-book

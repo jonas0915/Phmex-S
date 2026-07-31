@@ -162,7 +162,8 @@ def test_sr_bounce_signal_box_present():
     import web_dashboard as wd
     boxes = {b[0]: b[1] for b in wd._SIGNAL_BOXES}
     assert "SR_BOUNCE" in boxes
-    assert "PAPER FORWARD TEST" in boxes["SR_BOUNCE"]
+    # v2 fixed-geometry era (2026-07-30): card title updated with the re-arm.
+    assert "FIXED GEOMETRY" in boxes["SR_BOUNCE"]
 
 
 def test_sr_bounce_tombstone_branch_removed():

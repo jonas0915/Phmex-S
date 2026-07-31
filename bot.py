@@ -701,11 +701,14 @@ class Phmex2Bot:
         # .superpowers/sdd/2026-07-28-sr-bounce-slot/progress.md. strategy_name IS
         # a STRATEGIES key (strategies.sr_bounce -> sr_bounce.evaluate), so this
         # slot runs the full generic scalper path under standard slot gates — no
-        # htf_l2-specific gates apply. sl_percent/tp_percent are left at the
-        # StrategySlot default (None): the strategy supplies structural sl_price/
-        # tp_price on every non-HOLD signal, which the entry call sites below
-        # convert to pct-of-entry and use instead (see the sl_price/tp_price shim
-        # in _evaluate_slots). Paper-only; no live promotion path wired yet.
+        # htf_l2-specific gates apply. Paper-only; no live promotion path wired yet.
+        # v2 fixed-geometry era (2026-07-30 owner order, prereg
+        # docs/superpowers/specs/2026-07-30-sr-bounce-v2-fixed-geometry-prereg.md):
+        # era 1 (structural zone exits) closed KILL at its n=50 line (net −$0.79,
+        # neg Kelly). v2 keeps the entry signal frozen but exits at fixed
+        # TP 2.5% / SL 1.5% of entry price (25% / −15% ROI at 10x), applied
+        # verbatim via exact_geometry — the strategy's structural sl_price/
+        # tp_price are ignored by the entry shim for this slot.
         self.slots.append(StrategySlot(
             slot_id="SR_BOUNCE",
             strategy_name="sr_bounce",             # STRATEGIES key — strategies.py
@@ -715,6 +718,9 @@ class Phmex2Bot:
             paper_mode=True,
             trade_amount_usdt=5.0,
             entry_patience_s=45.0,
+            sl_percent=1.5,
+            tp_percent=2.5,
+            exact_geometry=True,
         ))
         # ETH-TSM-28 runtime state: sidecar mirror + per-cycle entry-in-flight flag
         # (read by _tsm_locks_symbol so the main bot never grabs ETH mid-entry).
@@ -3177,7 +3183,15 @@ class Phmex2Bot:
                         _sig_sl = getattr(signal, "sl_price", None)
                         _sig_tp = getattr(signal, "tp_price", None)
                         _entry_atr = atr_val
-                        if _sig_sl is not None and _sig_tp is not None and price > 0:
+                        if slot.exact_geometry:
+                            # Fixed-geometry slot (SR_BOUNCE v2, 2026-07-30 owner order):
+                            # slot sl/tp percentages apply verbatim — atr=0 forces
+                            # risk_manager's exact-percentage branch (no R:R clamp, no
+                            # stop widening), and structural signal levels are ignored,
+                            # so the era-1 stale-levels skip deliberately does not run
+                            # (recorded in the v2 prereg as an entry-set difference).
+                            _entry_atr = 0.0
+                        elif _sig_sl is not None and _sig_tp is not None and price > 0:
                             # Structural per-trade exits (SR_BOUNCE 2026-07-28): strategy-supplied
                             # absolute levels convert to pct-of-entry; open_position's None-default
                             # keeps every other slot on its existing geometry.
@@ -3235,7 +3249,10 @@ class Phmex2Bot:
                         # isn't known yet, and by then a real order would already be live).
                         _sig_sl = getattr(signal, "sl_price", None)
                         _sig_tp = getattr(signal, "tp_price", None)
-                        if _sig_sl is not None and _sig_tp is not None and price > 0:
+                        # exact_geometry slots ignore structural levels (2026-07-30),
+                        # so the stale-levels skip must not veto their entries.
+                        if (not slot.exact_geometry and _sig_sl is not None
+                                and _sig_tp is not None and price > 0):
                             _levels_ok = ((direction == "long" and _sig_sl < price < _sig_tp) or
                                           (direction == "short" and _sig_tp < price < _sig_sl))
                             _stale_sl_pct = abs(price - _sig_sl) / price * 100.0
@@ -3324,7 +3341,12 @@ class Phmex2Bot:
                             fill_price = self._extract_fill_price(order, price)
                             _sl_pct, _tp_pct = slot.sl_percent, slot.tp_percent
                             _entry_atr = atr_val
-                            if _sig_sl is not None and _sig_tp is not None and fill_price > 0:
+                            if slot.exact_geometry:
+                                # Fixed-geometry slot (2026-07-30): slot pcts verbatim,
+                                # atr=0 exact branch, structural levels ignored — mirrors
+                                # the paper entry site.
+                                _entry_atr = 0.0
+                            elif _sig_sl is not None and _sig_tp is not None and fill_price > 0:
                                 # Structural per-trade exits (SR_BOUNCE 2026-07-28): strategy-supplied
                                 # absolute levels convert to pct-of-entry; open_position's None-default
                                 # keeps every other slot on its existing geometry. _sig_sl/_sig_tp

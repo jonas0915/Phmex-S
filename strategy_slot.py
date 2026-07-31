@@ -47,6 +47,11 @@ class StrategySlot:
     sl_percent: float = None         # per-slot SL % override passed to open_position (2026-07-18,
                                      # HTF_L2); None = inherit Config.STOP_LOSS_PERCENT
     tp_percent: float = None         # per-slot TP % override; None = inherit Config.TAKE_PROFIT_PERCENT
+    exact_geometry: bool = False     # per-slot opt-in (2026-07-30, SR_BOUNCE v2 owner order):
+                                     # sl_percent/tp_percent apply VERBATIM — entry passes atr=0 so
+                                     # risk_manager's ATR branch can't clamp R:R or widen the stop,
+                                     # and any strategy-supplied structural sl_price/tp_price on the
+                                     # signal is ignored (informational only). Off = no change.
     durable_trail_enabled: bool = False  # per-slot opt-in: ratchet the resting exchange SL up as the
                                          # trail arms (Config.TRAIL_ARM_ROI), mirroring the main-bot durable trail.
                                          # The amend rests on Phemex, so the profit-lock survives a host
@@ -63,6 +68,13 @@ class StrategySlot:
                                     # (its patience buys back-of-queue toxic fills).
 
     def __post_init__(self):
+        # exact_geometry promises the slot's own percentages apply verbatim —
+        # with either missing, risk_manager would silently fall back to the
+        # global Config SL/TP, which is exactly the surprise the flag exists
+        # to prevent (review catch 2026-07-30).
+        if self.exact_geometry and (self.sl_percent is None or self.tp_percent is None):
+            raise ValueError(f"slot {self.slot_id}: exact_geometry=True requires "
+                             "explicit sl_percent AND tp_percent")
         # Each slot gets its own RiskManager (separate positions, P&L, Kelly)
         state_file = f"trading_state_{self.slot_id}.json"
         self.risk = RiskManager(state_file=state_file)

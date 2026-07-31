@@ -568,9 +568,12 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
     live_ids = _live_slot_ids()
     known_order = ["5m_scalp", "5m_mean_revert", "5m_liq_cascade"]
     ordered = [s for s in known_order if s in slot_states]
-    # v8_245trades is an archived state snapshot, not a slot (same skip as before)
+    # v8_245trades is an archived state snapshot, not a slot (same skip as before);
+    # SR_BOUNCE_era1 is the era-1 archive (2026-07-30 rotation) — its history
+    # stays in the blotter but must not render as a phantom slot card.
     ordered += sorted(s for s in slot_states
-                      if s not in known_order and s != "v8_245trades")
+                      if s not in known_order
+                      and s not in ("v8_245trades", "SR_BOUNCE_era1"))
 
     def _stats_html(subset, pnl_fn=_net_pnl):
         sn = len(subset)
@@ -744,15 +747,15 @@ _SIGNAL_BOXES = [
      "forward test 2026-07-20&ndash;07-27; AUTO-KILLED at 50 trades by the "
      "negative-Kelly switch (38% WR, &minus;$6.81 net) &mdash; forward test "
      "answered."),
-    ("SR_BOUNCE",      "SR_BOUNCE &mdash; PAPER FORWARD TEST (SCAN SAID NO)",
+    ("SR_BOUNCE",      "SR_BOUNCE v2 &mdash; FIXED GEOMETRY (PAPER)",
      "Owner-designed horizontal S/R bounce: 1h swing-pivot zones (k=3, "
      "0.25&times;ATR cluster, &ge;2 touches), confirmed-rejection 5m entry, "
-     "structural stop/target, ADX&lt;30 regime. The backtest kill-gate said "
-     "DO-NOT-BUILD (&minus;$0.07/t holdout, worse than a coin flip &mdash; "
-     "reports/2026-07-28-sr-bounce-scan.md). Owner-ordered paper forward "
-     "test anyway (2026-07-28): measuring the one thing the scan couldn't "
-     "&mdash; real fill selection. KILL at n=50 fee-adj net &le; $0 "
-     "(adjudicator-graded)."),
+     "ADX&lt;30 regime. Era 1 (structural zone exits) hit its registered "
+     "KILL at n=50 on 2026-07-30 (net &minus;$0.79, 46% WR &mdash; ledger "
+     "archived to _era1). v2 (owner order 2026-07-30): same entry signal, "
+     "exits fixed TP +2.5% / SL &minus;1.5% of price (25%/&minus;15% ROI "
+     "at 10x), applied verbatim. BE-WR 40.5% fee-incl. Verdict at n=50: "
+     "KILL if net &le; $0 (adjudicator-graded, sr_bounce_v2 line)."),
     ("ETH_TSM_28",     "ETH-TSM-28 &mdash; SLOW TREND (PAPER)",
      "Daily-horizon time-series momentum: long 0.01 ETH when the 28-day return is "
      "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "
@@ -1078,8 +1081,8 @@ def build_equity_series(era: str = "sentinel") -> dict:
     """
     rows = [("main", t) for t in read_state().get("closed_trades", []) or []]
     for slot_id, state in sorted(read_all_slot_states().items()):
-        if slot_id in ("5m_scalp", "v8_245trades"):
-            continue  # main file already merged above; v8 is an archive snapshot
+        if slot_id in ("5m_scalp", "v8_245trades", "SR_BOUNCE_era1"):
+            continue  # main file already merged above; v8/era1 are archive snapshots
         slot_trades = (state or {}).get("closed_trades", []) or []
         rows.extend((slot_id, t) for t in slot_trades if t.get("mode") == "live")
     if era == "sentinel":
@@ -1273,8 +1276,8 @@ def _today_net_pnl(state: dict) -> float:
         total = sum(_net_pnl(t) for t in state.get("closed_trades", [])
                     if t.get("closed_at", 0) >= today_start)
         for slot_id, sstate in read_all_slot_states().items():
-            if slot_id in ("5m_scalp", "v8_245trades"):
-                continue  # 5m_scalp IS the main state; v8 is an archive
+            if slot_id in ("5m_scalp", "v8_245trades", "SR_BOUNCE_era1"):
+                continue  # 5m_scalp IS the main state; v8/era1 are archives
             total += sum(_net_pnl(t) for t in (sstate or {}).get("closed_trades") or []
                          if t.get("mode") == "live" and t.get("closed_at", 0) >= today_start)
         return total

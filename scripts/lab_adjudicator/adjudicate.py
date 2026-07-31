@@ -202,6 +202,20 @@ EXPERIMENTS = {
         "verdict_n": 50,
         "scan_prior_per_trade": -0.0705,
     },
+    # SR_BOUNCE v2 — fixed geometry era (2026-07-30 owner order; prereg
+    # docs/superpowers/specs/2026-07-30-sr-bounce-v2-fixed-geometry-prereg.md).
+    # Era 1 (structural zone exits) hit its registered KILL at n=50
+    # (net −$0.79, 23W/27L, neg Kelly −0.076, auto-killed 8:24:54 PM PT 7/30);
+    # its ledger is archived to trading_state_SR_BOUNCE_era1.json and its
+    # grader keeps printing the final. v2 keeps the entry signal frozen and
+    # exits at fixed TP 2.5% / SL 1.5% of price (25%/−15% ROI at 10x).
+    # BE-WR 40.5% fee-inclusive ($1.19 win / $0.81 loss on $5 margin).
+    "sr_bounce_v2": {
+        "deployed_ts": _pt_ts(2026, 7, 30, 21, 0),  # registration; restart may land later
+        "verdict_n": 50,
+        "era1_per_trade": -0.0158,   # era-1 realized net/trade — the prior to beat
+        "breakeven_wr": 0.405,
+    },
 }
 
 TSM_STATE_FILE = BOT_DIR / "trading_state_ETH_TSM_28.json"
@@ -210,7 +224,8 @@ HTF_L2_STATE_FILE = BOT_DIR / "trading_state_HTF_L2.json"
 HTF_L2_COUNTERS_FILE = BOT_DIR / "trading_state_HTF_L2_blocked.json"
 VWAP_CROSS_STATE_FILE = BOT_DIR / "trading_state_VWAP_CROSS.json"
 VWAP_CROSS_COUNTERS_FILE = BOT_DIR / "trading_state_VWAP_CROSS_blocked.json"
-SR_BOUNCE_STATE_FILE = BOT_DIR / "trading_state_SR_BOUNCE.json"
+SR_BOUNCE_STATE_FILE = BOT_DIR / "trading_state_SR_BOUNCE.json"          # v2 era (fresh ledger post-rotation)
+SR_BOUNCE_ERA1_STATE_FILE = BOT_DIR / "trading_state_SR_BOUNCE_era1.json"  # era-1 archive (KILL final)
 
 
 # ── shared helpers ────────────────────────────────────────────────────────
@@ -733,23 +748,82 @@ def grade_sr_bounce(slot_state: dict, cfg: dict) -> dict:
     net = sum(nets) if nets else 0.0
     n = len(trades)
 
-    if n >= cfg["verdict_n"]:
-        if net <= 0:
-            status = "KILL"
-            note = (f"registered verdict: n={n}, net ${net:+.2f} <= 0 — "
-                     "scan prior confirmed; kill the slot (touch .kill_SR_BOUNCE)")
-        else:
-            status = "PASS-ELIGIBLE"
-            note = (f"n={n}, net ${net:+.2f} > 0 — beats the scan prior; "
-                     "owner decision required (promotion is never automatic)")
+    # Era 1 ended 2026-07-30: the registered n=50 line tripped (net −$0.79,
+    # neg Kelly −0.076, auto-killed 8:30 PM PT) and the owner immediately
+    # re-armed the slot as v2 (fixed geometry — see grade_sr_bounce_v2).
+    # This grader now reads the ARCHIVED era-1 ledger and prints the final.
+    if n >= cfg["verdict_n"] and net <= 0:
+        status = "KILLED"
+        note = (f"era 1 (structural exits) registered verdict tripped "
+                f"2026-07-30: n={n}, net ${net:+.2f} <= 0 — scan prior "
+                "confirmed. Final; superseded by sr_bounce_v2.")
+    elif n == 0:
+        status = "KILLED"
+        note = ("era 1 KILL final (n=50, net −$0.79, 2026-07-30) — archive "
+                "trading_state_SR_BOUNCE_era1.json not found; rotation "
+                "pending, stats omitted rather than guessed")
     else:
-        status = WATCH
-        note = (f"paper accruing (n={n}/{cfg['verdict_n']}, net "
-                 f"${net:+.2f}; scan prior -$0.07/t)")
+        # Archive holds something other than the decided era-1 ledger —
+        # surface it instead of silently grading.
+        status = "DATA?"
+        note = (f"era-1 archive has n={n}, net ${net:+.2f} — expected the "
+                "decided n=50 KILL ledger; investigate the rotation")
 
     return {"experiment": "sr_bounce", "status": status, "note": note,
             "n_trades": n, "wins": wins,
             "wr": round(wr, 4) if wr is not None else None,
+            "net_usd": round(net, 4)}
+
+
+def grade_sr_bounce_v2(slot_state: dict, cfg: dict) -> dict:
+    """SR_BOUNCE v2 grader — fixed-geometry era (2026-07-30 owner order,
+    prereg docs/superpowers/specs/2026-07-30-sr-bounce-v2-fixed-geometry-
+    prereg.md). Entry signal frozen from era 1; exits fixed TP 2.5% /
+    SL 1.5% of price applied verbatim (exact_geometry, atr=0 path).
+    net_pnl used AS-IS — fee-inclusive at the source (risk_manager deducts
+    sim fees at close; re-subtracting here would double-count, the exact
+    bug caught in the era-1 build review).
+      - n >= 50: KILL if net <= 0 (fixed-geometry thesis refuted; S/R
+        program closes again — no v3 without a new mechanism); PASS-ELIGIBLE
+        if net > 0 (owner decision required; I3 fill_price revalidation is a
+        mandatory pre-live gate)
+      - n < 50: WATCH, accruing toward the registered verdict"""
+    # Era guard: before the rotation script archives the era-1 ledger, the
+    # live state file still holds era 1's 50 decided trades — counting them
+    # here would print a false v2 KILL in any digest that fires between
+    # registration and the restart. Only trades closed after the v2
+    # registration count (era 1's last close was 8:20:50 PM PT 7/30; the
+    # registration ts is 9:00 PM PT — ~39 min of margin).
+    trades = [t for t in (slot_state.get("closed_trades", []) or [])
+              if (t.get("closed_at") or 0) >= cfg["deployed_ts"]]
+
+    nets = [n for t in trades for n in [_net(t)] if n is not None]
+    wins = sum(1 for n in nets if n > 0)
+    wr = (wins / len(nets)) if nets else None
+    net = sum(nets) if nets else 0.0
+    n = len(trades)
+
+    if n >= cfg["verdict_n"]:
+        if net <= 0:
+            status = "KILL"
+            note = (f"registered verdict: n={n}, net ${net:+.2f} <= 0 — "
+                     "fixed geometry doesn't save it; kill the slot "
+                     "(touch .kill_SR_BOUNCE)")
+        else:
+            status = "PASS-ELIGIBLE"
+            note = (f"n={n}, net ${net:+.2f} > 0 — owner decision required "
+                     "(promotion is never automatic; I3 fill-revalidation "
+                     "gates any live path)")
+    else:
+        status = WATCH
+        note = (f"fixed-geometry era accruing (n={n}/{cfg['verdict_n']}, net "
+                 f"${net:+.2f}; BE-WR {cfg['breakeven_wr']:.1%}, era-1 prior "
+                 f"${cfg['era1_per_trade']:+.3f}/t)")
+
+    return {"experiment": "sr_bounce_v2", "status": status, "note": note,
+            "n_trades": n, "wins": wins,
+            "wr": round(wr, 4) if wr is not None else None,
+            "breakeven_wr": cfg["breakeven_wr"],
             "net_usd": round(net, 4)}
 
 
@@ -834,6 +908,13 @@ def _line_sr_bounce(r) -> str:
             f"{r['n_trades']} trades {r['wins']}W ${r['net_usd']:+.2f} | {wr}")
 
 
+def _line_sr_bounce_v2(r) -> str:
+    wr = f"WR {r['wr']*100:.1f}%" if r["wr"] is not None else "WR n/a"
+    return (f"[sr_bounce_v2] {r['status']} — {r['note']} | "
+            f"{r['n_trades']} trades {r['wins']}W ${r['net_usd']:+.2f} | "
+            f"{wr} (BE {r['breakeven_wr']:.1%})")
+
+
 def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     now = now or time.time()
     trades = load_closed_trades()
@@ -854,8 +935,10 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
                          load_json(VWAP_CROSS_COUNTERS_FILE, {}),
                          EXPERIMENTS["vwap_cross"]),
         grade_main_gated(trades, EXPERIMENTS["main_gated"]),
-        grade_sr_bounce(load_json(SR_BOUNCE_STATE_FILE, {}),
+        grade_sr_bounce(load_json(SR_BOUNCE_ERA1_STATE_FILE, {}),
                         EXPERIMENTS["sr_bounce"]),
+        grade_sr_bounce_v2(load_json(SR_BOUNCE_STATE_FILE, {}),
+                           EXPERIMENTS["sr_bounce_v2"]),
     ]
     stamp = datetime.fromtimestamp(now, tz=PT).strftime("%b %-d %-I:%M %p PT")
     lines = [f"LAB ADJUDICATOR — live forward tests ({stamp})"]
@@ -867,6 +950,7 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     lines.append(_line_vwap_cross(results[5]))
     lines.append(_line_main_gated(results[6]))
     lines.append(_line_sr_bounce(results[7]))
+    lines.append(_line_sr_bounce_v2(results[8]))
     return "\n".join(lines), results
 
 
