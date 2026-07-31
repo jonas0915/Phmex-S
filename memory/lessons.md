@@ -625,3 +625,12 @@ live: the running bot keeps the old in-memory code until a /pre-restart-audit'd 
 - **Rule:** when stubbing attributes on real classes, copy the attribute name FROM THE CLASS DEFINITION (grep `self\.<name> =` in __init__), never from the code under test. Prefer `getattr(self, "_x", None)` guards on rarely-run paths.
 - **Fix:** bot.py kill path → getattr(_ws_feed); 5 test stubs corrected; suite 591 green; restarted PID 90784 10:03 AM PT; ETH_TSM kill re-run clean.
 - 2026-07-18→27 (session, graded 7/27): A− — Ten-day arc: reboot recovery + overwatch AbandonProcessGroup fix; htf_l2 resurrected as slot (paper→live→demote→re-live saga, renamed HTF_L2), geometry redesign (240-config sweep, 0/240 reach WR≥68 — trade-off measured), entry-features mining (F7 family NULL, placebo-guarded), VWAP+SMA filter tested+rejected (alignment HARMS residual book CI-excl-0), VWAP_CROSS owner slot built+live-on-paper, 7/23 loss audit (quiet-block gap 57% of slot loss; cross-book contention; geometry acquitted by ticks), safety bundle U1-U6 (account-wide halt, DD peak persistence + 20% hard halt, era loss caps), era-2 MFE closes last mechanism hypothesis, fleet re-weighted by evidence ($18/$15/$5), ETH-TSM killed by pre-registered line, verdict lines registered. MISSES: promised forensic agents 7/22 and didn't dispatch until 7/23 (turn ended on a promise — rule: launch before ending turn); ws_feed typo shipped 7/16 masked by test stubs copying the typo (lesson saved); one recon agent claim (paper fees) survived to memory before the build agent disproved it — retraction issued, but verify-before-memory should have caught it.
+
+## phmex_status.trades_today Is Main-Book-Only — Sum All Books for Activity Questions (Jul 31)
+Answered "zero trades today" from the MCP `phmex_status` `trades_today` field while
+5m_mean_revert had already closed ETH short +$4.38 that day (the trade that set the
+new $101.30 balance high). That counter reads the main book only. For any "did it
+trade / how's today" question: read closed_trades from ALL trading_state*.json
+(exclude archives v8_245trades + SR_BOUNCE_era1), filter closed_at >= midnight PT,
+report per-book. Same failure class as the 6/29 "sum all state files" PnL lesson —
+one counter/file is never the fleet.
