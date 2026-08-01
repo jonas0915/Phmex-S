@@ -1,3 +1,19 @@
+# TASK: MR-universe ranginess scan (2026-07-31 ~10 PM PT, owner: "execute on #1") — RUNNING
+
+Thesis: gainer-ranked scanner feeds 5m_MR trend-optimized pairs; test a ranginess-ranked
+top-8 (R1 ADX<25 fraction × R2 band-revert rate, 7d rebalance) vs gainer-proxy control.
+Prereg FROZEN: docs/superpowers/specs/2026-08-01-mr-universe-ranginess-scan-prereg.md
+(train 70% eligibility: net>0 AND ≥control AND ≥1.5× control trades/day; one holdout read).
+Universe-selection only — live slot, gates, strategy untouched. Background agent running;
+report lands at reports/2026-08-01-mr-universe-scan.md.
+
+- [x] Prereg written + frozen
+- [ ] Scan agent: engine reuse + fee-bug check + data fetch + replay + verdict
+- [ ] Report review + verify numbers independently
+- [ ] Present verdict to Jonas (PASS → separate registration for paper A/B slot, owner-gated)
+
+---
+
 # TASK: SR_BOUNCE v2 — fixed geometry era (2026-07-30, owner order "Set 2.5% on 10x leverage and then 1.5% sl" → "SR_Bounce. 25% roi") — DEPLOYED 7/30 9:52 PM PT PID 63222 (Jonas "Go"; boot verified: slot ACTIVE 0 trades, no halts, 5m_MR LIVE intact)
 
 Re-arm SR_BOUNCE with fixed TP 2.5% price (25% ROI @10x) / SL 1.5% price (−15% ROI),

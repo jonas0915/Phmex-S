@@ -1,0 +1,82 @@
+{
+ "generated_utc": "2026-08-01T05:15:36.445608+00:00",
+ "rule": "top 30 USDT linear perps by current 24h quoteVolume, all >= $3M",
+ "pairs": [
+  {
+   "symbol": "BTC/USDT:USDT",
+   "turnover_24h_usdt": 279514963.50314
+  },
+  {
+   "symbol": "ETH/USDT:USDT",
+   "turnover_24h_usdt": 58991083.4976
+  },
+  {
+   "symbol": "BNB/USDT:USDT",
+   "turnover_24h_usdt": 28598685.0562
+  },
+  {
+   "symbol": "SOL/USDT:USDT",
+   "turnover_24h_usdt": 23863704.9161
+  },
+  {
+   "symbol": "LINK/USDT:USDT",
+   "turnover_24h_usdt": 11404280.24546
+  },
+  {
+   "symbol": "ADA/USDT:USDT",
+   "turnover_24h_usdt": 8977637.632356
+  },
+  {
+   "symbol": "SUI/USDT:USDT",
+   "turnover_24h_usdt": 8724644.6826
+  },
+  {
+   "symbol": "XRP/USDT:USDT",
+   "turnover_24h_usdt": 8113949.167972
+  },
+  {
+   "symbol": "GIGGLE/USDT:USDT",
+   "turnover_24h_usdt": 7915304.26076
+  },
+  {
+   "symbol": "DOGE/USDT:USDT",
+   "turnover_24h_usdt": 7076732.20036
+  },
+  {
+   "symbol": "ONDO/USDT:USDT",
+   "turnover_24h_usdt": 4647816.1531
+  },
+  {
+   "symbol": "1000SHIB/USDT:USDT",
+   "turnover_24h_usdt": 4208749.775078
+  },
+  {
+   "symbol": "TAO/USDT:USDT",
+   "turnover_24h_usdt": 3935507.3722
+  },
+  {
+   "symbol": "NEAR/USDT:USDT",
+   "turnover_24h_usdt": 3670399.756
+  },
+  {
+   "symbol": "AAVE/USDT:USDT",
+   "turnover_24h_usdt": 3620211.351
+  },
+  {
+   "symbol": "XLM/USDT:USDT",
+   "turnover_24h_usdt": 3516760.40957
+  },
+  {
+   "symbol": "UNI/USDT:USDT",
+   "turnover_24h_usdt": 3352230.28766
+  },
+  {
+   "symbol": "LTC/USDT:USDT",
+   "turnover_24h_usdt": 3285572.3775
+  },
+  {
+   "symbol": "1000PEPE/USDT:USDT",
+   "turnover_24h_usdt": 3218965.4710381
+  }
+ ]
+}
