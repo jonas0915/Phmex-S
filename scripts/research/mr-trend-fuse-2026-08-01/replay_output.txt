@@ -1,0 +1,77 @@
+
+======================================================================
+LIVE ERA (mode=live, closes 6/18 onward; slot promoted 6/12): 19 closed trades
+  total net +15.3953 | full-stop losses: 4
+    STOP 2026-06-24 06:06:45 PM PT XLM/USDT:USDT      short exchange_close net -1.4749
+    STOP 2026-07-16 01:10:36 AM PT SOL/USDT:USDT      long  exchange_close net -1.8101
+    STOP 2026-07-17 10:00:30 PM PT INJ/USDT:USDT      long  exchange_close net -1.8566
+    STOP 2026-07-22 08:21:09 AM PT XRP/USDT:USDT      short exchange_close net -1.9308
+  [1-stop fuse] (sensitivity) trips=4 prevented=0 sum(prevented net)=+0.0000 => NO EFFECT
+      TRIP at 2026-06-24 06:06:45 PM PT side=short (stand down short until 06/25 12:00 AM PT)
+      TRIP at 2026-07-16 01:10:36 AM PT side=long (stand down long until 07/17 12:00 AM PT)
+      TRIP at 2026-07-17 10:00:30 PM PT side=long (stand down long until 07/18 12:00 AM PT)
+      TRIP at 2026-07-22 08:21:09 AM PT side=short (stand down short until 07/23 12:00 AM PT)
+  [2-stop fuse] <== PRIMARY trips=0 prevented=0 sum(prevented net)=+0.0000 => NO EFFECT
+  [3-stop fuse] (sensitivity) trips=0 prevented=0 sum(prevented net)=+0.0000 => NO EFFECT
+
+======================================================================
+PRE-PROMOTION ERA (no mode field, closes 3/28-6/11) [labeled separately]: 20 closed trades
+  total net +2.5007 | full-stop losses: 4
+    STOP 2026-05-19 03:44:22 AM PT ZEC/USDT:USDT      long  stop_loss      net -1.4874
+    STOP 2026-05-23 08:35:21 AM PT WLD/USDT:USDT      long  stop_loss      net -3.1009
+    STOP 2026-06-11 08:45:41 AM PT LTC/USDT:USDT      long  stop_loss      net -1.6076
+    STOP 2026-06-11 11:37:47 PM PT AVAX/USDT:USDT     long  stop_loss      net -1.4450
+  [1-stop fuse] (sensitivity) trips=3 prevented=1 sum(prevented net)=-1.4450 => fuse SAVES
+      TRIP at 2026-05-19 03:44:22 AM PT side=long (stand down long until 05/20 12:00 AM PT)
+      TRIP at 2026-05-23 08:35:21 AM PT side=long (stand down long until 05/24 12:00 AM PT)
+      TRIP at 2026-06-11 08:45:41 AM PT side=long (stand down long until 06/12 12:00 AM PT)
+      PREVENTED entry 2026-06-11 06:32:40 PM PT AVAX/USDT:USDT long actual net -1.4450 (stop_loss)
+  [2-stop fuse] <== PRIMARY trips=1 prevented=0 sum(prevented net)=+0.0000 => NO EFFECT
+      TRIP at 2026-06-11 11:37:47 PM PT side=long (stand down long until 06/12 12:00 AM PT)
+  [3-stop fuse] (sensitivity) trips=0 prevented=0 sum(prevented net)=+0.0000 => NO EFFECT
+
+======================================================================
+FULL LEDGER (both eras walked as one sequence): 39 closed trades
+  total net +17.8960 | full-stop losses: 8
+    STOP 2026-05-19 03:44:22 AM PT ZEC/USDT:USDT      long  stop_loss      net -1.4874
+    STOP 2026-05-23 08:35:21 AM PT WLD/USDT:USDT      long  stop_loss      net -3.1009
+    STOP 2026-06-11 08:45:41 AM PT LTC/USDT:USDT      long  stop_loss      net -1.6076
+    STOP 2026-06-11 11:37:47 PM PT AVAX/USDT:USDT     long  stop_loss      net -1.4450
+    STOP 2026-06-24 06:06:45 PM PT XLM/USDT:USDT      short exchange_close net -1.4749
+    STOP 2026-07-16 01:10:36 AM PT SOL/USDT:USDT      long  exchange_close net -1.8101
+    STOP 2026-07-17 10:00:30 PM PT INJ/USDT:USDT      long  exchange_close net -1.8566
+    STOP 2026-07-22 08:21:09 AM PT XRP/USDT:USDT      short exchange_close net -1.9308
+  [1-stop fuse] (sensitivity) trips=7 prevented=1 sum(prevented net)=-1.4450 => fuse SAVES
+      TRIP at 2026-05-19 03:44:22 AM PT side=long (stand down long until 05/20 12:00 AM PT)
+      TRIP at 2026-05-23 08:35:21 AM PT side=long (stand down long until 05/24 12:00 AM PT)
+      TRIP at 2026-06-11 08:45:41 AM PT side=long (stand down long until 06/12 12:00 AM PT)
+      TRIP at 2026-06-24 06:06:45 PM PT side=short (stand down short until 06/25 12:00 AM PT)
+      TRIP at 2026-07-16 01:10:36 AM PT side=long (stand down long until 07/17 12:00 AM PT)
+      TRIP at 2026-07-17 10:00:30 PM PT side=long (stand down long until 07/18 12:00 AM PT)
+      TRIP at 2026-07-22 08:21:09 AM PT side=short (stand down short until 07/23 12:00 AM PT)
+      PREVENTED entry 2026-06-11 06:32:40 PM PT AVAX/USDT:USDT long actual net -1.4450 (stop_loss)
+  [2-stop fuse] <== PRIMARY trips=1 prevented=0 sum(prevented net)=+0.0000 => NO EFFECT
+      TRIP at 2026-06-11 11:37:47 PM PT side=long (stand down long until 06/12 12:00 AM PT)
+  [3-stop fuse] (sensitivity) trips=0 prevented=0 sum(prevented net)=+0.0000 => NO EFFECT
+
+======================================================================
+Per-day sequences for days with >=1 full-stop loss (full ledger):
+  2026-05-19:
+    *STOP* open 2026-05-19 12:36:20 AM PT -> close 2026-05-19 03:44:22 AM PT ZEC/USDT:USDT      long  stop_loss      net -1.4874 mode=pre
+           open 2026-05-19 09:59:48 AM PT -> close 2026-05-19 01:24:27 PM PT XLM/USDT:USDT      short take_profit    net +1.4075 mode=pre
+  2026-05-23:
+    *STOP* open 2026-05-22 11:08:52 AM PT -> close 2026-05-23 08:35:21 AM PT WLD/USDT:USDT      long  stop_loss      net -3.1009 mode=pre
+  2026-06-11:
+    *STOP* open 2026-06-10 11:11:16 PM PT -> close 2026-06-11 08:45:41 AM PT LTC/USDT:USDT      long  stop_loss      net -1.6076 mode=pre
+    *STOP* open 2026-06-11 06:32:40 PM PT -> close 2026-06-11 11:37:47 PM PT AVAX/USDT:USDT     long  stop_loss      net -1.4450 mode=pre
+  2026-06-24:
+    *STOP* open 2026-06-24 01:26:21 PM PT -> close 2026-06-24 06:06:45 PM PT XLM/USDT:USDT      short exchange_close net -1.4749 mode=live
+  2026-07-16:
+    *STOP* open 2026-07-16 12:28:44 AM PT -> close 2026-07-16 01:10:36 AM PT SOL/USDT:USDT      long  exchange_close net -1.8101 mode=live
+           open 2026-07-16 06:35:49 AM PT -> close 2026-07-16 11:17:03 AM PT 1000PEPE/USDT:USDT short hard_time_exit net +0.1687 mode=live
+           open 2026-07-16 02:15:56 PM PT -> close 2026-07-16 04:10:28 PM PT TAO/USDT:USDT      short exchange_close net +2.3800 mode=live
+  2026-07-17:
+           open 2026-07-17 02:05:50 AM PT -> close 2026-07-17 06:49:59 AM PT TAO/USDT:USDT      short hard_time_exit net +0.3773 mode=live
+    *STOP* open 2026-07-17 09:30:09 PM PT -> close 2026-07-17 10:00:30 PM PT INJ/USDT:USDT      long  exchange_close net -1.8566 mode=live
+  2026-07-22:
+    *STOP* open 2026-07-22 03:31:01 AM PT -> close 2026-07-22 08:21:09 AM PT XRP/USDT:USDT      short exchange_close net -1.9308 mode=live

@@ -1,3 +1,14 @@
+# TASK: 5m_MR ledger trio (2026-08-01 owner: "how do we fix those weak points") — DONE 8/1
+
+Three parallel read-only analyses (reports/2026-08-01-mr-*.md, artifacts scripts/research/mr-*-2026-08-01/):
+- [x] Trend-day fuse replay: NULL — 0 trades prevented, $0.00 both eras; anti-clustering prior confirmed; CLOSED
+- [x] Timeout entry-signature mine: NULL — 0/36 tests survive; timeouts net +$0.20 (capacity drag, not loss engine); recheck at ~10 live timeouts, spread_pct single hypothesis
+- [x] Long/short split: SUPPORTED — live shorts 83% WR +$16.57 vs longs 29% WR −$1.17, diff CI [−2.99,−0.03]; paper era same sign; PROPOSED (owner-gated, not taken): adjudicator line KILL long side if next-8-live-longs net ≤ 0
+- [ ] OPEN FOLLOW-UP: MR paper-eval TypeError wrapper warnings (bot.log.1 7/29) — same family as SR_BOUNCE fatal wrapper bug; investigate htf_df drop on MR paper path
+- [ ] Awaiting owner: register the long-side verdict line? (zero behavior change until verdict)
+
+---
+
 # TASK: MR-universe ranginess scan (2026-07-31 ~10 PM PT, owner: "execute on #1") — DONE 8/1: DO-NOT-BUILD
 
 Thesis: gainer-ranked scanner feeds 5m_MR trend-optimized pairs; test a ranginess-ranked

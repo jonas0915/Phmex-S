@@ -1,0 +1,49 @@
+
+=== LIVE era only (primary): timeout n=5 vs priced n=13 ===
+  ob_imbalance               T mean=+0.0612 med=+0.0280 (n=5) | P mean=-0.0054 med=+0.0140 (n=11) | d=+0.57 p=0.3437
+  ob_imbalance_aligned       T mean=-0.0468 med=-0.0180 (n=5) | P mean=+0.0183 med=+0.0040 (n=11) | d=-0.55 p=0.3468
+  spread_pct                 T mean=+0.0241 med=+0.0218 (n=5) | P mean=+0.0123 med=+0.0106 (n=11) | d=+1.00 p=0.0833
+  buy_ratio                  T mean=+0.4320 med=+0.4920 (n=5) | P mean=+0.5840 med=+0.5520 (n=13) | d=-0.43 p=0.4262
+  buy_ratio_aligned          T mean=+0.2784 med=+0.2650 (n=5) | P mean=+0.0497 med=+0.0660 (n=13) | d=+0.70 p=0.2017
+  cvd_slope_aligned          T mean=+0.4841 med=+0.5404 (n=5) | P mean=+0.1024 med=+0.0625 (n=13) | d=+0.83 p=0.1250
+  large_trade_bias_aligned   T mean=+0.4280 med=+0.3000 (n=5) | P mean=+0.2900 med=+0.2500 (n=13) | d=+0.21 p=0.6924
+  trade_count                T mean=+52.6000 med=+59.0000 (n=5) | P mean=+43.6154 med=+42.0000 (n=13) | d=+0.31 p=0.5699
+  adx                        T mean=+18.6000 med=+18.9000 (n=5) | P mean=+20.2462 med=+18.4000 (n=13) | d=-0.33 p=0.5340
+  atr_pct                    T mean=+0.0020 med=+0.0020 (n=5) | P mean=+0.0022 med=+0.0018 (n=13) | d=-0.17 p=0.7820
+  vol_ratio                  T mean=+1.6160 med=+1.6700 (n=5) | P mean=+1.5338 med=+1.4400 (n=13) | d=+0.32 p=0.5715
+  htf_adx                    SKIP (n=1 vs 5 non-null)
+  hour_pt                    T mean=+9.6000 med=+6.0000 (n=5) | P mean=+11.7692 med=+13.0000 (n=13) | d=-0.26 p=0.6322
+  side_long                  T 2/5 | P 4/13 | Fisher p=1.0000
+  regime_choppy              T 4/5 | P 8/13 | Fisher p=0.6148
+  above_ema200               T 2/5 | P 3/13 | Fisher p=0.5827
+  any_bid_wall               T 2/5 | P 3/11 | Fisher p=1.0000
+  any_ask_wall               T 2/5 | P 3/11 | Fisher p=1.0000
+  ema_stack_aligned          T 0/5 | P 0/13 | Fisher p=1.0000
+
+=== POOLED eras (secondary, era-labeled caveat): timeout n=8 vs priced n=24 ===
+  ob_imbalance               T mean=+0.0612 med=+0.0280 (n=5) | P mean=-0.0054 med=+0.0140 (n=11) | d=+0.57 p=0.3437
+  ob_imbalance_aligned       T mean=-0.0468 med=-0.0180 (n=5) | P mean=+0.0183 med=+0.0040 (n=11) | d=-0.55 p=0.3468
+  spread_pct                 T mean=+0.0241 med=+0.0218 (n=5) | P mean=+0.0123 med=+0.0106 (n=11) | d=+1.00 p=0.0833
+  buy_ratio                  T mean=+0.3989 med=+0.4440 (n=8) | P mean=+0.5828 med=+0.5520 (n=23) | d=-0.56 p=0.1776
+  buy_ratio_aligned          T mean=+0.1414 med=+0.1980 (n=8) | P mean=+0.1371 med=+0.1600 (n=23) | d=+0.01 p=0.9748
+  cvd_slope_aligned          T mean=+0.4979 med=+0.4311 (n=8) | P mean=+0.2797 med=+0.3680 (n=23) | d=+0.47 p=0.2640
+  large_trade_bias_aligned   T mean=+0.2050 med=+0.1400 (n=8) | P mean=+0.2422 med=+0.2500 (n=23) | d=-0.05 p=0.8990
+  trade_count                T mean=+44.2500 med=+49.5000 (n=8) | P mean=+47.0435 med=+45.0000 (n=23) | d=-0.11 p=0.8015
+  adx                        T mean=+18.4750 med=+19.2000 (n=8) | P mean=+19.8739 med=+18.4000 (n=23) | d=-0.30 p=0.4661
+  atr_pct                    T mean=+0.0019 med=+0.0019 (n=8) | P mean=+0.0029 med=+0.0021 (n=23) | d=-0.55 p=0.1842
+  vol_ratio                  T mean=+1.6700 med=+1.7150 (n=8) | P mean=+1.6113 med=+1.5200 (n=23) | d=+0.20 p=0.6380
+  htf_adx                    SKIP (n=1 vs 5 non-null)
+  hour_pt                    T mean=+8.5000 med=+4.0000 (n=8) | P mean=+11.0000 med=+11.0000 (n=24) | d=-0.32 p=0.4475
+  side_long                  T 4/8 | P 10/24 | Fisher p=0.7035
+  regime_choppy              T 6/8 | P 16/23 | Fisher p=1.0000
+  above_ema200               T 3/8 | P 8/23 | Fisher p=1.0000
+  any_bid_wall               T 2/5 | P 3/11 | Fisher p=1.0000
+  any_ask_wall               T 2/5 | P 3/11 | Fisher p=1.0000
+  ema_stack_aligned          T 0/8 | P 0/23 | Fisher p=1.0000
+
+Total tests run: 36  -> Bonferroni alpha for p<0.05: 0.0014
+Nominal p<0.05 hits:
+
+adverse_exit trades (excluded from comparison): idx [0, 4, 6, 8], all paper era
+paper timeouts: idx [1, 7, 15, 16], 23.9h held, gross -0.32, net(where recorded) -0.37
+live timeouts: idx [25, 27, 29, 31, 37], 24.8h held, gross +0.76, net(where recorded) +0.20
