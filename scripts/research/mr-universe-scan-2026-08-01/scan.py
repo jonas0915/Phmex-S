@@ -201,7 +201,7 @@ def main():
         df5 = _load(sym, "5m")
         if df5 is not None and len(df5):
             end_5m = max(end_5m, int(df5.index.view("int64")[-1] // 1_000_000_000))
-    span_start = start_1h + SCORE_LOOKBACK_D * D
+    span_start = int(start_1h) + SCORE_LOOKBACK_D * D  # int() — np.int64 breaks json.dump
     span_end = end_5m
     reb_ts_list = list(range(span_start, span_end, REBAL_DAYS * D))
     log(f"span: {datetime.fromtimestamp(span_start, tz=timezone.utc)} -> "
@@ -236,12 +236,19 @@ def main():
         json.dump(lists, fh, indent=1)
 
     # replay all pairs once; filter by membership per list
-    all_trades = []
-    for sym in pairs:
-        tr = replay_pair(sym)
-        log(f"  replay {sym}: {len(tr)} trades (full span, pre-membership)")
-        all_trades.extend(tr)
-    pd.DataFrame(all_trades).to_csv(os.path.join(HERE, "trades_all.csv"), index=False)
+    trades_csv = os.path.join(HERE, "trades_all.csv")
+    if os.path.exists(trades_csv):
+        # fast path after the 2026-08-01 json-serialization crash: the replay
+        # already ran to completion; reuse its on-disk output (deterministic).
+        all_trades = pd.read_csv(trades_csv).to_dict("records")
+        log(f"  loaded {len(all_trades)} trades from existing trades_all.csv")
+    else:
+        all_trades = []
+        for sym in pairs:
+            tr = replay_pair(sym)
+            log(f"  replay {sym}: {len(tr)} trades (full span, pre-membership)")
+            all_trades.extend(tr)
+        pd.DataFrame(all_trades).to_csv(trades_csv, index=False)
 
     def in_list(kind, t):
         R_idx = (t["entry_ts"] - span_start) // (REBAL_DAYS * D)

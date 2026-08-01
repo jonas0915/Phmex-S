@@ -1,4 +1,4 @@
-# TASK: MR-universe ranginess scan (2026-07-31 ~10 PM PT, owner: "execute on #1") — RUNNING
+# TASK: MR-universe ranginess scan (2026-07-31 ~10 PM PT, owner: "execute on #1") — DONE 8/1: DO-NOT-BUILD
 
 Thesis: gainer-ranked scanner feeds 5m_MR trend-optimized pairs; test a ranginess-ranked
 top-8 (R1 ADX<25 fraction × R2 band-revert rate, 7d rebalance) vs gainer-proxy control.
@@ -8,9 +8,9 @@ Universe-selection only — live slot, gates, strategy untouched. Background age
 report lands at reports/2026-08-01-mr-universe-scan.md.
 
 - [x] Prereg written + frozen
-- [ ] Scan agent: engine reuse + fee-bug check + data fetch + replay + verdict
-- [ ] Report review + verify numbers independently
-- [ ] Present verdict to Jonas (PASS → separate registration for paper A/B slot, owner-gated)
+- [x] Scan agent ran (1 stall at 10:30 AM re-kicked; numpy-json crash fixed+rerun, metrics reproduced)
+- [x] Numbers verified vs results.json independently
+- [x] Verdict: DO-NOT-BUILD — train cond1 FAIL (−$0.020/t), cond3 FAIL (0.97x control freq vs 1.5x needed); holdout quality reversed (noise); memory reference_mr_universe_scan_2026-08-01 saved
 
 ---
 

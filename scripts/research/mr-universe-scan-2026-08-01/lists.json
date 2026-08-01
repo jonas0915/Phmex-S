@@ -1,0 +1,8332 @@
+[
+ {
+  "rebalance_ts": 1753596000,
+  "rebalance_utc": "2025-07-27T06:00:00+00:00",
+  "test_top8": [
+   "ADA/USDT:USDT",
+   "BTC/USDT:USDT",
+   "TAO/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "BNB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "XRP/USDT:USDT",
+   "ETH/USDT:USDT"
+  ],
+  "test_scores": {
+   "ADA/USDT:USDT": {
+    "score": 0.3555,
+    "r1": 0.552,
+    "r2": 0.644,
+    "n_events": 73
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.3539,
+    "r1": 0.527,
+    "r2": 0.671,
+    "n_events": 70
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3116,
+    "r1": 0.606,
+    "r2": 0.514,
+    "n_events": 72
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2908,
+    "r1": 0.495,
+    "r2": 0.587,
+    "n_events": 63
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2757,
+    "r1": 0.501,
+    "r2": 0.551,
+    "n_events": 69
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2541,
+    "r1": 0.446,
+    "r2": 0.569,
+    "n_events": 65
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2316,
+    "r1": 0.438,
+    "r2": 0.529,
+    "n_events": 70
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2312,
+    "r1": 0.445,
+    "r2": 0.519,
+    "n_events": 77
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2292,
+    "r1": 0.431,
+    "r2": 0.532,
+    "n_events": 79
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2281,
+    "r1": 0.471,
+    "r2": 0.484,
+    "n_events": 62
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2199,
+    "r1": 0.445,
+    "r2": 0.494,
+    "n_events": 83
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2064,
+    "r1": 0.389,
+    "r2": 0.53,
+    "n_events": 83
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2063,
+    "r1": 0.395,
+    "r2": 0.522,
+    "n_events": 67
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2019,
+    "r1": 0.399,
+    "r2": 0.506,
+    "n_events": 87
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.183,
+    "r1": 0.406,
+    "r2": 0.451,
+    "n_events": 71
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.1764,
+    "r1": 0.37,
+    "r2": 0.477,
+    "n_events": 65
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.1652,
+    "r1": 0.396,
+    "r2": 0.417,
+    "n_events": 72
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.1368,
+    "r1": 0.289,
+    "r2": 0.473,
+    "n_events": 74
+   }
+  },
+  "control_top8": [
+   "SUI/USDT:USDT",
+   "LINK/USDT:USDT",
+   "UNI/USDT:USDT",
+   "BNB/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "XLM/USDT:USDT",
+   "XRP/USDT:USDT",
+   "DOGE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "SUI/USDT:USDT": 0.05216,
+   "LINK/USDT:USDT": 0.03227,
+   "UNI/USDT:USDT": 0.02403,
+   "BNB/USDT:USDT": 0.02109,
+   "NEAR/USDT:USDT": 0.01955,
+   "XLM/USDT:USDT": 0.01865,
+   "XRP/USDT:USDT": 0.01589,
+   "DOGE/USDT:USDT": 0.01491,
+   "LTC/USDT:USDT": 0.01296,
+   "ETH/USDT:USDT": 0.01142,
+   "ADA/USDT:USDT": 0.01127,
+   "ONDO/USDT:USDT": 0.01067,
+   "BTC/USDT:USDT": 0.00718,
+   "SOL/USDT:USDT": 0.006,
+   "1000SHIB/USDT:USDT": 0.0049,
+   "TAO/USDT:USDT": 0.00424,
+   "AAVE/USDT:USDT": 0.00391,
+   "1000PEPE/USDT:USDT": 0.0033
+  }
+ },
+ {
+  "rebalance_ts": 1754200800,
+  "rebalance_utc": "2025-08-03T06:00:00+00:00",
+  "test_top8": [
+   "BTC/USDT:USDT",
+   "ADA/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "SOL/USDT:USDT"
+  ],
+  "test_scores": {
+   "BTC/USDT:USDT": {
+    "score": 0.3629,
+    "r1": 0.597,
+    "r2": 0.608,
+    "n_events": 79
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3433,
+    "r1": 0.508,
+    "r2": 0.675,
+    "n_events": 77
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3319,
+    "r1": 0.524,
+    "r2": 0.634,
+    "n_events": 71
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2809,
+    "r1": 0.554,
+    "r2": 0.507,
+    "n_events": 73
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2618,
+    "r1": 0.524,
+    "r2": 0.5,
+    "n_events": 82
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.259,
+    "r1": 0.44,
+    "r2": 0.588,
+    "n_events": 68
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2534,
+    "r1": 0.5,
+    "r2": 0.507,
+    "n_events": 73
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2451,
+    "r1": 0.426,
+    "r2": 0.575,
+    "n_events": 87
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2288,
+    "r1": 0.365,
+    "r2": 0.627,
+    "n_events": 83
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2247,
+    "r1": 0.4,
+    "r2": 0.562,
+    "n_events": 73
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2208,
+    "r1": 0.436,
+    "r2": 0.506,
+    "n_events": 79
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2167,
+    "r1": 0.451,
+    "r2": 0.48,
+    "n_events": 75
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2004,
+    "r1": 0.36,
+    "r2": 0.557,
+    "n_events": 70
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.1994,
+    "r1": 0.386,
+    "r2": 0.516,
+    "n_events": 91
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.1958,
+    "r1": 0.481,
+    "r2": 0.407,
+    "n_events": 81
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.1701,
+    "r1": 0.379,
+    "r2": 0.449,
+    "n_events": 78
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.1675,
+    "r1": 0.308,
+    "r2": 0.543,
+    "n_events": 81
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.1551,
+    "r1": 0.338,
+    "r2": 0.459,
+    "n_events": 74
+   }
+  },
+  "control_top8": [
+   "XRP/USDT:USDT",
+   "SUI/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "XLM/USDT:USDT",
+   "BNB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "SOL/USDT:USDT",
+   "TAO/USDT:USDT"
+  ],
+  "control_ranks": {
+   "XRP/USDT:USDT": 0.05841,
+   "SUI/USDT:USDT": 0.03619,
+   "DOGE/USDT:USDT": 0.03241,
+   "XLM/USDT:USDT": 0.03171,
+   "BNB/USDT:USDT": 0.02814,
+   "1000PEPE/USDT:USDT": 0.02721,
+   "SOL/USDT:USDT": 0.02624,
+   "TAO/USDT:USDT": 0.02549,
+   "ETH/USDT:USDT": 0.02118,
+   "ONDO/USDT:USDT": 0.02009,
+   "1000SHIB/USDT:USDT": 0.02005,
+   "NEAR/USDT:USDT": 0.01766,
+   "ADA/USDT:USDT": 0.01533,
+   "LINK/USDT:USDT": 0.01344,
+   "UNI/USDT:USDT": 0.0127,
+   "AAVE/USDT:USDT": 0.00595,
+   "LTC/USDT:USDT": 0.00399,
+   "BTC/USDT:USDT": 0.00321
+  }
+ },
+ {
+  "rebalance_ts": 1754805600,
+  "rebalance_utc": "2025-08-10T06:00:00+00:00",
+  "test_top8": [
+   "BTC/USDT:USDT",
+   "ADA/USDT:USDT",
+   "TAO/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "LTC/USDT:USDT"
+  ],
+  "test_scores": {
+   "BTC/USDT:USDT": {
+    "score": 0.4684,
+    "r1": 0.647,
+    "r2": 0.724,
+    "n_events": 76
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3592,
+    "r1": 0.483,
+    "r2": 0.743,
+    "n_events": 74
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3034,
+    "r1": 0.465,
+    "r2": 0.652,
+    "n_events": 69
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3009,
+    "r1": 0.444,
+    "r2": 0.677,
+    "n_events": 65
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2852,
+    "r1": 0.433,
+    "r2": 0.658,
+    "n_events": 79
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2827,
+    "r1": 0.481,
+    "r2": 0.588,
+    "n_events": 68
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2804,
+    "r1": 0.433,
+    "r2": 0.647,
+    "n_events": 68
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2793,
+    "r1": 0.472,
+    "r2": 0.592,
+    "n_events": 71
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2591,
+    "r1": 0.41,
+    "r2": 0.632,
+    "n_events": 68
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2453,
+    "r1": 0.406,
+    "r2": 0.605,
+    "n_events": 81
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2342,
+    "r1": 0.475,
+    "r2": 0.493,
+    "n_events": 71
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2342,
+    "r1": 0.438,
+    "r2": 0.535,
+    "n_events": 71
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2324,
+    "r1": 0.351,
+    "r2": 0.661,
+    "n_events": 62
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2284,
+    "r1": 0.469,
+    "r2": 0.486,
+    "n_events": 74
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2231,
+    "r1": 0.331,
+    "r2": 0.675,
+    "n_events": 80
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2113,
+    "r1": 0.328,
+    "r2": 0.645,
+    "n_events": 76
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2,
+    "r1": 0.422,
+    "r2": 0.474,
+    "n_events": 76
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.1601,
+    "r1": 0.307,
+    "r2": 0.522,
+    "n_events": 69
+   }
+  },
+  "control_top8": [
+   "UNI/USDT:USDT",
+   "LINK/USDT:USDT",
+   "TAO/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "XRP/USDT:USDT",
+   "XLM/USDT:USDT",
+   "BTC/USDT:USDT"
+  ],
+  "control_ranks": {
+   "UNI/USDT:USDT": 0.03853,
+   "LINK/USDT:USDT": 0.03131,
+   "TAO/USDT:USDT": 0.02439,
+   "LTC/USDT:USDT": 0.02435,
+   "1000SHIB/USDT:USDT": 0.01812,
+   "XRP/USDT:USDT": 0.01748,
+   "XLM/USDT:USDT": 0.01147,
+   "BTC/USDT:USDT": 0.0111,
+   "SUI/USDT:USDT": 0.00989,
+   "DOGE/USDT:USDT": 0.00989,
+   "ETH/USDT:USDT": 0.00915,
+   "AAVE/USDT:USDT": 0.009,
+   "SOL/USDT:USDT": 0.00681,
+   "1000PEPE/USDT:USDT": 0.00542,
+   "BNB/USDT:USDT": 0.00406,
+   "ONDO/USDT:USDT": 0.00317,
+   "NEAR/USDT:USDT": 0.00179,
+   "ADA/USDT:USDT": 0.00123
+  }
+ },
+ {
+  "rebalance_ts": 1755410400,
+  "rebalance_utc": "2025-08-17T06:00:00+00:00",
+  "test_top8": [
+   "BTC/USDT:USDT",
+   "XLM/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "ADA/USDT:USDT",
+   "XRP/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "LTC/USDT:USDT",
+   "BNB/USDT:USDT"
+  ],
+  "test_scores": {
+   "BTC/USDT:USDT": {
+    "score": 0.3687,
+    "r1": 0.597,
+    "r2": 0.617,
+    "n_events": 81
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3106,
+    "r1": 0.5,
+    "r2": 0.621,
+    "n_events": 66
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3001,
+    "r1": 0.46,
+    "r2": 0.653,
+    "n_events": 72
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2941,
+    "r1": 0.447,
+    "r2": 0.658,
+    "n_events": 73
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2656,
+    "r1": 0.414,
+    "r2": 0.642,
+    "n_events": 67
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2548,
+    "r1": 0.461,
+    "r2": 0.553,
+    "n_events": 76
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2514,
+    "r1": 0.503,
+    "r2": 0.5,
+    "n_events": 72
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2401,
+    "r1": 0.501,
+    "r2": 0.479,
+    "n_events": 71
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2312,
+    "r1": 0.393,
+    "r2": 0.588,
+    "n_events": 68
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.1981,
+    "r1": 0.315,
+    "r2": 0.628,
+    "n_events": 78
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.1926,
+    "r1": 0.362,
+    "r2": 0.531,
+    "n_events": 64
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1735,
+    "r1": 0.388,
+    "r2": 0.448,
+    "n_events": 67
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.1693,
+    "r1": 0.393,
+    "r2": 0.431,
+    "n_events": 65
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.1676,
+    "r1": 0.388,
+    "r2": 0.432,
+    "n_events": 74
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.1659,
+    "r1": 0.306,
+    "r2": 0.543,
+    "n_events": 70
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.1657,
+    "r1": 0.318,
+    "r2": 0.521,
+    "n_events": 71
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.1595,
+    "r1": 0.315,
+    "r2": 0.506,
+    "n_events": 83
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.1439,
+    "r1": 0.365,
+    "r2": 0.394,
+    "n_events": 66
+   }
+  },
+  "control_top8": [
+   "LINK/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "SOL/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "SUI/USDT:USDT",
+   "LTC/USDT:USDT",
+   "BNB/USDT:USDT",
+   "TAO/USDT:USDT"
+  ],
+  "control_ranks": {
+   "LINK/USDT:USDT": 0.12585,
+   "1000PEPE/USDT:USDT": 0.03773,
+   "SOL/USDT:USDT": 0.03515,
+   "ONDO/USDT:USDT": 0.02803,
+   "SUI/USDT:USDT": 0.02599,
+   "LTC/USDT:USDT": 0.02314,
+   "BNB/USDT:USDT": 0.01864,
+   "TAO/USDT:USDT": 0.0155,
+   "1000SHIB/USDT:USDT": 0.013,
+   "UNI/USDT:USDT": 0.01294,
+   "NEAR/USDT:USDT": 0.01218,
+   "ETH/USDT:USDT": 0.01104,
+   "DOGE/USDT:USDT": 0.01042,
+   "ADA/USDT:USDT": 0.00952,
+   "XLM/USDT:USDT": 0.00889,
+   "XRP/USDT:USDT": 0.0086,
+   "BTC/USDT:USDT": 0.00362,
+   "AAVE/USDT:USDT": 0.00107
+  }
+ },
+ {
+  "rebalance_ts": 1756015200,
+  "rebalance_utc": "2025-08-24T06:00:00+00:00",
+  "test_top8": [
+   "ADA/USDT:USDT",
+   "LTC/USDT:USDT",
+   "XLM/USDT:USDT",
+   "XRP/USDT:USDT",
+   "BTC/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "BNB/USDT:USDT"
+  ],
+  "test_scores": {
+   "ADA/USDT:USDT": {
+    "score": 0.3019,
+    "r1": 0.453,
+    "r2": 0.667,
+    "n_events": 81
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2785,
+    "r1": 0.557,
+    "r2": 0.5,
+    "n_events": 70
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2758,
+    "r1": 0.417,
+    "r2": 0.662,
+    "n_events": 71
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2401,
+    "r1": 0.356,
+    "r2": 0.675,
+    "n_events": 77
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2338,
+    "r1": 0.456,
+    "r2": 0.513,
+    "n_events": 76
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2295,
+    "r1": 0.404,
+    "r2": 0.568,
+    "n_events": 81
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2285,
+    "r1": 0.463,
+    "r2": 0.494,
+    "n_events": 85
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.1924,
+    "r1": 0.422,
+    "r2": 0.456,
+    "n_events": 79
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.1915,
+    "r1": 0.436,
+    "r2": 0.439,
+    "n_events": 82
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.1902,
+    "r1": 0.328,
+    "r2": 0.58,
+    "n_events": 81
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.1835,
+    "r1": 0.362,
+    "r2": 0.506,
+    "n_events": 79
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.1812,
+    "r1": 0.318,
+    "r2": 0.57,
+    "n_events": 79
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.1787,
+    "r1": 0.367,
+    "r2": 0.487,
+    "n_events": 80
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.1778,
+    "r1": 0.356,
+    "r2": 0.5,
+    "n_events": 74
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1704,
+    "r1": 0.364,
+    "r2": 0.468,
+    "n_events": 79
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.1531,
+    "r1": 0.369,
+    "r2": 0.414,
+    "n_events": 70
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.1401,
+    "r1": 0.304,
+    "r2": 0.461,
+    "n_events": 76
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.1311,
+    "r1": 0.328,
+    "r2": 0.4,
+    "n_events": 75
+   }
+  },
+  "control_top8": [
+   "1000PEPE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "TAO/USDT:USDT",
+   "SUI/USDT:USDT",
+   "XLM/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "LINK/USDT:USDT",
+   "ADA/USDT:USDT"
+  ],
+  "control_ranks": {
+   "1000PEPE/USDT:USDT": 0.03037,
+   "ONDO/USDT:USDT": 0.02243,
+   "TAO/USDT:USDT": 0.02201,
+   "SUI/USDT:USDT": 0.01825,
+   "XLM/USDT:USDT": 0.01814,
+   "1000SHIB/USDT:USDT": 0.0174,
+   "LINK/USDT:USDT": 0.01655,
+   "ADA/USDT:USDT": 0.01624,
+   "BNB/USDT:USDT": 0.01495,
+   "NEAR/USDT:USDT": 0.01406,
+   "DOGE/USDT:USDT": 0.01019,
+   "LTC/USDT:USDT": 0.00874,
+   "BTC/USDT:USDT": 0.00815,
+   "ETH/USDT:USDT": 0.00691,
+   "SOL/USDT:USDT": 0.00525,
+   "AAVE/USDT:USDT": 0.00436,
+   "UNI/USDT:USDT": 0.00373,
+   "XRP/USDT:USDT": 0.00052
+  }
+ },
+ {
+  "rebalance_ts": 1756620000,
+  "rebalance_utc": "2025-08-31T06:00:00+00:00",
+  "test_top8": [
+   "ADA/USDT:USDT",
+   "XLM/USDT:USDT",
+   "BNB/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "SUI/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000PEPE/USDT:USDT"
+  ],
+  "test_scores": {
+   "ADA/USDT:USDT": {
+    "score": 0.3583,
+    "r1": 0.547,
+    "r2": 0.655,
+    "n_events": 84
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3029,
+    "r1": 0.475,
+    "r2": 0.638,
+    "n_events": 69
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2967,
+    "r1": 0.525,
+    "r2": 0.565,
+    "n_events": 69
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2942,
+    "r1": 0.458,
+    "r2": 0.642,
+    "n_events": 81
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2942,
+    "r1": 0.536,
+    "r2": 0.549,
+    "n_events": 82
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2681,
+    "r1": 0.471,
+    "r2": 0.569,
+    "n_events": 72
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2678,
+    "r1": 0.487,
+    "r2": 0.549,
+    "n_events": 71
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2674,
+    "r1": 0.428,
+    "r2": 0.625,
+    "n_events": 80
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2483,
+    "r1": 0.438,
+    "r2": 0.568,
+    "n_events": 74
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2377,
+    "r1": 0.376,
+    "r2": 0.632,
+    "n_events": 76
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2308,
+    "r1": 0.41,
+    "r2": 0.563,
+    "n_events": 71
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2186,
+    "r1": 0.443,
+    "r2": 0.493,
+    "n_events": 75
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.197,
+    "r1": 0.428,
+    "r2": 0.461,
+    "n_events": 76
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1905,
+    "r1": 0.376,
+    "r2": 0.506,
+    "n_events": 83
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.1897,
+    "r1": 0.414,
+    "r2": 0.458,
+    "n_events": 72
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.1894,
+    "r1": 0.425,
+    "r2": 0.446,
+    "n_events": 92
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.1724,
+    "r1": 0.374,
+    "r2": 0.462,
+    "n_events": 78
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.1205,
+    "r1": 0.326,
+    "r2": 0.369,
+    "n_events": 65
+   }
+  },
+  "control_top8": [
+   "LINK/USDT:USDT",
+   "ETH/USDT:USDT",
+   "UNI/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "SOL/USDT:USDT",
+   "ADA/USDT:USDT",
+   "ONDO/USDT:USDT"
+  ],
+  "control_ranks": {
+   "LINK/USDT:USDT": 0.02095,
+   "ETH/USDT:USDT": 0.01835,
+   "UNI/USDT:USDT": 0.01499,
+   "AAVE/USDT:USDT": 0.01417,
+   "DOGE/USDT:USDT": 0.00979,
+   "SOL/USDT:USDT": 0.00743,
+   "ADA/USDT:USDT": 0.00456,
+   "ONDO/USDT:USDT": 0.00415,
+   "1000SHIB/USDT:USDT": 0.00404,
+   "LTC/USDT:USDT": 0.0038,
+   "TAO/USDT:USDT": 0.00377,
+   "BTC/USDT:USDT": 0.00374,
+   "NEAR/USDT:USDT": 0.00369,
+   "XRP/USDT:USDT": 0.0035,
+   "1000PEPE/USDT:USDT": 0.00333,
+   "SUI/USDT:USDT": 0.00305,
+   "XLM/USDT:USDT": 0.00186,
+   "BNB/USDT:USDT": 0.00182
+  }
+ },
+ {
+  "rebalance_ts": 1757224800,
+  "rebalance_utc": "2025-09-07T06:00:00+00:00",
+  "test_top8": [
+   "XLM/USDT:USDT",
+   "ADA/USDT:USDT",
+   "XRP/USDT:USDT",
+   "BNB/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "LINK/USDT:USDT"
+  ],
+  "test_scores": {
+   "XLM/USDT:USDT": {
+    "score": 0.5048,
+    "r1": 0.644,
+    "r2": 0.783,
+    "n_events": 60
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.4302,
+    "r1": 0.672,
+    "r2": 0.64,
+    "n_events": 75
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.4151,
+    "r1": 0.546,
+    "r2": 0.761,
+    "n_events": 71
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3562,
+    "r1": 0.606,
+    "r2": 0.588,
+    "n_events": 68
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.355,
+    "r1": 0.586,
+    "r2": 0.606,
+    "n_events": 71
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3434,
+    "r1": 0.532,
+    "r2": 0.646,
+    "n_events": 79
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3404,
+    "r1": 0.557,
+    "r2": 0.611,
+    "n_events": 72
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3346,
+    "r1": 0.596,
+    "r2": 0.562,
+    "n_events": 73
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3318,
+    "r1": 0.558,
+    "r2": 0.594,
+    "n_events": 69
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3313,
+    "r1": 0.51,
+    "r2": 0.65,
+    "n_events": 80
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3257,
+    "r1": 0.562,
+    "r2": 0.579,
+    "n_events": 76
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3236,
+    "r1": 0.574,
+    "r2": 0.564,
+    "n_events": 78
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.3224,
+    "r1": 0.531,
+    "r2": 0.608,
+    "n_events": 79
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.3162,
+    "r1": 0.519,
+    "r2": 0.609,
+    "n_events": 69
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.294,
+    "r1": 0.562,
+    "r2": 0.523,
+    "n_events": 88
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2632,
+    "r1": 0.512,
+    "r2": 0.514,
+    "n_events": 74
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2337,
+    "r1": 0.487,
+    "r2": 0.479,
+    "n_events": 73
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.1709,
+    "r1": 0.389,
+    "r2": 0.439,
+    "n_events": 66
+   }
+  },
+  "control_top8": [
+   "NEAR/USDT:USDT",
+   "LTC/USDT:USDT",
+   "TAO/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "BNB/USDT:USDT",
+   "UNI/USDT:USDT",
+   "LINK/USDT:USDT",
+   "DOGE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "NEAR/USDT:USDT": 0.02765,
+   "LTC/USDT:USDT": 0.01995,
+   "TAO/USDT:USDT": 0.01918,
+   "1000PEPE/USDT:USDT": 0.0173,
+   "BNB/USDT:USDT": 0.01347,
+   "UNI/USDT:USDT": 0.01055,
+   "LINK/USDT:USDT": 0.00948,
+   "DOGE/USDT:USDT": 0.00938,
+   "1000SHIB/USDT:USDT": 0.00772,
+   "ONDO/USDT:USDT": 0.00642,
+   "SUI/USDT:USDT": 0.00428,
+   "ADA/USDT:USDT": 0.00413,
+   "XRP/USDT:USDT": 0.00373,
+   "SOL/USDT:USDT": 0.00277,
+   "AAVE/USDT:USDT": 0.00133,
+   "XLM/USDT:USDT": 0.00092,
+   "BTC/USDT:USDT": 0.00065,
+   "ETH/USDT:USDT": 0.0
+  }
+ },
+ {
+  "rebalance_ts": 1757829600,
+  "rebalance_utc": "2025-09-14T06:00:00+00:00",
+  "test_top8": [
+   "UNI/USDT:USDT",
+   "ADA/USDT:USDT",
+   "SUI/USDT:USDT",
+   "TAO/USDT:USDT",
+   "XLM/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "LINK/USDT:USDT",
+   "LTC/USDT:USDT"
+  ],
+  "test_scores": {
+   "UNI/USDT:USDT": {
+    "score": 0.4824,
+    "r1": 0.661,
+    "r2": 0.73,
+    "n_events": 74
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.4717,
+    "r1": 0.749,
+    "r2": 0.63,
+    "n_events": 73
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.4411,
+    "r1": 0.642,
+    "r2": 0.688,
+    "n_events": 64
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.4331,
+    "r1": 0.629,
+    "r2": 0.688,
+    "n_events": 77
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.4304,
+    "r1": 0.61,
+    "r2": 0.706,
+    "n_events": 68
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.4189,
+    "r1": 0.604,
+    "r2": 0.693,
+    "n_events": 75
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.4088,
+    "r1": 0.672,
+    "r2": 0.608,
+    "n_events": 74
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.398,
+    "r1": 0.593,
+    "r2": 0.671,
+    "n_events": 76
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.3754,
+    "r1": 0.657,
+    "r2": 0.571,
+    "n_events": 91
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3728,
+    "r1": 0.531,
+    "r2": 0.703,
+    "n_events": 74
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3612,
+    "r1": 0.594,
+    "r2": 0.608,
+    "n_events": 79
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3514,
+    "r1": 0.606,
+    "r2": 0.58,
+    "n_events": 81
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.3442,
+    "r1": 0.543,
+    "r2": 0.634,
+    "n_events": 71
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3424,
+    "r1": 0.628,
+    "r2": 0.545,
+    "n_events": 66
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3075,
+    "r1": 0.562,
+    "r2": 0.547,
+    "n_events": 75
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3,
+    "r1": 0.472,
+    "r2": 0.635,
+    "n_events": 85
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2766,
+    "r1": 0.508,
+    "r2": 0.544,
+    "n_events": 68
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2437,
+    "r1": 0.5,
+    "r2": 0.487,
+    "n_events": 80
+   }
+  },
+  "control_top8": [
+   "UNI/USDT:USDT",
+   "SOL/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "BNB/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "SUI/USDT:USDT"
+  ],
+  "control_ranks": {
+   "UNI/USDT:USDT": 0.04489,
+   "SOL/USDT:USDT": 0.02483,
+   "DOGE/USDT:USDT": 0.02454,
+   "1000PEPE/USDT:USDT": 0.02334,
+   "NEAR/USDT:USDT": 0.02044,
+   "BNB/USDT:USDT": 0.01874,
+   "ONDO/USDT:USDT": 0.01867,
+   "SUI/USDT:USDT": 0.01822,
+   "AAVE/USDT:USDT": 0.01623,
+   "XLM/USDT:USDT": 0.01269,
+   "ETH/USDT:USDT": 0.00996,
+   "LINK/USDT:USDT": 0.00886,
+   "LTC/USDT:USDT": 0.00761,
+   "TAO/USDT:USDT": 0.0072,
+   "1000SHIB/USDT:USDT": 0.00496,
+   "ADA/USDT:USDT": 0.00313,
+   "XRP/USDT:USDT": 0.00197,
+   "BTC/USDT:USDT": 0.00119
+  }
+ },
+ {
+  "rebalance_ts": 1758434400,
+  "rebalance_utc": "2025-09-21T06:00:00+00:00",
+  "test_top8": [
+   "BTC/USDT:USDT",
+   "LINK/USDT:USDT",
+   "UNI/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "ADA/USDT:USDT",
+   "XLM/USDT:USDT",
+   "LTC/USDT:USDT"
+  ],
+  "test_scores": {
+   "BTC/USDT:USDT": {
+    "score": 0.4711,
+    "r1": 0.697,
+    "r2": 0.676,
+    "n_events": 74
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.4332,
+    "r1": 0.637,
+    "r2": 0.679,
+    "n_events": 78
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.4283,
+    "r1": 0.661,
+    "r2": 0.648,
+    "n_events": 71
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.4259,
+    "r1": 0.635,
+    "r2": 0.671,
+    "n_events": 76
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.4242,
+    "r1": 0.64,
+    "r2": 0.662,
+    "n_events": 80
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.423,
+    "r1": 0.708,
+    "r2": 0.597,
+    "n_events": 72
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3949,
+    "r1": 0.6,
+    "r2": 0.658,
+    "n_events": 79
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3784,
+    "r1": 0.622,
+    "r2": 0.608,
+    "n_events": 74
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.3627,
+    "r1": 0.628,
+    "r2": 0.578,
+    "n_events": 90
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3578,
+    "r1": 0.544,
+    "r2": 0.657,
+    "n_events": 70
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3468,
+    "r1": 0.594,
+    "r2": 0.583,
+    "n_events": 84
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3441,
+    "r1": 0.561,
+    "r2": 0.613,
+    "n_events": 75
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3384,
+    "r1": 0.589,
+    "r2": 0.575,
+    "n_events": 87
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3357,
+    "r1": 0.519,
+    "r2": 0.646,
+    "n_events": 82
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2937,
+    "r1": 0.514,
+    "r2": 0.571,
+    "n_events": 70
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2909,
+    "r1": 0.608,
+    "r2": 0.478,
+    "n_events": 69
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2643,
+    "r1": 0.51,
+    "r2": 0.519,
+    "n_events": 81
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2608,
+    "r1": 0.515,
+    "r2": 0.506,
+    "n_events": 81
+   }
+  },
+  "control_top8": [
+   "BNB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "SUI/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "SOL/USDT:USDT",
+   "XLM/USDT:USDT"
+  ],
+  "control_ranks": {
+   "BNB/USDT:USDT": 0.07061,
+   "1000PEPE/USDT:USDT": 0.00944,
+   "AAVE/USDT:USDT": 0.00809,
+   "SUI/USDT:USDT": 0.0073,
+   "DOGE/USDT:USDT": 0.00705,
+   "1000SHIB/USDT:USDT": 0.00478,
+   "SOL/USDT:USDT": 0.0041,
+   "XLM/USDT:USDT": 0.00381,
+   "TAO/USDT:USDT": 0.00361,
+   "NEAR/USDT:USDT": 0.00287,
+   "LINK/USDT:USDT": 0.00213,
+   "XRP/USDT:USDT": 0.00127,
+   "LTC/USDT:USDT": 0.00096,
+   "ONDO/USDT:USDT": 0.00069,
+   "UNI/USDT:USDT": 0.00033,
+   "BTC/USDT:USDT": 0.00026,
+   "ADA/USDT:USDT": 0.00022,
+   "ETH/USDT:USDT": 0.00016
+  }
+ },
+ {
+  "rebalance_ts": 1759039200,
+  "rebalance_utc": "2025-09-28T06:00:00+00:00",
+  "test_top8": [
+   "BTC/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "XLM/USDT:USDT",
+   "TAO/USDT:USDT",
+   "LINK/USDT:USDT",
+   "XRP/USDT:USDT",
+   "DOGE/USDT:USDT"
+  ],
+  "test_scores": {
+   "BTC/USDT:USDT": {
+    "score": 0.3978,
+    "r1": 0.635,
+    "r2": 0.627,
+    "n_events": 75
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3592,
+    "r1": 0.604,
+    "r2": 0.595,
+    "n_events": 74
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3438,
+    "r1": 0.592,
+    "r2": 0.581,
+    "n_events": 74
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.328,
+    "r1": 0.551,
+    "r2": 0.595,
+    "n_events": 79
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3258,
+    "r1": 0.579,
+    "r2": 0.562,
+    "n_events": 80
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3137,
+    "r1": 0.592,
+    "r2": 0.53,
+    "n_events": 83
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3125,
+    "r1": 0.5,
+    "r2": 0.625,
+    "n_events": 72
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3124,
+    "r1": 0.565,
+    "r2": 0.553,
+    "n_events": 76
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.311,
+    "r1": 0.558,
+    "r2": 0.557,
+    "n_events": 79
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.302,
+    "r1": 0.569,
+    "r2": 0.53,
+    "n_events": 66
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2955,
+    "r1": 0.571,
+    "r2": 0.518,
+    "n_events": 85
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2882,
+    "r1": 0.551,
+    "r2": 0.523,
+    "n_events": 88
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2779,
+    "r1": 0.483,
+    "r2": 0.575,
+    "n_events": 80
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2776,
+    "r1": 0.604,
+    "r2": 0.459,
+    "n_events": 74
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2651,
+    "r1": 0.482,
+    "r2": 0.55,
+    "n_events": 80
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.253,
+    "r1": 0.532,
+    "r2": 0.476,
+    "n_events": 82
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2499,
+    "r1": 0.557,
+    "r2": 0.449,
+    "n_events": 78
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2411,
+    "r1": 0.533,
+    "r2": 0.452,
+    "n_events": 73
+   }
+  },
+  "control_top8": [
+   "1000PEPE/USDT:USDT",
+   "ADA/USDT:USDT",
+   "SUI/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "TAO/USDT:USDT",
+   "1000SHIB/USDT:USDT"
+  ],
+  "control_ranks": {
+   "1000PEPE/USDT:USDT": 0.02794,
+   "ADA/USDT:USDT": 0.02162,
+   "SUI/USDT:USDT": 0.0209,
+   "ONDO/USDT:USDT": 0.02013,
+   "DOGE/USDT:USDT": 0.01943,
+   "NEAR/USDT:USDT": 0.01902,
+   "TAO/USDT:USDT": 0.01731,
+   "1000SHIB/USDT:USDT": 0.01548,
+   "LINK/USDT:USDT": 0.01323,
+   "XLM/USDT:USDT": 0.01298,
+   "AAVE/USDT:USDT": 0.01214,
+   "SOL/USDT:USDT": 0.00588,
+   "UNI/USDT:USDT": 0.00331,
+   "XRP/USDT:USDT": 0.00287,
+   "BNB/USDT:USDT": 0.00282,
+   "BTC/USDT:USDT": 0.00234,
+   "ETH/USDT:USDT": 0.00222,
+   "LTC/USDT:USDT": 0.00135
+  }
+ },
+ {
+  "rebalance_ts": 1759644000,
+  "rebalance_utc": "2025-10-05T06:00:00+00:00",
+  "test_top8": [
+   "AAVE/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "LINK/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "LTC/USDT:USDT",
+   "UNI/USDT:USDT",
+   "TAO/USDT:USDT",
+   "1000SHIB/USDT:USDT"
+  ],
+  "test_scores": {
+   "AAVE/USDT:USDT": {
+    "score": 0.364,
+    "r1": 0.601,
+    "r2": 0.605,
+    "n_events": 76
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3182,
+    "r1": 0.544,
+    "r2": 0.584,
+    "n_events": 77
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3033,
+    "r1": 0.572,
+    "r2": 0.53,
+    "n_events": 83
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3016,
+    "r1": 0.507,
+    "r2": 0.595,
+    "n_events": 79
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2847,
+    "r1": 0.51,
+    "r2": 0.558,
+    "n_events": 77
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2792,
+    "r1": 0.558,
+    "r2": 0.5,
+    "n_events": 64
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2785,
+    "r1": 0.531,
+    "r2": 0.525,
+    "n_events": 80
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2646,
+    "r1": 0.511,
+    "r2": 0.518,
+    "n_events": 85
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2532,
+    "r1": 0.483,
+    "r2": 0.524,
+    "n_events": 84
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2512,
+    "r1": 0.515,
+    "r2": 0.487,
+    "n_events": 80
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2481,
+    "r1": 0.49,
+    "r2": 0.506,
+    "n_events": 83
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2452,
+    "r1": 0.44,
+    "r2": 0.557,
+    "n_events": 79
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2429,
+    "r1": 0.5,
+    "r2": 0.486,
+    "n_events": 70
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.235,
+    "r1": 0.412,
+    "r2": 0.57,
+    "n_events": 79
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2287,
+    "r1": 0.508,
+    "r2": 0.45,
+    "n_events": 80
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2197,
+    "r1": 0.444,
+    "r2": 0.494,
+    "n_events": 89
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2196,
+    "r1": 0.499,
+    "r2": 0.44,
+    "n_events": 84
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.185,
+    "r1": 0.424,
+    "r2": 0.437,
+    "n_events": 87
+   }
+  },
+  "control_top8": [
+   "SUI/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "UNI/USDT:USDT",
+   "LTC/USDT:USDT",
+   "BTC/USDT:USDT",
+   "SOL/USDT:USDT",
+   "ADA/USDT:USDT"
+  ],
+  "control_ranks": {
+   "SUI/USDT:USDT": 0.0324,
+   "DOGE/USDT:USDT": 0.03046,
+   "NEAR/USDT:USDT": 0.02664,
+   "UNI/USDT:USDT": 0.02439,
+   "LTC/USDT:USDT": 0.02254,
+   "BTC/USDT:USDT": 0.02118,
+   "SOL/USDT:USDT": 0.01975,
+   "ADA/USDT:USDT": 0.01881,
+   "ETH/USDT:USDT": 0.01475,
+   "ONDO/USDT:USDT": 0.01467,
+   "AAVE/USDT:USDT": 0.0139,
+   "LINK/USDT:USDT": 0.01368,
+   "TAO/USDT:USDT": 0.01047,
+   "1000SHIB/USDT:USDT": 0.00691,
+   "XRP/USDT:USDT": 0.00374,
+   "1000PEPE/USDT:USDT": 0.00207,
+   "BNB/USDT:USDT": 0.00123,
+   "XLM/USDT:USDT": 0.00117
+  }
+ },
+ {
+  "rebalance_ts": 1760248800,
+  "rebalance_utc": "2025-10-12T06:00:00+00:00",
+  "test_top8": [
+   "LTC/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "SOL/USDT:USDT",
+   "LINK/USDT:USDT"
+  ],
+  "test_scores": {
+   "LTC/USDT:USDT": {
+    "score": 0.2807,
+    "r1": 0.517,
+    "r2": 0.543,
+    "n_events": 81
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2645,
+    "r1": 0.494,
+    "r2": 0.535,
+    "n_events": 86
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2631,
+    "r1": 0.469,
+    "r2": 0.56,
+    "n_events": 91
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2425,
+    "r1": 0.463,
+    "r2": 0.524,
+    "n_events": 82
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2366,
+    "r1": 0.485,
+    "r2": 0.488,
+    "n_events": 84
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2243,
+    "r1": 0.449,
+    "r2": 0.5,
+    "n_events": 78
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2239,
+    "r1": 0.464,
+    "r2": 0.483,
+    "n_events": 87
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2236,
+    "r1": 0.478,
+    "r2": 0.468,
+    "n_events": 94
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2076,
+    "r1": 0.425,
+    "r2": 0.488,
+    "n_events": 86
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.1878,
+    "r1": 0.475,
+    "r2": 0.395,
+    "n_events": 86
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.1869,
+    "r1": 0.365,
+    "r2": 0.512,
+    "n_events": 86
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.1785,
+    "r1": 0.443,
+    "r2": 0.403,
+    "n_events": 72
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.1717,
+    "r1": 0.408,
+    "r2": 0.42,
+    "n_events": 88
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.167,
+    "r1": 0.379,
+    "r2": 0.44,
+    "n_events": 84
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1503,
+    "r1": 0.397,
+    "r2": 0.378,
+    "n_events": 74
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.1488,
+    "r1": 0.378,
+    "r2": 0.394,
+    "n_events": 99
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.1433,
+    "r1": 0.349,
+    "r2": 0.411,
+    "n_events": 90
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.136,
+    "r1": 0.364,
+    "r2": 0.374,
+    "n_events": 91
+   }
+  },
+  "control_top8": [
+   "SUI/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "LTC/USDT:USDT",
+   "UNI/USDT:USDT",
+   "BNB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "1000SHIB/USDT:USDT"
+  ],
+  "control_ranks": {
+   "SUI/USDT:USDT": 0.05898,
+   "NEAR/USDT:USDT": 0.04397,
+   "LTC/USDT:USDT": 0.04176,
+   "UNI/USDT:USDT": 0.04028,
+   "BNB/USDT:USDT": 0.03226,
+   "1000PEPE/USDT:USDT": 0.02762,
+   "ONDO/USDT:USDT": 0.01822,
+   "1000SHIB/USDT:USDT": 0.01739,
+   "DOGE/USDT:USDT": 0.01505,
+   "LINK/USDT:USDT": 0.01356,
+   "XRP/USDT:USDT": 0.01311,
+   "TAO/USDT:USDT": 0.01095,
+   "BTC/USDT:USDT": 0.0062,
+   "SOL/USDT:USDT": 0.00467,
+   "ETH/USDT:USDT": 0.00459,
+   "XLM/USDT:USDT": 0.00284,
+   "AAVE/USDT:USDT": 0.00065,
+   "ADA/USDT:USDT": 0.00015
+  }
+ },
+ {
+  "rebalance_ts": 1760853600,
+  "rebalance_utc": "2025-10-19T06:00:00+00:00",
+  "test_top8": [
+   "LTC/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "XRP/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "LINK/USDT:USDT",
+   "SOL/USDT:USDT"
+  ],
+  "test_scores": {
+   "LTC/USDT:USDT": {
+    "score": 0.304,
+    "r1": 0.532,
+    "r2": 0.571,
+    "n_events": 84
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2621,
+    "r1": 0.501,
+    "r2": 0.523,
+    "n_events": 88
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2162,
+    "r1": 0.449,
+    "r2": 0.482,
+    "n_events": 83
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2048,
+    "r1": 0.356,
+    "r2": 0.576,
+    "n_events": 92
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2033,
+    "r1": 0.494,
+    "r2": 0.411,
+    "n_events": 90
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.197,
+    "r1": 0.408,
+    "r2": 0.482,
+    "n_events": 85
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.196,
+    "r1": 0.449,
+    "r2": 0.437,
+    "n_events": 103
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.1919,
+    "r1": 0.429,
+    "r2": 0.447,
+    "n_events": 85
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.1895,
+    "r1": 0.371,
+    "r2": 0.511,
+    "n_events": 90
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.1839,
+    "r1": 0.411,
+    "r2": 0.447,
+    "n_events": 76
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.1776,
+    "r1": 0.389,
+    "r2": 0.457,
+    "n_events": 81
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1722,
+    "r1": 0.371,
+    "r2": 0.464,
+    "n_events": 84
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.1688,
+    "r1": 0.375,
+    "r2": 0.45,
+    "n_events": 80
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.1595,
+    "r1": 0.364,
+    "r2": 0.438,
+    "n_events": 89
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.1585,
+    "r1": 0.407,
+    "r2": 0.389,
+    "n_events": 95
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.1372,
+    "r1": 0.343,
+    "r2": 0.4,
+    "n_events": 90
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.1342,
+    "r1": 0.344,
+    "r2": 0.389,
+    "n_events": 95
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.1236,
+    "r1": 0.351,
+    "r2": 0.352,
+    "n_events": 91
+   }
+  },
+  "control_top8": [
+   "AAVE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "UNI/USDT:USDT",
+   "SUI/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "LTC/USDT:USDT",
+   "SOL/USDT:USDT",
+   "NEAR/USDT:USDT"
+  ],
+  "control_ranks": {
+   "AAVE/USDT:USDT": 0.03205,
+   "TAO/USDT:USDT": 0.02311,
+   "UNI/USDT:USDT": 0.0221,
+   "SUI/USDT:USDT": 0.0205,
+   "DOGE/USDT:USDT": 0.01893,
+   "LTC/USDT:USDT": 0.01853,
+   "SOL/USDT:USDT": 0.01079,
+   "NEAR/USDT:USDT": 0.00929,
+   "XRP/USDT:USDT": 0.00858,
+   "ETH/USDT:USDT": 0.00783,
+   "ADA/USDT:USDT": 0.00445,
+   "1000SHIB/USDT:USDT": 0.00438,
+   "1000PEPE/USDT:USDT": 0.00427,
+   "ONDO/USDT:USDT": 0.00365,
+   "BNB/USDT:USDT": 0.00223,
+   "LINK/USDT:USDT": 0.00222,
+   "XLM/USDT:USDT": 0.00154,
+   "BTC/USDT:USDT": 0.0008
+  }
+ },
+ {
+  "rebalance_ts": 1761458400,
+  "rebalance_utc": "2025-10-26T06:00:00+00:00",
+  "test_top8": [
+   "LTC/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "UNI/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "1000SHIB/USDT:USDT"
+  ],
+  "test_scores": {
+   "LTC/USDT:USDT": {
+    "score": 0.4335,
+    "r1": 0.632,
+    "r2": 0.686,
+    "n_events": 86
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3527,
+    "r1": 0.542,
+    "r2": 0.651,
+    "n_events": 86
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3454,
+    "r1": 0.551,
+    "r2": 0.627,
+    "n_events": 83
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2862,
+    "r1": 0.489,
+    "r2": 0.585,
+    "n_events": 82
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2859,
+    "r1": 0.497,
+    "r2": 0.575,
+    "n_events": 80
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2852,
+    "r1": 0.469,
+    "r2": 0.608,
+    "n_events": 79
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2838,
+    "r1": 0.561,
+    "r2": 0.506,
+    "n_events": 87
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2837,
+    "r1": 0.501,
+    "r2": 0.566,
+    "n_events": 76
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2797,
+    "r1": 0.496,
+    "r2": 0.564,
+    "n_events": 78
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2775,
+    "r1": 0.515,
+    "r2": 0.538,
+    "n_events": 78
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2551,
+    "r1": 0.481,
+    "r2": 0.531,
+    "n_events": 81
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2472,
+    "r1": 0.451,
+    "r2": 0.548,
+    "n_events": 84
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2425,
+    "r1": 0.465,
+    "r2": 0.521,
+    "n_events": 94
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2415,
+    "r1": 0.512,
+    "r2": 0.471,
+    "n_events": 87
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2402,
+    "r1": 0.439,
+    "r2": 0.547,
+    "n_events": 95
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2224,
+    "r1": 0.425,
+    "r2": 0.523,
+    "n_events": 86
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2194,
+    "r1": 0.479,
+    "r2": 0.458,
+    "n_events": 83
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2168,
+    "r1": 0.443,
+    "r2": 0.489,
+    "n_events": 94
+   }
+  },
+  "control_top8": [
+   "TAO/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "XRP/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "XLM/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "LTC/USDT:USDT"
+  ],
+  "control_ranks": {
+   "TAO/USDT:USDT": 0.0313,
+   "NEAR/USDT:USDT": 0.02504,
+   "XRP/USDT:USDT": 0.02218,
+   "DOGE/USDT:USDT": 0.01559,
+   "XLM/USDT:USDT": 0.01531,
+   "1000PEPE/USDT:USDT": 0.00845,
+   "ONDO/USDT:USDT": 0.00785,
+   "LTC/USDT:USDT": 0.00729,
+   "SUI/USDT:USDT": 0.00695,
+   "LINK/USDT:USDT": 0.00642,
+   "AAVE/USDT:USDT": 0.00554,
+   "SOL/USDT:USDT": 0.00427,
+   "ETH/USDT:USDT": 0.00309,
+   "ADA/USDT:USDT": 0.00244,
+   "BTC/USDT:USDT": 0.00234,
+   "BNB/USDT:USDT": 0.00218,
+   "1000SHIB/USDT:USDT": 0.00158,
+   "UNI/USDT:USDT": 0.00081
+  }
+ },
+ {
+  "rebalance_ts": 1762063200,
+  "rebalance_utc": "2025-11-02T06:00:00+00:00",
+  "test_top8": [
+   "LTC/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "BNB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "XLM/USDT:USDT",
+   "BTC/USDT:USDT",
+   "XRP/USDT:USDT"
+  ],
+  "test_scores": {
+   "LTC/USDT:USDT": {
+    "score": 0.3782,
+    "r1": 0.574,
+    "r2": 0.659,
+    "n_events": 91
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3275,
+    "r1": 0.546,
+    "r2": 0.6,
+    "n_events": 90
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2941,
+    "r1": 0.521,
+    "r2": 0.565,
+    "n_events": 85
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2889,
+    "r1": 0.506,
+    "r2": 0.571,
+    "n_events": 84
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2839,
+    "r1": 0.508,
+    "r2": 0.558,
+    "n_events": 77
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2835,
+    "r1": 0.494,
+    "r2": 0.573,
+    "n_events": 75
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2738,
+    "r1": 0.479,
+    "r2": 0.571,
+    "n_events": 91
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2708,
+    "r1": 0.482,
+    "r2": 0.562,
+    "n_events": 89
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.255,
+    "r1": 0.425,
+    "r2": 0.6,
+    "n_events": 80
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2548,
+    "r1": 0.489,
+    "r2": 0.521,
+    "n_events": 71
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2479,
+    "r1": 0.443,
+    "r2": 0.56,
+    "n_events": 84
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2412,
+    "r1": 0.476,
+    "r2": 0.506,
+    "n_events": 79
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2336,
+    "r1": 0.44,
+    "r2": 0.531,
+    "n_events": 98
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2198,
+    "r1": 0.421,
+    "r2": 0.522,
+    "n_events": 90
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2191,
+    "r1": 0.428,
+    "r2": 0.512,
+    "n_events": 82
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2136,
+    "r1": 0.487,
+    "r2": 0.438,
+    "n_events": 89
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2049,
+    "r1": 0.492,
+    "r2": 0.417,
+    "n_events": 84
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1985,
+    "r1": 0.388,
+    "r2": 0.512,
+    "n_events": 82
+   }
+  },
+  "control_top8": [
+   "TAO/USDT:USDT",
+   "LTC/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "UNI/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "LINK/USDT:USDT"
+  ],
+  "control_ranks": {
+   "TAO/USDT:USDT": 0.07472,
+   "LTC/USDT:USDT": 0.04868,
+   "ONDO/USDT:USDT": 0.03211,
+   "NEAR/USDT:USDT": 0.03126,
+   "1000PEPE/USDT:USDT": 0.02472,
+   "UNI/USDT:USDT": 0.02388,
+   "1000SHIB/USDT:USDT": 0.02194,
+   "LINK/USDT:USDT": 0.0213,
+   "ETH/USDT:USDT": 0.01221,
+   "ADA/USDT:USDT": 0.01118,
+   "XLM/USDT:USDT": 0.0106,
+   "DOGE/USDT:USDT": 0.00844,
+   "XRP/USDT:USDT": 0.00503,
+   "BNB/USDT:USDT": 0.0047,
+   "SOL/USDT:USDT": 0.00446,
+   "SUI/USDT:USDT": 0.00424,
+   "BTC/USDT:USDT": 0.00341,
+   "AAVE/USDT:USDT": 0.00155
+  }
+ },
+ {
+  "rebalance_ts": 1762668000,
+  "rebalance_utc": "2025-11-09T06:00:00+00:00",
+  "test_top8": [
+   "XLM/USDT:USDT",
+   "BNB/USDT:USDT",
+   "LTC/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "BTC/USDT:USDT"
+  ],
+  "test_scores": {
+   "XLM/USDT:USDT": {
+    "score": 0.3333,
+    "r1": 0.531,
+    "r2": 0.628,
+    "n_events": 78
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3104,
+    "r1": 0.536,
+    "r2": 0.579,
+    "n_events": 76
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3015,
+    "r1": 0.478,
+    "r2": 0.631,
+    "n_events": 84
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2919,
+    "r1": 0.512,
+    "r2": 0.57,
+    "n_events": 79
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2809,
+    "r1": 0.55,
+    "r2": 0.511,
+    "n_events": 94
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2802,
+    "r1": 0.522,
+    "r2": 0.537,
+    "n_events": 82
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2788,
+    "r1": 0.4,
+    "r2": 0.697,
+    "n_events": 66
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2563,
+    "r1": 0.435,
+    "r2": 0.589,
+    "n_events": 95
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2413,
+    "r1": 0.463,
+    "r2": 0.522,
+    "n_events": 92
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2369,
+    "r1": 0.424,
+    "r2": 0.559,
+    "n_events": 93
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2342,
+    "r1": 0.444,
+    "r2": 0.527,
+    "n_events": 93
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2291,
+    "r1": 0.478,
+    "r2": 0.479,
+    "n_events": 73
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2287,
+    "r1": 0.447,
+    "r2": 0.511,
+    "n_events": 88
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2286,
+    "r1": 0.481,
+    "r2": 0.476,
+    "n_events": 82
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2194,
+    "r1": 0.469,
+    "r2": 0.467,
+    "n_events": 92
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2127,
+    "r1": 0.421,
+    "r2": 0.505,
+    "n_events": 91
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2001,
+    "r1": 0.406,
+    "r2": 0.494,
+    "n_events": 77
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.1946,
+    "r1": 0.429,
+    "r2": 0.453,
+    "n_events": 86
+   }
+  },
+  "control_top8": [
+   "TAO/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "ADA/USDT:USDT",
+   "XLM/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "LINK/USDT:USDT",
+   "ONDO/USDT:USDT"
+  ],
+  "control_ranks": {
+   "TAO/USDT:USDT": 0.0511,
+   "NEAR/USDT:USDT": 0.04325,
+   "ADA/USDT:USDT": 0.03876,
+   "XLM/USDT:USDT": 0.03633,
+   "1000PEPE/USDT:USDT": 0.03361,
+   "DOGE/USDT:USDT": 0.02737,
+   "LINK/USDT:USDT": 0.02711,
+   "ONDO/USDT:USDT": 0.02673,
+   "AAVE/USDT:USDT": 0.02529,
+   "SUI/USDT:USDT": 0.02395,
+   "1000SHIB/USDT:USDT": 0.02252,
+   "SOL/USDT:USDT": 0.02003,
+   "XRP/USDT:USDT": 0.01876,
+   "ETH/USDT:USDT": 0.00751,
+   "UNI/USDT:USDT": 0.00642,
+   "BTC/USDT:USDT": 0.00358,
+   "LTC/USDT:USDT": 0.0018,
+   "BNB/USDT:USDT": 0.00046
+  }
+ },
+ {
+  "rebalance_ts": 1763272800,
+  "rebalance_utc": "2025-11-16T06:00:00+00:00",
+  "test_top8": [
+   "BNB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "XLM/USDT:USDT",
+   "LTC/USDT:USDT",
+   "TAO/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "1000SHIB/USDT:USDT"
+  ],
+  "test_scores": {
+   "BNB/USDT:USDT": {
+    "score": 0.3955,
+    "r1": 0.597,
+    "r2": 0.662,
+    "n_events": 74
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3917,
+    "r1": 0.583,
+    "r2": 0.671,
+    "n_events": 70
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3577,
+    "r1": 0.496,
+    "r2": 0.721,
+    "n_events": 61
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3466,
+    "r1": 0.517,
+    "r2": 0.671,
+    "n_events": 79
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3239,
+    "r1": 0.447,
+    "r2": 0.724,
+    "n_events": 58
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3188,
+    "r1": 0.518,
+    "r2": 0.615,
+    "n_events": 65
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3171,
+    "r1": 0.515,
+    "r2": 0.615,
+    "n_events": 78
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3108,
+    "r1": 0.529,
+    "r2": 0.587,
+    "n_events": 63
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2995,
+    "r1": 0.517,
+    "r2": 0.58,
+    "n_events": 69
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2939,
+    "r1": 0.483,
+    "r2": 0.608,
+    "n_events": 74
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2875,
+    "r1": 0.475,
+    "r2": 0.605,
+    "n_events": 76
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2751,
+    "r1": 0.476,
+    "r2": 0.577,
+    "n_events": 71
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2605,
+    "r1": 0.46,
+    "r2": 0.567,
+    "n_events": 90
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.257,
+    "r1": 0.454,
+    "r2": 0.566,
+    "n_events": 76
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2515,
+    "r1": 0.453,
+    "r2": 0.556,
+    "n_events": 72
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.247,
+    "r1": 0.435,
+    "r2": 0.568,
+    "n_events": 88
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2396,
+    "r1": 0.479,
+    "r2": 0.5,
+    "n_events": 58
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.1906,
+    "r1": 0.424,
+    "r2": 0.45,
+    "n_events": 80
+   }
+  },
+  "control_top8": [
+   "NEAR/USDT:USDT",
+   "UNI/USDT:USDT",
+   "LTC/USDT:USDT",
+   "SUI/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "ADA/USDT:USDT",
+   "XLM/USDT:USDT",
+   "BNB/USDT:USDT"
+  ],
+  "control_ranks": {
+   "NEAR/USDT:USDT": 0.04309,
+   "UNI/USDT:USDT": 0.03656,
+   "LTC/USDT:USDT": 0.01907,
+   "SUI/USDT:USDT": 0.01776,
+   "1000PEPE/USDT:USDT": 0.0175,
+   "ADA/USDT:USDT": 0.01376,
+   "XLM/USDT:USDT": 0.01317,
+   "BNB/USDT:USDT": 0.01295,
+   "SOL/USDT:USDT": 0.01016,
+   "ETH/USDT:USDT": 0.00823,
+   "ONDO/USDT:USDT": 0.00783,
+   "XRP/USDT:USDT": 0.00774,
+   "1000SHIB/USDT:USDT": 0.00694,
+   "TAO/USDT:USDT": 0.00461,
+   "BTC/USDT:USDT": 0.00444,
+   "AAVE/USDT:USDT": 0.00361,
+   "LINK/USDT:USDT": 0.00254,
+   "DOGE/USDT:USDT": 0.0008
+  }
+ },
+ {
+  "rebalance_ts": 1763877600,
+  "rebalance_utc": "2025-11-23T06:00:00+00:00",
+  "test_top8": [
+   "BNB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "LINK/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "XLM/USDT:USDT"
+  ],
+  "test_scores": {
+   "BNB/USDT:USDT": {
+    "score": 0.3509,
+    "r1": 0.542,
+    "r2": 0.648,
+    "n_events": 71
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3487,
+    "r1": 0.535,
+    "r2": 0.652,
+    "n_events": 69
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3327,
+    "r1": 0.476,
+    "r2": 0.698,
+    "n_events": 63
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2953,
+    "r1": 0.525,
+    "r2": 0.562,
+    "n_events": 64
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2905,
+    "r1": 0.474,
+    "r2": 0.613,
+    "n_events": 75
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2783,
+    "r1": 0.442,
+    "r2": 0.63,
+    "n_events": 73
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2677,
+    "r1": 0.465,
+    "r2": 0.575,
+    "n_events": 73
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2548,
+    "r1": 0.368,
+    "r2": 0.692,
+    "n_events": 65
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2505,
+    "r1": 0.442,
+    "r2": 0.567,
+    "n_events": 67
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2479,
+    "r1": 0.503,
+    "r2": 0.493,
+    "n_events": 73
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2346,
+    "r1": 0.508,
+    "r2": 0.462,
+    "n_events": 65
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2328,
+    "r1": 0.458,
+    "r2": 0.508,
+    "n_events": 63
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2288,
+    "r1": 0.443,
+    "r2": 0.516,
+    "n_events": 91
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2202,
+    "r1": 0.39,
+    "r2": 0.564,
+    "n_events": 78
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2097,
+    "r1": 0.419,
+    "r2": 0.5,
+    "n_events": 78
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2048,
+    "r1": 0.415,
+    "r2": 0.493,
+    "n_events": 73
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.1954,
+    "r1": 0.386,
+    "r2": 0.506,
+    "n_events": 81
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.1397,
+    "r1": 0.351,
+    "r2": 0.397,
+    "n_events": 78
+   }
+  },
+  "control_top8": [
+   "XRP/USDT:USDT",
+   "LINK/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "XLM/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "ONDO/USDT:USDT"
+  ],
+  "control_ranks": {
+   "XRP/USDT:USDT": 0.065,
+   "LINK/USDT:USDT": 0.051,
+   "DOGE/USDT:USDT": 0.04849,
+   "1000PEPE/USDT:USDT": 0.04734,
+   "AAVE/USDT:USDT": 0.04038,
+   "XLM/USDT:USDT": 0.03786,
+   "1000SHIB/USDT:USDT": 0.03623,
+   "ONDO/USDT:USDT": 0.03479,
+   "SOL/USDT:USDT": 0.03449,
+   "TAO/USDT:USDT": 0.03142,
+   "ETH/USDT:USDT": 0.0297,
+   "ADA/USDT:USDT": 0.02816,
+   "BNB/USDT:USDT": 0.02711,
+   "BTC/USDT:USDT": 0.02465,
+   "LTC/USDT:USDT": 0.01836,
+   "NEAR/USDT:USDT": 0.01785,
+   "SUI/USDT:USDT": 0.01548,
+   "UNI/USDT:USDT": 0.01488
+  }
+ },
+ {
+  "rebalance_ts": 1764482400,
+  "rebalance_utc": "2025-11-30T06:00:00+00:00",
+  "test_top8": [
+   "UNI/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "BNB/USDT:USDT",
+   "TAO/USDT:USDT",
+   "LTC/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "DOGE/USDT:USDT"
+  ],
+  "test_scores": {
+   "UNI/USDT:USDT": {
+    "score": 0.392,
+    "r1": 0.624,
+    "r2": 0.629,
+    "n_events": 70
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3913,
+    "r1": 0.596,
+    "r2": 0.657,
+    "n_events": 67
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3847,
+    "r1": 0.593,
+    "r2": 0.649,
+    "n_events": 74
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3641,
+    "r1": 0.631,
+    "r2": 0.577,
+    "n_events": 71
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3454,
+    "r1": 0.526,
+    "r2": 0.656,
+    "n_events": 64
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3348,
+    "r1": 0.546,
+    "r2": 0.613,
+    "n_events": 75
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3301,
+    "r1": 0.589,
+    "r2": 0.561,
+    "n_events": 66
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3238,
+    "r1": 0.571,
+    "r2": 0.567,
+    "n_events": 67
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3164,
+    "r1": 0.556,
+    "r2": 0.569,
+    "n_events": 72
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3091,
+    "r1": 0.568,
+    "r2": 0.544,
+    "n_events": 68
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2938,
+    "r1": 0.512,
+    "r2": 0.573,
+    "n_events": 75
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2921,
+    "r1": 0.496,
+    "r2": 0.589,
+    "n_events": 73
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.29,
+    "r1": 0.483,
+    "r2": 0.6,
+    "n_events": 70
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.285,
+    "r1": 0.551,
+    "r2": 0.517,
+    "n_events": 89
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2812,
+    "r1": 0.446,
+    "r2": 0.631,
+    "n_events": 65
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2795,
+    "r1": 0.511,
+    "r2": 0.547,
+    "n_events": 64
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2227,
+    "r1": 0.469,
+    "r2": 0.474,
+    "n_events": 78
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.1846,
+    "r1": 0.418,
+    "r2": 0.442,
+    "n_events": 77
+   }
+  },
+  "control_top8": [
+   "NEAR/USDT:USDT",
+   "TAO/USDT:USDT",
+   "LTC/USDT:USDT",
+   "ETH/USDT:USDT",
+   "UNI/USDT:USDT",
+   "BNB/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "SOL/USDT:USDT"
+  ],
+  "control_ranks": {
+   "NEAR/USDT:USDT": 0.0275,
+   "TAO/USDT:USDT": 0.01837,
+   "LTC/USDT:USDT": 0.01355,
+   "ETH/USDT:USDT": 0.01337,
+   "UNI/USDT:USDT": 0.01158,
+   "BNB/USDT:USDT": 0.01138,
+   "ONDO/USDT:USDT": 0.01087,
+   "SOL/USDT:USDT": 0.01057,
+   "1000SHIB/USDT:USDT": 0.0095,
+   "1000PEPE/USDT:USDT": 0.00891,
+   "SUI/USDT:USDT": 0.00748,
+   "LINK/USDT:USDT": 0.00696,
+   "XRP/USDT:USDT": 0.00684,
+   "DOGE/USDT:USDT": 0.00575,
+   "AAVE/USDT:USDT": 0.00382,
+   "XLM/USDT:USDT": 0.0029,
+   "BTC/USDT:USDT": 0.0006,
+   "ADA/USDT:USDT": 0.0
+  }
+ },
+ {
+  "rebalance_ts": 1765087200,
+  "rebalance_utc": "2025-12-07T06:00:00+00:00",
+  "test_top8": [
+   "BNB/USDT:USDT",
+   "TAO/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "UNI/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "LINK/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "LTC/USDT:USDT"
+  ],
+  "test_scores": {
+   "BNB/USDT:USDT": {
+    "score": 0.3409,
+    "r1": 0.589,
+    "r2": 0.579,
+    "n_events": 76
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3273,
+    "r1": 0.525,
+    "r2": 0.623,
+    "n_events": 77
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3054,
+    "r1": 0.526,
+    "r2": 0.58,
+    "n_events": 81
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2977,
+    "r1": 0.569,
+    "r2": 0.523,
+    "n_events": 88
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2862,
+    "r1": 0.531,
+    "r2": 0.539,
+    "n_events": 76
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2786,
+    "r1": 0.514,
+    "r2": 0.542,
+    "n_events": 83
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2471,
+    "r1": 0.515,
+    "r2": 0.479,
+    "n_events": 73
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.247,
+    "r1": 0.512,
+    "r2": 0.482,
+    "n_events": 83
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2426,
+    "r1": 0.457,
+    "r2": 0.531,
+    "n_events": 81
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2401,
+    "r1": 0.517,
+    "r2": 0.465,
+    "n_events": 71
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.237,
+    "r1": 0.512,
+    "r2": 0.463,
+    "n_events": 80
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.233,
+    "r1": 0.493,
+    "r2": 0.473,
+    "n_events": 91
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2257,
+    "r1": 0.482,
+    "r2": 0.468,
+    "n_events": 79
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2196,
+    "r1": 0.468,
+    "r2": 0.469,
+    "n_events": 81
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2153,
+    "r1": 0.431,
+    "r2": 0.5,
+    "n_events": 74
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2062,
+    "r1": 0.412,
+    "r2": 0.5,
+    "n_events": 80
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.1797,
+    "r1": 0.433,
+    "r2": 0.415,
+    "n_events": 82
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.132,
+    "r1": 0.382,
+    "r2": 0.346,
+    "n_events": 81
+   }
+  },
+  "control_top8": [
+   "1000PEPE/USDT:USDT",
+   "SUI/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "LINK/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "LTC/USDT:USDT",
+   "UNI/USDT:USDT",
+   "TAO/USDT:USDT"
+  ],
+  "control_ranks": {
+   "1000PEPE/USDT:USDT": 0.03633,
+   "SUI/USDT:USDT": 0.02754,
+   "AAVE/USDT:USDT": 0.02605,
+   "LINK/USDT:USDT": 0.02424,
+   "NEAR/USDT:USDT": 0.02328,
+   "LTC/USDT:USDT": 0.02268,
+   "UNI/USDT:USDT": 0.01856,
+   "TAO/USDT:USDT": 0.01854,
+   "1000SHIB/USDT:USDT": 0.01376,
+   "BNB/USDT:USDT": 0.01199,
+   "DOGE/USDT:USDT": 0.00575,
+   "ADA/USDT:USDT": 0.00459,
+   "ONDO/USDT:USDT": 0.00301,
+   "XRP/USDT:USDT": 0.0025,
+   "ETH/USDT:USDT": 0.00233,
+   "SOL/USDT:USDT": 0.00203,
+   "XLM/USDT:USDT": 0.00175,
+   "BTC/USDT:USDT": 0.00081
+  }
+ },
+ {
+  "rebalance_ts": 1765692000,
+  "rebalance_utc": "2025-12-14T06:00:00+00:00",
+  "test_top8": [
+   "TAO/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "UNI/USDT:USDT",
+   "BNB/USDT:USDT",
+   "LINK/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "XLM/USDT:USDT"
+  ],
+  "test_scores": {
+   "TAO/USDT:USDT": {
+    "score": 0.4155,
+    "r1": 0.615,
+    "r2": 0.675,
+    "n_events": 77
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3813,
+    "r1": 0.607,
+    "r2": 0.628,
+    "n_events": 78
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3599,
+    "r1": 0.644,
+    "r2": 0.558,
+    "n_events": 77
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.3565,
+    "r1": 0.704,
+    "r2": 0.506,
+    "n_events": 79
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3356,
+    "r1": 0.614,
+    "r2": 0.547,
+    "n_events": 75
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3328,
+    "r1": 0.614,
+    "r2": 0.542,
+    "n_events": 83
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2924,
+    "r1": 0.529,
+    "r2": 0.553,
+    "n_events": 76
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2913,
+    "r1": 0.575,
+    "r2": 0.507,
+    "n_events": 75
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2867,
+    "r1": 0.56,
+    "r2": 0.512,
+    "n_events": 82
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2853,
+    "r1": 0.586,
+    "r2": 0.487,
+    "n_events": 76
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2607,
+    "r1": 0.515,
+    "r2": 0.506,
+    "n_events": 85
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2586,
+    "r1": 0.511,
+    "r2": 0.506,
+    "n_events": 83
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2581,
+    "r1": 0.554,
+    "r2": 0.466,
+    "n_events": 73
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2556,
+    "r1": 0.511,
+    "r2": 0.5,
+    "n_events": 84
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2551,
+    "r1": 0.615,
+    "r2": 0.415,
+    "n_events": 82
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2343,
+    "r1": 0.463,
+    "r2": 0.506,
+    "n_events": 77
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2278,
+    "r1": 0.536,
+    "r2": 0.425,
+    "n_events": 80
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2175,
+    "r1": 0.485,
+    "r2": 0.449,
+    "n_events": 78
+   }
+  },
+  "control_top8": [
+   "UNI/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "SUI/USDT:USDT",
+   "XLM/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "BNB/USDT:USDT",
+   "1000SHIB/USDT:USDT"
+  ],
+  "control_ranks": {
+   "UNI/USDT:USDT": 0.01855,
+   "LTC/USDT:USDT": 0.01363,
+   "1000PEPE/USDT:USDT": 0.01345,
+   "SUI/USDT:USDT": 0.01152,
+   "XLM/USDT:USDT": 0.0108,
+   "NEAR/USDT:USDT": 0.00971,
+   "BNB/USDT:USDT": 0.00893,
+   "1000SHIB/USDT:USDT": 0.00815,
+   "LINK/USDT:USDT": 0.00755,
+   "XRP/USDT:USDT": 0.00744,
+   "ETH/USDT:USDT": 0.0071,
+   "AAVE/USDT:USDT": 0.00661,
+   "ADA/USDT:USDT": 0.0061,
+   "DOGE/USDT:USDT": 0.00517,
+   "TAO/USDT:USDT": 0.00429,
+   "BTC/USDT:USDT": 0.00168,
+   "ONDO/USDT:USDT": 0.00065,
+   "SOL/USDT:USDT": 0.0
+  }
+ },
+ {
+  "rebalance_ts": 1766296800,
+  "rebalance_utc": "2025-12-21T06:00:00+00:00",
+  "test_top8": [
+   "TAO/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "BNB/USDT:USDT",
+   "XLM/USDT:USDT",
+   "LINK/USDT:USDT",
+   "SUI/USDT:USDT",
+   "UNI/USDT:USDT",
+   "1000SHIB/USDT:USDT"
+  ],
+  "test_scores": {
+   "TAO/USDT:USDT": {
+    "score": 0.3513,
+    "r1": 0.524,
+    "r2": 0.671,
+    "n_events": 79
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3345,
+    "r1": 0.651,
+    "r2": 0.514,
+    "n_events": 74
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.33,
+    "r1": 0.628,
+    "r2": 0.526,
+    "n_events": 78
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3198,
+    "r1": 0.617,
+    "r2": 0.519,
+    "n_events": 81
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3179,
+    "r1": 0.66,
+    "r2": 0.482,
+    "n_events": 83
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3039,
+    "r1": 0.615,
+    "r2": 0.494,
+    "n_events": 83
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.3014,
+    "r1": 0.657,
+    "r2": 0.459,
+    "n_events": 85
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.274,
+    "r1": 0.51,
+    "r2": 0.537,
+    "n_events": 80
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.267,
+    "r1": 0.613,
+    "r2": 0.436,
+    "n_events": 78
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2664,
+    "r1": 0.526,
+    "r2": 0.506,
+    "n_events": 83
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2656,
+    "r1": 0.59,
+    "r2": 0.45,
+    "n_events": 80
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2524,
+    "r1": 0.539,
+    "r2": 0.468,
+    "n_events": 79
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2503,
+    "r1": 0.558,
+    "r2": 0.448,
+    "n_events": 87
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2489,
+    "r1": 0.622,
+    "r2": 0.4,
+    "n_events": 80
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.239,
+    "r1": 0.496,
+    "r2": 0.482,
+    "n_events": 83
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.232,
+    "r1": 0.569,
+    "r2": 0.407,
+    "n_events": 81
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2281,
+    "r1": 0.506,
+    "r2": 0.451,
+    "n_events": 82
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2194,
+    "r1": 0.51,
+    "r2": 0.43,
+    "n_events": 79
+   }
+  },
+  "control_top8": [
+   "UNI/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "SUI/USDT:USDT",
+   "XLM/USDT:USDT",
+   "ADA/USDT:USDT",
+   "SOL/USDT:USDT",
+   "BNB/USDT:USDT"
+  ],
+  "control_ranks": {
+   "UNI/USDT:USDT": 0.17197,
+   "AAVE/USDT:USDT": 0.02269,
+   "TAO/USDT:USDT": 0.01879,
+   "SUI/USDT:USDT": 0.01754,
+   "XLM/USDT:USDT": 0.01751,
+   "ADA/USDT:USDT": 0.01447,
+   "SOL/USDT:USDT": 0.00879,
+   "BNB/USDT:USDT": 0.00697,
+   "1000PEPE/USDT:USDT": 0.00696,
+   "ONDO/USDT:USDT": 0.00582,
+   "XRP/USDT:USDT": 0.00465,
+   "LTC/USDT:USDT": 0.00456,
+   "NEAR/USDT:USDT": 0.0033,
+   "DOGE/USDT:USDT": 0.00313,
+   "ETH/USDT:USDT": 0.00249,
+   "1000SHIB/USDT:USDT": 0.00216,
+   "BTC/USDT:USDT": 0.00179,
+   "LINK/USDT:USDT": 0.00016
+  }
+ },
+ {
+  "rebalance_ts": 1766901600,
+  "rebalance_utc": "2025-12-28T06:00:00+00:00",
+  "test_top8": [
+   "LINK/USDT:USDT",
+   "BNB/USDT:USDT",
+   "XLM/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "TAO/USDT:USDT",
+   "SUI/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "ETH/USDT:USDT"
+  ],
+  "test_scores": {
+   "LINK/USDT:USDT": {
+    "score": 0.4263,
+    "r1": 0.749,
+    "r2": 0.569,
+    "n_events": 72
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.4055,
+    "r1": 0.661,
+    "r2": 0.613,
+    "n_events": 75
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.4044,
+    "r1": 0.713,
+    "r2": 0.568,
+    "n_events": 74
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3719,
+    "r1": 0.683,
+    "r2": 0.544,
+    "n_events": 79
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3693,
+    "r1": 0.543,
+    "r2": 0.68,
+    "n_events": 75
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3596,
+    "r1": 0.676,
+    "r2": 0.532,
+    "n_events": 79
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3533,
+    "r1": 0.658,
+    "r2": 0.537,
+    "n_events": 82
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.3288,
+    "r1": 0.567,
+    "r2": 0.58,
+    "n_events": 81
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3271,
+    "r1": 0.654,
+    "r2": 0.5,
+    "n_events": 86
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.3256,
+    "r1": 0.621,
+    "r2": 0.524,
+    "n_events": 82
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3235,
+    "r1": 0.656,
+    "r2": 0.494,
+    "n_events": 77
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.3208,
+    "r1": 0.596,
+    "r2": 0.538,
+    "n_events": 78
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3181,
+    "r1": 0.564,
+    "r2": 0.564,
+    "n_events": 78
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2993,
+    "r1": 0.599,
+    "r2": 0.5,
+    "n_events": 82
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.291,
+    "r1": 0.575,
+    "r2": 0.506,
+    "n_events": 81
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2838,
+    "r1": 0.631,
+    "r2": 0.45,
+    "n_events": 80
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2656,
+    "r1": 0.637,
+    "r2": 0.417,
+    "n_events": 84
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2384,
+    "r1": 0.656,
+    "r2": 0.364,
+    "n_events": 77
+   }
+  },
+  "control_top8": [
+   "ADA/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "XLM/USDT:USDT",
+   "TAO/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "UNI/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "SUI/USDT:USDT"
+  ],
+  "control_ranks": {
+   "ADA/USDT:USDT": 0.04864,
+   "NEAR/USDT:USDT": 0.04712,
+   "XLM/USDT:USDT": 0.04323,
+   "TAO/USDT:USDT": 0.03534,
+   "ONDO/USDT:USDT": 0.03493,
+   "UNI/USDT:USDT": 0.03198,
+   "1000PEPE/USDT:USDT": 0.03121,
+   "SUI/USDT:USDT": 0.02873,
+   "1000SHIB/USDT:USDT": 0.02414,
+   "LTC/USDT:USDT": 0.02368,
+   "LINK/USDT:USDT": 0.01849,
+   "XRP/USDT:USDT": 0.0126,
+   "AAVE/USDT:USDT": 0.00854,
+   "DOGE/USDT:USDT": 0.00831,
+   "BNB/USDT:USDT": 0.00721,
+   "SOL/USDT:USDT": 0.00487,
+   "BTC/USDT:USDT": 0.00169,
+   "ETH/USDT:USDT": 0.00138
+  }
+ },
+ {
+  "rebalance_ts": 1767506400,
+  "rebalance_utc": "2026-01-04T06:00:00+00:00",
+  "test_top8": [
+   "LINK/USDT:USDT",
+   "TAO/USDT:USDT",
+   "BNB/USDT:USDT",
+   "SOL/USDT:USDT",
+   "ETH/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "XRP/USDT:USDT",
+   "BTC/USDT:USDT"
+  ],
+  "test_scores": {
+   "LINK/USDT:USDT": {
+    "score": 0.4594,
+    "r1": 0.789,
+    "r2": 0.582,
+    "n_events": 79
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.4323,
+    "r1": 0.576,
+    "r2": 0.75,
+    "n_events": 84
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.4205,
+    "r1": 0.683,
+    "r2": 0.615,
+    "n_events": 78
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.4075,
+    "r1": 0.69,
+    "r2": 0.59,
+    "n_events": 83
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.4019,
+    "r1": 0.603,
+    "r2": 0.667,
+    "n_events": 87
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3902,
+    "r1": 0.667,
+    "r2": 0.585,
+    "n_events": 82
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.366,
+    "r1": 0.622,
+    "r2": 0.588,
+    "n_events": 85
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.3612,
+    "r1": 0.586,
+    "r2": 0.616,
+    "n_events": 86
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3503,
+    "r1": 0.624,
+    "r2": 0.562,
+    "n_events": 89
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3289,
+    "r1": 0.579,
+    "r2": 0.568,
+    "n_events": 81
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3228,
+    "r1": 0.621,
+    "r2": 0.52,
+    "n_events": 100
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3101,
+    "r1": 0.628,
+    "r2": 0.494,
+    "n_events": 83
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2902,
+    "r1": 0.514,
+    "r2": 0.565,
+    "n_events": 85
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2878,
+    "r1": 0.569,
+    "r2": 0.505,
+    "n_events": 93
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2778,
+    "r1": 0.632,
+    "r2": 0.44,
+    "n_events": 91
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2758,
+    "r1": 0.665,
+    "r2": 0.415,
+    "n_events": 82
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2359,
+    "r1": 0.499,
+    "r2": 0.473,
+    "n_events": 93
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2357,
+    "r1": 0.532,
+    "r2": 0.443,
+    "n_events": 88
+   }
+  },
+  "control_top8": [
+   "DOGE/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "XLM/USDT:USDT",
+   "SOL/USDT:USDT",
+   "LINK/USDT:USDT",
+   "XRP/USDT:USDT"
+  ],
+  "control_ranks": {
+   "DOGE/USDT:USDT": 0.06894,
+   "1000PEPE/USDT:USDT": 0.05832,
+   "1000SHIB/USDT:USDT": 0.03497,
+   "ONDO/USDT:USDT": 0.02918,
+   "XLM/USDT:USDT": 0.02715,
+   "SOL/USDT:USDT": 0.02018,
+   "LINK/USDT:USDT": 0.01837,
+   "XRP/USDT:USDT": 0.01729,
+   "SUI/USDT:USDT": 0.0163,
+   "BTC/USDT:USDT": 0.01602,
+   "TAO/USDT:USDT": 0.01587,
+   "AAVE/USDT:USDT": 0.01498,
+   "ADA/USDT:USDT": 0.01349,
+   "BNB/USDT:USDT": 0.01304,
+   "ETH/USDT:USDT": 0.01249,
+   "UNI/USDT:USDT": 0.00953,
+   "NEAR/USDT:USDT": 0.00352,
+   "LTC/USDT:USDT": 0.00109
+  }
+ },
+ {
+  "rebalance_ts": 1768111200,
+  "rebalance_utc": "2026-01-11T06:00:00+00:00",
+  "test_top8": [
+   "SOL/USDT:USDT",
+   "LINK/USDT:USDT",
+   "ETH/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "BNB/USDT:USDT",
+   "TAO/USDT:USDT",
+   "LTC/USDT:USDT"
+  ],
+  "test_scores": {
+   "SOL/USDT:USDT": {
+    "score": 0.522,
+    "r1": 0.758,
+    "r2": 0.688,
+    "n_events": 77
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.4841,
+    "r1": 0.772,
+    "r2": 0.627,
+    "n_events": 67
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.4571,
+    "r1": 0.607,
+    "r2": 0.753,
+    "n_events": 81
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.4201,
+    "r1": 0.667,
+    "r2": 0.63,
+    "n_events": 73
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.4077,
+    "r1": 0.619,
+    "r2": 0.658,
+    "n_events": 79
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3993,
+    "r1": 0.607,
+    "r2": 0.658,
+    "n_events": 76
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3962,
+    "r1": 0.531,
+    "r2": 0.747,
+    "n_events": 79
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3897,
+    "r1": 0.682,
+    "r2": 0.571,
+    "n_events": 70
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3813,
+    "r1": 0.626,
+    "r2": 0.609,
+    "n_events": 92
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.3692,
+    "r1": 0.521,
+    "r2": 0.709,
+    "n_events": 79
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.3205,
+    "r1": 0.61,
+    "r2": 0.526,
+    "n_events": 78
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3027,
+    "r1": 0.558,
+    "r2": 0.542,
+    "n_events": 83
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2877,
+    "r1": 0.582,
+    "r2": 0.494,
+    "n_events": 89
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.281,
+    "r1": 0.49,
+    "r2": 0.573,
+    "n_events": 82
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2784,
+    "r1": 0.515,
+    "r2": 0.54,
+    "n_events": 87
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2576,
+    "r1": 0.583,
+    "r2": 0.442,
+    "n_events": 77
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2464,
+    "r1": 0.471,
+    "r2": 0.523,
+    "n_events": 86
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2,
+    "r1": 0.463,
+    "r2": 0.432,
+    "n_events": 74
+   }
+  },
+  "control_top8": [
+   "TAO/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "ADA/USDT:USDT",
+   "SUI/USDT:USDT",
+   "LINK/USDT:USDT",
+   "UNI/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "NEAR/USDT:USDT"
+  ],
+  "control_ranks": {
+   "TAO/USDT:USDT": 0.02333,
+   "AAVE/USDT:USDT": 0.01172,
+   "ADA/USDT:USDT": 0.01059,
+   "SUI/USDT:USDT": 0.01019,
+   "LINK/USDT:USDT": 0.01016,
+   "UNI/USDT:USDT": 0.00989,
+   "1000SHIB/USDT:USDT": 0.0091,
+   "NEAR/USDT:USDT": 0.00715,
+   "BNB/USDT:USDT": 0.00692,
+   "ONDO/USDT:USDT": 0.00676,
+   "XLM/USDT:USDT": 0.00664,
+   "1000PEPE/USDT:USDT": 0.00548,
+   "LTC/USDT:USDT": 0.00531,
+   "DOGE/USDT:USDT": 0.00393,
+   "ETH/USDT:USDT": 0.00392,
+   "SOL/USDT:USDT": 0.00287,
+   "XRP/USDT:USDT": 0.00259,
+   "BTC/USDT:USDT": 0.00183
+  }
+ },
+ {
+  "rebalance_ts": 1768716000,
+  "rebalance_utc": "2026-01-18T06:00:00+00:00",
+  "test_top8": [
+   "SOL/USDT:USDT",
+   "LINK/USDT:USDT",
+   "ETH/USDT:USDT",
+   "TAO/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "BTC/USDT:USDT",
+   "LTC/USDT:USDT"
+  ],
+  "test_scores": {
+   "SOL/USDT:USDT": {
+    "score": 0.5776,
+    "r1": 0.717,
+    "r2": 0.806,
+    "n_events": 67
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.5298,
+    "r1": 0.764,
+    "r2": 0.694,
+    "n_events": 62
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.4944,
+    "r1": 0.61,
+    "r2": 0.811,
+    "n_events": 74
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.4532,
+    "r1": 0.601,
+    "r2": 0.754,
+    "n_events": 69
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.4476,
+    "r1": 0.635,
+    "r2": 0.705,
+    "n_events": 78
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.4281,
+    "r1": 0.651,
+    "r2": 0.657,
+    "n_events": 70
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.4061,
+    "r1": 0.561,
+    "r2": 0.724,
+    "n_events": 76
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.381,
+    "r1": 0.618,
+    "r2": 0.616,
+    "n_events": 73
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3778,
+    "r1": 0.567,
+    "r2": 0.667,
+    "n_events": 72
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3464,
+    "r1": 0.535,
+    "r2": 0.648,
+    "n_events": 88
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3172,
+    "r1": 0.568,
+    "r2": 0.558,
+    "n_events": 77
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2894,
+    "r1": 0.524,
+    "r2": 0.553,
+    "n_events": 76
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2824,
+    "r1": 0.55,
+    "r2": 0.514,
+    "n_events": 74
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.276,
+    "r1": 0.601,
+    "r2": 0.459,
+    "n_events": 61
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2588,
+    "r1": 0.457,
+    "r2": 0.566,
+    "n_events": 83
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2524,
+    "r1": 0.518,
+    "r2": 0.487,
+    "n_events": 78
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2516,
+    "r1": 0.436,
+    "r2": 0.577,
+    "n_events": 78
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2099,
+    "r1": 0.433,
+    "r2": 0.484,
+    "n_events": 64
+   }
+  },
+  "control_top8": [
+   "NEAR/USDT:USDT",
+   "XLM/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "SUI/USDT:USDT",
+   "BNB/USDT:USDT",
+   "TAO/USDT:USDT"
+  ],
+  "control_ranks": {
+   "NEAR/USDT:USDT": 0.0138,
+   "XLM/USDT:USDT": 0.0131,
+   "1000SHIB/USDT:USDT": 0.01235,
+   "AAVE/USDT:USDT": 0.01225,
+   "1000PEPE/USDT:USDT": 0.01217,
+   "SUI/USDT:USDT": 0.01051,
+   "BNB/USDT:USDT": 0.00996,
+   "TAO/USDT:USDT": 0.00958,
+   "SOL/USDT:USDT": 0.00785,
+   "ETH/USDT:USDT": 0.00723,
+   "UNI/USDT:USDT": 0.00486,
+   "LTC/USDT:USDT": 0.00456,
+   "XRP/USDT:USDT": 0.00412,
+   "ONDO/USDT:USDT": 0.00387,
+   "DOGE/USDT:USDT": 0.00233,
+   "ADA/USDT:USDT": 0.00227,
+   "BTC/USDT:USDT": 0.00122,
+   "LINK/USDT:USDT": 0.00029
+  }
+ },
+ {
+  "rebalance_ts": 1769320800,
+  "rebalance_utc": "2026-01-25T06:00:00+00:00",
+  "test_top8": [
+   "LINK/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "SOL/USDT:USDT",
+   "TAO/USDT:USDT",
+   "ETH/USDT:USDT",
+   "BTC/USDT:USDT",
+   "LTC/USDT:USDT",
+   "NEAR/USDT:USDT"
+  ],
+  "test_scores": {
+   "LINK/USDT:USDT": {
+    "score": 0.4374,
+    "r1": 0.722,
+    "r2": 0.606,
+    "n_events": 71
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.4147,
+    "r1": 0.653,
+    "r2": 0.635,
+    "n_events": 85
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.3815,
+    "r1": 0.589,
+    "r2": 0.648,
+    "n_events": 71
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3801,
+    "r1": 0.597,
+    "r2": 0.636,
+    "n_events": 77
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.3642,
+    "r1": 0.56,
+    "r2": 0.651,
+    "n_events": 83
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.3497,
+    "r1": 0.549,
+    "r2": 0.637,
+    "n_events": 80
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3227,
+    "r1": 0.554,
+    "r2": 0.582,
+    "n_events": 79
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3201,
+    "r1": 0.596,
+    "r2": 0.537,
+    "n_events": 67
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2976,
+    "r1": 0.553,
+    "r2": 0.538,
+    "n_events": 78
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2783,
+    "r1": 0.564,
+    "r2": 0.494,
+    "n_events": 77
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2745,
+    "r1": 0.493,
+    "r2": 0.557,
+    "n_events": 88
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2657,
+    "r1": 0.512,
+    "r2": 0.519,
+    "n_events": 81
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2522,
+    "r1": 0.518,
+    "r2": 0.487,
+    "n_events": 76
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2492,
+    "r1": 0.557,
+    "r2": 0.447,
+    "n_events": 76
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2427,
+    "r1": 0.446,
+    "r2": 0.544,
+    "n_events": 79
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2241,
+    "r1": 0.443,
+    "r2": 0.506,
+    "n_events": 85
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.1972,
+    "r1": 0.592,
+    "r2": 0.333,
+    "n_events": 63
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.1857,
+    "r1": 0.421,
+    "r2": 0.441,
+    "n_events": 68
+   }
+  },
+  "control_top8": [
+   "ONDO/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "UNI/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "BNB/USDT:USDT",
+   "XRP/USDT:USDT",
+   "ADA/USDT:USDT"
+  ],
+  "control_ranks": {
+   "ONDO/USDT:USDT": 0.02311,
+   "1000PEPE/USDT:USDT": 0.02025,
+   "1000SHIB/USDT:USDT": 0.0127,
+   "UNI/USDT:USDT": 0.01265,
+   "AAVE/USDT:USDT": 0.01215,
+   "BNB/USDT:USDT": 0.01189,
+   "XRP/USDT:USDT": 0.01036,
+   "ADA/USDT:USDT": 0.00944,
+   "LINK/USDT:USDT": 0.009,
+   "DOGE/USDT:USDT": 0.00868,
+   "BTC/USDT:USDT": 0.00866,
+   "SOL/USDT:USDT": 0.0065,
+   "TAO/USDT:USDT": 0.00576,
+   "ETH/USDT:USDT": 0.00461,
+   "SUI/USDT:USDT": 0.00376,
+   "NEAR/USDT:USDT": 0.00331,
+   "XLM/USDT:USDT": 0.00246,
+   "LTC/USDT:USDT": 0.00058
+  }
+ },
+ {
+  "rebalance_ts": 1769925600,
+  "rebalance_utc": "2026-02-01T06:00:00+00:00",
+  "test_top8": [
+   "LINK/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "ADA/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "TAO/USDT:USDT",
+   "XLM/USDT:USDT",
+   "1000PEPE/USDT:USDT"
+  ],
+  "test_scores": {
+   "LINK/USDT:USDT": {
+    "score": 0.3651,
+    "r1": 0.603,
+    "r2": 0.606,
+    "n_events": 71
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3359,
+    "r1": 0.583,
+    "r2": 0.576,
+    "n_events": 66
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3246,
+    "r1": 0.556,
+    "r2": 0.584,
+    "n_events": 89
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.314,
+    "r1": 0.571,
+    "r2": 0.55,
+    "n_events": 80
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3006,
+    "r1": 0.547,
+    "r2": 0.549,
+    "n_events": 71
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2997,
+    "r1": 0.519,
+    "r2": 0.577,
+    "n_events": 78
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2987,
+    "r1": 0.519,
+    "r2": 0.575,
+    "n_events": 80
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2872,
+    "r1": 0.489,
+    "r2": 0.588,
+    "n_events": 80
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2805,
+    "r1": 0.497,
+    "r2": 0.564,
+    "n_events": 78
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2662,
+    "r1": 0.504,
+    "r2": 0.528,
+    "n_events": 89
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2611,
+    "r1": 0.51,
+    "r2": 0.512,
+    "n_events": 82
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2584,
+    "r1": 0.565,
+    "r2": 0.457,
+    "n_events": 70
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2429,
+    "r1": 0.454,
+    "r2": 0.535,
+    "n_events": 86
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2425,
+    "r1": 0.404,
+    "r2": 0.6,
+    "n_events": 70
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2314,
+    "r1": 0.433,
+    "r2": 0.534,
+    "n_events": 88
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2277,
+    "r1": 0.542,
+    "r2": 0.42,
+    "n_events": 88
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2177,
+    "r1": 0.44,
+    "r2": 0.494,
+    "n_events": 89
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.1846,
+    "r1": 0.361,
+    "r2": 0.511,
+    "n_events": 90
+   }
+  },
+  "control_top8": [
+   "SOL/USDT:USDT",
+   "ETH/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "SUI/USDT:USDT",
+   "TAO/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "LTC/USDT:USDT",
+   "BNB/USDT:USDT"
+  ],
+  "control_ranks": {
+   "SOL/USDT:USDT": 0.1176,
+   "ETH/USDT:USDT": 0.09912,
+   "NEAR/USDT:USDT": 0.09366,
+   "SUI/USDT:USDT": 0.09306,
+   "TAO/USDT:USDT": 0.09095,
+   "DOGE/USDT:USDT": 0.08721,
+   "LTC/USDT:USDT": 0.08289,
+   "BNB/USDT:USDT": 0.08255,
+   "ONDO/USDT:USDT": 0.07989,
+   "1000PEPE/USDT:USDT": 0.07841,
+   "UNI/USDT:USDT": 0.07381,
+   "AAVE/USDT:USDT": 0.07267,
+   "LINK/USDT:USDT": 0.07182,
+   "ADA/USDT:USDT": 0.06652,
+   "BTC/USDT:USDT": 0.06431,
+   "XLM/USDT:USDT": 0.05557,
+   "XRP/USDT:USDT": 0.04566,
+   "1000SHIB/USDT:USDT": 0.04479
+  }
+ },
+ {
+  "rebalance_ts": 1770530400,
+  "rebalance_utc": "2026-02-08T06:00:00+00:00",
+  "test_top8": [
+   "XLM/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "ADA/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "TAO/USDT:USDT",
+   "SUI/USDT:USDT"
+  ],
+  "test_scores": {
+   "XLM/USDT:USDT": {
+    "score": 0.4201,
+    "r1": 0.581,
+    "r2": 0.724,
+    "n_events": 76
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3812,
+    "r1": 0.528,
+    "r2": 0.722,
+    "n_events": 72
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3667,
+    "r1": 0.565,
+    "r2": 0.649,
+    "n_events": 74
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3419,
+    "r1": 0.586,
+    "r2": 0.583,
+    "n_events": 84
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3313,
+    "r1": 0.554,
+    "r2": 0.598,
+    "n_events": 92
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3203,
+    "r1": 0.596,
+    "r2": 0.537,
+    "n_events": 80
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3125,
+    "r1": 0.561,
+    "r2": 0.557,
+    "n_events": 79
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2979,
+    "r1": 0.596,
+    "r2": 0.5,
+    "n_events": 74
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.295,
+    "r1": 0.537,
+    "r2": 0.549,
+    "n_events": 82
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.286,
+    "r1": 0.461,
+    "r2": 0.62,
+    "n_events": 79
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2514,
+    "r1": 0.492,
+    "r2": 0.511,
+    "n_events": 88
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2438,
+    "r1": 0.433,
+    "r2": 0.562,
+    "n_events": 80
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2344,
+    "r1": 0.45,
+    "r2": 0.521,
+    "n_events": 96
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2289,
+    "r1": 0.453,
+    "r2": 0.506,
+    "n_events": 89
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2231,
+    "r1": 0.461,
+    "r2": 0.484,
+    "n_events": 93
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.1867,
+    "r1": 0.401,
+    "r2": 0.465,
+    "n_events": 86
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1714,
+    "r1": 0.457,
+    "r2": 0.375,
+    "n_events": 88
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.1647,
+    "r1": 0.424,
+    "r2": 0.389,
+    "n_events": 90
+   }
+  },
+  "control_top8": [
+   "NEAR/USDT:USDT",
+   "XRP/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "UNI/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "BNB/USDT:USDT",
+   "SUI/USDT:USDT",
+   "XLM/USDT:USDT"
+  ],
+  "control_ranks": {
+   "NEAR/USDT:USDT": 0.03022,
+   "XRP/USDT:USDT": 0.02832,
+   "1000PEPE/USDT:USDT": 0.02317,
+   "UNI/USDT:USDT": 0.01824,
+   "AAVE/USDT:USDT": 0.01771,
+   "BNB/USDT:USDT": 0.01751,
+   "SUI/USDT:USDT": 0.01625,
+   "XLM/USDT:USDT": 0.01497,
+   "TAO/USDT:USDT": 0.01482,
+   "DOGE/USDT:USDT": 0.01414,
+   "BTC/USDT:USDT": 0.01297,
+   "ADA/USDT:USDT": 0.01279,
+   "1000SHIB/USDT:USDT": 0.01229,
+   "LTC/USDT:USDT": 0.01211,
+   "LINK/USDT:USDT": 0.01208,
+   "SOL/USDT:USDT": 0.00604,
+   "ONDO/USDT:USDT": 0.0031,
+   "ETH/USDT:USDT": 0.00033
+  }
+ },
+ {
+  "rebalance_ts": 1771135200,
+  "rebalance_utc": "2026-02-15T06:00:00+00:00",
+  "test_top8": [
+   "XLM/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "ADA/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "LINK/USDT:USDT"
+  ],
+  "test_scores": {
+   "XLM/USDT:USDT": {
+    "score": 0.4264,
+    "r1": 0.606,
+    "r2": 0.704,
+    "n_events": 71
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.4019,
+    "r1": 0.603,
+    "r2": 0.667,
+    "n_events": 75
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.398,
+    "r1": 0.642,
+    "r2": 0.62,
+    "n_events": 79
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3666,
+    "r1": 0.592,
+    "r2": 0.62,
+    "n_events": 92
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3378,
+    "r1": 0.565,
+    "r2": 0.598,
+    "n_events": 82
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.33,
+    "r1": 0.529,
+    "r2": 0.624,
+    "n_events": 85
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3129,
+    "r1": 0.557,
+    "r2": 0.562,
+    "n_events": 89
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2934,
+    "r1": 0.531,
+    "r2": 0.553,
+    "n_events": 85
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.282,
+    "r1": 0.539,
+    "r2": 0.523,
+    "n_events": 86
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2667,
+    "r1": 0.472,
+    "r2": 0.565,
+    "n_events": 85
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.265,
+    "r1": 0.524,
+    "r2": 0.506,
+    "n_events": 83
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2616,
+    "r1": 0.507,
+    "r2": 0.516,
+    "n_events": 93
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2595,
+    "r1": 0.472,
+    "r2": 0.549,
+    "n_events": 91
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2542,
+    "r1": 0.465,
+    "r2": 0.546,
+    "n_events": 97
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2461,
+    "r1": 0.464,
+    "r2": 0.531,
+    "n_events": 98
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2348,
+    "r1": 0.475,
+    "r2": 0.494,
+    "n_events": 87
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2203,
+    "r1": 0.456,
+    "r2": 0.484,
+    "n_events": 91
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2016,
+    "r1": 0.428,
+    "r2": 0.471,
+    "n_events": 87
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.1796,
+    "r1": 0.458,
+    "r2": 0.392,
+    "n_events": 97
+   }
+  },
+  "control_top8": [
+   "1000PEPE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "XRP/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "ADA/USDT:USDT",
+   "XLM/USDT:USDT",
+   "GIGGLE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "1000PEPE/USDT:USDT": 0.28276,
+   "DOGE/USDT:USDT": 0.19853,
+   "XRP/USDT:USDT": 0.12449,
+   "1000SHIB/USDT:USDT": 0.10575,
+   "AAVE/USDT:USDT": 0.08679,
+   "ADA/USDT:USDT": 0.08473,
+   "XLM/USDT:USDT": 0.08441,
+   "GIGGLE/USDT:USDT": 0.08039,
+   "ONDO/USDT:USDT": 0.07823,
+   "SUI/USDT:USDT": 0.07622,
+   "UNI/USDT:USDT": 0.07482,
+   "SOL/USDT:USDT": 0.05959,
+   "NEAR/USDT:USDT": 0.05371,
+   "LINK/USDT:USDT": 0.04069,
+   "BNB/USDT:USDT": 0.03229,
+   "BTC/USDT:USDT": 0.02186,
+   "LTC/USDT:USDT": 0.01904,
+   "ETH/USDT:USDT": 0.01835,
+   "TAO/USDT:USDT": 0.00475
+  }
+ },
+ {
+  "rebalance_ts": 1771740000,
+  "rebalance_utc": "2026-02-22T06:00:00+00:00",
+  "test_top8": [
+   "XLM/USDT:USDT",
+   "ADA/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "XRP/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "LINK/USDT:USDT"
+  ],
+  "test_scores": {
+   "XLM/USDT:USDT": {
+    "score": 0.4538,
+    "r1": 0.662,
+    "r2": 0.685,
+    "n_events": 73
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.4203,
+    "r1": 0.651,
+    "r2": 0.645,
+    "n_events": 93
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3895,
+    "r1": 0.574,
+    "r2": 0.679,
+    "n_events": 81
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3857,
+    "r1": 0.632,
+    "r2": 0.61,
+    "n_events": 77
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3801,
+    "r1": 0.564,
+    "r2": 0.674,
+    "n_events": 89
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3615,
+    "r1": 0.617,
+    "r2": 0.586,
+    "n_events": 87
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3604,
+    "r1": 0.578,
+    "r2": 0.624,
+    "n_events": 101
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3385,
+    "r1": 0.583,
+    "r2": 0.58,
+    "n_events": 81
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3374,
+    "r1": 0.596,
+    "r2": 0.566,
+    "n_events": 83
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3359,
+    "r1": 0.578,
+    "r2": 0.581,
+    "n_events": 86
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.3155,
+    "r1": 0.544,
+    "r2": 0.58,
+    "n_events": 88
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3127,
+    "r1": 0.549,
+    "r2": 0.57,
+    "n_events": 100
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3049,
+    "r1": 0.556,
+    "r2": 0.549,
+    "n_events": 82
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.3017,
+    "r1": 0.578,
+    "r2": 0.522,
+    "n_events": 90
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2934,
+    "r1": 0.517,
+    "r2": 0.568,
+    "n_events": 81
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.273,
+    "r1": 0.507,
+    "r2": 0.538,
+    "n_events": 78
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2717,
+    "r1": 0.49,
+    "r2": 0.554,
+    "n_events": 83
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2389,
+    "r1": 0.5,
+    "r2": 0.478,
+    "n_events": 90
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2389,
+    "r1": 0.522,
+    "r2": 0.457,
+    "n_events": 94
+   }
+  },
+  "control_top8": [
+   "1000PEPE/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "XLM/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "ADA/USDT:USDT",
+   "SUI/USDT:USDT"
+  ],
+  "control_ranks": {
+   "1000PEPE/USDT:USDT": 0.05144,
+   "GIGGLE/USDT:USDT": 0.04323,
+   "XLM/USDT:USDT": 0.04101,
+   "NEAR/USDT:USDT": 0.03839,
+   "1000SHIB/USDT:USDT": 0.03659,
+   "DOGE/USDT:USDT": 0.02962,
+   "ADA/USDT:USDT": 0.02684,
+   "SUI/USDT:USDT": 0.02076,
+   "AAVE/USDT:USDT": 0.01622,
+   "ONDO/USDT:USDT": 0.01418,
+   "LTC/USDT:USDT": 0.0138,
+   "BNB/USDT:USDT": 0.01223,
+   "UNI/USDT:USDT": 0.00678,
+   "LINK/USDT:USDT": 0.0063,
+   "ETH/USDT:USDT": 0.00623,
+   "SOL/USDT:USDT": 0.00568,
+   "XRP/USDT:USDT": 0.00511,
+   "TAO/USDT:USDT": 0.00504,
+   "BTC/USDT:USDT": 0.00173
+  }
+ },
+ {
+  "rebalance_ts": 1772344800,
+  "rebalance_utc": "2026-03-01T06:00:00+00:00",
+  "test_top8": [
+   "AAVE/USDT:USDT",
+   "XRP/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "XLM/USDT:USDT",
+   "ADA/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "LTC/USDT:USDT"
+  ],
+  "test_scores": {
+   "AAVE/USDT:USDT": {
+    "score": 0.3475,
+    "r1": 0.518,
+    "r2": 0.671,
+    "n_events": 82
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3355,
+    "r1": 0.526,
+    "r2": 0.637,
+    "n_events": 91
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3247,
+    "r1": 0.546,
+    "r2": 0.595,
+    "n_events": 79
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3238,
+    "r1": 0.51,
+    "r2": 0.635,
+    "n_events": 85
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3125,
+    "r1": 0.521,
+    "r2": 0.6,
+    "n_events": 80
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.297,
+    "r1": 0.533,
+    "r2": 0.557,
+    "n_events": 88
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2896,
+    "r1": 0.479,
+    "r2": 0.604,
+    "n_events": 91
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2833,
+    "r1": 0.499,
+    "r2": 0.568,
+    "n_events": 88
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.2809,
+    "r1": 0.49,
+    "r2": 0.573,
+    "n_events": 89
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2809,
+    "r1": 0.479,
+    "r2": 0.586,
+    "n_events": 87
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2799,
+    "r1": 0.476,
+    "r2": 0.588,
+    "n_events": 80
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2793,
+    "r1": 0.519,
+    "r2": 0.538,
+    "n_events": 93
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2776,
+    "r1": 0.478,
+    "r2": 0.581,
+    "n_events": 105
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2691,
+    "r1": 0.472,
+    "r2": 0.57,
+    "n_events": 93
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2537,
+    "r1": 0.496,
+    "r2": 0.512,
+    "n_events": 86
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2312,
+    "r1": 0.446,
+    "r2": 0.519,
+    "n_events": 81
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2111,
+    "r1": 0.422,
+    "r2": 0.5,
+    "n_events": 84
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.1782,
+    "r1": 0.386,
+    "r2": 0.462,
+    "n_events": 91
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.1775,
+    "r1": 0.407,
+    "r2": 0.436,
+    "n_events": 94
+   }
+  },
+  "control_top8": [
+   "NEAR/USDT:USDT",
+   "SOL/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "ETH/USDT:USDT",
+   "SUI/USDT:USDT",
+   "LINK/USDT:USDT",
+   "XRP/USDT:USDT",
+   "AAVE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "NEAR/USDT:USDT": 0.08947,
+   "SOL/USDT:USDT": 0.07018,
+   "ONDO/USDT:USDT": 0.04777,
+   "ETH/USDT:USDT": 0.04732,
+   "SUI/USDT:USDT": 0.04666,
+   "LINK/USDT:USDT": 0.04604,
+   "XRP/USDT:USDT": 0.04486,
+   "AAVE/USDT:USDT": 0.04119,
+   "ADA/USDT:USDT": 0.03739,
+   "DOGE/USDT:USDT": 0.03663,
+   "TAO/USDT:USDT": 0.03525,
+   "UNI/USDT:USDT": 0.03434,
+   "XLM/USDT:USDT": 0.02928,
+   "BNB/USDT:USDT": 0.02773,
+   "BTC/USDT:USDT": 0.02608,
+   "1000SHIB/USDT:USDT": 0.01443,
+   "GIGGLE/USDT:USDT": 0.01308,
+   "1000PEPE/USDT:USDT": 0.0104,
+   "LTC/USDT:USDT": 0.00624
+  }
+ },
+ {
+  "rebalance_ts": 1772949600,
+  "rebalance_utc": "2026-03-08T06:00:00+00:00",
+  "test_top8": [
+   "XRP/USDT:USDT",
+   "UNI/USDT:USDT",
+   "TAO/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "LTC/USDT:USDT",
+   "ADA/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "1000SHIB/USDT:USDT"
+  ],
+  "test_scores": {
+   "XRP/USDT:USDT": {
+    "score": 0.382,
+    "r1": 0.61,
+    "r2": 0.627,
+    "n_events": 83
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.3695,
+    "r1": 0.649,
+    "r2": 0.57,
+    "n_events": 79
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3689,
+    "r1": 0.59,
+    "r2": 0.625,
+    "n_events": 72
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.367,
+    "r1": 0.636,
+    "r2": 0.577,
+    "n_events": 78
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3632,
+    "r1": 0.59,
+    "r2": 0.615,
+    "n_events": 78
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3566,
+    "r1": 0.64,
+    "r2": 0.557,
+    "n_events": 79
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3436,
+    "r1": 0.556,
+    "r2": 0.618,
+    "n_events": 76
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3415,
+    "r1": 0.562,
+    "r2": 0.607,
+    "n_events": 84
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3414,
+    "r1": 0.549,
+    "r2": 0.622,
+    "n_events": 90
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3318,
+    "r1": 0.606,
+    "r2": 0.548,
+    "n_events": 73
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3268,
+    "r1": 0.558,
+    "r2": 0.585,
+    "n_events": 82
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3264,
+    "r1": 0.522,
+    "r2": 0.625,
+    "n_events": 64
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3223,
+    "r1": 0.543,
+    "r2": 0.593,
+    "n_events": 91
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2932,
+    "r1": 0.56,
+    "r2": 0.524,
+    "n_events": 84
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2785,
+    "r1": 0.557,
+    "r2": 0.5,
+    "n_events": 78
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2721,
+    "r1": 0.551,
+    "r2": 0.494,
+    "n_events": 77
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2689,
+    "r1": 0.503,
+    "r2": 0.535,
+    "n_events": 86
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2589,
+    "r1": 0.506,
+    "r2": 0.512,
+    "n_events": 82
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2536,
+    "r1": 0.528,
+    "r2": 0.481,
+    "n_events": 77
+   }
+  },
+  "control_top8": [
+   "1000PEPE/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "ADA/USDT:USDT",
+   "UNI/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "XLM/USDT:USDT"
+  ],
+  "control_ranks": {
+   "1000PEPE/USDT:USDT": 0.05041,
+   "GIGGLE/USDT:USDT": 0.04285,
+   "ONDO/USDT:USDT": 0.02885,
+   "ADA/USDT:USDT": 0.02704,
+   "UNI/USDT:USDT": 0.02618,
+   "AAVE/USDT:USDT": 0.02387,
+   "1000SHIB/USDT:USDT": 0.02295,
+   "XLM/USDT:USDT": 0.02283,
+   "LINK/USDT:USDT": 0.02204,
+   "SOL/USDT:USDT": 0.02171,
+   "SUI/USDT:USDT": 0.01915,
+   "ETH/USDT:USDT": 0.01509,
+   "BNB/USDT:USDT": 0.01509,
+   "DOGE/USDT:USDT": 0.01423,
+   "BTC/USDT:USDT": 0.01284,
+   "LTC/USDT:USDT": 0.00967,
+   "XRP/USDT:USDT": 0.00966,
+   "NEAR/USDT:USDT": 0.00901,
+   "TAO/USDT:USDT": 0.00284
+  }
+ },
+ {
+  "rebalance_ts": 1773554400,
+  "rebalance_utc": "2026-03-15T06:00:00+00:00",
+  "test_top8": [
+   "XRP/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "UNI/USDT:USDT",
+   "SUI/USDT:USDT",
+   "NEAR/USDT:USDT"
+  ],
+  "test_scores": {
+   "XRP/USDT:USDT": {
+    "score": 0.3785,
+    "r1": 0.603,
+    "r2": 0.628,
+    "n_events": 86
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.369,
+    "r1": 0.586,
+    "r2": 0.63,
+    "n_events": 81
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3414,
+    "r1": 0.578,
+    "r2": 0.591,
+    "n_events": 88
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3281,
+    "r1": 0.525,
+    "r2": 0.625,
+    "n_events": 88
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3264,
+    "r1": 0.597,
+    "r2": 0.547,
+    "n_events": 86
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.3214,
+    "r1": 0.626,
+    "r2": 0.513,
+    "n_events": 76
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3166,
+    "r1": 0.518,
+    "r2": 0.611,
+    "n_events": 72
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3158,
+    "r1": 0.526,
+    "r2": 0.6,
+    "n_events": 85
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3109,
+    "r1": 0.525,
+    "r2": 0.592,
+    "n_events": 76
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3015,
+    "r1": 0.575,
+    "r2": 0.524,
+    "n_events": 82
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2927,
+    "r1": 0.578,
+    "r2": 0.507,
+    "n_events": 75
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2927,
+    "r1": 0.499,
+    "r2": 0.587,
+    "n_events": 92
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2879,
+    "r1": 0.512,
+    "r2": 0.562,
+    "n_events": 89
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2719,
+    "r1": 0.51,
+    "r2": 0.533,
+    "n_events": 75
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2583,
+    "r1": 0.517,
+    "r2": 0.5,
+    "n_events": 74
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.236,
+    "r1": 0.529,
+    "r2": 0.446,
+    "n_events": 74
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2302,
+    "r1": 0.483,
+    "r2": 0.476,
+    "n_events": 84
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2291,
+    "r1": 0.499,
+    "r2": 0.459,
+    "n_events": 74
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2263,
+    "r1": 0.49,
+    "r2": 0.462,
+    "n_events": 78
+   }
+  },
+  "control_top8": [
+   "TAO/USDT:USDT",
+   "XLM/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "LINK/USDT:USDT",
+   "XRP/USDT:USDT",
+   "SUI/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "GIGGLE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "TAO/USDT:USDT": 0.07195,
+   "XLM/USDT:USDT": 0.02105,
+   "NEAR/USDT:USDT": 0.01974,
+   "LINK/USDT:USDT": 0.018,
+   "XRP/USDT:USDT": 0.01341,
+   "SUI/USDT:USDT": 0.0133,
+   "1000SHIB/USDT:USDT": 0.01215,
+   "GIGGLE/USDT:USDT": 0.01062,
+   "AAVE/USDT:USDT": 0.00768,
+   "ETH/USDT:USDT": 0.00742,
+   "1000PEPE/USDT:USDT": 0.00661,
+   "BTC/USDT:USDT": 0.00655,
+   "BNB/USDT:USDT": 0.0058,
+   "ONDO/USDT:USDT": 0.00533,
+   "ADA/USDT:USDT": 0.00455,
+   "DOGE/USDT:USDT": 0.00429,
+   "UNI/USDT:USDT": 0.00353,
+   "SOL/USDT:USDT": 0.00273,
+   "LTC/USDT:USDT": 0.00109
+  }
+ },
+ {
+  "rebalance_ts": 1774159200,
+  "rebalance_utc": "2026-03-22T06:00:00+00:00",
+  "test_top8": [
+   "GIGGLE/USDT:USDT",
+   "XRP/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "LTC/USDT:USDT",
+   "DOGE/USDT:USDT"
+  ],
+  "test_scores": {
+   "GIGGLE/USDT:USDT": {
+    "score": 0.4635,
+    "r1": 0.618,
+    "r2": 0.75,
+    "n_events": 80
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3572,
+    "r1": 0.593,
+    "r2": 0.602,
+    "n_events": 88
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3481,
+    "r1": 0.508,
+    "r2": 0.685,
+    "n_events": 92
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3418,
+    "r1": 0.608,
+    "r2": 0.562,
+    "n_events": 89
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3417,
+    "r1": 0.569,
+    "r2": 0.6,
+    "n_events": 75
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3377,
+    "r1": 0.617,
+    "r2": 0.548,
+    "n_events": 84
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3351,
+    "r1": 0.585,
+    "r2": 0.573,
+    "n_events": 82
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3336,
+    "r1": 0.558,
+    "r2": 0.598,
+    "n_events": 82
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3221,
+    "r1": 0.521,
+    "r2": 0.618,
+    "n_events": 76
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2959,
+    "r1": 0.511,
+    "r2": 0.579,
+    "n_events": 76
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2926,
+    "r1": 0.571,
+    "r2": 0.512,
+    "n_events": 80
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2817,
+    "r1": 0.549,
+    "r2": 0.514,
+    "n_events": 74
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2806,
+    "r1": 0.561,
+    "r2": 0.5,
+    "n_events": 76
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2661,
+    "r1": 0.519,
+    "r2": 0.512,
+    "n_events": 82
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2611,
+    "r1": 0.51,
+    "r2": 0.512,
+    "n_events": 82
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.241,
+    "r1": 0.482,
+    "r2": 0.5,
+    "n_events": 86
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2051,
+    "r1": 0.481,
+    "r2": 0.427,
+    "n_events": 82
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2011,
+    "r1": 0.44,
+    "r2": 0.457,
+    "n_events": 81
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.1962,
+    "r1": 0.472,
+    "r2": 0.416,
+    "n_events": 77
+   }
+  },
+  "control_top8": [
+   "GIGGLE/USDT:USDT",
+   "ADA/USDT:USDT",
+   "SUI/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "LTC/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "UNI/USDT:USDT",
+   "DOGE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "GIGGLE/USDT:USDT": 0.0751,
+   "ADA/USDT:USDT": 0.03307,
+   "SUI/USDT:USDT": 0.03183,
+   "1000SHIB/USDT:USDT": 0.03174,
+   "LTC/USDT:USDT": 0.03007,
+   "ONDO/USDT:USDT": 0.02841,
+   "UNI/USDT:USDT": 0.02725,
+   "DOGE/USDT:USDT": 0.02704,
+   "XRP/USDT:USDT": 0.02682,
+   "1000PEPE/USDT:USDT": 0.02622,
+   "XLM/USDT:USDT": 0.02583,
+   "LINK/USDT:USDT": 0.02392,
+   "BTC/USDT:USDT": 0.02204,
+   "AAVE/USDT:USDT": 0.02028,
+   "ETH/USDT:USDT": 0.01865,
+   "SOL/USDT:USDT": 0.01679,
+   "TAO/USDT:USDT": 0.01508,
+   "BNB/USDT:USDT": 0.01366,
+   "NEAR/USDT:USDT": 0.01064
+  }
+ },
+ {
+  "rebalance_ts": 1774764000,
+  "rebalance_utc": "2026-03-29T06:00:00+00:00",
+  "test_top8": [
+   "GIGGLE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "LTC/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "XRP/USDT:USDT",
+   "XLM/USDT:USDT"
+  ],
+  "test_scores": {
+   "GIGGLE/USDT:USDT": {
+    "score": 0.5225,
+    "r1": 0.688,
+    "r2": 0.76,
+    "n_events": 75
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.344,
+    "r1": 0.571,
+    "r2": 0.603,
+    "n_events": 78
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3179,
+    "r1": 0.575,
+    "r2": 0.553,
+    "n_events": 85
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3052,
+    "r1": 0.501,
+    "r2": 0.609,
+    "n_events": 69
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3041,
+    "r1": 0.531,
+    "r2": 0.573,
+    "n_events": 82
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2898,
+    "r1": 0.485,
+    "r2": 0.598,
+    "n_events": 97
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2754,
+    "r1": 0.544,
+    "r2": 0.506,
+    "n_events": 87
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2681,
+    "r1": 0.55,
+    "r2": 0.487,
+    "n_events": 80
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2681,
+    "r1": 0.536,
+    "r2": 0.5,
+    "n_events": 82
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2621,
+    "r1": 0.493,
+    "r2": 0.532,
+    "n_events": 79
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2595,
+    "r1": 0.512,
+    "r2": 0.506,
+    "n_events": 79
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.253,
+    "r1": 0.571,
+    "r2": 0.443,
+    "n_events": 88
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2496,
+    "r1": 0.486,
+    "r2": 0.514,
+    "n_events": 74
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.238,
+    "r1": 0.532,
+    "r2": 0.447,
+    "n_events": 76
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.212,
+    "r1": 0.517,
+    "r2": 0.41,
+    "n_events": 78
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2118,
+    "r1": 0.49,
+    "r2": 0.432,
+    "n_events": 81
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2032,
+    "r1": 0.45,
+    "r2": 0.452,
+    "n_events": 93
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.1777,
+    "r1": 0.447,
+    "r2": 0.397,
+    "n_events": 78
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.1667,
+    "r1": 0.41,
+    "r2": 0.407,
+    "n_events": 86
+   }
+  },
+  "control_top8": [
+   "GIGGLE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "TAO/USDT:USDT",
+   "XLM/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "SUI/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "LTC/USDT:USDT"
+  ],
+  "control_ranks": {
+   "GIGGLE/USDT:USDT": 0.05117,
+   "ONDO/USDT:USDT": 0.03015,
+   "TAO/USDT:USDT": 0.01613,
+   "XLM/USDT:USDT": 0.01485,
+   "1000SHIB/USDT:USDT": 0.01112,
+   "SUI/USDT:USDT": 0.0104,
+   "DOGE/USDT:USDT": 0.00809,
+   "LTC/USDT:USDT": 0.00801,
+   "1000PEPE/USDT:USDT": 0.00777,
+   "BTC/USDT:USDT": 0.00657,
+   "ETH/USDT:USDT": 0.00555,
+   "UNI/USDT:USDT": 0.00385,
+   "AAVE/USDT:USDT": 0.00372,
+   "XRP/USDT:USDT": 0.00284,
+   "BNB/USDT:USDT": 0.00211,
+   "NEAR/USDT:USDT": 0.00171,
+   "LINK/USDT:USDT": 0.00105,
+   "ADA/USDT:USDT": 0.00081,
+   "SOL/USDT:USDT": 0.0006
+  }
+ },
+ {
+  "rebalance_ts": 1775368800,
+  "rebalance_utc": "2026-04-05T06:00:00+00:00",
+  "test_top8": [
+   "GIGGLE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "XRP/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "LTC/USDT:USDT"
+  ],
+  "test_scores": {
+   "GIGGLE/USDT:USDT": {
+    "score": 0.6238,
+    "r1": 0.749,
+    "r2": 0.833,
+    "n_events": 72
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.327,
+    "r1": 0.596,
+    "r2": 0.549,
+    "n_events": 82
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3167,
+    "r1": 0.579,
+    "r2": 0.547,
+    "n_events": 64
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3165,
+    "r1": 0.589,
+    "r2": 0.537,
+    "n_events": 80
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3136,
+    "r1": 0.581,
+    "r2": 0.54,
+    "n_events": 87
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2998,
+    "r1": 0.636,
+    "r2": 0.471,
+    "n_events": 87
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2921,
+    "r1": 0.531,
+    "r2": 0.551,
+    "n_events": 89
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2907,
+    "r1": 0.561,
+    "r2": 0.518,
+    "n_events": 83
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.275,
+    "r1": 0.596,
+    "r2": 0.462,
+    "n_events": 78
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.27,
+    "r1": 0.535,
+    "r2": 0.505,
+    "n_events": 103
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2602,
+    "r1": 0.508,
+    "r2": 0.512,
+    "n_events": 84
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2508,
+    "r1": 0.599,
+    "r2": 0.419,
+    "n_events": 74
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2467,
+    "r1": 0.533,
+    "r2": 0.463,
+    "n_events": 80
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2429,
+    "r1": 0.506,
+    "r2": 0.481,
+    "n_events": 77
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2351,
+    "r1": 0.508,
+    "r2": 0.463,
+    "n_events": 80
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2164,
+    "r1": 0.61,
+    "r2": 0.355,
+    "n_events": 62
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.1828,
+    "r1": 0.492,
+    "r2": 0.372,
+    "n_events": 78
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.1753,
+    "r1": 0.45,
+    "r2": 0.39,
+    "n_events": 77
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1706,
+    "r1": 0.401,
+    "r2": 0.425,
+    "n_events": 80
+   }
+  },
+  "control_top8": [
+   "GIGGLE/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "UNI/USDT:USDT",
+   "TAO/USDT:USDT",
+   "SUI/USDT:USDT",
+   "XRP/USDT:USDT",
+   "AAVE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "GIGGLE/USDT:USDT": 0.06145,
+   "NEAR/USDT:USDT": 0.02709,
+   "ONDO/USDT:USDT": 0.0252,
+   "UNI/USDT:USDT": 0.02315,
+   "TAO/USDT:USDT": 0.01766,
+   "SUI/USDT:USDT": 0.0154,
+   "XRP/USDT:USDT": 0.01261,
+   "AAVE/USDT:USDT": 0.01164,
+   "XLM/USDT:USDT": 0.01015,
+   "1000SHIB/USDT:USDT": 0.00695,
+   "1000PEPE/USDT:USDT": 0.00655,
+   "LINK/USDT:USDT": 0.00521,
+   "DOGE/USDT:USDT": 0.00483,
+   "BNB/USDT:USDT": 0.00468,
+   "ETH/USDT:USDT": 0.00251,
+   "ADA/USDT:USDT": 0.00164,
+   "SOL/USDT:USDT": 0.00125,
+   "LTC/USDT:USDT": 0.00113,
+   "BTC/USDT:USDT": 0.0004
+  }
+ },
+ {
+  "rebalance_ts": 1775973600,
+  "rebalance_utc": "2026-04-12T06:00:00+00:00",
+  "test_top8": [
+   "GIGGLE/USDT:USDT",
+   "BNB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "TAO/USDT:USDT",
+   "XRP/USDT:USDT",
+   "XLM/USDT:USDT"
+  ],
+  "test_scores": {
+   "GIGGLE/USDT:USDT": {
+    "score": 0.4426,
+    "r1": 0.685,
+    "r2": 0.646,
+    "n_events": 82
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3346,
+    "r1": 0.608,
+    "r2": 0.55,
+    "n_events": 80
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2823,
+    "r1": 0.633,
+    "r2": 0.446,
+    "n_events": 83
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2821,
+    "r1": 0.571,
+    "r2": 0.494,
+    "n_events": 85
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2787,
+    "r1": 0.607,
+    "r2": 0.459,
+    "n_events": 98
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2749,
+    "r1": 0.564,
+    "r2": 0.487,
+    "n_events": 80
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2695,
+    "r1": 0.56,
+    "r2": 0.481,
+    "n_events": 81
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2632,
+    "r1": 0.556,
+    "r2": 0.474,
+    "n_events": 76
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2528,
+    "r1": 0.578,
+    "r2": 0.438,
+    "n_events": 64
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2488,
+    "r1": 0.626,
+    "r2": 0.397,
+    "n_events": 73
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2486,
+    "r1": 0.497,
+    "r2": 0.5,
+    "n_events": 82
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2345,
+    "r1": 0.49,
+    "r2": 0.478,
+    "n_events": 92
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.208,
+    "r1": 0.483,
+    "r2": 0.43,
+    "n_events": 79
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.208,
+    "r1": 0.472,
+    "r2": 0.44,
+    "n_events": 84
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2039,
+    "r1": 0.492,
+    "r2": 0.415,
+    "n_events": 82
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2007,
+    "r1": 0.481,
+    "r2": 0.418,
+    "n_events": 79
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.1995,
+    "r1": 0.582,
+    "r2": 0.343,
+    "n_events": 70
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.1975,
+    "r1": 0.439,
+    "r2": 0.45,
+    "n_events": 80
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.173,
+    "r1": 0.407,
+    "r2": 0.425,
+    "n_events": 80
+   }
+  },
+  "control_top8": [
+   "ADA/USDT:USDT",
+   "LINK/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "SOL/USDT:USDT",
+   "SUI/USDT:USDT",
+   "UNI/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "1000PEPE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "ADA/USDT:USDT": 0.02994,
+   "LINK/USDT:USDT": 0.02269,
+   "AAVE/USDT:USDT": 0.02195,
+   "SOL/USDT:USDT": 0.02011,
+   "SUI/USDT:USDT": 0.01962,
+   "UNI/USDT:USDT": 0.01884,
+   "ONDO/USDT:USDT": 0.01819,
+   "1000PEPE/USDT:USDT": 0.01717,
+   "BNB/USDT:USDT": 0.01662,
+   "DOGE/USDT:USDT": 0.01637,
+   "1000SHIB/USDT:USDT": 0.01504,
+   "BTC/USDT:USDT": 0.01387,
+   "XRP/USDT:USDT": 0.01269,
+   "XLM/USDT:USDT": 0.01025,
+   "LTC/USDT:USDT": 0.00954,
+   "ETH/USDT:USDT": 0.00689,
+   "TAO/USDT:USDT": 0.00673,
+   "GIGGLE/USDT:USDT": 0.00171,
+   "NEAR/USDT:USDT": 0.00149
+  }
+ },
+ {
+  "rebalance_ts": 1776578400,
+  "rebalance_utc": "2026-04-19T06:00:00+00:00",
+  "test_top8": [
+   "TAO/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "BNB/USDT:USDT",
+   "XLM/USDT:USDT",
+   "NEAR/USDT:USDT"
+  ],
+  "test_scores": {
+   "TAO/USDT:USDT": {
+    "score": 0.3582,
+    "r1": 0.664,
+    "r2": 0.539,
+    "n_events": 76
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3299,
+    "r1": 0.614,
+    "r2": 0.537,
+    "n_events": 67
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3267,
+    "r1": 0.622,
+    "r2": 0.525,
+    "n_events": 80
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3111,
+    "r1": 0.544,
+    "r2": 0.571,
+    "n_events": 91
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2914,
+    "r1": 0.564,
+    "r2": 0.517,
+    "n_events": 89
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2799,
+    "r1": 0.56,
+    "r2": 0.5,
+    "n_events": 80
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2757,
+    "r1": 0.551,
+    "r2": 0.5,
+    "n_events": 86
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2719,
+    "r1": 0.508,
+    "r2": 0.535,
+    "n_events": 86
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2492,
+    "r1": 0.543,
+    "r2": 0.459,
+    "n_events": 85
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2442,
+    "r1": 0.585,
+    "r2": 0.418,
+    "n_events": 91
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2339,
+    "r1": 0.444,
+    "r2": 0.526,
+    "n_events": 76
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2181,
+    "r1": 0.485,
+    "r2": 0.45,
+    "n_events": 80
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2128,
+    "r1": 0.508,
+    "r2": 0.419,
+    "n_events": 86
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2118,
+    "r1": 0.49,
+    "r2": 0.432,
+    "n_events": 81
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2111,
+    "r1": 0.478,
+    "r2": 0.442,
+    "n_events": 86
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.1954,
+    "r1": 0.476,
+    "r2": 0.41,
+    "n_events": 78
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.1917,
+    "r1": 0.479,
+    "r2": 0.4,
+    "n_events": 80
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.1862,
+    "r1": 0.594,
+    "r2": 0.313,
+    "n_events": 83
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1521,
+    "r1": 0.385,
+    "r2": 0.395,
+    "n_events": 86
+   }
+  },
+  "control_top8": [
+   "GIGGLE/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "SUI/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "UNI/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "NEAR/USDT:USDT"
+  ],
+  "control_ranks": {
+   "GIGGLE/USDT:USDT": 0.30788,
+   "AAVE/USDT:USDT": 0.1892,
+   "SUI/USDT:USDT": 0.05857,
+   "ONDO/USDT:USDT": 0.05763,
+   "UNI/USDT:USDT": 0.05303,
+   "1000PEPE/USDT:USDT": 0.05052,
+   "TAO/USDT:USDT": 0.04756,
+   "NEAR/USDT:USDT": 0.04704,
+   "1000SHIB/USDT:USDT": 0.04595,
+   "LINK/USDT:USDT": 0.04105,
+   "DOGE/USDT:USDT": 0.04088,
+   "ADA/USDT:USDT": 0.04037,
+   "BNB/USDT:USDT": 0.03469,
+   "SOL/USDT:USDT": 0.03316,
+   "ETH/USDT:USDT": 0.03176,
+   "XRP/USDT:USDT": 0.02629,
+   "XLM/USDT:USDT": 0.02227,
+   "BTC/USDT:USDT": 0.02055,
+   "LTC/USDT:USDT": 0.01155
+  }
+ },
+ {
+  "rebalance_ts": 1777183200,
+  "rebalance_utc": "2026-04-26T06:00:00+00:00",
+  "test_top8": [
+   "TAO/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "LTC/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "XLM/USDT:USDT",
+   "BNB/USDT:USDT",
+   "NEAR/USDT:USDT"
+  ],
+  "test_scores": {
+   "TAO/USDT:USDT": {
+    "score": 0.4521,
+    "r1": 0.75,
+    "r2": 0.603,
+    "n_events": 73
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.4129,
+    "r1": 0.664,
+    "r2": 0.622,
+    "n_events": 82
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3745,
+    "r1": 0.639,
+    "r2": 0.586,
+    "n_events": 87
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3671,
+    "r1": 0.526,
+    "r2": 0.697,
+    "n_events": 76
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3396,
+    "r1": 0.633,
+    "r2": 0.536,
+    "n_events": 69
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.331,
+    "r1": 0.593,
+    "r2": 0.558,
+    "n_events": 86
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.328,
+    "r1": 0.589,
+    "r2": 0.557,
+    "n_events": 79
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3227,
+    "r1": 0.56,
+    "r2": 0.576,
+    "n_events": 85
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3156,
+    "r1": 0.569,
+    "r2": 0.554,
+    "n_events": 83
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3081,
+    "r1": 0.582,
+    "r2": 0.529,
+    "n_events": 85
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3061,
+    "r1": 0.649,
+    "r2": 0.472,
+    "n_events": 89
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2767,
+    "r1": 0.54,
+    "r2": 0.512,
+    "n_events": 82
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2568,
+    "r1": 0.507,
+    "r2": 0.506,
+    "n_events": 77
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2485,
+    "r1": 0.517,
+    "r2": 0.481,
+    "n_events": 79
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2454,
+    "r1": 0.536,
+    "r2": 0.458,
+    "n_events": 83
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2381,
+    "r1": 0.603,
+    "r2": 0.395,
+    "n_events": 81
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2372,
+    "r1": 0.501,
+    "r2": 0.473,
+    "n_events": 93
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2161,
+    "r1": 0.457,
+    "r2": 0.473,
+    "n_events": 74
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1748,
+    "r1": 0.429,
+    "r2": 0.407,
+    "n_events": 81
+   }
+  },
+  "control_top8": [
+   "GIGGLE/USDT:USDT",
+   "XLM/USDT:USDT",
+   "TAO/USDT:USDT",
+   "BNB/USDT:USDT",
+   "SUI/USDT:USDT",
+   "LTC/USDT:USDT",
+   "BTC/USDT:USDT",
+   "NEAR/USDT:USDT"
+  ],
+  "control_ranks": {
+   "GIGGLE/USDT:USDT": 0.03181,
+   "XLM/USDT:USDT": 0.02416,
+   "TAO/USDT:USDT": 0.01068,
+   "BNB/USDT:USDT": 0.00797,
+   "SUI/USDT:USDT": 0.0076,
+   "LTC/USDT:USDT": 0.00744,
+   "BTC/USDT:USDT": 0.00603,
+   "NEAR/USDT:USDT": 0.00567,
+   "ETH/USDT:USDT": 0.00522,
+   "ADA/USDT:USDT": 0.00477,
+   "XRP/USDT:USDT": 0.00475,
+   "ONDO/USDT:USDT": 0.00343,
+   "LINK/USDT:USDT": 0.0034,
+   "UNI/USDT:USDT": 0.00337,
+   "SOL/USDT:USDT": 0.00279,
+   "AAVE/USDT:USDT": 0.00222,
+   "1000PEPE/USDT:USDT": 0.00214,
+   "1000SHIB/USDT:USDT": 0.00161,
+   "DOGE/USDT:USDT": 0.00132
+  }
+ },
+ {
+  "rebalance_ts": 1777788000,
+  "rebalance_utc": "2026-05-03T06:00:00+00:00",
+  "test_top8": [
+   "1000PEPE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "LTC/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "SUI/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "LINK/USDT:USDT"
+  ],
+  "test_scores": {
+   "1000PEPE/USDT:USDT": {
+    "score": 0.4679,
+    "r1": 0.681,
+    "r2": 0.688,
+    "n_events": 80
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.4361,
+    "r1": 0.643,
+    "r2": 0.678,
+    "n_events": 87
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3844,
+    "r1": 0.683,
+    "r2": 0.562,
+    "n_events": 80
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3826,
+    "r1": 0.524,
+    "r2": 0.731,
+    "n_events": 78
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3667,
+    "r1": 0.568,
+    "r2": 0.646,
+    "n_events": 79
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3616,
+    "r1": 0.61,
+    "r2": 0.593,
+    "n_events": 86
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3489,
+    "r1": 0.597,
+    "r2": 0.584,
+    "n_events": 89
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3386,
+    "r1": 0.567,
+    "r2": 0.598,
+    "n_events": 82
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3383,
+    "r1": 0.644,
+    "r2": 0.525,
+    "n_events": 80
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.331,
+    "r1": 0.579,
+    "r2": 0.571,
+    "n_events": 91
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3258,
+    "r1": 0.528,
+    "r2": 0.617,
+    "n_events": 81
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3194,
+    "r1": 0.549,
+    "r2": 0.582,
+    "n_events": 79
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3015,
+    "r1": 0.574,
+    "r2": 0.526,
+    "n_events": 78
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2949,
+    "r1": 0.551,
+    "r2": 0.535,
+    "n_events": 86
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2905,
+    "r1": 0.535,
+    "r2": 0.543,
+    "n_events": 81
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2736,
+    "r1": 0.592,
+    "r2": 0.463,
+    "n_events": 80
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.235,
+    "r1": 0.46,
+    "r2": 0.511,
+    "n_events": 90
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.2324,
+    "r1": 0.481,
+    "r2": 0.484,
+    "n_events": 91
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.1766,
+    "r1": 0.399,
+    "r2": 0.443,
+    "n_events": 79
+   }
+  },
+  "control_top8": [
+   "TAO/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "ADA/USDT:USDT"
+  ],
+  "control_ranks": {
+   "TAO/USDT:USDT": 0.06489,
+   "GIGGLE/USDT:USDT": 0.04126,
+   "ONDO/USDT:USDT": 0.03432,
+   "NEAR/USDT:USDT": 0.00855,
+   "LTC/USDT:USDT": 0.00705,
+   "1000PEPE/USDT:USDT": 0.00527,
+   "AAVE/USDT:USDT": 0.00458,
+   "ADA/USDT:USDT": 0.00445,
+   "DOGE/USDT:USDT": 0.00391,
+   "UNI/USDT:USDT": 0.00375,
+   "1000SHIB/USDT:USDT": 0.00305,
+   "BNB/USDT:USDT": 0.00302,
+   "XLM/USDT:USDT": 0.00289,
+   "ETH/USDT:USDT": 0.00211,
+   "LINK/USDT:USDT": 0.00132,
+   "BTC/USDT:USDT": 0.00082,
+   "XRP/USDT:USDT": 0.0008,
+   "SOL/USDT:USDT": 0.00036,
+   "SUI/USDT:USDT": 0.0
+  }
+ },
+ {
+  "rebalance_ts": 1778392800,
+  "rebalance_utc": "2026-05-10T06:00:00+00:00",
+  "test_top8": [
+   "1000SHIB/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "SUI/USDT:USDT",
+   "NEAR/USDT:USDT"
+  ],
+  "test_scores": {
+   "1000SHIB/USDT:USDT": {
+    "score": 0.5183,
+    "r1": 0.749,
+    "r2": 0.692,
+    "n_events": 78
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.5041,
+    "r1": 0.689,
+    "r2": 0.732,
+    "n_events": 82
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.4908,
+    "r1": 0.718,
+    "r2": 0.684,
+    "n_events": 79
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.455,
+    "r1": 0.65,
+    "r2": 0.7,
+    "n_events": 70
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.4198,
+    "r1": 0.647,
+    "r2": 0.649,
+    "n_events": 74
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.399,
+    "r1": 0.614,
+    "r2": 0.65,
+    "n_events": 80
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3959,
+    "r1": 0.613,
+    "r2": 0.646,
+    "n_events": 82
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.375,
+    "r1": 0.608,
+    "r2": 0.616,
+    "n_events": 73
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.3655,
+    "r1": 0.628,
+    "r2": 0.582,
+    "n_events": 79
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3577,
+    "r1": 0.599,
+    "r2": 0.598,
+    "n_events": 82
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3487,
+    "r1": 0.567,
+    "r2": 0.615,
+    "n_events": 91
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3137,
+    "r1": 0.546,
+    "r2": 0.575,
+    "n_events": 87
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3059,
+    "r1": 0.56,
+    "r2": 0.547,
+    "n_events": 86
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3023,
+    "r1": 0.569,
+    "r2": 0.531,
+    "n_events": 81
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2965,
+    "r1": 0.514,
+    "r2": 0.577,
+    "n_events": 78
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2742,
+    "r1": 0.562,
+    "r2": 0.487,
+    "n_events": 80
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.2374,
+    "r1": 0.499,
+    "r2": 0.476,
+    "n_events": 84
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2314,
+    "r1": 0.433,
+    "r2": 0.534,
+    "n_events": 88
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.1969,
+    "r1": 0.41,
+    "r2": 0.481,
+    "n_events": 77
+   }
+  },
+  "control_top8": [
+   "ONDO/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "UNI/USDT:USDT",
+   "XLM/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "ADA/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "DOGE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "ONDO/USDT:USDT": 0.07582,
+   "GIGGLE/USDT:USDT": 0.05885,
+   "UNI/USDT:USDT": 0.0489,
+   "XLM/USDT:USDT": 0.0323,
+   "NEAR/USDT:USDT": 0.02511,
+   "ADA/USDT:USDT": 0.02427,
+   "1000PEPE/USDT:USDT": 0.02338,
+   "DOGE/USDT:USDT": 0.02034,
+   "LINK/USDT:USDT": 0.01596,
+   "LTC/USDT:USDT": 0.01193,
+   "AAVE/USDT:USDT": 0.01059,
+   "1000SHIB/USDT:USDT": 0.00928,
+   "TAO/USDT:USDT": 0.00905,
+   "XRP/USDT:USDT": 0.00589,
+   "ETH/USDT:USDT": 0.00552,
+   "BNB/USDT:USDT": 0.00456,
+   "BTC/USDT:USDT": 0.00402,
+   "SOL/USDT:USDT": 0.00384,
+   "SUI/USDT:USDT": 0.00334
+  }
+ },
+ {
+  "rebalance_ts": 1778997600,
+  "rebalance_utc": "2026-05-17T06:00:00+00:00",
+  "test_top8": [
+   "AAVE/USDT:USDT",
+   "LTC/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "SUI/USDT:USDT",
+   "XRP/USDT:USDT"
+  ],
+  "test_scores": {
+   "AAVE/USDT:USDT": {
+    "score": 0.5182,
+    "r1": 0.713,
+    "r2": 0.727,
+    "n_events": 66
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.5161,
+    "r1": 0.736,
+    "r2": 0.701,
+    "n_events": 87
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.5113,
+    "r1": 0.69,
+    "r2": 0.741,
+    "n_events": 81
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.487,
+    "r1": 0.731,
+    "r2": 0.667,
+    "n_events": 84
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.4758,
+    "r1": 0.682,
+    "r2": 0.698,
+    "n_events": 86
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.4639,
+    "r1": 0.696,
+    "r2": 0.667,
+    "n_events": 69
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3967,
+    "r1": 0.635,
+    "r2": 0.625,
+    "n_events": 88
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3967,
+    "r1": 0.576,
+    "r2": 0.688,
+    "n_events": 93
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3657,
+    "r1": 0.578,
+    "r2": 0.633,
+    "n_events": 79
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3467,
+    "r1": 0.55,
+    "r2": 0.63,
+    "n_events": 92
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3439,
+    "r1": 0.588,
+    "r2": 0.585,
+    "n_events": 82
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.3351,
+    "r1": 0.585,
+    "r2": 0.573,
+    "n_events": 82
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.3296,
+    "r1": 0.59,
+    "r2": 0.558,
+    "n_events": 77
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3277,
+    "r1": 0.504,
+    "r2": 0.65,
+    "n_events": 80
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3176,
+    "r1": 0.564,
+    "r2": 0.563,
+    "n_events": 87
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3034,
+    "r1": 0.55,
+    "r2": 0.552,
+    "n_events": 87
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.279,
+    "r1": 0.512,
+    "r2": 0.544,
+    "n_events": 90
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2282,
+    "r1": 0.425,
+    "r2": 0.537,
+    "n_events": 95
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2172,
+    "r1": 0.41,
+    "r2": 0.53,
+    "n_events": 83
+   }
+  },
+  "control_top8": [
+   "1000SHIB/USDT:USDT",
+   "TAO/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "SOL/USDT:USDT",
+   "ETH/USDT:USDT",
+   "LINK/USDT:USDT",
+   "SUI/USDT:USDT",
+   "DOGE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "1000SHIB/USDT:USDT": 0.03703,
+   "TAO/USDT:USDT": 0.0254,
+   "1000PEPE/USDT:USDT": 0.01946,
+   "SOL/USDT:USDT": 0.01875,
+   "ETH/USDT:USDT": 0.01777,
+   "LINK/USDT:USDT": 0.0177,
+   "SUI/USDT:USDT": 0.0152,
+   "DOGE/USDT:USDT": 0.01488,
+   "BNB/USDT:USDT": 0.01363,
+   "ADA/USDT:USDT": 0.01314,
+   "UNI/USDT:USDT": 0.01237,
+   "BTC/USDT:USDT": 0.01142,
+   "LTC/USDT:USDT": 0.01039,
+   "XLM/USDT:USDT": 0.00933,
+   "XRP/USDT:USDT": 0.00604,
+   "ONDO/USDT:USDT": 0.00591,
+   "GIGGLE/USDT:USDT": 0.00512,
+   "AAVE/USDT:USDT": 0.0032,
+   "NEAR/USDT:USDT": 0.00197
+  }
+ },
+ {
+  "rebalance_ts": 1779602400,
+  "rebalance_utc": "2026-05-24T06:00:00+00:00",
+  "test_top8": [
+   "AAVE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "SUI/USDT:USDT",
+   "LTC/USDT:USDT",
+   "XRP/USDT:USDT",
+   "ADA/USDT:USDT"
+  ],
+  "test_scores": {
+   "AAVE/USDT:USDT": {
+    "score": 0.5833,
+    "r1": 0.729,
+    "r2": 0.8,
+    "n_events": 65
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.5051,
+    "r1": 0.74,
+    "r2": 0.682,
+    "n_events": 85
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.4642,
+    "r1": 0.66,
+    "r2": 0.704,
+    "n_events": 81
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.4368,
+    "r1": 0.678,
+    "r2": 0.644,
+    "n_events": 90
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.4255,
+    "r1": 0.657,
+    "r2": 0.648,
+    "n_events": 88
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.4224,
+    "r1": 0.679,
+    "r2": 0.622,
+    "n_events": 82
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.4017,
+    "r1": 0.56,
+    "r2": 0.718,
+    "n_events": 85
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3914,
+    "r1": 0.611,
+    "r2": 0.64,
+    "n_events": 89
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.3581,
+    "r1": 0.614,
+    "r2": 0.583,
+    "n_events": 84
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.3499,
+    "r1": 0.607,
+    "r2": 0.576,
+    "n_events": 85
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3454,
+    "r1": 0.564,
+    "r2": 0.613,
+    "n_events": 80
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3454,
+    "r1": 0.597,
+    "r2": 0.578,
+    "n_events": 83
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3296,
+    "r1": 0.56,
+    "r2": 0.589,
+    "n_events": 90
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3198,
+    "r1": 0.539,
+    "r2": 0.593,
+    "n_events": 91
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2952,
+    "r1": 0.482,
+    "r2": 0.613,
+    "n_events": 80
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2758,
+    "r1": 0.499,
+    "r2": 0.553,
+    "n_events": 94
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2754,
+    "r1": 0.485,
+    "r2": 0.568,
+    "n_events": 88
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2591,
+    "r1": 0.465,
+    "r2": 0.557,
+    "n_events": 79
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2132,
+    "r1": 0.436,
+    "r2": 0.489,
+    "n_events": 90
+   }
+  },
+  "control_top8": [
+   "NEAR/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "TAO/USDT:USDT",
+   "XLM/USDT:USDT",
+   "ETH/USDT:USDT",
+   "SUI/USDT:USDT",
+   "LINK/USDT:USDT",
+   "UNI/USDT:USDT"
+  ],
+  "control_ranks": {
+   "NEAR/USDT:USDT": 0.12716,
+   "ONDO/USDT:USDT": 0.11377,
+   "TAO/USDT:USDT": 0.0494,
+   "XLM/USDT:USDT": 0.03054,
+   "ETH/USDT:USDT": 0.02668,
+   "SUI/USDT:USDT": 0.02471,
+   "LINK/USDT:USDT": 0.02419,
+   "UNI/USDT:USDT": 0.02317,
+   "XRP/USDT:USDT": 0.02142,
+   "SOL/USDT:USDT": 0.02002,
+   "BTC/USDT:USDT": 0.01773,
+   "GIGGLE/USDT:USDT": 0.01705,
+   "ADA/USDT:USDT": 0.01695,
+   "DOGE/USDT:USDT": 0.01641,
+   "LTC/USDT:USDT": 0.01253,
+   "BNB/USDT:USDT": 0.01012,
+   "AAVE/USDT:USDT": 0.00901,
+   "1000PEPE/USDT:USDT": 0.00842,
+   "1000SHIB/USDT:USDT": 0.00071
+  }
+ },
+ {
+  "rebalance_ts": 1780207200,
+  "rebalance_utc": "2026-05-31T06:00:00+00:00",
+  "test_top8": [
+   "AAVE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "XRP/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "LTC/USDT:USDT",
+   "ADA/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "ETH/USDT:USDT"
+  ],
+  "test_scores": {
+   "AAVE/USDT:USDT": {
+    "score": 0.5609,
+    "r1": 0.711,
+    "r2": 0.789,
+    "n_events": 71
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.4434,
+    "r1": 0.694,
+    "r2": 0.639,
+    "n_events": 83
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.4355,
+    "r1": 0.594,
+    "r2": 0.733,
+    "n_events": 86
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.418,
+    "r1": 0.643,
+    "r2": 0.65,
+    "n_events": 80
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3939,
+    "r1": 0.651,
+    "r2": 0.605,
+    "n_events": 86
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.3806,
+    "r1": 0.619,
+    "r2": 0.614,
+    "n_events": 83
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3618,
+    "r1": 0.618,
+    "r2": 0.585,
+    "n_events": 82
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.3565,
+    "r1": 0.542,
+    "r2": 0.658,
+    "n_events": 79
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.3486,
+    "r1": 0.614,
+    "r2": 0.568,
+    "n_events": 81
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3407,
+    "r1": 0.579,
+    "r2": 0.588,
+    "n_events": 85
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3356,
+    "r1": 0.596,
+    "r2": 0.563,
+    "n_events": 87
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3274,
+    "r1": 0.525,
+    "r2": 0.624,
+    "n_events": 85
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3231,
+    "r1": 0.588,
+    "r2": 0.55,
+    "n_events": 80
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3059,
+    "r1": 0.544,
+    "r2": 0.562,
+    "n_events": 89
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2685,
+    "r1": 0.474,
+    "r2": 0.567,
+    "n_events": 97
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2472,
+    "r1": 0.494,
+    "r2": 0.5,
+    "n_events": 82
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2416,
+    "r1": 0.447,
+    "r2": 0.54,
+    "n_events": 87
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2371,
+    "r1": 0.457,
+    "r2": 0.519,
+    "n_events": 79
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.1948,
+    "r1": 0.407,
+    "r2": 0.479,
+    "n_events": 94
+   }
+  },
+  "control_top8": [
+   "BNB/USDT:USDT",
+   "XLM/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "TAO/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "SUI/USDT:USDT",
+   "ADA/USDT:USDT"
+  ],
+  "control_ranks": {
+   "BNB/USDT:USDT": 0.10651,
+   "XLM/USDT:USDT": 0.07845,
+   "GIGGLE/USDT:USDT": 0.06051,
+   "ONDO/USDT:USDT": 0.05197,
+   "TAO/USDT:USDT": 0.02551,
+   "NEAR/USDT:USDT": 0.01697,
+   "SUI/USDT:USDT": 0.01062,
+   "ADA/USDT:USDT": 0.00849,
+   "ETH/USDT:USDT": 0.00698,
+   "LINK/USDT:USDT": 0.00665,
+   "BTC/USDT:USDT": 0.00616,
+   "SOL/USDT:USDT": 0.00545,
+   "AAVE/USDT:USDT": 0.00519,
+   "DOGE/USDT:USDT": 0.00493,
+   "XRP/USDT:USDT": 0.00408,
+   "1000PEPE/USDT:USDT": 0.00405,
+   "1000SHIB/USDT:USDT": 0.00345,
+   "LTC/USDT:USDT": 0.0021,
+   "UNI/USDT:USDT": 0.00033
+  }
+ },
+ {
+  "rebalance_ts": 1780812000,
+  "rebalance_utc": "2026-06-07T06:00:00+00:00",
+  "test_top8": [
+   "DOGE/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "ETH/USDT:USDT",
+   "LINK/USDT:USDT",
+   "XRP/USDT:USDT"
+  ],
+  "test_scores": {
+   "DOGE/USDT:USDT": {
+    "score": 0.3856,
+    "r1": 0.582,
+    "r2": 0.663,
+    "n_events": 83
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3475,
+    "r1": 0.508,
+    "r2": 0.684,
+    "n_events": 79
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3283,
+    "r1": 0.569,
+    "r2": 0.576,
+    "n_events": 85
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3259,
+    "r1": 0.489,
+    "r2": 0.667,
+    "n_events": 90
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.313,
+    "r1": 0.469,
+    "r2": 0.667,
+    "n_events": 84
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2793,
+    "r1": 0.46,
+    "r2": 0.608,
+    "n_events": 79
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.2776,
+    "r1": 0.507,
+    "r2": 0.548,
+    "n_events": 84
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2773,
+    "r1": 0.464,
+    "r2": 0.598,
+    "n_events": 87
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2722,
+    "r1": 0.483,
+    "r2": 0.563,
+    "n_events": 87
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.2536,
+    "r1": 0.469,
+    "r2": 0.54,
+    "n_events": 87
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2496,
+    "r1": 0.468,
+    "r2": 0.533,
+    "n_events": 90
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2414,
+    "r1": 0.51,
+    "r2": 0.474,
+    "n_events": 76
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2396,
+    "r1": 0.479,
+    "r2": 0.5,
+    "n_events": 82
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2368,
+    "r1": 0.447,
+    "r2": 0.529,
+    "n_events": 85
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2344,
+    "r1": 0.458,
+    "r2": 0.511,
+    "n_events": 88
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2143,
+    "r1": 0.45,
+    "r2": 0.476,
+    "n_events": 84
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.1927,
+    "r1": 0.435,
+    "r2": 0.443,
+    "n_events": 88
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.1907,
+    "r1": 0.419,
+    "r2": 0.455,
+    "n_events": 88
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.1195,
+    "r1": 0.29,
+    "r2": 0.412,
+    "n_events": 85
+   }
+  },
+  "control_top8": [
+   "GIGGLE/USDT:USDT",
+   "SUI/USDT:USDT",
+   "XLM/USDT:USDT",
+   "TAO/USDT:USDT",
+   "UNI/USDT:USDT",
+   "ADA/USDT:USDT",
+   "LINK/USDT:USDT",
+   "DOGE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "GIGGLE/USDT:USDT": 0.15118,
+   "SUI/USDT:USDT": 0.08526,
+   "XLM/USDT:USDT": 0.0766,
+   "TAO/USDT:USDT": 0.06208,
+   "UNI/USDT:USDT": 0.05464,
+   "ADA/USDT:USDT": 0.04811,
+   "LINK/USDT:USDT": 0.04799,
+   "DOGE/USDT:USDT": 0.04187,
+   "1000SHIB/USDT:USDT": 0.0416,
+   "1000PEPE/USDT:USDT": 0.04133,
+   "XRP/USDT:USDT": 0.02791,
+   "SOL/USDT:USDT": 0.02654,
+   "AAVE/USDT:USDT": 0.02491,
+   "ETH/USDT:USDT": 0.02351,
+   "ONDO/USDT:USDT": 0.02155,
+   "NEAR/USDT:USDT": 0.01654,
+   "BNB/USDT:USDT": 0.01588,
+   "BTC/USDT:USDT": 0.01328,
+   "LTC/USDT:USDT": 0.01165
+  }
+ },
+ {
+  "rebalance_ts": 1781416800,
+  "rebalance_utc": "2026-06-14T06:00:00+00:00",
+  "test_top8": [
+   "AAVE/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "SUI/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "XLM/USDT:USDT",
+   "LTC/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "ADA/USDT:USDT"
+  ],
+  "test_scores": {
+   "AAVE/USDT:USDT": {
+    "score": 0.3637,
+    "r1": 0.542,
+    "r2": 0.671,
+    "n_events": 70
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3541,
+    "r1": 0.486,
+    "r2": 0.728,
+    "n_events": 81
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3433,
+    "r1": 0.531,
+    "r2": 0.647,
+    "n_events": 68
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3381,
+    "r1": 0.561,
+    "r2": 0.603,
+    "n_events": 78
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3369,
+    "r1": 0.592,
+    "r2": 0.569,
+    "n_events": 72
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3099,
+    "r1": 0.55,
+    "r2": 0.563,
+    "n_events": 71
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3042,
+    "r1": 0.507,
+    "r2": 0.6,
+    "n_events": 75
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2947,
+    "r1": 0.547,
+    "r2": 0.538,
+    "n_events": 65
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2928,
+    "r1": 0.567,
+    "r2": 0.517,
+    "n_events": 60
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.291,
+    "r1": 0.565,
+    "r2": 0.515,
+    "n_events": 68
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.2756,
+    "r1": 0.531,
+    "r2": 0.519,
+    "n_events": 77
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2654,
+    "r1": 0.476,
+    "r2": 0.557,
+    "n_events": 70
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2503,
+    "r1": 0.464,
+    "r2": 0.539,
+    "n_events": 76
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2332,
+    "r1": 0.443,
+    "r2": 0.526,
+    "n_events": 76
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2074,
+    "r1": 0.451,
+    "r2": 0.459,
+    "n_events": 74
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.1967,
+    "r1": 0.435,
+    "r2": 0.452,
+    "n_events": 84
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.1929,
+    "r1": 0.45,
+    "r2": 0.429,
+    "n_events": 84
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.1786,
+    "r1": 0.428,
+    "r2": 0.418,
+    "n_events": 91
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.1734,
+    "r1": 0.408,
+    "r2": 0.425,
+    "n_events": 73
+   }
+  },
+  "control_top8": [
+   "TAO/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "SOL/USDT:USDT",
+   "LTC/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "DOGE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "TAO/USDT:USDT": 0.27682,
+   "NEAR/USDT:USDT": 0.05853,
+   "GIGGLE/USDT:USDT": 0.04589,
+   "1000SHIB/USDT:USDT": 0.02369,
+   "SOL/USDT:USDT": 0.02217,
+   "LTC/USDT:USDT": 0.02177,
+   "AAVE/USDT:USDT": 0.01856,
+   "DOGE/USDT:USDT": 0.01789,
+   "UNI/USDT:USDT": 0.01687,
+   "BNB/USDT:USDT": 0.01596,
+   "SUI/USDT:USDT": 0.01573,
+   "XRP/USDT:USDT": 0.01449,
+   "ADA/USDT:USDT": 0.01415,
+   "ONDO/USDT:USDT": 0.01239,
+   "BTC/USDT:USDT": 0.01222,
+   "1000PEPE/USDT:USDT": 0.01012,
+   "ETH/USDT:USDT": 0.00816,
+   "LINK/USDT:USDT": 0.00571,
+   "XLM/USDT:USDT": 0.00275
+  }
+ },
+ {
+  "rebalance_ts": 1782021600,
+  "rebalance_utc": "2026-06-21T06:00:00+00:00",
+  "test_top8": [
+   "ONDO/USDT:USDT",
+   "XLM/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "GIGGLE/USDT:USDT"
+  ],
+  "test_scores": {
+   "ONDO/USDT:USDT": {
+    "score": 0.5075,
+    "r1": 0.613,
+    "r2": 0.829,
+    "n_events": 70
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.36,
+    "r1": 0.579,
+    "r2": 0.622,
+    "n_events": 74
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3456,
+    "r1": 0.588,
+    "r2": 0.588,
+    "n_events": 68
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3339,
+    "r1": 0.542,
+    "r2": 0.616,
+    "n_events": 73
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3274,
+    "r1": 0.578,
+    "r2": 0.567,
+    "n_events": 60
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3157,
+    "r1": 0.517,
+    "r2": 0.611,
+    "n_events": 72
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3147,
+    "r1": 0.522,
+    "r2": 0.603,
+    "n_events": 78
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3146,
+    "r1": 0.468,
+    "r2": 0.672,
+    "n_events": 61
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3058,
+    "r1": 0.593,
+    "r2": 0.516,
+    "n_events": 64
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2858,
+    "r1": 0.489,
+    "r2": 0.585,
+    "n_events": 65
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2633,
+    "r1": 0.464,
+    "r2": 0.568,
+    "n_events": 74
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.2582,
+    "r1": 0.486,
+    "r2": 0.531,
+    "n_events": 64
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2396,
+    "r1": 0.457,
+    "r2": 0.524,
+    "n_events": 82
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.2306,
+    "r1": 0.468,
+    "r2": 0.493,
+    "n_events": 69
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2175,
+    "r1": 0.424,
+    "r2": 0.514,
+    "n_events": 74
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2175,
+    "r1": 0.485,
+    "r2": 0.449,
+    "n_events": 78
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2075,
+    "r1": 0.404,
+    "r2": 0.514,
+    "n_events": 74
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.1999,
+    "r1": 0.471,
+    "r2": 0.425,
+    "n_events": 73
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.1802,
+    "r1": 0.431,
+    "r2": 0.419,
+    "n_events": 86
+   }
+  },
+  "control_top8": [
+   "ONDO/USDT:USDT",
+   "UNI/USDT:USDT",
+   "XLM/USDT:USDT",
+   "ADA/USDT:USDT",
+   "SOL/USDT:USDT",
+   "SUI/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "1000PEPE/USDT:USDT"
+  ],
+  "control_ranks": {
+   "ONDO/USDT:USDT": 0.04285,
+   "UNI/USDT:USDT": 0.02426,
+   "XLM/USDT:USDT": 0.02001,
+   "ADA/USDT:USDT": 0.01896,
+   "SOL/USDT:USDT": 0.01798,
+   "SUI/USDT:USDT": 0.01753,
+   "NEAR/USDT:USDT": 0.01469,
+   "1000PEPE/USDT:USDT": 0.01412,
+   "TAO/USDT:USDT": 0.0128,
+   "GIGGLE/USDT:USDT": 0.01267,
+   "BNB/USDT:USDT": 0.01168,
+   "AAVE/USDT:USDT": 0.01002,
+   "1000SHIB/USDT:USDT": 0.00929,
+   "BTC/USDT:USDT": 0.00911,
+   "DOGE/USDT:USDT": 0.0087,
+   "LINK/USDT:USDT": 0.00777,
+   "LTC/USDT:USDT": 0.00679,
+   "ETH/USDT:USDT": 0.0042,
+   "XRP/USDT:USDT": 0.00349
+  }
+ },
+ {
+  "rebalance_ts": 1782626400,
+  "rebalance_utc": "2026-06-28T06:00:00+00:00",
+  "test_top8": [
+   "ONDO/USDT:USDT",
+   "XLM/USDT:USDT",
+   "SUI/USDT:USDT",
+   "UNI/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "LINK/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "AAVE/USDT:USDT"
+  ],
+  "test_scores": {
+   "ONDO/USDT:USDT": {
+    "score": 0.5467,
+    "r1": 0.614,
+    "r2": 0.891,
+    "n_events": 64
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.4308,
+    "r1": 0.596,
+    "r2": 0.723,
+    "n_events": 65
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.4036,
+    "r1": 0.582,
+    "r2": 0.694,
+    "n_events": 62
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.368,
+    "r1": 0.594,
+    "r2": 0.619,
+    "n_events": 63
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3602,
+    "r1": 0.526,
+    "r2": 0.684,
+    "n_events": 57
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3516,
+    "r1": 0.601,
+    "r2": 0.585,
+    "n_events": 65
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.3369,
+    "r1": 0.526,
+    "r2": 0.64,
+    "n_events": 75
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3305,
+    "r1": 0.532,
+    "r2": 0.621,
+    "n_events": 66
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3268,
+    "r1": 0.529,
+    "r2": 0.618,
+    "n_events": 68
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3135,
+    "r1": 0.496,
+    "r2": 0.632,
+    "n_events": 68
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.302,
+    "r1": 0.558,
+    "r2": 0.541,
+    "n_events": 61
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2999,
+    "r1": 0.504,
+    "r2": 0.595,
+    "n_events": 79
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2822,
+    "r1": 0.496,
+    "r2": 0.569,
+    "n_events": 65
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.2768,
+    "r1": 0.524,
+    "r2": 0.529,
+    "n_events": 70
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.2396,
+    "r1": 0.415,
+    "r2": 0.577,
+    "n_events": 78
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2387,
+    "r1": 0.544,
+    "r2": 0.438,
+    "n_events": 73
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.2369,
+    "r1": 0.456,
+    "r2": 0.52,
+    "n_events": 75
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2303,
+    "r1": 0.478,
+    "r2": 0.482,
+    "n_events": 83
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.1942,
+    "r1": 0.406,
+    "r2": 0.479,
+    "n_events": 71
+   }
+  },
+  "control_top8": [
+   "SUI/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "TAO/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "ADA/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "1000SHIB/USDT:USDT"
+  ],
+  "control_ranks": {
+   "SUI/USDT:USDT": 0.04638,
+   "NEAR/USDT:USDT": 0.04201,
+   "ONDO/USDT:USDT": 0.03592,
+   "TAO/USDT:USDT": 0.02514,
+   "DOGE/USDT:USDT": 0.02509,
+   "ADA/USDT:USDT": 0.02436,
+   "1000PEPE/USDT:USDT": 0.0217,
+   "1000SHIB/USDT:USDT": 0.01871,
+   "SOL/USDT:USDT": 0.01797,
+   "BNB/USDT:USDT": 0.01704,
+   "GIGGLE/USDT:USDT": 0.01689,
+   "XLM/USDT:USDT": 0.01669,
+   "LINK/USDT:USDT": 0.01465,
+   "UNI/USDT:USDT": 0.01258,
+   "XRP/USDT:USDT": 0.00984,
+   "ETH/USDT:USDT": 0.0063,
+   "AAVE/USDT:USDT": 0.00475,
+   "BTC/USDT:USDT": 0.00418,
+   "LTC/USDT:USDT": 0.00118
+  }
+ },
+ {
+  "rebalance_ts": 1783231200,
+  "rebalance_utc": "2026-07-05T06:00:00+00:00",
+  "test_top8": [
+   "ONDO/USDT:USDT",
+   "LTC/USDT:USDT",
+   "SUI/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "UNI/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "XLM/USDT:USDT",
+   "GIGGLE/USDT:USDT"
+  ],
+  "test_scores": {
+   "ONDO/USDT:USDT": {
+    "score": 0.4982,
+    "r1": 0.604,
+    "r2": 0.825,
+    "n_events": 57
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.4557,
+    "r1": 0.611,
+    "r2": 0.746,
+    "n_events": 59
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.441,
+    "r1": 0.643,
+    "r2": 0.686,
+    "n_events": 70
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.4249,
+    "r1": 0.66,
+    "r2": 0.644,
+    "n_events": 59
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.4189,
+    "r1": 0.688,
+    "r2": 0.609,
+    "n_events": 64
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.4104,
+    "r1": 0.557,
+    "r2": 0.737,
+    "n_events": 76
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.4087,
+    "r1": 0.565,
+    "r2": 0.723,
+    "n_events": 65
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.3831,
+    "r1": 0.547,
+    "r2": 0.7,
+    "n_events": 60
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3551,
+    "r1": 0.583,
+    "r2": 0.609,
+    "n_events": 69
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3355,
+    "r1": 0.5,
+    "r2": 0.671,
+    "n_events": 76
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3269,
+    "r1": 0.579,
+    "r2": 0.565,
+    "n_events": 62
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3233,
+    "r1": 0.507,
+    "r2": 0.638,
+    "n_events": 69
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.321,
+    "r1": 0.433,
+    "r2": 0.741,
+    "n_events": 81
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.2978,
+    "r1": 0.624,
+    "r2": 0.478,
+    "n_events": 67
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.2921,
+    "r1": 0.444,
+    "r2": 0.657,
+    "n_events": 70
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2868,
+    "r1": 0.512,
+    "r2": 0.56,
+    "n_events": 84
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2668,
+    "r1": 0.465,
+    "r2": 0.573,
+    "n_events": 75
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2516,
+    "r1": 0.443,
+    "r2": 0.568,
+    "n_events": 81
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2252,
+    "r1": 0.444,
+    "r2": 0.507,
+    "n_events": 75
+   }
+  },
+  "control_top8": [
+   "ADA/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "SOL/USDT:USDT",
+   "XLM/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "SUI/USDT:USDT"
+  ],
+  "control_ranks": {
+   "ADA/USDT:USDT": 0.06306,
+   "GIGGLE/USDT:USDT": 0.05933,
+   "1000PEPE/USDT:USDT": 0.03943,
+   "SOL/USDT:USDT": 0.03515,
+   "XLM/USDT:USDT": 0.02855,
+   "1000SHIB/USDT:USDT": 0.02334,
+   "NEAR/USDT:USDT": 0.02251,
+   "SUI/USDT:USDT": 0.01952,
+   "ONDO/USDT:USDT": 0.01912,
+   "DOGE/USDT:USDT": 0.01788,
+   "AAVE/USDT:USDT": 0.01355,
+   "TAO/USDT:USDT": 0.00884,
+   "UNI/USDT:USDT": 0.00781,
+   "LTC/USDT:USDT": 0.0072,
+   "LINK/USDT:USDT": 0.00606,
+   "ETH/USDT:USDT": 0.00509,
+   "BTC/USDT:USDT": 0.00487,
+   "XRP/USDT:USDT": 0.0022,
+   "BNB/USDT:USDT": 0.00068
+  }
+ },
+ {
+  "rebalance_ts": 1783836000,
+  "rebalance_utc": "2026-07-12T06:00:00+00:00",
+  "test_top8": [
+   "ONDO/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "LTC/USDT:USDT",
+   "UNI/USDT:USDT",
+   "XRP/USDT:USDT",
+   "TAO/USDT:USDT",
+   "LINK/USDT:USDT"
+  ],
+  "test_scores": {
+   "ONDO/USDT:USDT": {
+    "score": 0.5322,
+    "r1": 0.665,
+    "r2": 0.8,
+    "n_events": 55
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.5021,
+    "r1": 0.617,
+    "r2": 0.814,
+    "n_events": 70
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.4816,
+    "r1": 0.653,
+    "r2": 0.738,
+    "n_events": 61
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.4615,
+    "r1": 0.615,
+    "r2": 0.75,
+    "n_events": 60
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.4163,
+    "r1": 0.697,
+    "r2": 0.597,
+    "n_events": 67
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3947,
+    "r1": 0.56,
+    "r2": 0.705,
+    "n_events": 78
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.3858,
+    "r1": 0.588,
+    "r2": 0.657,
+    "n_events": 67
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3769,
+    "r1": 0.574,
+    "r2": 0.657,
+    "n_events": 70
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.3717,
+    "r1": 0.694,
+    "r2": 0.535,
+    "n_events": 71
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.371,
+    "r1": 0.586,
+    "r2": 0.633,
+    "n_events": 79
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.3612,
+    "r1": 0.493,
+    "r2": 0.733,
+    "n_events": 86
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.3444,
+    "r1": 0.546,
+    "r2": 0.631,
+    "n_events": 84
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3182,
+    "r1": 0.461,
+    "r2": 0.69,
+    "n_events": 71
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3083,
+    "r1": 0.565,
+    "r2": 0.545,
+    "n_events": 66
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.3004,
+    "r1": 0.503,
+    "r2": 0.597,
+    "n_events": 77
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2926,
+    "r1": 0.446,
+    "r2": 0.656,
+    "n_events": 64
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.2924,
+    "r1": 0.568,
+    "r2": 0.515,
+    "n_events": 68
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2833,
+    "r1": 0.472,
+    "r2": 0.6,
+    "n_events": 80
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2672,
+    "r1": 0.485,
+    "r2": 0.551,
+    "n_events": 78
+   }
+  },
+  "control_top8": [
+   "AAVE/USDT:USDT",
+   "UNI/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "SUI/USDT:USDT",
+   "XLM/USDT:USDT",
+   "TAO/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "SOL/USDT:USDT"
+  ],
+  "control_ranks": {
+   "AAVE/USDT:USDT": 0.0398,
+   "UNI/USDT:USDT": 0.03797,
+   "GIGGLE/USDT:USDT": 0.02431,
+   "SUI/USDT:USDT": 0.02046,
+   "XLM/USDT:USDT": 0.0202,
+   "TAO/USDT:USDT": 0.01947,
+   "1000SHIB/USDT:USDT": 0.01936,
+   "SOL/USDT:USDT": 0.01849,
+   "DOGE/USDT:USDT": 0.01774,
+   "ADA/USDT:USDT": 0.01619,
+   "1000PEPE/USDT:USDT": 0.0118,
+   "XRP/USDT:USDT": 0.01085,
+   "NEAR/USDT:USDT": 0.00892,
+   "LTC/USDT:USDT": 0.00712,
+   "ONDO/USDT:USDT": 0.00671,
+   "BNB/USDT:USDT": 0.00396,
+   "BTC/USDT:USDT": 0.00306,
+   "ETH/USDT:USDT": 0.00217,
+   "LINK/USDT:USDT": 0.00175
+  }
+ },
+ {
+  "rebalance_ts": 1784440800,
+  "rebalance_utc": "2026-07-19T06:00:00+00:00",
+  "test_top8": [
+   "1000SHIB/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "UNI/USDT:USDT",
+   "NEAR/USDT:USDT",
+   "SUI/USDT:USDT",
+   "TAO/USDT:USDT",
+   "BNB/USDT:USDT",
+   "XRP/USDT:USDT"
+  ],
+  "test_scores": {
+   "1000SHIB/USDT:USDT": {
+    "score": 0.5448,
+    "r1": 0.656,
+    "r2": 0.831,
+    "n_events": 71
+   },
+   "GIGGLE/USDT:USDT": {
+    "score": 0.5198,
+    "r1": 0.707,
+    "r2": 0.735,
+    "n_events": 68
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.5181,
+    "r1": 0.818,
+    "r2": 0.633,
+    "n_events": 60
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.4795,
+    "r1": 0.714,
+    "r2": 0.672,
+    "n_events": 67
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.4782,
+    "r1": 0.669,
+    "r2": 0.714,
+    "n_events": 77
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.4658,
+    "r1": 0.608,
+    "r2": 0.766,
+    "n_events": 64
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.4071,
+    "r1": 0.547,
+    "r2": 0.744,
+    "n_events": 82
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.4013,
+    "r1": 0.61,
+    "r2": 0.658,
+    "n_events": 79
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.4004,
+    "r1": 0.579,
+    "r2": 0.691,
+    "n_events": 81
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.3662,
+    "r1": 0.629,
+    "r2": 0.582,
+    "n_events": 67
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3571,
+    "r1": 0.532,
+    "r2": 0.671,
+    "n_events": 73
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.3542,
+    "r1": 0.588,
+    "r2": 0.603,
+    "n_events": 68
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3509,
+    "r1": 0.642,
+    "r2": 0.547,
+    "n_events": 64
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.3315,
+    "r1": 0.532,
+    "r2": 0.623,
+    "n_events": 69
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.3054,
+    "r1": 0.492,
+    "r2": 0.621,
+    "n_events": 66
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.3032,
+    "r1": 0.547,
+    "r2": 0.554,
+    "n_events": 74
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2978,
+    "r1": 0.536,
+    "r2": 0.556,
+    "n_events": 81
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2938,
+    "r1": 0.503,
+    "r2": 0.584,
+    "n_events": 89
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2698,
+    "r1": 0.514,
+    "r2": 0.525,
+    "n_events": 80
+   }
+  },
+  "control_top8": [
+   "ONDO/USDT:USDT",
+   "LTC/USDT:USDT",
+   "AAVE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "SOL/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "ETH/USDT:USDT",
+   "BTC/USDT:USDT"
+  ],
+  "control_ranks": {
+   "ONDO/USDT:USDT": 0.06954,
+   "LTC/USDT:USDT": 0.0304,
+   "AAVE/USDT:USDT": 0.02966,
+   "TAO/USDT:USDT": 0.01529,
+   "SOL/USDT:USDT": 0.01402,
+   "1000PEPE/USDT:USDT": 0.01342,
+   "ETH/USDT:USDT": 0.01226,
+   "BTC/USDT:USDT": 0.01178,
+   "LINK/USDT:USDT": 0.01177,
+   "XLM/USDT:USDT": 0.01078,
+   "SUI/USDT:USDT": 0.00775,
+   "XRP/USDT:USDT": 0.00772,
+   "UNI/USDT:USDT": 0.00767,
+   "NEAR/USDT:USDT": 0.00417,
+   "ADA/USDT:USDT": 0.0036,
+   "BNB/USDT:USDT": 0.00211,
+   "DOGE/USDT:USDT": 0.00194,
+   "GIGGLE/USDT:USDT": 0.00191,
+   "1000SHIB/USDT:USDT": 0.00145
+  }
+ },
+ {
+  "rebalance_ts": 1785045600,
+  "rebalance_utc": "2026-07-26T06:00:00+00:00",
+  "test_top8": [
+   "GIGGLE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "BNB/USDT:USDT",
+   "LTC/USDT:USDT",
+   "1000SHIB/USDT:USDT",
+   "UNI/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "NEAR/USDT:USDT"
+  ],
+  "test_scores": {
+   "GIGGLE/USDT:USDT": {
+    "score": 0.5261,
+    "r1": 0.694,
+    "r2": 0.758,
+    "n_events": 66
+   },
+   "TAO/USDT:USDT": {
+    "score": 0.5247,
+    "r1": 0.665,
+    "r2": 0.789,
+    "n_events": 71
+   },
+   "BNB/USDT:USDT": {
+    "score": 0.4895,
+    "r1": 0.658,
+    "r2": 0.744,
+    "n_events": 78
+   },
+   "LTC/USDT:USDT": {
+    "score": 0.4805,
+    "r1": 0.726,
+    "r2": 0.662,
+    "n_events": 65
+   },
+   "1000SHIB/USDT:USDT": {
+    "score": 0.4803,
+    "r1": 0.671,
+    "r2": 0.716,
+    "n_events": 81
+   },
+   "UNI/USDT:USDT": {
+    "score": 0.4498,
+    "r1": 0.736,
+    "r2": 0.611,
+    "n_events": 72
+   },
+   "DOGE/USDT:USDT": {
+    "score": 0.3747,
+    "r1": 0.589,
+    "r2": 0.636,
+    "n_events": 77
+   },
+   "NEAR/USDT:USDT": {
+    "score": 0.366,
+    "r1": 0.622,
+    "r2": 0.588,
+    "n_events": 68
+   },
+   "1000PEPE/USDT:USDT": {
+    "score": 0.3487,
+    "r1": 0.613,
+    "r2": 0.569,
+    "n_events": 65
+   },
+   "LINK/USDT:USDT": {
+    "score": 0.3428,
+    "r1": 0.56,
+    "r2": 0.613,
+    "n_events": 80
+   },
+   "XRP/USDT:USDT": {
+    "score": 0.3202,
+    "r1": 0.579,
+    "r2": 0.553,
+    "n_events": 85
+   },
+   "SUI/USDT:USDT": {
+    "score": 0.3092,
+    "r1": 0.589,
+    "r2": 0.525,
+    "n_events": 80
+   },
+   "ONDO/USDT:USDT": {
+    "score": 0.2924,
+    "r1": 0.593,
+    "r2": 0.493,
+    "n_events": 71
+   },
+   "SOL/USDT:USDT": {
+    "score": 0.2877,
+    "r1": 0.54,
+    "r2": 0.532,
+    "n_events": 77
+   },
+   "XLM/USDT:USDT": {
+    "score": 0.2837,
+    "r1": 0.478,
+    "r2": 0.594,
+    "n_events": 64
+   },
+   "ADA/USDT:USDT": {
+    "score": 0.2803,
+    "r1": 0.496,
+    "r2": 0.565,
+    "n_events": 92
+   },
+   "BTC/USDT:USDT": {
+    "score": 0.2502,
+    "r1": 0.483,
+    "r2": 0.518,
+    "n_events": 85
+   },
+   "AAVE/USDT:USDT": {
+    "score": 0.2175,
+    "r1": 0.483,
+    "r2": 0.45,
+    "n_events": 80
+   },
+   "ETH/USDT:USDT": {
+    "score": 0.2007,
+    "r1": 0.426,
+    "r2": 0.471,
+    "n_events": 85
+   }
+  },
+  "control_top8": [
+   "1000SHIB/USDT:USDT",
+   "1000PEPE/USDT:USDT",
+   "DOGE/USDT:USDT",
+   "GIGGLE/USDT:USDT",
+   "TAO/USDT:USDT",
+   "ONDO/USDT:USDT",
+   "ADA/USDT:USDT",
+   "LINK/USDT:USDT"
+  ],
+  "control_ranks": {
+   "1000SHIB/USDT:USDT": 0.36342,
+   "1000PEPE/USDT:USDT": 0.09435,
+   "DOGE/USDT:USDT": 0.0587,
+   "GIGGLE/USDT:USDT": 0.04895,
+   "TAO/USDT:USDT": 0.04418,
+   "ONDO/USDT:USDT": 0.02987,
+   "ADA/USDT:USDT": 0.01472,
+   "LINK/USDT:USDT": 0.01467,
+   "SUI/USDT:USDT": 0.01407,
+   "SOL/USDT:USDT": 0.01407,
+   "ETH/USDT:USDT": 0.01331,
+   "LTC/USDT:USDT": 0.0119,
+   "BNB/USDT:USDT": 0.01116,
+   "XRP/USDT:USDT": 0.00789,
+   "UNI/USDT:USDT": 0.00705,
+   "AAVE/USDT:USDT": 0.00656,
+   "BTC/USDT:USDT": 0.00619,
+   "XLM/USDT:USDT": 0.00294,
+   "NEAR/USDT:USDT": 0.00222
+  }
+ }
+]

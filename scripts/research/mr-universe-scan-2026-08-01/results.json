@@ -1,0 +1,452 @@
+{
+ "generated_utc": "2026-08-01T17:39:59.851461+00:00",
+ "prereg": "docs/superpowers/specs/2026-08-01-mr-universe-ranginess-scan-prereg.md",
+ "fee_model": {
+  "rt_pct_of_notional": 0.12,
+  "margin": 30.0,
+  "leverage": 10,
+  "notional": 300.0,
+  "fee_per_trade_usd": 0.36
+ },
+ "span": {
+  "start_ts": 1753596000,
+  "end_ts": 1785604800,
+  "split_ts": 1776002160,
+  "start_utc": "2025-07-27T06:00:00+00:00",
+  "split_utc": "2026-04-12T13:56:00+00:00",
+  "end_utc": "2026-08-01T17:20:00+00:00",
+  "train_days": 259.33,
+  "holdout_days": 111.14,
+  "n_rebalances": 53
+ },
+ "train": {
+  "test": {
+   "n": 407,
+   "days": 259.33,
+   "trades_per_day": 1.5694,
+   "net_total": -8.1469,
+   "net_per_trade": -0.02,
+   "win_rate": 0.6904,
+   "avg_win": 1.222,
+   "avg_loss": -2.7899
+  },
+  "control": {
+   "n": 418,
+   "days": 259.33,
+   "trades_per_day": 1.6118,
+   "net_total": -43.4831,
+   "net_per_trade": -0.104,
+   "win_rate": 0.689,
+   "avg_win": 1.2623,
+   "avg_loss": -3.131
+  },
+  "test_per_pair": {
+   "1000PEPE/USDT:USDT": {
+    "n": 26,
+    "net": -1.72,
+    "wr": 0.731
+   },
+   "1000SHIB/USDT:USDT": {
+    "n": 38,
+    "net": 15.7882,
+    "wr": 0.789
+   },
+   "AAVE/USDT:USDT": {
+    "n": 19,
+    "net": 18.6584,
+    "wr": 0.895
+   },
+   "ADA/USDT:USDT": {
+    "n": 20,
+    "net": 21.9251,
+    "wr": 0.9
+   },
+   "BNB/USDT:USDT": {
+    "n": 18,
+    "net": -4.6017,
+    "wr": 0.5
+   },
+   "BTC/USDT:USDT": {
+    "n": 17,
+    "net": -2.7596,
+    "wr": 0.471
+   },
+   "DOGE/USDT:USDT": {
+    "n": 6,
+    "net": -3.9801,
+    "wr": 0.5
+   },
+   "ETH/USDT:USDT": {
+    "n": 6,
+    "net": -7.0248,
+    "wr": 0.333
+   },
+   "GIGGLE/USDT:USDT": {
+    "n": 8,
+    "net": 1.3958,
+    "wr": 0.875
+   },
+   "LINK/USDT:USDT": {
+    "n": 23,
+    "net": 9.3429,
+    "wr": 0.739
+   },
+   "LTC/USDT:USDT": {
+    "n": 44,
+    "net": -8.4878,
+    "wr": 0.636
+   },
+   "NEAR/USDT:USDT": {
+    "n": 26,
+    "net": 4.2764,
+    "wr": 0.769
+   },
+   "ONDO/USDT:USDT": {
+    "n": 27,
+    "net": 1.9205,
+    "wr": 0.704
+   },
+   "SOL/USDT:USDT": {
+    "n": 11,
+    "net": -6.8339,
+    "wr": 0.636
+   },
+   "SUI/USDT:USDT": {
+    "n": 10,
+    "net": -13.381,
+    "wr": 0.5
+   },
+   "TAO/USDT:USDT": {
+    "n": 44,
+    "net": -14.2753,
+    "wr": 0.659
+   },
+   "UNI/USDT:USDT": {
+    "n": 15,
+    "net": -12.3815,
+    "wr": 0.6
+   },
+   "XLM/USDT:USDT": {
+    "n": 27,
+    "net": -16.1371,
+    "wr": 0.593
+   },
+   "XRP/USDT:USDT": {
+    "n": 22,
+    "net": 10.1286,
+    "wr": 0.818
+   }
+  },
+  "control_per_pair": {
+   "1000PEPE/USDT:USDT": {
+    "n": 20,
+    "net": 3.516,
+    "wr": 0.75
+   },
+   "1000SHIB/USDT:USDT": {
+    "n": 32,
+    "net": 11.2178,
+    "wr": 0.688
+   },
+   "AAVE/USDT:USDT": {
+    "n": 13,
+    "net": 6.224,
+    "wr": 0.846
+   },
+   "ADA/USDT:USDT": {
+    "n": 24,
+    "net": 19.0381,
+    "wr": 0.833
+   },
+   "BNB/USDT:USDT": {
+    "n": 18,
+    "net": 0.9526,
+    "wr": 0.611
+   },
+   "BTC/USDT:USDT": {
+    "n": 1,
+    "net": -0.6154,
+    "wr": 0.0
+   },
+   "DOGE/USDT:USDT": {
+    "n": 22,
+    "net": -12.6568,
+    "wr": 0.591
+   },
+   "ETH/USDT:USDT": {
+    "n": 3,
+    "net": 2.3677,
+    "wr": 1.0
+   },
+   "GIGGLE/USDT:USDT": {
+    "n": 11,
+    "net": 3.4943,
+    "wr": 0.909
+   },
+   "LINK/USDT:USDT": {
+    "n": 20,
+    "net": -9.2553,
+    "wr": 0.6
+   },
+   "LTC/USDT:USDT": {
+    "n": 26,
+    "net": -22.9414,
+    "wr": 0.577
+   },
+   "NEAR/USDT:USDT": {
+    "n": 35,
+    "net": 21.4334,
+    "wr": 0.829
+   },
+   "ONDO/USDT:USDT": {
+    "n": 28,
+    "net": 12.5052,
+    "wr": 0.75
+   },
+   "SOL/USDT:USDT": {
+    "n": 20,
+    "net": -10.0579,
+    "wr": 0.7
+   },
+   "SUI/USDT:USDT": {
+    "n": 29,
+    "net": -27.0343,
+    "wr": 0.517
+   },
+   "TAO/USDT:USDT": {
+    "n": 39,
+    "net": -26.7392,
+    "wr": 0.59
+   },
+   "UNI/USDT:USDT": {
+    "n": 34,
+    "net": -13.7214,
+    "wr": 0.647
+   },
+   "XLM/USDT:USDT": {
+    "n": 27,
+    "net": -13.545,
+    "wr": 0.63
+   },
+   "XRP/USDT:USDT": {
+    "n": 16,
+    "net": 12.3342,
+    "wr": 0.938
+   }
+  }
+ },
+ "train_eligibility": {
+  "cond1_net_per_trade_pos": false,
+  "cond2_net_ge_control": true,
+  "cond3_freq_ge_1p5x_control": false,
+  "eligible": false
+ },
+ "holdout": {
+  "test": {
+   "n": 203,
+   "days": 111.14,
+   "trades_per_day": 1.8265,
+   "net_total": -20.0196,
+   "net_per_trade": -0.0986,
+   "win_rate": 0.67,
+   "avg_win": 1.2709,
+   "avg_loss": -2.8784
+  },
+  "control": {
+   "n": 207,
+   "days": 111.14,
+   "trades_per_day": 1.8625,
+   "net_total": -2.2788,
+   "net_per_trade": -0.011,
+   "win_rate": 0.686,
+   "avg_win": 1.3135,
+   "avg_loss": -2.9046
+  },
+  "test_per_pair": {
+   "1000PEPE/USDT:USDT": {
+    "n": 8,
+    "net": 10.413,
+    "wr": 1.0
+   },
+   "1000SHIB/USDT:USDT": {
+    "n": 25,
+    "net": 3.7391,
+    "wr": 0.68
+   },
+   "AAVE/USDT:USDT": {
+    "n": 15,
+    "net": -13.8538,
+    "wr": 0.467
+   },
+   "ADA/USDT:USDT": {
+    "n": 3,
+    "net": 3.3822,
+    "wr": 1.0
+   },
+   "BNB/USDT:USDT": {
+    "n": 10,
+    "net": -1.6124,
+    "wr": 0.6
+   },
+   "DOGE/USDT:USDT": {
+    "n": 15,
+    "net": -7.0271,
+    "wr": 0.6
+   },
+   "ETH/USDT:USDT": {
+    "n": 2,
+    "net": 0.8491,
+    "wr": 1.0
+   },
+   "GIGGLE/USDT:USDT": {
+    "n": 16,
+    "net": 22.8392,
+    "wr": 0.938
+   },
+   "LINK/USDT:USDT": {
+    "n": 3,
+    "net": 3.5642,
+    "wr": 1.0
+   },
+   "LTC/USDT:USDT": {
+    "n": 13,
+    "net": 1.9091,
+    "wr": 0.538
+   },
+   "NEAR/USDT:USDT": {
+    "n": 10,
+    "net": -6.7554,
+    "wr": 0.7
+   },
+   "ONDO/USDT:USDT": {
+    "n": 11,
+    "net": -19.4239,
+    "wr": 0.455
+   },
+   "SUI/USDT:USDT": {
+    "n": 15,
+    "net": -11.0671,
+    "wr": 0.667
+   },
+   "TAO/USDT:USDT": {
+    "n": 21,
+    "net": 12.609,
+    "wr": 0.667
+   },
+   "UNI/USDT:USDT": {
+    "n": 11,
+    "net": -11.7445,
+    "wr": 0.545
+   },
+   "XLM/USDT:USDT": {
+    "n": 14,
+    "net": -2.1352,
+    "wr": 0.786
+   },
+   "XRP/USDT:USDT": {
+    "n": 11,
+    "net": -5.7049,
+    "wr": 0.545
+   }
+  },
+  "control_per_pair": {
+   "1000PEPE/USDT:USDT": {
+    "n": 9,
+    "net": 7.4185,
+    "wr": 0.889
+   },
+   "1000SHIB/USDT:USDT": {
+    "n": 9,
+    "net": 0.2429,
+    "wr": 0.556
+   },
+   "AAVE/USDT:USDT": {
+    "n": 12,
+    "net": -2.817,
+    "wr": 0.75
+   },
+   "ADA/USDT:USDT": {
+    "n": 13,
+    "net": -13.5002,
+    "wr": 0.538
+   },
+   "BNB/USDT:USDT": {
+    "n": 2,
+    "net": 2.0892,
+    "wr": 1.0
+   },
+   "BTC/USDT:USDT": {
+    "n": 1,
+    "net": 0.0718,
+    "wr": 1.0
+   },
+   "DOGE/USDT:USDT": {
+    "n": 13,
+    "net": -9.5913,
+    "wr": 0.538
+   },
+   "ETH/USDT:USDT": {
+    "n": 6,
+    "net": 0.1349,
+    "wr": 0.833
+   },
+   "GIGGLE/USDT:USDT": {
+    "n": 12,
+    "net": 4.5666,
+    "wr": 0.833
+   },
+   "LINK/USDT:USDT": {
+    "n": 2,
+    "net": 0.8082,
+    "wr": 1.0
+   },
+   "LTC/USDT:USDT": {
+    "n": 3,
+    "net": 0.3883,
+    "wr": 0.667
+   },
+   "NEAR/USDT:USDT": {
+    "n": 9,
+    "net": -1.7758,
+    "wr": 0.667
+   },
+   "ONDO/USDT:USDT": {
+    "n": 17,
+    "net": 5.0333,
+    "wr": 0.765
+   },
+   "SOL/USDT:USDT": {
+    "n": 18,
+    "net": 9.0347,
+    "wr": 0.667
+   },
+   "SUI/USDT:USDT": {
+    "n": 22,
+    "net": -2.3895,
+    "wr": 0.682
+   },
+   "TAO/USDT:USDT": {
+    "n": 25,
+    "net": 17.385,
+    "wr": 0.72
+   },
+   "UNI/USDT:USDT": {
+    "n": 15,
+    "net": -14.0052,
+    "wr": 0.533
+   },
+   "XLM/USDT:USDT": {
+    "n": 19,
+    "net": -5.3733,
+    "wr": 0.632
+   }
+  }
+ },
+ "verdict": "DO-NOT-BUILD",
+ "verdict_basis": {
+  "train_eligibility_failed": true,
+  "cond1_net_per_trade_pos": false,
+  "cond2_net_ge_control": true,
+  "cond3_freq_ge_1p5x_control": false
+ }
+}
