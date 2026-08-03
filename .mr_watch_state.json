@@ -1,9 +1,9 @@
 {
   "last_closed_at": 1785506857.289634,
   "counters": {
-    "requote_miss": 16,
+    "requote_miss": 17,
     "requote_fill": 4,
     "mr_rsi_floor": 4
   },
-  "last_run": 1785739901.130319
+  "last_run": 1785757901.385216
 }
