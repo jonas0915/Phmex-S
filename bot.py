@@ -14,6 +14,31 @@ from risk_manager import RiskManager
 from strategy_slot import StrategySlot
 from strategies import STRATEGIES, Signal, TradeSignal, st2_absorption
 
+# Cycle counter persistence (2026-08-04 fix): cycle_count must be monotonic
+# across restarts because Position.entry_cycle is persisted in the state files
+# — a counter reset to 0 on boot makes cycles_held negative and disables every
+# cycle-denominated exit for days (TAO short 8/2 held 27h vs ~6h design).
+CYCLE_STATE_FILE = ".bot_cycles.json"
+
+
+def _load_cycle_count(path: str = CYCLE_STATE_FILE) -> int:
+    try:
+        with open(path) as f:
+            return int(json.load(f).get("cycle_count", 0))
+    except Exception:
+        return 0
+
+
+def _save_cycle_count(cycle_count: int, path: str = CYCLE_STATE_FILE) -> None:
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump({"cycle_count": int(cycle_count), "ts": time.time()}, f)
+        os.replace(tmp, path)
+    except Exception:
+        pass  # persistence is best-effort; the rebase guard covers a lost file
+
+
 # ST2.0 book×tape absorption short — fixed ~15-min hold (900s / 60s cycle = 15 cycles),
 # matching the backtested exit (docs/2026-06-13-wider-setup-search.md).
 ST2_HOLD_CYCLES = 15
@@ -491,7 +516,10 @@ class Phmex2Bot:
         self.risk = RiskManager()
         self.strategy_fn = STRATEGIES.get(Config.STRATEGY, STRATEGIES["confluence"])
         self.running = False
-        self.cycle_count = 0
+        # Resume the monotonic counter so persisted entry_cycle stays
+        # comparable across restarts (2026-08-04 time-exit fix).
+        self.cycle_count = _load_cycle_count()
+        self.boot_cycle = self.cycle_count  # warmup grace is boot-relative
         self.active_pairs = Config.TRADING_PAIRS[:]
         self._leverage_set: set = set()  # track symbols that already have leverage configured
         self.consecutive_errors = 0
@@ -1496,6 +1524,7 @@ class Phmex2Bot:
 
         self._process_sentinels()
         self.cycle_count += 1
+        _save_cycle_count(self.cycle_count)
         logger.info(f"Cycle #{self.cycle_count} | Positions: {len(self.risk.positions)}")
 
         # Refresh volatility scan periodically (non-blocking background thread)
@@ -1540,8 +1569,8 @@ class Phmex2Bot:
         # Also skip if WebSocket is connected — data shortage means candle history is
         # still accumulating, not a CDN ban.
         if all_symbols and not prices:
-            if self.cycle_count <= 5:
-                logger.info(f"[WARMUP] No OHLCV data yet (cycle {self.cycle_count}/5), waiting for WebSocket cache...")
+            if self.cycle_count - self.boot_cycle <= 5:
+                logger.info(f"[WARMUP] No OHLCV data yet (cycle {self.cycle_count - self.boot_cycle}/5 since boot), waiting for WebSocket cache...")
                 return
             if self._ws_feed and self._ws_feed.is_connected:
                 logger.info("[WARMUP] WebSocket connected, waiting for candle history to accumulate...")

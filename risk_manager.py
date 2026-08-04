@@ -216,6 +216,21 @@ class Position:
             return 0.0
         return self.pnl_usdt(current_price) / self.margin * 100
 
+    def _cycles_held(self, current_cycle: int) -> int:
+        """entry_cycle > current_cycle can only mean this position was opened
+        under a prior run's counter (the bot's cycle counter used to reset to 0
+        on restart while entry_cycle is persisted) — left alone, cycles_held
+        goes deeply negative and every cycle-denominated exit is inert for days
+        (TAO short 2026-08-02: 27h hold vs ~6h design). Rebase to the current
+        counter so timers re-arm from now."""
+        if self.entry_cycle > current_cycle:
+            logger.warning(
+                f"[TIME EXIT] {self.symbol} stale entry_cycle {self.entry_cycle} > "
+                f"current cycle {current_cycle} (pre-restart state) — rebasing timer"
+            )
+            self.entry_cycle = current_cycle
+        return current_cycle - self.entry_cycle
+
     def should_adverse_exit(self, current_cycle: int, current_price: float,
                             threshold: float = None, cycles: int = None) -> bool:
         """Exit early if trade is going wrong direction after N cycles.
@@ -226,7 +241,7 @@ class Position:
         the global Config (ADVERSE_EXIT_THRESHOLD = -999 = disabled), so the main bot
         and every other slot are unaffected."""
         cyc = Config.ADVERSE_EXIT_CYCLES if cycles is None else cycles
-        cycles_held = current_cycle - self.entry_cycle
+        cycles_held = self._cycles_held(current_cycle)
         if cycles_held < cyc:
             return False
         thr = Config.ADVERSE_EXIT_THRESHOLD if threshold is None else threshold
@@ -241,7 +256,7 @@ class Position:
         tight time exits destroy performance.
         Adverse exit at -5% ROI handles wrong-direction trades."""
         hard_limit = 240  # 4 hours at 60s loop = 240 cycles
-        cycles_held = current_cycle - self.entry_cycle
+        cycles_held = self._cycles_held(current_cycle)
         roi = self.pnl_percent(current_price) if current_price > 0 else -99.0
 
         if cycles_held >= hard_limit:
@@ -259,7 +274,7 @@ class Position:
         bleed to time_exit (89 trades, 2.2% WR, -$34.84).
         Widened from [2.5%, 4%) to [-4%, +4%) to catch near-zero losers too."""
         FLAT_EXIT_CYCLES = 240  # 240 × 60s = 4 hrs
-        cycles_held = current_cycle - self.entry_cycle
+        cycles_held = self._cycles_held(current_cycle)
         if cycles_held < FLAT_EXIT_CYCLES:
             return False
         roi = self.pnl_percent(current_price)
