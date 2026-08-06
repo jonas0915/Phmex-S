@@ -39,6 +39,35 @@ def _save_cycle_count(cycle_count: int, path: str = CYCLE_STATE_FILE) -> None:
         pass  # persistence is best-effort; the rebase guard covers a lost file
 
 
+# Honest paper-entry pricing (2026-08-05, I3 fill-reval audit): the per-cycle
+# cached prices dict goes stale 1-3 min across the ~90s loop, so paper fills
+# recorded phantom favorable prices (41% of the SR_BOUNCE v2 book). Same 10s
+# freshness bound as the live exit watcher.
+PAPER_PX_MAX_AGE_S = 10.0
+
+
+def _fresh_paper_entry_price(ws_feed, exchange, symbol: str, cached_price: float):
+    """(price, age_seconds, source) for a PAPER fill. Prefers a fresh WS tick,
+    falls back to a REST ticker, and only then to the cycle-cached price —
+    explicitly flagged with age=-1.0 so staleness is recorded, never hidden.
+    Never raises: paper entries must not be able to break the cycle."""
+    try:
+        if ws_feed is not None:
+            lp = ws_feed.last_price(symbol)
+            if lp is not None and lp[1] <= PAPER_PX_MAX_AGE_S:
+                return float(lp[0]), float(lp[1]), "ws"
+    except Exception:
+        pass
+    try:
+        ticker = exchange.get_ticker(symbol) if exchange is not None else None
+        px = float((ticker or {}).get("last") or 0.0)
+        if px > 0:
+            return px, 0.0, "rest"
+    except Exception:
+        pass
+    return float(cached_price), -1.0, "cached"
+
+
 # ST2.0 book×tape absorption short — fixed ~15-min hold (900s / 60s cycle = 15 cycles),
 # matching the backtested exit (docs/2026-06-13-wider-setup-search.md).
 ST2_HOLD_CYCLES = 15
@@ -3199,6 +3228,7 @@ class Phmex2Bot:
                     _entry_strategy_name = _strat_name if (slot.slot_id == "5m_narrow" and _strat_name) else slot.strategy_name
 
                     _block_label = f" [WOULD BLOCK: {_tag_str}]" if _would_block else ""
+                    _px_age = _px_src = None  # set on the paper path only
 
                     if slot.paper_mode:
                         # F1: global pause blocks ALL entries, paper included —
@@ -3208,6 +3238,13 @@ class Phmex2Bot:
                         if self._slot_entries_blocked():
                             logger.info(f"[PAPER] {slot.slot_id} {symbol} entry blocked — account halt")
                             continue
+                        # Honest paper fill price (2026-08-05 I3 audit): refresh
+                        # BEFORE the geometry math so SL/TP percentages, the
+                        # stale-levels check, and the recorded entry all use the
+                        # same live price instead of the cycle-cached one.
+                        price, _px_age, _px_src = _fresh_paper_entry_price(
+                            getattr(self, "_ws_feed", None), getattr(self, "exchange", None),
+                            symbol, price)
                         _sl_pct, _tp_pct = slot.sl_percent, slot.tp_percent
                         _sig_sl = getattr(signal, "sl_price", None)
                         _sig_tp = getattr(signal, "tp_price", None)
@@ -3255,7 +3292,8 @@ class Phmex2Bot:
                         )
                         logger.info(
                             f"[PAPER] {slot.slot_id} ENTRY {direction.upper()} {symbol} | "
-                            f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}{_block_label}"
+                            f"Price: {price:.4f} | Strength: {signal.strength:.2f} | {signal.reason}"
+                            f" | px_src={_px_src} px_age={_px_age:.1f}s{_block_label}"
                         )
                     else:
                         # --- LIVE slot entry (spec 2026-06-12) ---
@@ -3450,6 +3488,12 @@ class Phmex2Bot:
                     if symbol in slot.risk.positions:
                         slot.risk.positions[symbol].entry_snapshot = snap
                         slot.risk.positions[symbol].gate_tags = _tag_str
+                        if _px_src is not None:
+                            # Paper-fill price provenance (I3 audit follow-up):
+                            # persisted so future fill revalidations read it
+                            # straight from the ledger instead of reconstructing.
+                            snap["px_src"] = _px_src
+                            snap["px_age_s"] = _px_age
                         try:
                             slot.risk._save_state()
                         except Exception as _e:
@@ -4716,6 +4760,11 @@ class Phmex2Bot:
         """Paper fill at the current price. 1x sizing (spec: no leverage in
         paper): margin is recorded AS the notional, so ROI% == price move %,
         matching the unlevered weight semantics of the validated replay."""
+        # Honest paper fill price (2026-08-05 I3 audit): same refresh as the
+        # 5m slot paper path — the cycle-cached price can be minutes stale.
+        price, _px_age, _px_src = _fresh_paper_entry_price(
+            getattr(self, "_ws_feed", None), getattr(self, "exchange", None),
+            symbol, price)
         n_long = int(sum(self._donchian_state[symbol].get("submodel_pos") or []))
         pos = slot.risk.open_position(symbol, price, notional, side="long",
                                       atr=0.0, regime="medium",
@@ -4733,6 +4782,7 @@ class Phmex2Bot:
                                     slot=slot.slot_id)
         logger.info(f"[PAPER] {slot.slot_id} ENTRY LONG {symbol} @ {price:.2f} "
                     f"| ${notional:.2f} notional (w={w:.4f}, {n_long}/9 long) "
+                    f"| px_src={_px_src} px_age={_px_age:.1f}s "
                     f"| no TP, close-only daily stops")
 
     def _close_slot_position(self, slot, symbol, pos, price, reason):
