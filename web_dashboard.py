@@ -1191,6 +1191,15 @@ def collect_blotter_rows(limit: int = 500, slot_states: dict = None) -> list[dic
             # promotion) — same rule build_equity_series uses. Trades closed
             # while the slot was still paper stay tagged paper.
             mode = "live" if owner == "main" else (t.get("mode") or "paper")
+            net = round(_net_pnl(t) if mode == "live" else _sim_net_pnl(t), 4)
+            # Per-trade return on margin (owner request 2026-08-06): same
+            # basis as the bot's close-line ROI%. None when the record has
+            # no usable margin — render a dash, never a fake percentage.
+            try:
+                margin = float(t.get("margin") or 0)
+            except (TypeError, ValueError):
+                margin = 0.0
+            roi = round(net / margin * 100, 1) if margin > 0 else None
             rows.append({
                 "id": f"{owner}:{i}",
                 "ts": ts,
@@ -1198,7 +1207,8 @@ def collect_blotter_rows(limit: int = 500, slot_states: dict = None) -> list[dic
                 "sym": str(t.get("symbol") or "?").replace("/USDT:USDT", ""),
                 "side": str(t.get("side") or "?"),
                 "strat": str(t.get("strategy") or ""),
-                "net": round(_net_pnl(t) if mode == "live" else _sim_net_pnl(t), 4),
+                "net": net,
+                "roi": roi,
                 "reason": str(t.get("exit_reason") or t.get("reason") or ""),
                 "owner": owner,
                 "mode": mode,
@@ -1573,21 +1583,39 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
     """BLOTTER panel body: merged main+slot rows, newest first, click-to-drill.
     Slot rows carry an owner badge — amber when the slot trade ran LIVE, dim
     for paper. Row ids feed drill() → GET /api/trade?id=owner:index."""
-    rows = collect_blotter_rows(limit, slot_states)
+    # Fetch ALL rows (the function builds them all before slicing anyway):
+    # chips need full-ledger win rates, the table renders only the newest
+    # `limit`. A win rate from the visible rows alone would read as "recent
+    # WR" while labeled like a book stat — the owner request (2026-08-06)
+    # is the true per-strategy rate.
+    all_rows = collect_blotter_rows(10 ** 9, slot_states)
+    rows = all_rows[:limit]
     if not rows:
         return "<div class='dim'>no closed trades yet</div>"
+
+    def _wr(sample: list) -> str:
+        # min_margin_skip rows are bookkeeping (skipped entries), not trades.
+        real = [r for r in sample if r["reason"] != "min_margin_skip"]
+        if not real:
+            return ""
+        wins = sum(1 for r in real if r["net"] > 0)
+        return f" &middot; {wins / len(real) * 100:.0f}%"
+
     # Strategy filter chips — built from the strategies actually present in the
     # rendered rows (not hardcoded). "*" = ALL sentinel (can't collide with a
     # real strategy name); "" tags rows whose trade record has no strategy.
     # Filtering is client-side (stratFilter/applyStratFilter in the static
     # script), so it survives the 3s #content swap and needs no round-trip.
+    # Each chip carries its strategy's FULL-ledger win rate (all_rows, not the
+    # rendered subset) so the number matches the book, not the visible window.
     strats = sorted({r["strat"] for r in rows})
     out = ("<div class='strat-chips'>"
-           "<span class='chip active' data-strat='*' onclick='stratFilter(this)'>ALL</span>")
+           f"<span class='chip active' data-strat='*' onclick='stratFilter(this)'>ALL{_wr(all_rows)}</span>")
     for s in strats:
         label = escape(s[:16]) if s else "(none)"
+        wr = _wr([r for r in all_rows if r["strat"] == s])
         out += (f"<span class='chip' data-strat=\"{escape(s)}\" "
-                f"onclick=\"stratFilter(this)\">{label}</span>")
+                f"onclick=\"stratFilter(this)\">{label}{wr}</span>")
     out += "</div>"
     out += ("<table><tr class='dim'><th>TIME</th><th>SYM</th><th>SIDE</th>"
             "<th>MODE</th><th>STRAT</th><th>PNL</th><th>REASON</th></tr>")
@@ -1615,7 +1643,10 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
             f"<td class='{side_cls}'>{side}</td>"
             f"{mode_cell}"
             f"<td class='dim'>{escape(r['strat'][:16])}</td>"
-            f"<td class='{net_cls}'>{r['net']:+.2f}</td>"
+            f"<td class='{net_cls}'>{r['net']:+.2f} "
+            + (f"<span class='dim'>{r['roi']:+.1f}%</span>" if r["roi"] is not None
+               else "<span class='dim'>&mdash;</span>")
+            + "</td>"
             f"<td class='dim'>{escape(r['reason'][:14])}</td></tr>"
         )
     return out + "</table>"
