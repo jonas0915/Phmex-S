@@ -632,8 +632,13 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
             # Permanent kill (sidecar killed_at) — same precedence as the
             # STRATEGIES-card badge; panels disagreed before (2026-07-31
             # audit: HTF_L2 card said KILLED, this panel said paper).
+            # A sidecar whose _note says "retired" gets the honest badge
+            # (2026-08-09 audit: ETH_TSM_28 retired-by-criteria, not killed).
+            _badge = ("retired" if "retired" in
+                      str(modes.get(slot_id, {}).get("_note", "")).lower()
+                      else "killed (permanent)")
             rows += (f"<tr class='dim'><td>&#10013; {name}</td>"
-                     f"<td>killed (permanent)</td>"
+                     f"<td>{_badge}</td>"
                      f"<td>{('live ' + _stats_html(live_rows)) if live_rows else _stats_html(sim_rows, _sim_net_pnl)}</td></tr>")
             if live_rows and sim_rows:
                 rows += _sim_row_html(sim_rows)
@@ -739,10 +744,11 @@ _SIGNAL_BOXES = [
     ("main_gated",     "MAIN BOOK &mdash; CURRENT TEST (since 7/21 gates)",
      "The SAME book as FULL HISTORY (left), showing ONLY trades since the "
      "2026-07-21 9:25 PM PT un-halt &mdash; every trade in this window was "
-     "taken with the gates active. This card answers \"is the fixed version "
-     "worth keeping?\": adjudicator verdict at n=40 (net &gt; $0 PASS, "
-     "&le; $0 KILL &rarr; halt entries). Not a separate trader &mdash; its "
-     "trades also appear in FULL HISTORY's counts."),
+     "taken with the gates active. VERDICT REGISTERED 2026-08-09 3:00 AM PT: "
+     "<span class='pos'>PASS</span> at n=42, net +$4.30 &mdash; ladder rung "
+     "$10; owner sized to $15 (registered ceiling) 8/9. The card keeps "
+     "reporting the era live past the verdict. Not a separate trader &mdash; "
+     "its trades also appear in FULL HISTORY's counts."),
     ("5m_mean_revert", "5M_MEAN_REVERT &mdash; LIVE FORWARD TEST",
      "Bollinger-Band mean-reversion scalp &mdash; fades lower-BB bounces / upper-BB "
      "rejections in ranging (low-ADX) markets. LIVE since 2026-06-12; running the "
@@ -1378,22 +1384,31 @@ def _watcher_enabled() -> bool:
             # watcher line in the tail with no later scanner restart → enabled
             result = True
         else:
-            # Neither marker in the tail window — grep the whole file (fast C grep).
-            out = subprocess.run(
-                ["grep", "-F", "-n", "-e", "Volume scanner ON",
-                 "-e", "[LIVE EXIT] watcher enabled", LOG_FILE],
-                capture_output=True, text=True, timeout=5,
-            ).stdout
-            last_scan = last_watch = -1
-            for ln in out.splitlines():
-                no, _, rest = ln.partition(":")
-                if not no.isdigit():
+            # Neither marker in the tail window — grep whole files, newest
+            # first, following logrotate (2026-08-09 audit: a long-running
+            # bot's boot markers scroll into bot.log.1 and the old current-
+            # file-only grep showed a false red OFF on a working watcher).
+            # The first file that contains any marker decides.
+            for logf in (LOG_FILE, LOG_FILE + ".1", LOG_FILE + ".2"):
+                if not os.path.exists(logf):
                     continue
-                if "Volume scanner ON" in rest:
-                    last_scan = int(no)
-                elif "[LIVE EXIT] watcher enabled" in rest:
-                    last_watch = int(no)
-            result = last_watch != -1 and last_watch > last_scan
+                out = subprocess.run(
+                    ["grep", "-F", "-n", "-e", "Volume scanner ON",
+                     "-e", "[LIVE EXIT] watcher enabled", logf],
+                    capture_output=True, text=True, timeout=5,
+                ).stdout
+                last_scan = last_watch = -1
+                for ln in out.splitlines():
+                    no, _, rest = ln.partition(":")
+                    if not no.isdigit():
+                        continue
+                    if "Volume scanner ON" in rest:
+                        last_scan = int(no)
+                    elif "[LIVE EXIT] watcher enabled" in rest:
+                        last_watch = int(no)
+                if last_scan != -1 or last_watch != -1:
+                    result = last_watch != -1 and last_watch > last_scan
+                    break
     except Exception:
         pass
     _watcher_cache["v"] = result

@@ -21,7 +21,7 @@ Current version: **Sentinel (v11)** — deployed 2026-04-01.
 ## Current Parameters
 | Parameter | Value | Location |
 |-----------|-------|----------|
-| Trade size | $5 margin main book (lowered from $15 on 2026-07-27, owner directive — main is breakeven-at-best; capital concentrated in 5m_mean_revert at $30/trade per-slot pin). MIN/MAX_TRADE_MARGIN also pinned 5.0 so every Kelly path resolves to $5; weekend cap now follows TRADE_AMOUNT_USDT. NOTE: BTC entries auto-bump to ~$13 via the exchange-min-qty bump (bot.py ~2242) — designed behavior so BTC stays tradable | .env: TRADE_AMOUNT_USDT |
+| Trade size | $15 margin main book (restored from $5 on 2026-08-09, owner order, after the gated-era n=40 verdict PASSED — n=42 +$4.30, ladder rung $10, owner chose the $15 registered ceiling; 5m_mean_revert stays $30/trade per-slot pin). MIN/MAX_TRADE_MARGIN pinned 15.0 so every Kelly path resolves to $15; weekend cap follows TRADE_AMOUNT_USDT. The BTC exchange-min-qty bump (~$13) is moot at $15 | .env: TRADE_AMOUNT_USDT |
 | Daily loss halt | max(3% × balance, $8.00) — floor raised $5→$8 2026-07-27 (owner directive, with 5m_mean_revert $30 resize + $92 balance) preserving the 2026-07-07 semantics: ~2 worst stops of the largest book (≈−$3.86 each at $30) tolerated, halt on the 3rd | bot.py:_should_halt_daily_loss |
 | Leverage | 10x | .env: LEVERAGE |
 | Max open trades | 3 | .env: MAX_OPEN_TRADES |
