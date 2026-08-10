@@ -70,6 +70,38 @@ def test_row_roi_missing_margin_renders_dash():
     assert "&mdash;" in html  # no margin -> no fake percentage
 
 
+def test_sparse_strategy_gets_backfill_rows():
+    """A low-frequency strategy squeezed out of the newest-N window gets
+    backfill rows (data-backfill) so its chip shows real history — owner
+    report 2026-08-09: bb_mean_revert 'only 3 transactions' on the chip."""
+    # 40 recent chatty rows push the 10 old sparse rows out of a 20-row window.
+    chatty = [_trade("chatty", 1.0, ts=1_785_900_000 + i) for i in range(40)]
+    sparse = [_trade("sparse", 1.0, ts=1_785_000_000 + i) for i in range(10)]
+    html = wd._build_blotter_panel(limit=20, slot_states=_states(
+        {"5m_scalp": chatty, "SLOT_X": sparse}))
+    # sparse (fully outside the window, but active within 30d) keeps its chip
+    # and backfills all 10 rows; chatty backfills its newest-30 minus the 20
+    # already rendered = 10. Total 20.
+    assert html.count("data-backfill") == 20
+    assert 'data-strat="sparse"' in html
+
+
+def test_backfill_caps_per_strategy():
+    sparse = [_trade("sparse", 1.0, ts=1_785_000_000 + i) for i in range(50)]
+    chatty = [_trade("chatty", 1.0, ts=1_785_900_000 + i) for i in range(20)]
+    html = wd._build_blotter_panel(limit=20, slot_states=_states(
+        {"5m_scalp": chatty, "SLOT_X": sparse}))
+    # chatty's 20 rows all fit the window (0 backfill); sparse backfills
+    # its newest 30 of 50 — the per-strategy cap.
+    assert html.count("data-backfill") == 30
+
+
+def test_no_backfill_when_strategy_fits_window():
+    trades = [_trade("stratA", 1.0, ts=1_785_900_000 + i) for i in range(10)]
+    html = wd._build_blotter_panel(limit=20, slot_states=_states({"5m_scalp": trades}))
+    assert "data-backfill" not in html
+
+
 def test_win_rate_uses_full_ledger_not_rendered_rows():
     # 30 old losers + 5 recent winners; render only the 5 newest rows.
     trades = ([_trade("stratA", -1.0, ts=1_785_000_000 + i) for i in range(30)]

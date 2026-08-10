@@ -1601,14 +1601,22 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
         wins = sum(1 for r in real if r["net"] > 0)
         return f" &middot; {wins / len(real) * 100:.0f}%"
 
-    # Strategy filter chips — built from the strategies actually present in the
-    # rendered rows (not hardcoded). "*" = ALL sentinel (can't collide with a
-    # real strategy name); "" tags rows whose trade record has no strategy.
-    # Filtering is client-side (stratFilter/applyStratFilter in the static
-    # script), so it survives the 3s #content swap and needs no round-trip.
-    # Each chip carries its strategy's FULL-ledger win rate (all_rows, not the
-    # rendered subset) so the number matches the book, not the visible window.
-    strats = sorted({r["strat"] for r in rows})
+    # Strategy filter chips — strategies present in the rendered window PLUS
+    # any strategy that traded within 30 days of the newest row (2026-08-09:
+    # a low-frequency book squeezed fully out of the window lost its chip —
+    # and with it, any way to see it). Long-dead strategies age out naturally.
+    # "*" = ALL sentinel (can't collide with a real strategy name); "" tags
+    # rows whose trade record has no strategy. Filtering is client-side
+    # (stratFilter/applyStratFilter in the static script), so it survives the
+    # 3s #content swap and needs no round-trip. Each chip carries its
+    # strategy's FULL-ledger win rate (all_rows, not the rendered subset).
+    newest_ts = all_rows[0]["ts"] if all_rows else 0
+    _ACTIVE_HORIZON_S = 30 * 86400
+    recently_active = set()
+    for r in all_rows:  # newest-first: first sighting of a strat = its newest
+        if r["strat"] not in recently_active and r["ts"] >= newest_ts - _ACTIVE_HORIZON_S:
+            recently_active.add(r["strat"])
+    strats = sorted(recently_active | {r["strat"] for r in rows})
     out = ("<div class='strat-chips'>"
            f"<span class='chip active' data-strat='*' onclick='stratFilter(this)'>ALL{_wr(all_rows)}</span>")
     for s in strats:
@@ -1617,9 +1625,23 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
         out += (f"<span class='chip' data-strat=\"{escape(s)}\" "
                 f"onclick=\"stratFilter(this)\">{label}{wr}</span>")
     out += "</div>"
+    # Backfill (2026-08-09, owner report "bb_mean_revert only has 3 rows"):
+    # low-frequency strategies get squeezed out of the newest-`limit` window
+    # by chattier books, so a chip click showed only their window slice. For
+    # each strategy present, append its newest 30 rows that missed the window,
+    # tagged data-backfill and hidden until that chip is selected — the ALL
+    # view renders exactly the same `limit` rows as before.
+    _BACKFILL_PER_STRAT = 30
+    window_ids = {r["id"] for r in rows}
+    backfill = []
+    for s in strats:
+        strat_newest = [r for r in all_rows if r["strat"] == s][:_BACKFILL_PER_STRAT]
+        backfill.extend(r for r in strat_newest if r["id"] not in window_ids)
+    backfill.sort(key=lambda r: (r["ts"], r["owner"]), reverse=True)
+
     out += ("<table><tr class='dim'><th>TIME</th><th>SYM</th><th>SIDE</th>"
             "<th>MODE</th><th>STRAT</th><th>PNL</th><th>REASON</th></tr>")
-    for r in rows:
+    for r in rows + backfill:
         net_cls = "pos" if r["net"] >= 0 else "neg"
         side = r["side"][:1].upper()
         side = {"L": "LNG", "S": "SHT"}.get(side, escape(r["side"][:3].upper()))
@@ -1634,10 +1656,15 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
         sim_cls = "" if r["mode"] == "live" else " class='dim'"
         # id is generated server-side as owner:index ([A-Za-z0-9_:] only) — safe in attr;
         # sym passed via data-sym to avoid JS-string escaping issues with special chars.
+        # Backfill rows ship hidden — applyStratFilter reveals them only when
+        # their strategy chip is active (never under ALL).
+        in_window = r["id"] in window_ids
+        bf = "" if in_window else " data-backfill=\"1\""
+        style = "cursor:pointer" if in_window else "cursor:pointer;display:none"
         out += (
             f"<tr{sim_cls} onclick=\"drill(this,this.dataset.id,this.dataset.sym)\" "
             f"data-id=\"{r['id']}\" data-sym=\"{escape(r['sym'])}\" "
-            f"data-strat=\"{escape(r['strat'])}\" style='cursor:pointer'>"
+            f"data-strat=\"{escape(r['strat'])}\"{bf} style='{style}'>"
             f"<td>{escape(r['time_pt'])}</td>"
             f"<td>{escape(r['sym'])}{badge}</td>"
             f"<td class='{side_cls}'>{side}</td>"
@@ -2059,7 +2086,11 @@ function applyStratFilter(){{
       return;
     }}
     if(tr.dataset.strat === undefined){{ prevHidden = false; return; }}  // header
-    const hide = stratActive !== '*' && tr.dataset.strat !== stratActive;
+    // Backfill rows (older per-strategy history beyond the newest-N window)
+    // only surface when their own chip is active — ALL keeps the plain window.
+    const isBackfill = tr.dataset.backfill !== undefined;
+    const hide = (stratActive === '*') ? isBackfill
+                                       : tr.dataset.strat !== stratActive;
     tr.style.display = hide ? 'none' : '';
     prevHidden = hide;
   }});
