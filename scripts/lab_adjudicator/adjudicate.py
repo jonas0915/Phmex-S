@@ -190,6 +190,23 @@ EXPERIMENTS = {
         "deployed_ts": _pt_ts(2026, 7, 21, 21, 25),  # the un-halt moment
         "verdict_n": 40,
     },
+    # $15-era tripwire (owner-registered 2026-08-10, the day after the n=42
+    # PASS resize $5→$15 landed mid-slump — 8 of the prior 11 era trades were
+    # losses and the first $15 trade stopped −$1.71). Registered lines:
+    #   TRIP if (n >= 10 $15-era trades AND net <= −$3.00) OR net <= −$6.00
+    #   at any n. On TRIP this grader touches .halt_main_entries itself
+    #   (runtime sentinel — blocks main entries only, exits unaffected) and
+    #   the owner decides: revert to $5 (audited restart) or resume
+    #   (rm .halt_main_entries). Daily 6 AM cadence — the account-wide $8
+    #   halt still guards intraday. This is the ONE exception to the
+    #   "no per-book rail" design, bought by the resize-into-slump timing.
+    "main_resize15": {
+        "deployed_ts": _pt_ts(2026, 8, 9, 20, 47),  # $15 restart (PID 42101)
+        "trip_n": 10,
+        "trip_net": -3.0,
+        "hard_net": -6.0,
+        "min_margin": 10.0,  # $15-sized fills only; excludes $5-era stragglers
+    },
     # SR_BOUNCE slot (2026-07-28): owner-ordered paper forward test
     # OVERRIDING the scan's DO-NOT-BUILD (reports/2026-07-28-sr-bounce-scan.md;
     # holdout −$0.0705/trade, worse than coin flip). The scan measures
@@ -682,6 +699,43 @@ def grade_main_gated(trades: list, cfg: dict) -> dict:
             "net_usd": round(net, 4)}
 
 
+def grade_main_resize15(trades: list, cfg: dict, bot_dir=None) -> dict:
+    """$15-era tripwire (registered 2026-08-10, see EXPERIMENTS comment).
+    Same era filter as grade_main_gated PLUS margin >= min_margin so only
+    $15-sized fills count. TRIP touches .halt_main_entries (idempotent —
+    an existing sentinel, e.g. an owner halt, is never overwritten)."""
+    era = [t for t in (trades or [])
+           if t.get("strategy") == "htf_l2_anticipation"
+           and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"
+           and float(t.get("opened_at") or 0) >= cfg["deployed_ts"]
+           and float(t.get("margin") or 0) >= cfg["min_margin"]]
+    nets = [n for t in era for n in [_net(t)] if n is not None]
+    wins = sum(1 for n in nets if n > 0)
+    net = sum(nets) if nets else 0.0
+    n = len(era)
+    tripped = (n >= cfg["trip_n"] and net <= cfg["trip_net"]) or net <= cfg["hard_net"]
+    if tripped:
+        sentinel = os.path.join(str(bot_dir or BOT_DIR), ".halt_main_entries")
+        if not os.path.exists(sentinel):
+            try:
+                with open(sentinel, "w") as f:
+                    f.write(f"main_resize15 tripwire {datetime.now(tz=PT):%Y-%m-%d %I:%M %p PT}: "
+                            f"n={n} net ${net:+.2f} — registered line hit; "
+                            f"owner: revert to $5 (audited restart) or rm this file to resume\n")
+            except Exception as e:
+                logging.warning("tripwire sentinel write failed: %s", e)
+        status, note = "TRIP", (f"$15-era n={n}, net ${net:+.2f} hit the registered "
+                                f"line (n>={cfg['trip_n']} & <=${cfg['trip_net']:.2f}, "
+                                f"or <=${cfg['hard_net']:.2f} any n) — .halt_main_entries "
+                                "touched; owner: revert to $5 or rm to resume")
+    else:
+        status, note = WATCH, (f"$15 era accruing (n={n}, net ${net:+.2f}; trips at "
+                               f"n>={cfg['trip_n']} & net<=${cfg['trip_net']:.2f}, "
+                               f"hard ${cfg['hard_net']:.2f} any n)")
+    return {"experiment": "main_resize15", "status": status, "note": note,
+            "n_trades": n, "wins": wins, "net_usd": round(net, 4)}
+
+
 def grade_vwap_cross(slot_state: dict, counters: dict, cfg: dict) -> dict:
     """VWAP_CROSS slot grader — REPORT-ONLY (follows grade_htf_l2's shape).
     Reports n accrued, WR vs the 32.9% geometry breakeven (derived in the
@@ -939,6 +993,7 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
                         EXPERIMENTS["sr_bounce"]),
         grade_sr_bounce_v2(load_json(SR_BOUNCE_STATE_FILE, {}),
                            EXPERIMENTS["sr_bounce_v2"]),
+        grade_main_resize15(trades, EXPERIMENTS["main_resize15"]),
     ]
     stamp = datetime.fromtimestamp(now, tz=PT).strftime("%b %-d %-I:%M %p PT")
     lines = [f"LAB ADJUDICATOR — live forward tests ({stamp})"]
@@ -951,6 +1006,7 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     lines.append(_line_main_gated(results[6]))
     lines.append(_line_sr_bounce(results[7]))
     lines.append(_line_sr_bounce_v2(results[8]))
+    lines.append(f"[main_resize15] {results[9]['status']} — {results[9]['note']}")
     return "\n".join(lines), results
 
 
