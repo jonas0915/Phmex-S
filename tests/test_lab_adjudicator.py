@@ -306,7 +306,7 @@ def test_grade_htf_l2_registered_verdicts():
 
 def test_htf_l2_wired_into_digest():
     digest, results = adj.build_digest(now=1_784_000_000.0)
-    assert len(results) == 10                # + vwap_cross (7/20) + main_gated (7/27) + main_resize15 (8/10)
+    assert len(results) == 12                # + main_resize15 + main_long_side + mr_long_side (8/10)
     assert results[4]["experiment"] == "htf_l2"                      # + sr_bounce (7/28)
     assert "[htf_l2]" in digest                                      # + sr_bounce_v2 (7/30)
     assert results[5]["experiment"] == "vwap_cross"

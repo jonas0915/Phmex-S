@@ -207,6 +207,30 @@ EXPERIMENTS = {
         "hard_net": -6.0,
         "min_margin": 10.0,  # $15-sized fills only; excludes $5-era stragglers
     },
+    # Long-side verdict lines (owner-registered 2026-08-10 ~8:45 PM PT).
+    # Evidence at registration: main gated-era longs −$3.37 @58% vs shorts
+    # +$4.05 @82% (short-minus-long CI [+0.006,+0.656] excludes 0); MR live
+    # longs −$1.07/6t vs shorts +$15.15/13t (8/1 research CI [−2.99,−0.03]);
+    # 7/12 drift research: blocked MR longs LOSE. Forward-only — trades
+    # opened BEFORE registration never count. At n: net <= $0 → KILL_SIDE →
+    # grader touches .block_longs_<book> (bot skips that book's long entries;
+    # shorts unaffected); net > $0 → PASS, side survives, line closes.
+    "main_long_side": {
+        "registered_ts": _pt_ts(2026, 8, 10, 20, 45),
+        "verdict_n": 10,
+        "side": "long",
+        "strategy": "htf_l2_anticipation",
+        "require_live_mode": False,
+        "sentinel": ".block_longs_main",
+    },
+    "mr_long_side": {
+        "registered_ts": _pt_ts(2026, 8, 10, 20, 45),
+        "verdict_n": 8,
+        "side": "long",
+        "strategy": None,          # MR state file is single-strategy
+        "require_live_mode": True,  # live fills only — paper longs are shadow data
+        "sentinel": ".block_longs_5m_mean_revert",
+    },
     # SR_BOUNCE slot (2026-07-28): owner-ordered paper forward test
     # OVERRIDING the scan's DO-NOT-BUILD (reports/2026-07-28-sr-bounce-scan.md;
     # holdout −$0.0705/trade, worse than coin flip). The scan measures
@@ -699,6 +723,50 @@ def grade_main_gated(trades: list, cfg: dict) -> dict:
             "net_usd": round(net, 4)}
 
 
+def grade_side_line(trades: list, cfg: dict, bot_dir=None) -> dict:
+    """Generic per-side verdict line (registered 2026-08-10, see EXPERIMENTS).
+    Counts only cfg['side'] trades opened AFTER registration (forward-only,
+    no lookback), optionally filtered to a strategy and to live-mode fills.
+    At n >= verdict_n: net <= $0 → KILL_SIDE (touch cfg['sentinel'],
+    idempotent — never clobbers an existing file); net > $0 → PASS."""
+    era = [t for t in (trades or [])
+           if t.get("side") == cfg["side"]
+           and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"
+           and float(t.get("opened_at") or 0) >= cfg["registered_ts"]
+           and (cfg["strategy"] is None or t.get("strategy") == cfg["strategy"])
+           and (not cfg["require_live_mode"] or t.get("mode") == "live")]
+    nets = [n for t in era for n in [_net(t)] if n is not None]
+    wins = sum(1 for n in nets if n > 0)
+    net = sum(nets) if nets else 0.0
+    n = len(era)
+    name = cfg["sentinel"].replace(".block_longs_", "")
+    if n >= cfg["verdict_n"]:
+        if net <= 0:
+            sentinel = os.path.join(str(bot_dir or BOT_DIR), cfg["sentinel"])
+            if not os.path.exists(sentinel):
+                try:
+                    with open(sentinel, "w") as f:
+                        f.write(f"side line {datetime.now(tz=PT):%Y-%m-%d %I:%M %p PT}: "
+                                f"{name} {cfg['side']}s n={n} net ${net:+.2f} <= 0 — "
+                                f"registered KILL_SIDE; rm this file to re-enable\n")
+                except Exception as e:
+                    logging.warning("side-line sentinel write failed: %s", e)
+            status = "KILL_SIDE"
+            note = (f"{name} {cfg['side']}s: n={n} net ${net:+.2f} <= 0 — "
+                    f"registered verdict; {cfg['sentinel']} touched "
+                    f"({cfg['side']} entries blocked, other side unaffected)")
+        else:
+            status = PASS
+            note = (f"{name} {cfg['side']}s: n={n} net ${net:+.2f} > 0 — "
+                    "side survives its registered line; line closed")
+    else:
+        status = WATCH
+        note = (f"{name} {cfg['side']}s accruing (n={n}/{cfg['verdict_n']}, "
+                f"net ${net:+.2f}; KILL_SIDE if net <= $0 at n)")
+    return {"experiment": f"{name}_{cfg['side']}_side", "status": status,
+            "note": note, "n_trades": n, "wins": wins, "net_usd": round(net, 4)}
+
+
 def grade_main_resize15(trades: list, cfg: dict, bot_dir=None) -> dict:
     """$15-era tripwire (registered 2026-08-10, see EXPERIMENTS comment).
     Same era filter as grade_main_gated PLUS margin >= min_margin so only
@@ -994,6 +1062,9 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
         grade_sr_bounce_v2(load_json(SR_BOUNCE_STATE_FILE, {}),
                            EXPERIMENTS["sr_bounce_v2"]),
         grade_main_resize15(trades, EXPERIMENTS["main_resize15"]),
+        grade_side_line(trades, EXPERIMENTS["main_long_side"]),
+        grade_side_line(load_json(MR_STATE_FILE, {}).get("closed_trades", []),
+                        EXPERIMENTS["mr_long_side"]),
     ]
     stamp = datetime.fromtimestamp(now, tz=PT).strftime("%b %-d %-I:%M %p PT")
     lines = [f"LAB ADJUDICATOR — live forward tests ({stamp})"]
@@ -1007,6 +1078,8 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     lines.append(_line_sr_bounce(results[7]))
     lines.append(_line_sr_bounce_v2(results[8]))
     lines.append(f"[main_resize15] {results[9]['status']} — {results[9]['note']}")
+    lines.append(f"[main_long_side] {results[10]['status']} — {results[10]['note']}")
+    lines.append(f"[mr_long_side]  {results[11]['status']} — {results[11]['note']}")
     return "\n".join(lines), results
 
 

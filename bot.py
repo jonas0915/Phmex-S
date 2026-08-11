@@ -68,6 +68,14 @@ def _fresh_paper_entry_price(ws_feed, exchange, symbol: str, cached_price: float
     return float(cached_price), -1.0, "cached"
 
 
+# Long-side kill sentinels (2026-08-10 owner-registered side verdict lines):
+# the adjudicator touches .block_longs_<book> when a book's registered long
+# line KILLs (main: 10 era longs net<=0; MR: 8 live longs net<=0). Fresh
+# file check per entry — dormant until a line trips; shorts unaffected.
+def _longs_blocked(book: str, bot_dir: str = ".") -> bool:
+    return os.path.exists(os.path.join(bot_dir, f".block_longs_{book}"))
+
+
 # ST2.0 book×tape absorption short — fixed ~15-min hold (900s / 60s cycle = 15 cycles),
 # matching the backtested exit (docs/2026-06-13-wider-setup-search.md).
 ST2_HOLD_CYCLES = 15
@@ -2163,6 +2171,14 @@ class Phmex2Bot:
             if signal.signal in (Signal.BUY, Signal.SELL):
                 direction = "long" if signal.signal == Signal.BUY else "short"
 
+                # Side-line kill (2026-08-10): registered long-line KILL blocks
+                # main long entries; shorts unaffected. Dormant until the
+                # adjudicator touches the sentinel.
+                if direction == "long" and _longs_blocked("main"):
+                    logger.info(f"[SIDE BLOCK] main {symbol} LONG skipped — "
+                                ".block_longs_main (registered side-line kill)")
+                    continue
+
                 # Build cvd_data from order flow (backward compatible with ensemble layer 3)
                 cvd_data = None
                 if flow and flow.get("trade_count", 0) > 0:
@@ -3300,6 +3316,12 @@ class Phmex2Bot:
                         # account halts: pause sentinel + main drawdown pause (risk_manager.py:351)
                         if self._slot_entries_blocked():
                             logger.info(f"[SLOT LIVE] {slot.slot_id} {symbol} entry blocked — account halt")
+                            continue
+                        # Side-line kill (2026-08-10): a KILLed long line blocks
+                        # this slot's live LONG entries only; dormant sentinel.
+                        if direction == "long" and _longs_blocked(slot.slot_id):
+                            logger.info(f"[SIDE BLOCK] {slot.slot_id} {symbol} LONG skipped — "
+                                        f".block_longs_{slot.slot_id} (registered side-line kill)")
                             continue
                         # ETH ownership rule (ETH-TSM-28, 2026-07-06): same skip the main
                         # entry path applies — one-way mode would merge a scalper-slot ETH

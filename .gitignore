@@ -34,6 +34,7 @@ docs/fix-proposals/st2-lab-*.md
 .pause_*
 .kill_*
 .demote_*
+.block_longs_*
 # Cycle-counter persistence (rewritten every cycle — tracking it would churn auto-backup)
 .bot_cycles.json
 .bot_cycles.json.tmp
