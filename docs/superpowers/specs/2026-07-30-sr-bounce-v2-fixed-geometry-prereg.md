@@ -64,3 +64,26 @@ the 7/29 lever lab found no positive exit lever on 8,706 train trades — the
 mechanism's prior is against v2 too. The owner knows this and ordered the
 forward test; the forward test measures live signal-on-fresh-data, which the
 scan cannot. Prior per-trade to beat: −$0.016/t (era-1 realized).
+
+---
+
+## CHANGELOG — 2026-08-12 owner re-registration (honest-era verdict)
+
+**Owner order 2026-08-12 (~8:45 PM PT):** the n=50 verdict line now counts
+ONLY honest-era trades — `opened_at >= 1785991620` (the 2026-08-05 9:47 PM PT
+fresh-price fix, PID 27868). Rationale: the 19 pre-fix rows carry stale
+cached-price phantom entries (+$4.40 of the book's +$6.07 at re-registration);
+grading on them would pass the strategy on fills that could not have happened.
+The phantom-cushion caveat was flagged and recorded BEFORE the original line
+could grade (memory, 8/9-8/10), so this supersession predates any verdict —
+it is not a post-hoc goalpost move. State at re-registration: honest era
+n=23, net +$1.66, 14W/9L, ZERO take_profit exits (max favorable excursion
+2.47% vs the 2.5% target), 21 hard_time_exit / 2 stop_loss.
+
+Unchanged: KILL if net <= $0 at n=50 (honest count); PASS is never automatic;
+a fresh I3 strict-fill revalidation gates any live path; timer-units bugs
+(240 cycles ≈ 5.7-9.5h real vs the 4h label, silent ROI>=5% 1.5x extension)
+remain deferred to the era boundary and the grade carries that caveat.
+Implementation: `honest_since` in EXPERIMENTS["sr_bounce_v2"] +
+opened_at filter in grade_sr_bounce_v2 (adjudicate.py), tests
+test_grade_sr_bounce_v2_honest_* (686 suite green at deploy).

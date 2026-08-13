@@ -804,8 +804,11 @@ _SIGNAL_BOXES = [
      "KILL at n=50 on 2026-07-30 (net &minus;$0.79, 46% WR &mdash; ledger "
      "archived to _era1). v2 (owner order 2026-07-30): same entry signal, "
      "exits fixed TP +2.5% / SL &minus;1.5% of price (25%/&minus;15% ROI "
-     "at 10x), applied verbatim. BE-WR 40.5% fee-incl. Verdict at n=50: "
-     "KILL if net &le; $0 (adjudicator-graded, sr_bounce_v2 line)."),
+     "at 10x), applied verbatim. BE-WR 40.5% fee-incl. Verdict RE-REGISTERED "
+     "2026-08-12 (owner order): n=50 HONEST-ERA trades only (opened after the "
+     "8/5 fresh-price fix &mdash; pre-fix rows carry phantom stale-px entries); "
+     "KILL if net &le; $0 (adjudicator-graded, sr_bounce_v2 line). Fresh I3 "
+     "strict-fill pass gates any live path."),
     ("ETH_TSM_28",     "ETH-TSM-28 &mdash; SLOW TREND (PAPER)",
      "Daily-horizon time-series momentum: long 0.01 ETH when the 28-day return is "
      "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "
@@ -1059,8 +1062,9 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
         )
     elif slot_id == "SR_BOUNCE" and (n or n_stale):
         # SR_BOUNCE keeps its dedicated layout for the exit-mix line: zero TPs
-        # = geometry never reaches its target, the "signal doesn't travel"
-        # tell from the v2 prereg. trades is already honest-filtered above.
+        # = geometry never reaches its target (verified 2026-08-12: honest-era
+        # max MFE 2.47% vs the 2.5% target; the prereg itself only records
+        # time exits as a reporting item). trades is already honest-filtered.
         hon = trades
 
         def _rec(ts):

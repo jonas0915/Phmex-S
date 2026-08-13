@@ -364,8 +364,8 @@ def test_grade_sr_bounce_v2_watch_under_n():
     cfg = adj.EXPERIMENTS["sr_bounce_v2"]
     _ts = cfg["deployed_ts"] + 3600
     state = {"closed_trades": [
-        {"net_pnl": 0.10, "fees_usdt": 0.06, "mode": "paper", "closed_at": _ts},
-        {"net_pnl": -0.20, "fees_usdt": 0.06, "mode": "paper", "closed_at": _ts},
+        {"net_pnl": 0.10, "fees_usdt": 0.06, "mode": "paper", "closed_at": _ts, "opened_at": cfg["honest_since"] + 10},
+        {"net_pnl": -0.20, "fees_usdt": 0.06, "mode": "paper", "closed_at": _ts, "opened_at": cfg["honest_since"] + 10},
     ]}
     r = adj.grade_sr_bounce_v2(state, cfg)
     assert r["experiment"] == "sr_bounce_v2"
@@ -385,7 +385,8 @@ def test_grade_sr_bounce_v2_zero_is_watch():
 def test_grade_sr_bounce_v2_kill_at_n50_negative_net():
     cfg = adj.EXPERIMENTS["sr_bounce_v2"]
     trades = [{"net_pnl": -0.10, "fees_usdt": 0.06, "mode": "paper",
-               "closed_at": cfg["deployed_ts"] + 3600}
+               "closed_at": cfg["deployed_ts"] + 3600,
+               "opened_at": cfg["honest_since"] + 10}
               for _ in range(50)]
     r = adj.grade_sr_bounce_v2({"closed_trades": trades}, cfg)
     assert r["status"] == "KILL"
@@ -399,7 +400,8 @@ def test_grade_sr_bounce_v2_kill_at_n50_negative_net():
 def test_grade_sr_bounce_v2_pass_eligible_at_n50_positive_net():
     cfg = adj.EXPERIMENTS["sr_bounce_v2"]
     trades = [{"net_pnl": 0.50, "fees_usdt": 0.06, "mode": "paper",
-               "closed_at": cfg["deployed_ts"] + 3600}
+               "closed_at": cfg["deployed_ts"] + 3600,
+               "opened_at": cfg["honest_since"] + 10}
               for _ in range(50)]
     r = adj.grade_sr_bounce_v2({"closed_trades": trades}, cfg)
     assert r["status"] == "PASS-ELIGIBLE"
@@ -413,7 +415,8 @@ def test_grade_sr_bounce_v2_net_pnl_used_as_is():
     cfg = adj.EXPERIMENTS["sr_bounce_v2"]
     state = {"closed_trades": [
         {"net_pnl": 0.05, "fees_usdt": 0.06, "mode": "paper",
-         "closed_at": cfg["deployed_ts"] + 3600},
+         "closed_at": cfg["deployed_ts"] + 3600,
+         "opened_at": cfg["honest_since"] + 10},
     ]}
     r = adj.grade_sr_bounce_v2(state, cfg)
     assert r["wins"] == 1
@@ -469,3 +472,31 @@ def test_grade_sr_bounce_v2_era_guard_excludes_era1_trades():
     r = adj.grade_sr_bounce_v2({"closed_trades": trades}, cfg)
     assert r["status"] == adj.WATCH
     assert r["n_trades"] == 0
+
+
+def test_grade_sr_bounce_v2_honest_rereg_excludes_stale_rows():
+    """Owner re-registration 2026-08-12: the verdict counts ONLY honest-era
+    trades (opened_at >= honest_since = the 8/5 fresh-price fix). Stale-px
+    rows contribute to neither n nor net — the phantom cushion (+$4.40 at
+    re-registration) must not carry a PASS."""
+    cfg = adj.EXPERIMENTS["sr_bounce_v2"]
+    stale = [{"net_pnl": 1.00, "mode": "paper",
+              "closed_at": cfg["deployed_ts"] + 3600,
+              "opened_at": cfg["honest_since"] - 100} for _ in range(30)]
+    honest = [{"net_pnl": -0.10, "mode": "paper",
+               "closed_at": cfg["deployed_ts"] + 3600,
+               "opened_at": cfg["honest_since"] + 100} for _ in range(50)]
+    r = adj.grade_sr_bounce_v2({"closed_trades": stale + honest}, cfg)
+    assert r["n_trades"] == 50            # stale 30 not counted
+    assert r["status"] == "KILL"          # -$5 honest net, +$30 phantom ignored
+    assert abs(r["net_usd"] - (-5.0)) < 1e-9
+
+
+def test_grade_sr_bounce_v2_honest_boundary_inclusive():
+    """A trade opened exactly AT honest_since counts (>= boundary)."""
+    cfg = adj.EXPERIMENTS["sr_bounce_v2"]
+    r = adj.grade_sr_bounce_v2({"closed_trades": [
+        {"net_pnl": 0.10, "mode": "paper",
+         "closed_at": cfg["deployed_ts"] + 3600,
+         "opened_at": cfg["honest_since"]}]}, cfg)
+    assert r["n_trades"] == 1

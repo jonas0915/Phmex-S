@@ -251,8 +251,18 @@ EXPERIMENTS = {
     # grader keeps printing the final. v2 keeps the entry signal frozen and
     # exits at fixed TP 2.5% / SL 1.5% of price (25%/−15% ROI at 10x).
     # BE-WR 40.5% fee-inclusive ($1.19 win / $0.81 loss on $5 margin).
+    # RE-REGISTERED 2026-08-12 (owner order, "100% honest data"): the verdict
+    # counts ONLY honest-era trades — opened_at >= the 8/5 9:47 PM PT
+    # fresh-price fix (PID 27868). Pre-fix paper rows were flattered by the
+    # stale cached-price phantom-entry bug (+$4.40 cushion on 19 rows at
+    # re-registration; honest era stood at n=23, +$1.66, ZERO TPs). The
+    # phantom-cushion caveat was flagged BEFORE the original line could
+    # grade, so this supersession predates any verdict. Same KILL rule
+    # (net <= $0 at n=50) on the honest subset; I3 fill-revalidation still
+    # gates any live path.
     "sr_bounce_v2": {
         "deployed_ts": _pt_ts(2026, 7, 30, 21, 0),  # registration; restart may land later
+        "honest_since": 1785991620,  # 2026-08-06 04:47 UTC = 8/5 9:47 PM PT fix deploy
         "verdict_n": 50,
         "era1_per_trade": -0.0158,   # era-1 realized net/trade — the prior to beat
         "breakeven_wr": 0.405,
@@ -916,8 +926,12 @@ def grade_sr_bounce_v2(slot_state: dict, cfg: dict) -> dict:
     # registration and the restart. Only trades closed after the v2
     # registration count (era 1's last close was 8:20:50 PM PT 7/30; the
     # registration ts is 9:00 PM PT — ~39 min of margin).
+    # Honest-era guard (owner re-registration 2026-08-12): only trades
+    # OPENED at/after the 8/5 fresh-price fix count toward the verdict —
+    # pre-fix rows carry phantom stale-price entries (see cfg comment).
     trades = [t for t in (slot_state.get("closed_trades", []) or [])
-              if (t.get("closed_at") or 0) >= cfg["deployed_ts"]]
+              if (t.get("closed_at") or 0) >= cfg["deployed_ts"]
+              and (t.get("opened_at") or 0) >= cfg["honest_since"]]
 
     nets = [n for t in trades for n in [_net(t)] if n is not None]
     wins = sum(1 for n in nets if n > 0)
@@ -938,8 +952,8 @@ def grade_sr_bounce_v2(slot_state: dict, cfg: dict) -> dict:
                      "gates any live path)")
     else:
         status = WATCH
-        note = (f"fixed-geometry era accruing (n={n}/{cfg['verdict_n']}, net "
-                 f"${net:+.2f}; BE-WR {cfg['breakeven_wr']:.1%}, era-1 prior "
+        note = (f"honest era accruing (n={n}/{cfg['verdict_n']} post-8/5-fix, "
+                 f"net ${net:+.2f}; BE-WR {cfg['breakeven_wr']:.1%}, era-1 prior "
                  f"${cfg['era1_per_trade']:+.3f}/t)")
 
     return {"experiment": "sr_bounce_v2", "status": status, "note": note,
