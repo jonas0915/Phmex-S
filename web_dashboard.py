@@ -843,12 +843,26 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
     # Jonas mistook the green LIVE for an un-halt).
     if slot_id in ("5m_scalp", "main_gated") and os.path.exists(os.path.join(PROJECT_DIR, ".halt_main_entries")):
         return "<span class='amb'>&#9679; HALTED (entries)</span>"
+    # Side block (2026-08-12 split): .block_longs_<book> = that book is
+    # shorts-only right now. Appended to (not replacing) live/paper status
+    # on the main-book cards and the live-slot branch below.
+    _book = "main" if slot_id in ("5m_scalp", "main_gated") else slot_id
+    _side_badge = ""
+    if os.path.exists(os.path.join(PROJECT_DIR, f".block_longs_{_book}")):
+        _side_badge = (" <span class='amb'>&#9679; SHORTS-ONLY</span>"
+                       "<span class='dim' style='font-size:8px'> longs blocked"
+                       f" (.block_longs_{_book})</span>")
+    if slot_id == "5m_scalp" and _side_badge:
+        _base = ("<span class='pos'>&#9679; LIVE</span>" if "5m_scalp" in live_ids
+                 else "<span class='amb'>&#9679; PAPER</span>")
+        return _base + _side_badge
     # main_gated is a filtered VIEW of the main book (5m_scalp), not a slot —
     # it inherits the main book's live status. Badge labeled as a view
     # (owner 2026-07-28: two plain LIVE badges read as two separate books).
     if slot_id == "main_gated" and "5m_scalp" in live_ids:
-        return ("<span class='pos'>&#9679; LIVE</span> "
-                "<span class='dim' style='font-size:8px'>view of MAIN PATH — "
+        return ("<span class='pos'>&#9679; LIVE</span>"
+                + _side_badge +
+                " <span class='dim' style='font-size:8px'>view of MAIN PATH — "
                 "same book, not a separate one</span>")
     # Status is driven by the mode sidecar (trading_state_<slot>_mode.json) via
     # _live_slot_ids(): LIVE only while the sidecar has paper_mode=False. ST2.0
@@ -857,7 +871,7 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
     # demote writes the sidecar, not a .demote flag). Fixed 2026-06-15. Any
     # .demote_<slot> rollback flag above still wins.
     if slot_id in live_ids:
-        return "<span class='pos'>&#9679; LIVE</span>"
+        return "<span class='pos'>&#9679; LIVE</span>" + _side_badge
     # Persistent kill (2026-07-31): killed_at in the mode sidecar = the slot is
     # permanently dead (survives restarts) — outranks DEMOTED, which reads as
     # "resting" when the owner meant "buried" (HTF_L2 confusion, this date).
@@ -943,6 +957,26 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
     status_html = _slot_status_html(slot_id, trades, live_ids, modes)
     size_row = _size_row_html(slot_id, live_ids)
 
+    # Side half-books (owner split order 2026-08-12): long and short records
+    # rendered as separate rows. Longs-bad is the robust half of the 8/12
+    # retrospective; per-side rows make each half-book's record unmissable.
+    def _side_rows(rows, tag=""):
+        out = ""
+        for side, label in (("long", "longs"), ("short", "shorts")):
+            ss = [t for t in rows if t.get("side") == side]
+            if not ss:
+                continue
+            w = sum(1 for t in ss if _net_pnl(t) > 0)
+            l = sum(1 for t in ss if _net_pnl(t) < 0)
+            snet = sum(_net_pnl(t) for t in ss)
+            scls = "pos" if snet > 0 else "neg" if snet < 0 else "dim"
+            swr = w / (w + l) * 100 if (w + l) else 0.0
+            out += (f"<tr><td class='dim'>{label}{tag}</td><td>"
+                    f"<span class='pos'>{w}W</span> / <span class='neg'>{l}L</span> "
+                    f"&middot; {swr:.0f}% WR &middot; "
+                    f"<span class='{scls}'>${snet:+.2f}</span></td></tr>")
+        return out
+
     # Current open position(s) — side @ entry, else flat.
     if positions:
         pos_bits = []
@@ -1013,6 +1047,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"<span class='pos'>{lw}W</span> / <span class='neg'>{ll}L</span>{_lbe} "
             f"&middot; {lwr:.0f}% WR &middot; <span class='{lcls}'>${lnet:+.2f}</span>"
             f"<span class='dim' style='font-size:9px'> &middot; {len(live_ts)} tr</span></td></tr>"
+            f"{_side_rows(live_ts, ' (live)')}"
             f"<tr><td class='dim'>paper (sim)</td><td>"
             f"{pw}W / {pl}L{_pbe} &middot; {pwr:.0f}% WR &middot; <span class='{pcls}'>${pnet:+.2f}</span>"
             f"</td></tr>"
@@ -1053,6 +1088,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"<tr><td class='dim'>era (Jun+)</td><td>"
             f"<span class='pos'>{ew}W</span> / <span class='neg'>{el}L</span>{_ebe} "
             f"&middot; {ewr:.0f}% WR &middot; <span class='{ecls}'>${enet:+.2f}</span></td></tr>"
+            f"{_side_rows(era_ts, ' (era)')}"
             f"<tr><td class='dim'>earlier</td><td class='dim'>"
             f"{ow}W / {ol}L &middot; {owr:.0f}% WR &middot; <span class='{ocls}'>${onet:+.2f}</span></td></tr>"
             f"<tr><td class='dim'>net PnL (era)</td><td class='{ecls}'>${enet:+.2f}</td></tr>"
@@ -1106,11 +1142,24 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
         )
     else:
+        # main_gated is the main book's current-test view — real money, so it
+        # gets the same per-side half-book rows (owner split order 2026-08-12).
+        # An all-live slot book (e.g. 5m_MR once stale paper rows are
+        # excluded) lands in this generic branch too — its live record also
+        # splits by side.
+        _live_rows = [t for t in trades if t.get("mode") == "live"]
+        if slot_id == "main_gated":
+            gated_side_rows = _side_rows(trades)
+        elif _live_rows:
+            gated_side_rows = _side_rows(_live_rows, " (live)")
+        else:
+            gated_side_rows = ""
         stats_rows = (
             f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
             f"{size_row}"
             f"<tr><td class='dim'>trades</td><td>{n}"
             f"<span class='dim' style='font-size:9px'>{stale_note}</span></td></tr>"
+            f"{gated_side_rows}"
             f"<tr><td class='dim'>record</td><td>"
             f"<span class='pos'>{w_all}W</span> / <span class='neg'>{l_all}L</span> "
             f"&middot; {wr:.0f}%</td></tr>"

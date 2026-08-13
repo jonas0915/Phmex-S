@@ -231,6 +231,30 @@ EXPERIMENTS = {
         "require_live_mode": True,  # live fills only — paper longs are shadow data
         "sentinel": ".block_longs_5m_mean_revert",
     },
+    # Short-side WATCH lines (owner split order 2026-08-12 ~9:20 PM PT):
+    # each book's short side reported as its own half-book every digest —
+    # same forward window as the long lines for symmetry. watch_only: the
+    # 8/12 retrospective showed the short edge is FRAGILE (+$7.91 since 6/1,
+    # >100% from 5 July trades, negative Jun AND Aug), so shorts get
+    # visibility, not a kill line. No sentinel is ever written by these.
+    "main_short_side": {
+        "registered_ts": _pt_ts(2026, 8, 10, 20, 45),
+        "verdict_n": None,
+        "side": "short",
+        "strategy": "htf_l2_anticipation",
+        "require_live_mode": False,
+        "sentinel": ".block_shorts_main",   # name only — watch_only never writes
+        "watch_only": True,
+    },
+    "mr_short_side": {
+        "registered_ts": _pt_ts(2026, 8, 10, 20, 45),
+        "verdict_n": None,
+        "side": "short",
+        "strategy": None,
+        "require_live_mode": True,
+        "sentinel": ".block_shorts_5m_mean_revert",
+        "watch_only": True,
+    },
     # SR_BOUNCE slot (2026-07-28): owner-ordered paper forward test
     # OVERRIDING the scan's DO-NOT-BUILD (reports/2026-07-28-sr-bounce-scan.md;
     # holdout −$0.0705/trade, worse than coin flip). The scan measures
@@ -749,7 +773,27 @@ def grade_side_line(trades: list, cfg: dict, bot_dir=None) -> dict:
     wins = sum(1 for n in nets if n > 0)
     net = sum(nets) if nets else 0.0
     n = len(era)
-    name = cfg["sentinel"].replace(".block_longs_", "")
+    name = (cfg["sentinel"].replace(".block_longs_", "")
+                            .replace(".block_shorts_", ""))
+    # watch_only (2026-08-12 split): report the half-book's forward record,
+    # never verdict, never touch a sentinel — shorts have no kill line.
+    if cfg.get("watch_only"):
+        wr = (wins / n * 100) if n else 0.0
+        return {"experiment": f"{name}_{cfg['side']}_side", "status": WATCH,
+                "note": (f"{name} {cfg['side']}s (watch-only half-book): "
+                         f"n={n}, net ${net:+.2f}, {wr:.0f}% WR — no kill line"),
+                "n_trades": n, "wins": wins, "net_usd": round(net, 4)}
+    # Owner preemption (2026-08-12, .block_longs_main): if the block sentinel
+    # already exists while the line is still accruing, the side is not
+    # trading — say BLOCKED, not a forever-misleading "accruing".
+    if n < cfg["verdict_n"] and os.path.exists(
+            os.path.join(str(bot_dir or BOT_DIR), cfg["sentinel"])):
+        return {"experiment": f"{name}_{cfg['side']}_side", "status": "BLOCKED",
+                "note": (f"{name} {cfg['side']}s: sentinel present "
+                         f"({cfg['sentinel']}) — side blocked (owner or "
+                         f"registered kill); line frozen at n={n}, "
+                         f"net ${net:+.2f}; rm the file to resume"),
+                "n_trades": n, "wins": wins, "net_usd": round(net, 4)}
     if n >= cfg["verdict_n"]:
         if net <= 0:
             sentinel = os.path.join(str(bot_dir or BOT_DIR), cfg["sentinel"])
@@ -1079,6 +1123,9 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
         grade_side_line(trades, EXPERIMENTS["main_long_side"]),
         grade_side_line(load_json(MR_STATE_FILE, {}).get("closed_trades", []),
                         EXPERIMENTS["mr_long_side"]),
+        grade_side_line(trades, EXPERIMENTS["main_short_side"]),
+        grade_side_line(load_json(MR_STATE_FILE, {}).get("closed_trades", []),
+                        EXPERIMENTS["mr_short_side"]),
     ]
     stamp = datetime.fromtimestamp(now, tz=PT).strftime("%b %-d %-I:%M %p PT")
     lines = [f"LAB ADJUDICATOR — live forward tests ({stamp})"]
@@ -1094,6 +1141,8 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     lines.append(f"[main_resize15] {results[9]['status']} — {results[9]['note']}")
     lines.append(f"[main_long_side] {results[10]['status']} — {results[10]['note']}")
     lines.append(f"[mr_long_side]  {results[11]['status']} — {results[11]['note']}")
+    lines.append(f"[main_short_side] {results[12]['status']} — {results[12]['note']}")
+    lines.append(f"[mr_short_side] {results[13]['status']} — {results[13]['note']}")
     return "\n".join(lines), results
 
 

@@ -306,7 +306,7 @@ def test_grade_htf_l2_registered_verdicts():
 
 def test_htf_l2_wired_into_digest():
     digest, results = adj.build_digest(now=1_784_000_000.0)
-    assert len(results) == 12                # + main_resize15 + main_long_side + mr_long_side (8/10)
+    assert len(results) == 14                # + short-side watch lines (8/12 split)
     assert results[4]["experiment"] == "htf_l2"                      # + sr_bounce (7/28)
     assert "[htf_l2]" in digest                                      # + sr_bounce_v2 (7/30)
     assert results[5]["experiment"] == "vwap_cross"
@@ -500,3 +500,47 @@ def test_grade_sr_bounce_v2_honest_boundary_inclusive():
          "closed_at": cfg["deployed_ts"] + 3600,
          "opened_at": cfg["honest_since"]}]}, cfg)
     assert r["n_trades"] == 1
+
+
+# ── short-side WATCH lines + owner-block reporting (2026-08-12 split) ─────
+
+def test_short_side_watch_line_reports_but_never_kills(tmp_path):
+    """watch_only side lines report the forward record and NEVER write a
+    sentinel or emit KILL_SIDE/PASS — shorts have no kill line (owner split
+    order 2026-08-12: fragile shorts get visibility, not a verdict)."""
+    cfg = adj.EXPERIMENTS["main_short_side"]
+    assert cfg["watch_only"] is True
+    trades = [{"side": "short", "strategy": "htf_l2_anticipation",
+               "net_pnl": -1.0, "opened_at": cfg["registered_ts"] + 10,
+               "closed_at": cfg["registered_ts"] + 20}
+              for _ in range(50)]   # hugely negative, way past any n
+    r = adj.grade_side_line(trades, cfg, bot_dir=str(tmp_path))
+    assert r["status"] == adj.WATCH
+    assert r["n_trades"] == 50
+    assert not (tmp_path / cfg["sentinel"]).exists()
+    assert "watch-only" in r["note"]
+
+
+def test_side_line_reports_blocked_when_sentinel_present(tmp_path):
+    """If the block sentinel already exists while a KILL-capable line is
+    still accruing (owner preemption, like .block_longs_main 8/12), the
+    line must say BLOCKED — not print a misleading 'accruing' forever."""
+    cfg = adj.EXPERIMENTS["main_long_side"]
+    (tmp_path / cfg["sentinel"]).write_text("owner block")
+    r = adj.grade_side_line([], cfg, bot_dir=str(tmp_path))
+    assert r["status"] == "BLOCKED"
+    assert "sentinel present" in r["note"]
+
+
+def test_mr_short_side_line_counts_live_only():
+    cfg = adj.EXPERIMENTS["mr_short_side"]
+    assert cfg["watch_only"] is True and cfg["require_live_mode"] is True
+    trades = [
+        {"side": "short", "net_pnl": 2.0, "mode": "live",
+         "opened_at": cfg["registered_ts"] + 10, "closed_at": cfg["registered_ts"] + 20},
+        {"side": "short", "net_pnl": 9.9, "mode": "paper",   # shadow, excluded
+         "opened_at": cfg["registered_ts"] + 10, "closed_at": cfg["registered_ts"] + 20},
+    ]
+    r = adj.grade_side_line(trades, cfg)
+    assert r["n_trades"] == 1
+    assert abs(r["net_usd"] - 2.0) < 1e-9

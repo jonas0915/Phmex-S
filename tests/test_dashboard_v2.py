@@ -341,3 +341,51 @@ def test_main_gated_view_never_filtered():
                                  wd._live_slot_ids(), wd._slot_modes(), None, "")
     assert "excluded" not in card.lower()
     assert ">2<" in card or "trades</td><td>2" in card
+
+
+def test_main_card_side_split_rows():
+    """Owner split order 2026-08-12: main-book cards show the long and short
+    half-books as separate rows (real money, per-side W/L + net)."""
+    import web_dashboard as wd
+    trades = [
+        {"opened_at": 1786000000, "pnl_usdt": -1.00, "side": "long"},
+        {"opened_at": 1786000100, "pnl_usdt": -2.00, "side": "long"},
+        {"opened_at": 1786000200, "pnl_usdt": 1.50, "side": "short"},
+    ]
+    card = wd._build_signal_card("5m_scalp", "MAIN", {"closed_trades": trades,
+                                 "positions": {}}, set(), {}, None, "")
+    assert "longs" in card and "shorts" in card
+    assert "$-3.00" in card    # long half-book net
+    assert "$+1.50" in card    # short half-book net
+
+
+def test_mr_card_live_side_split_rows():
+    """Mixed live/paper cards (5m_MR): the LIVE record splits by side; paper
+    sims stay a single aggregate row."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    trades = [
+        {"opened_at": FIX + 10, "pnl_usdt": 2.00, "mode": "live", "side": "short"},
+        {"opened_at": FIX + 20, "pnl_usdt": -0.75, "mode": "live", "side": "long"},
+        {"opened_at": FIX + 30, "pnl_usdt": 0.30},   # paper sim
+    ]
+    card = wd._build_signal_card("5m_mean_revert", "MR", {"closed_trades": trades,
+                                 "positions": {}}, set(), {}, None, "")
+    assert "longs" in card and "shorts" in card
+    assert "$+2.00" in card and "$-0.75" in card
+
+
+def test_all_live_slot_book_gets_side_rows():
+    """Regression 2026-08-12: once the honest filter drops every stale paper
+    row, 5m_MR's remaining book is ALL live-mode → generic branch. The live
+    side split must render there too, not only in the mixed branch."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    trades = [
+        {"opened_at": FIX + 10, "pnl_usdt": 3.00, "mode": "live", "side": "short"},
+        {"opened_at": FIX + 20, "pnl_usdt": -1.00, "mode": "live", "side": "long"},
+    ]
+    card = wd._build_signal_card("5m_mean_revert", "MR", {"closed_trades": trades,
+                                 "positions": {}}, set(), {}, None, "")
+    assert "longs" in card and "shorts" in card
+    assert "$+3.00" in card and "$-1.00" in card

@@ -2964,6 +2964,16 @@ class Phmex2Bot:
                         _sr_htf, _sr_bucket = self._fetch_sr_bounce_htf(symbol)
                         candidate_signals.append(strategy_fn(df, ob, htf_df=_sr_htf,
                                                              cache_key=f"{symbol}:{_sr_bucket}"))
+                    elif slot.strategy_name == "bb_mean_reversion":
+                        # bb_mean_reversion takes (df, orderbook) only — no htf_df
+                        # param (strategies.py). Registered here (hygiene fix
+                        # 2026-08-12, closes the 8/1 open flag) so the shared path
+                        # stops raising/catching TypeError every symbol every cycle
+                        # and stops the misleading once-per-boot "htf_df silently
+                        # dropped" warning for this strategy. Nothing is dropped —
+                        # this IS the full evaluation. The generic fallback below
+                        # stays armed for genuinely unknown signatures.
+                        candidate_signals.append(strategy_fn(df, ob))
                     else:
                         try:
                             _s = strategy_fn(df, ob, htf_df=htf_df)
