@@ -634,3 +634,7 @@ trade / how's today" question: read closed_trades from ALL trading_state*.json
 (exclude archives v8_245trades + SR_BOUNCE_era1), filter closed_at >= midnight PT,
 report per-book. Same failure class as the 6/29 "sum all state files" PnL lesson —
 one counter/file is never the fleet.
+
+### Pseudo-slot ids can alias the MAIN book (2026-08-12)
+- `main_gated` is a filtered VIEW of trading_state.json (real money, no mode field), not a slot. Any slot_id-keyed filter over paper data must exempt BOTH `5m_scalp` and `main_gated` — the first honest-data deploy silently dropped 34 real main-book trades from the CURRENT TEST card.
+- The catch came from cross-verifying every rendered number against an independent state-file computation AFTER deploy — render-side notes mapped back to card titles exposed the one that shouldn't exist. Always map aggregate badges/notes back to their owning card when auditing a display change.

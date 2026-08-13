@@ -43,6 +43,25 @@ LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
 HOST = "0.0.0.0"  # bind all interfaces so phones on the same LAN can reach it (read-only dashboard)
 PORT = 8050
 
+# Paper rows opened before the fresh-price fix (deployed 2026-08-05 9:47 PM PT,
+# PID 27868) were flattered by the stale cached-price phantom-entry bug on EVERY
+# paper book — entries logged at prices a live order couldn't get. Owner order
+# 2026-08-12 ("100% honest data"): all displayed paper stats exclude those rows.
+# Live-mode rows are real fills and are never excluded. Pre-registered verdict
+# lines (adjudicator) are NOT display and still count every trade.
+PAPER_HONEST_TS = 1785991620  # 2026-08-06 04:47 UTC
+
+
+def _honest_paper(trades: list) -> tuple[list, int]:
+    """Split out stale-price paper rows: keeps live-mode rows (real fills,
+    any date) and paper rows opened at/after PAPER_HONEST_TS. Returns
+    (kept_rows, n_excluded). Callers must NOT apply this to the main book
+    (5m_scalp / trading_state.json): its rows carry no mode field but are
+    all real money."""
+    kept = [t for t in trades if t.get("mode") == "live"
+            or (t.get("opened_at") or 0) >= PAPER_HONEST_TS]
+    return kept, len(trades) - len(kept)
+
 # Access token — gates every request so the read-only dashboard (balance/PnL/positions)
 # isn't exposed unauthenticated on untrusted networks the laptop may join (0.0.0.0 binds
 # every interface, not just home WiFi). Persisted in a gitignored file so it survives
@@ -589,9 +608,9 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
         scls = "pos" if snet > 0 else "neg" if snet < 0 else "dim"
         return f"{sn}t &middot; {swr:.0f}% &middot; <span class='{scls}'>${snet:+.2f}</span>"
 
-    def _sim_row_html(sim_rows):
+    def _sim_row_html(sim_rows, note=""):
         return (f"<tr class='dim'><td></td><td>sim</td>"
-                f"<td>{_stats_html(sim_rows, _sim_net_pnl)}</td></tr>")
+                f"<td>{_stats_html(sim_rows, _sim_net_pnl)}{note}</td></tr>")
 
     rows = ""
     for slot_id in ordered:
@@ -604,12 +623,18 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
         live_rows = ([t for t in trades if t.get("mode") == "live"]
                      if slot_id != "5m_scalp" else trades)
         sim_rows = [t for t in trades if t.get("mode") != "live"] if slot_id != "5m_scalp" else []
+        # Honest-data rule (2026-08-12): stale-price paper rows never reach a
+        # displayed sim stat. Kill/demote CLASSIFICATION stays on the full
+        # ledger (badges must not flip because display rows were excluded).
+        sim_rows, n_stale_sim = _honest_paper(sim_rows)
+        sim_note = (f" <span class='dim'>({n_stale_sim} stale excl)</span>"
+                    if n_stale_sim else "")
 
         if slot_id in live_ids:
             rows += (f"<tr><td><span class='pos'>&#9679;</span> {name}</td>"
                      f"<td class='pos'>LIVE</td><td>{_stats_html(live_rows)}</td></tr>")
             if sim_rows:
-                rows += _sim_row_html(sim_rows)
+                rows += _sim_row_html(sim_rows, sim_note)
             mode = modes.get(slot_id)
             if mode and not mode.get("paper_mode", True):
                 # Promoted slot — render the auto-demote guardrail state.
@@ -640,9 +665,9 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
                       else "killed (permanent)")
             rows += (f"<tr class='dim'><td>&#10013; {name}</td>"
                      f"<td>{_badge}</td>"
-                     f"<td>{('live ' + _stats_html(live_rows)) if live_rows else _stats_html(sim_rows, _sim_net_pnl)}</td></tr>")
+                     f"<td>{('live ' + _stats_html(live_rows)) if live_rows else _stats_html(sim_rows, _sim_net_pnl)}{sim_note}</td></tr>")
             if live_rows and sim_rows:
-                rows += _sim_row_html(sim_rows)
+                rows += _sim_row_html(sim_rows, sim_note)
         elif (m := modes.get(slot_id)) is not None and m.get("paper_mode", True) and live_rows:
             # Demoted slot with real-money history: badge parity with the
             # STRATEGIES card ("DEMOTED @N live") — this panel used to say
@@ -650,7 +675,7 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
             rows += (f"<tr><td><span class='neg'>&#9679;</span> {name}</td>"
                      f"<td class='neg'>demoted @{len(live_rows)} live</td>"
                      f"<td>{_stats_html(live_rows)}</td></tr>")
-            rows += _sim_row_html(sim_rows)
+            rows += _sim_row_html(sim_rows, sim_note)
         elif n >= 50 and _kelly_wr_rr(trades) < 0:
             # Killed slot — a demoted slot may still hold real-money history
             # (e.g. ST2.0's 35 live trades): show it on its own row, never
@@ -658,20 +683,20 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
             if live_rows:
                 rows += (f"<tr class='dim'><td>&#10013; {name}</td><td>killed @{n}</td>"
                          f"<td>live {_stats_html(live_rows)}</td></tr>")
-                rows += _sim_row_html(sim_rows)
+                rows += _sim_row_html(sim_rows, sim_note)
             else:
                 rows += (f"<tr class='dim'><td>&#10013; {name}</td><td>killed @{n}</td>"
-                         f"<td>{_stats_html(sim_rows, _sim_net_pnl)}</td></tr>")
+                         f"<td>{_stats_html(sim_rows, _sim_net_pnl)}{sim_note}</td></tr>")
         else:
             if live_rows:
                 # Previously-promoted slot back on paper: keep its real record visible.
                 rows += (f"<tr><td><span class='amb'>&#9679;</span> {name}</td>"
                          f"<td class='amb'>paper</td><td>live {_stats_html(live_rows)}</td></tr>")
-                rows += _sim_row_html(sim_rows)
+                rows += _sim_row_html(sim_rows, sim_note)
             else:
                 rows += (f"<tr><td><span class='amb'>&#9679;</span> {name}</td>"
                          f"<td class='amb'>paper</td>"
-                         f"<td>{_stats_html(sim_rows, _sim_net_pnl)}</td></tr>")
+                         f"<td>{_stats_html(sim_rows, _sim_net_pnl)}{sim_note}</td></tr>")
 
     if not rows:
         rows = "<tr><td class='dim'>no slot state files found</td></tr>"
@@ -894,6 +919,15 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
     trades = st.get("closed_trades") or []
     positions = st.get("positions") or {}
 
+    # Honest-data rule (owner order 2026-08-12): stale-price paper rows never
+    # reach any displayed stat. Main-book cards exempt (5m_scalp + its
+    # main_gated filtered view) — all their rows are real money, no mode field.
+    n_stale = 0
+    if slot_id not in ("5m_scalp", "main_gated"):
+        trades, n_stale = _honest_paper(trades)
+    stale_note = (f" &middot; {n_stale} stale-px pre-8/5 excluded"
+                  if n_stale else "")
+
     n = len(trades)
     wins = [_net_pnl(t) for t in trades if _net_pnl(t) > 0]
     losses = [_net_pnl(t) for t in trades if _net_pnl(t) < 0]
@@ -971,7 +1005,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
             f"{size_row}"
             f"<tr><td class='dim'>trades</td><td><span class='amb'>{len(live_ts)} live</span>"
-            f"<span class='dim' style='font-size:9px'> &middot; {len(paper_ts)} paper sim &middot; {n} total</span></td></tr>"
+            f"<span class='dim' style='font-size:9px'> &middot; {len(paper_ts)} paper sim &middot; {n} total{stale_note}</span></td></tr>"
             f"<tr><td class='dim'>live (real)</td><td>"
             f"<span class='pos'>{lw}W</span> / <span class='neg'>{ll}L</span>{_lbe} "
             f"&middot; {lwr:.0f}% WR &middot; <span class='{lcls}'>${lnet:+.2f}</span>"
@@ -1023,11 +1057,56 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"<tr><td class='dim'>avg loss (era)</td><td class='neg'>${e_avgl:+.2f}</td></tr>"
             f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
         )
+    elif slot_id == "SR_BOUNCE" and (n or n_stale):
+        # SR_BOUNCE keeps its dedicated layout for the exit-mix line: zero TPs
+        # = geometry never reaches its target, the "signal doesn't travel"
+        # tell from the v2 prereg. trades is already honest-filtered above.
+        hon = trades
+
+        def _rec(ts):
+            w = sum(1 for t in ts if _net_pnl(t) > 0)
+            l = sum(1 for t in ts if _net_pnl(t) < 0)
+            be = len(ts) - w - l
+            wr_ = w / (w + l) * 100 if (w + l) else 0.0
+            return w, l, be, wr_, sum(_net_pnl(t) for t in ts)
+        hw, hl, hbe, hwr, hnet = _rec(hon)
+        _hbe = f" / <span class='dim'>{hbe}BE</span>" if hbe else ""
+
+        def _reason(t):
+            return t.get("exit_reason") or t.get("reason") or "?"
+        tp = sum(1 for t in hon if _reason(t) == "take_profit")
+        tim = sum(1 for t in hon if _reason(t) == "hard_time_exit")
+        sl = sum(1 for t in hon if _reason(t) == "stop_loss")
+        oth = len(hon) - tp - tim - sl
+        tp_cls = "neg" if (hon and tp == 0) else "pos"
+        mix = (f"<span class='{tp_cls}'>{tp} TP</span> &middot; {tim} time"
+               f" &middot; {sl} SL" + (f" &middot; {oth} other" if oth else ""))
+        _hwins = [_net_pnl(t) for t in hon if _net_pnl(t) > 0]
+        _hlosses = [_net_pnl(t) for t in hon if _net_pnl(t) < 0]
+        h_avgw = sum(_hwins) / len(_hwins) if _hwins else 0.0
+        h_avgl = sum(_hlosses) / len(_hlosses) if _hlosses else 0.0
+        hcls = "pos" if hnet > 0 else "neg" if hnet < 0 else "dim"
+        stats_rows = (
+            f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
+            f"{size_row}"
+            f"<tr><td class='dim'>trades</td><td><span class='amb'>{len(hon)} honest era</span>"
+            f"<span class='dim' style='font-size:9px'>{stale_note}"
+            f" &middot; {n + n_stale} total</span></td></tr>"
+            f"<tr><td class='dim'>honest (8/5 fix+)</td><td>"
+            f"<span class='pos'>{hw}W</span> / <span class='neg'>{hl}L</span>{_hbe} "
+            f"&middot; {hwr:.0f}% WR &middot; <span class='{hcls}'>${hnet:+.2f}</span></td></tr>"
+            f"<tr><td class='dim'>exit mix (honest)</td><td>{mix}</td></tr>"
+            f"<tr><td class='dim'>net PnL (honest)</td><td class='{hcls}'>${hnet:+.2f}</td></tr>"
+            f"<tr><td class='dim'>avg win (honest)</td><td class='pos'>${h_avgw:+.2f}</td></tr>"
+            f"<tr><td class='dim'>avg loss (honest)</td><td class='neg'>${h_avgl:+.2f}</td></tr>"
+            f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
+        )
     else:
         stats_rows = (
             f"<tr><td class='dim'>status</td><td>{status_html}</td></tr>"
             f"{size_row}"
-            f"<tr><td class='dim'>trades</td><td>{n}</td></tr>"
+            f"<tr><td class='dim'>trades</td><td>{n}"
+            f"<span class='dim' style='font-size:9px'>{stale_note}</span></td></tr>"
             f"<tr><td class='dim'>record</td><td>"
             f"<span class='pos'>{w_all}W</span> / <span class='neg'>{l_all}L</span> "
             f"&middot; {wr:.0f}%</td></tr>"
@@ -1198,6 +1277,10 @@ def collect_blotter_rows(limit: int = 500, slot_states: dict = None) -> list[dic
             # promotion) — same rule build_equity_series uses. Trades closed
             # while the slot was still paper stay tagged paper.
             mode = "live" if owner == "main" else (t.get("mode") or "paper")
+            # Honest-data rule (2026-08-12): pre-8/5 paper rows ran on stale
+            # cached prices — keep them in the ledger view but tag them so
+            # they render as stale and never count toward chip win rates.
+            stale = mode != "live" and (t.get("opened_at") or 0) < PAPER_HONEST_TS
             net = round(_net_pnl(t) if mode == "live" else _sim_net_pnl(t), 4)
             # Per-trade return on margin (owner request 2026-08-06): same
             # basis as the bot's close-line ROI%. None when the record has
@@ -1219,6 +1302,7 @@ def collect_blotter_rows(limit: int = 500, slot_states: dict = None) -> list[dic
                 "reason": str(t.get("exit_reason") or t.get("reason") or ""),
                 "owner": owner,
                 "mode": mode,
+                "stale": stale,
             })
     # Secondary owner key makes tie-timestamp order deterministic regardless of
     # whether sources came from disk globbing or a pre-loaded slot_states dict.
@@ -1610,8 +1694,10 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
         return "<div class='dim'>no closed trades yet</div>"
 
     def _wr(sample: list) -> str:
-        # min_margin_skip rows are bookkeeping (skipped entries), not trades.
-        real = [r for r in sample if r["reason"] != "min_margin_skip"]
+        # min_margin_skip rows are bookkeeping (skipped entries), not trades;
+        # stale-px paper rows are phantom fills (honest-data rule 2026-08-12).
+        real = [r for r in sample
+                if r["reason"] != "min_margin_skip" and not r.get("stale")]
         if not real:
             return ""
         wins = sum(1 for r in real if r["net"] > 0)
@@ -1667,7 +1753,9 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
             b_cls = "amb" if r["mode"] == "live" else "dim"
             badge = f" <span class='{b_cls}'>[{escape(r['owner'])}]</span>"
         # Real money vs simulation, unmissable per row (not just badge color).
+        # Stale-px sims (pre-8/5 phantom fills) say so on the row itself.
         mode_cell = ("<td class='pos'>LIVE</td>" if r["mode"] == "live"
+                     else "<td class='neg'>sim&middot;stale px</td>" if r.get("stale")
                      else "<td class='dim'>sim</td>")
         sim_cls = "" if r["mode"] == "live" else " class='dim'"
         # id is generated server-side as owner:index ([A-Za-z0-9_:] only) — safe in attr;

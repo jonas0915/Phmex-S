@@ -18,7 +18,10 @@ def _states(trades_by_slot):
     }
 
 
-def _trade(strat, pnl, reason="take_profit", ts=1_785_900_000):
+def _trade(strat, pnl, reason="take_profit", ts=1_786_400_000):
+    # ts default sits AFTER wd.PAPER_HONEST_TS (2026-08-05 fresh-price fix):
+    # paper rows opened before it are stale-px and excluded from chip win
+    # rates (honest-data rule 2026-08-12), which is not what these tests probe.
     return {"symbol": "SOL/USDT:USDT", "side": "long", "strategy": strat,
             "pnl_usdt": pnl, "net_pnl": pnl, "fees_usdt": 0.0,
             "exit_reason": reason, "closed_at": ts, "opened_at": ts - 60}

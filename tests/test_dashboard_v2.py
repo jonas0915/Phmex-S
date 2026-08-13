@@ -187,3 +187,157 @@ def test_sr_bounce_missing_state_renders_zero_trades():
     state = slot_states.get("SR_BOUNCE") or {"closed_trades": [], "positions": {}}
     card = wd._build_signal_card("SR_BOUNCE", "SR_BOUNCE", state, live_ids, modes, None, "")
     assert ">0<" in card or "trades</td><td>0" in card
+
+
+def test_sr_bounce_honest_only():
+    """SR_BOUNCE card (2026-08-12, owner order): pre-8/5 paper rows were
+    flattered by the stale cached-price phantom-entry bug (fixed 2026-08-05
+    9:47 PM PT, PID 27868). The card shows ONLY honest-era stats (opened_at
+    >= wd.PAPER_HONEST_TS). Pre-fix rows get no stats — just a dim
+    excluded-count so the card still reconciles with the n=50 verdict line,
+    which counts every v2 trade. Zero-TP tell stays visible in exit mix."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    trades = [
+        # pre-fix: flattered winner — must contribute NOTHING to shown stats
+        {"opened_at": FIX - 1000, "pnl_usdt": 4.00, "exit_reason": "take_profit"},
+        # honest era: time-exit winner + SL loser, zero TPs
+        {"opened_at": FIX + 1000, "pnl_usdt": 1.00, "exit_reason": "hard_time_exit"},
+        {"opened_at": FIX + 2000, "pnl_usdt": -0.50, "exit_reason": "stop_loss"},
+    ]
+    state = {"closed_trades": trades, "positions": {}}
+    card = wd._build_signal_card("SR_BOUNCE", "SR_BOUNCE", state,
+                                 wd._live_slot_ids(), wd._slot_modes(), None, "")
+    # honest stats only: 1W/1L, +$0.50 net
+    assert "honest" in card.lower()
+    assert "$+0.50" in card
+    # pre-fix PnL/WR must NOT appear anywhere — only an excluded row count
+    assert "$+4.00" not in card
+    assert "excluded" in card.lower()
+    assert "1 " in card and "stale" in card.lower()
+    # exit-mix line with the zero-TP tell (honest era only)
+    assert "0 TP" in card
+    assert "1 time" in card and "1 SL" in card
+
+
+def test_sr_bounce_honest_only_all_prefix_rows():
+    """All-pre-fix book (or missing opened_at → treated pre-fix): honest era
+    renders n=0 without crashing (division-by-zero guard) and shows no
+    pre-fix PnL."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    trades = [{"opened_at": FIX - 5000, "pnl_usdt": 2.00, "exit_reason": "take_profit"},
+              {"pnl_usdt": 1.00, "exit_reason": "take_profit"}]
+    state = {"closed_trades": trades, "positions": {}}
+    card = wd._build_signal_card("SR_BOUNCE", "SR_BOUNCE", state,
+                                 wd._live_slot_ids(), wd._slot_modes(), None, "")
+    assert "honest" in card.lower()
+    assert "$+3.00" not in card and "$+2.00" not in card
+    assert "excluded" in card.lower()
+
+
+def test_generic_paper_card_excludes_stale_rows():
+    """ALL paper cards (owner order 2026-08-12 'FIX IT ALL'): pre-8/5 paper
+    rows are stale-price flattered on every paper book, not just SR_BOUNCE.
+    Generic-branch cards must show honest-era stats only + an excluded count."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    trades = [
+        {"opened_at": FIX - 1000, "pnl_usdt": 7.77, "exit_reason": "take_profit"},
+        {"opened_at": FIX + 1000, "pnl_usdt": 1.00, "exit_reason": "take_profit"},
+        {"opened_at": FIX + 2000, "pnl_usdt": -0.25, "exit_reason": "stop_loss"},
+    ]
+    state = {"closed_trades": trades, "positions": {}}
+    card = wd._build_signal_card("DONCHIAN_BTC", "DONCHIAN BTC", state,
+                                 wd._live_slot_ids(), wd._slot_modes(), None, "")
+    assert "$+7.77" not in card and "7.77" not in card
+    assert "$+0.75" in card          # honest net only
+    assert "excluded" in card.lower()
+    assert "1W" in card and "1L" in card
+
+
+def test_mixed_card_keeps_prefix_live_rows():
+    """Live-mode rows are real fills — NEVER excluded, whatever their date.
+    Only paper sims opened pre-fix drop out of the shown stats."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    trades = [
+        {"opened_at": FIX - 9000, "pnl_usdt": 2.00, "mode": "live"},   # real, kept
+        {"opened_at": FIX - 1000, "pnl_usdt": 5.55},                   # stale sim, dropped
+        {"opened_at": FIX + 1000, "pnl_usdt": -1.00},                  # honest sim, kept
+    ]
+    state = {"closed_trades": trades, "positions": {}}
+    card = wd._build_signal_card("HTF_L2", "HTF_L2", state,
+                                 wd._live_slot_ids(), wd._slot_modes(), None, "")
+    assert "$+2.00" in card          # live net intact
+    assert "5.55" not in card        # stale sim gone
+    assert "$-1.00" in card          # honest paper net
+    assert "excluded" in card.lower()
+
+
+def test_main_book_card_never_filtered():
+    """5m_scalp = the main book: every row is real money (no mode field).
+    The honest-paper filter must not touch it — old rows all still counted."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    trades = [{"opened_at": FIX - 50000, "pnl_usdt": 1.00},
+              {"opened_at": FIX + 1000, "pnl_usdt": 1.00}]
+    state = {"closed_trades": trades, "positions": {}}
+    card = wd._build_signal_card("5m_scalp", "MAIN", state,
+                                 wd._live_slot_ids(), wd._slot_modes(), None, "")
+    assert "2 total" in card
+    assert "excluded" not in card.lower()
+
+
+def test_guardrails_sim_stats_exclude_stale():
+    """SLOTS+GUARDRAILS panel: sim stat lines exclude pre-fix paper rows and
+    carry a stale-excluded note; the honest sim record is what renders."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    slot_states = {"TESTSLOT_HONEST": {"closed_trades": [
+        {"opened_at": FIX - 1000, "pnl_usdt": 9.99},
+        {"opened_at": FIX + 1000, "pnl_usdt": 0.40},
+    ], "positions": {}}}
+    html = wd._build_slots_guardrails(slot_states)
+    assert "9.99" not in html
+    assert "$+0.40" in html
+    assert "stale" in html.lower()
+
+
+def test_blotter_rows_tag_stale_paper():
+    """Blotter: pre-fix paper rows carry stale=True (rendered as a stale sim
+    mode cell + excluded from chip win rates); live and post-fix rows don't."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    slot_states = {
+        "5m_scalp": {"closed_trades": [
+            {"opened_at": FIX - 1000, "closed_at": FIX - 900, "pnl_usdt": 1.0,
+             "symbol": "BTC/USDT:USDT", "side": "long", "strategy": "main"}]},
+        "TESTSLOT": {"closed_trades": [
+            {"opened_at": FIX - 1000, "closed_at": FIX - 900, "pnl_usdt": 2.0,
+             "symbol": "ETH/USDT:USDT", "side": "long", "strategy": "t"},
+            {"opened_at": FIX + 1000, "closed_at": FIX + 1100, "pnl_usdt": 3.0,
+             "symbol": "SOL/USDT:USDT", "side": "long", "strategy": "t"}]},
+    }
+    rows = wd.collect_blotter_rows(100, slot_states)
+    by_sym = {r["sym"]: r for r in rows}
+    assert not by_sym["BTC"]["stale"]     # main book row: real, never stale
+    assert by_sym["ETH"]["stale"]         # pre-fix paper sim
+    assert not by_sym["SOL"]["stale"]     # honest-era paper sim
+    panel = wd._build_blotter_panel(100, slot_states)
+    assert "stale" in panel.lower()
+
+
+def test_main_gated_view_never_filtered():
+    """main_gated is a filtered VIEW of the main book — real money, no mode
+    field. Regression 2026-08-12: the honest-paper filter wrongly dropped 34
+    real pre-8/5 trades from the CURRENT TEST card on first deploy."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    trades = [{"opened_at": FIX - 50000, "pnl_usdt": 1.00},
+              {"opened_at": FIX + 1000, "pnl_usdt": -0.40}]
+    state = {"closed_trades": trades, "positions": {}}
+    card = wd._build_signal_card("main_gated", "MAIN GATED", state,
+                                 wd._live_slot_ids(), wd._slot_modes(), None, "")
+    assert "excluded" not in card.lower()
+    assert ">2<" in card or "trades</td><td>2" in card
