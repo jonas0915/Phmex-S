@@ -544,3 +544,51 @@ def test_mr_short_side_line_counts_live_only():
     r = adj.grade_side_line(trades, cfg)
     assert r["n_trades"] == 1
     assert abs(r["net_usd"] - 2.0) < 1e-9
+
+
+# ── main_resize15 partial-TP grouping (owner re-registration 2026-08-17) ──
+
+def test_resize15_groups_partial_tp_rows(tmp_path):
+    """A $15 trade that partial-TPs is ledgered as two ~$7.50 rows sharing
+    opened_at. The old per-row margin>=10 filter dropped BOTH halves —
+    winners (partials fire on winners) escaped the era count while full-$15
+    losers always counted (pessimistic bias; flagged 8/13, materially caused
+    the 8/15 trip at -$6.43 undercounted). Re-registered counting: group by
+    (symbol, opened_at), sum margin and net, test the GROUP's margin."""
+    cfg = adj.EXPERIMENTS["main_resize15"]
+    dep = cfg["deployed_ts"]
+    trades = [
+        # one $15 trade split by partial-TP: counts as ONE trade, net summed
+        {"symbol": "A", "strategy": "htf_l2_anticipation", "opened_at": dep + 10,
+         "margin": 7.5, "net_pnl": 0.70, "exit_reason": "partial_tp"},
+        {"symbol": "A", "strategy": "htf_l2_anticipation", "opened_at": dep + 10,
+         "margin": 7.5, "net_pnl": 0.65, "exit_reason": "early_exit"},
+        # a plain $15 loser: one trade
+        {"symbol": "B", "strategy": "htf_l2_anticipation", "opened_at": dep + 20,
+         "margin": 15.0, "net_pnl": -1.70, "exit_reason": "stop_loss"},
+        # a genuine $5-era straggler: still excluded (group margin < 10)
+        {"symbol": "C", "strategy": "htf_l2_anticipation", "opened_at": dep + 30,
+         "margin": 5.0, "net_pnl": -0.50, "exit_reason": "stop_loss"},
+    ]
+    r = adj.grade_main_resize15(trades, cfg, bot_dir=str(tmp_path))
+    assert r["n_trades"] == 2                      # A-group + B; C excluded
+    assert abs(r["net_usd"] - (-0.35)) < 1e-9      # 1.35 - 1.70
+    assert r["status"] == adj.WATCH
+    assert not (tmp_path / ".halt_main_entries").exists()
+
+
+def test_resize15_group_margin_sums_to_qualify(tmp_path):
+    """Two $7.50 halves sum to $15 >= min_margin — the group qualifies even
+    though neither row does alone."""
+    cfg = adj.EXPERIMENTS["main_resize15"]
+    dep = cfg["deployed_ts"]
+    trades = [
+        {"symbol": "X", "strategy": "htf_l2_anticipation", "opened_at": dep + 5,
+         "margin": 7.5, "net_pnl": -3.10, "exit_reason": "stop_loss"},
+        {"symbol": "X", "strategy": "htf_l2_anticipation", "opened_at": dep + 5,
+         "margin": 7.5, "net_pnl": -3.20, "exit_reason": "stop_loss"},
+    ]
+    r = adj.grade_main_resize15(trades, cfg, bot_dir=str(tmp_path))
+    assert r["n_trades"] == 1
+    assert abs(r["net_usd"] - (-6.30)) < 1e-9      # group counts, trips hard line
+    assert r["status"] == "TRIP"

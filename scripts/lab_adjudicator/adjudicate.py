@@ -826,15 +826,31 @@ def grade_main_resize15(trades: list, cfg: dict, bot_dir=None) -> dict:
     Same era filter as grade_main_gated PLUS margin >= min_margin so only
     $15-sized fills count. TRIP touches .halt_main_entries (idempotent —
     an existing sentinel, e.g. an owner halt, is never overwritten)."""
-    era = [t for t in (trades or [])
-           if t.get("strategy") == "htf_l2_anticipation"
-           and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"
-           and float(t.get("opened_at") or 0) >= cfg["deployed_ts"]
-           and float(t.get("margin") or 0) >= cfg["min_margin"]]
-    nets = [n for t in era for n in [_net(t)] if n is not None]
-    wins = sum(1 for n in nets if n > 0)
-    net = sum(nets) if nets else 0.0
-    n = len(era)
+    # RE-REGISTERED COUNTING 2026-08-17 (owner order, option 2): a partial-TP
+    # splits one $15 trade into two ~$7.50 ledger rows sharing opened_at; the
+    # old per-row margin filter dropped BOTH halves, so partial winners never
+    # counted while full-margin losers always did (pessimistic bias — flagged
+    # 8/13 BEFORE the 8/15 trip; the -$6.43 trip was on this undercounted
+    # ledger). Rows now group by (symbol, opened_at) = one entry fill; the
+    # GROUP's summed margin must clear min_margin and its summed net counts
+    # as one trade. Same trip thresholds, honest ledger.
+    rows = [t for t in (trades or [])
+            if t.get("strategy") == "htf_l2_anticipation"
+            and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"
+            and float(t.get("opened_at") or 0) >= cfg["deployed_ts"]]
+    groups = {}
+    for t in rows:
+        groups.setdefault((t.get("symbol"), t.get("opened_at")), []).append(t)
+    era_nets = []
+    for g in groups.values():
+        if sum(float(t.get("margin") or 0) for t in g) < cfg["min_margin"]:
+            continue
+        gnets = [x for t in g for x in [_net(t)] if x is not None]
+        if gnets:
+            era_nets.append(sum(gnets))
+    wins = sum(1 for x in era_nets if x > 0)
+    net = sum(era_nets) if era_nets else 0.0
+    n = len(era_nets)
     tripped = (n >= cfg["trip_n"] and net <= cfg["trip_net"]) or net <= cfg["hard_net"]
     if tripped:
         sentinel = os.path.join(str(bot_dir or BOT_DIR), ".halt_main_entries")
