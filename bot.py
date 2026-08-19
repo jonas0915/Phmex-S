@@ -616,7 +616,11 @@ class Phmex2Bot:
                 timeframe="5m",
                 max_positions=1,      # conservative — mean reversion is riskier
                 capital_pct=0.3,      # 30% allocation (less than momentum/scalp)
-                trade_amount_usdt=30.0,  # 2026-07-27 owner scale-up #2 ($18 -> $30,
+                trade_amount_usdt=15.0,  # 2026-08-18 owner risk-cut ($30 -> $15,
+                                         # "stop losing" order after the -$3.57 PUMP
+                                         # stop = worst fleet single-trade risk;
+                                         # halves worst MR stop to ~-$1.80).
+                                         # Prior: 2026-07-27 owner scale-up #2 ($18 -> $30,
                                          # same day as $15 -> $18) after +$57.58
                                          # deposit (bal $92.36). Halt math at $30:
                                          # worst observed stop -$1.93 @ $15 scales to
