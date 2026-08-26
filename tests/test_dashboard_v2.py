@@ -389,3 +389,53 @@ def test_all_live_slot_book_gets_side_rows():
                                  "positions": {}}, set(), {}, None, "")
     assert "longs" in card and "shorts" in card
     assert "$+3.00" in card and "$-1.00" in card
+
+
+def test_crumb_rows_excluded_from_card_stats():
+    """min_margin_skip rows are bookkeeping crumbs, not trades (owner order
+    2026-08-25): they never count toward a card's trade count or WR, and the
+    card says how many were excluded."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    trades = [
+        {"opened_at": FIX + 1000, "pnl_usdt": 2.00, "mode": "live", "side": "short"},
+        {"opened_at": FIX + 2000, "pnl_usdt": -1.00, "mode": "live", "side": "short"},
+        {"opened_at": FIX + 3000, "pnl_usdt": -0.10, "mode": "live", "side": "short",
+         "exit_reason": "min_margin_skip"},
+    ]
+    state = {"closed_trades": trades, "positions": {}}
+    card = wd._build_signal_card("5m_mean_revert", "5M MR", state,
+                                 wd._live_slot_ids(), wd._slot_modes(), None, "")
+    assert "50% WR" in card                    # 1W/1L — crumb not a loss
+    assert "1 crumb skips excluded" in card
+    assert "$-0.10" not in card                # crumb PnL not rendered as a trade
+
+
+def test_crumb_rows_excluded_from_guardrails_stats():
+    """SLOTS+GUARDRAILS: displayed count/WR skip crumbs for every slot,
+    main book included."""
+    import web_dashboard as wd
+    real = [{"pnl_usdt": 1.00}, {"pnl_usdt": -2.00}]
+    crumb = [{"pnl_usdt": 0.0, "reason": "min_margin_skip"}]
+    panel = wd._build_slots_guardrails(
+        {"5m_scalp": {"closed_trades": real + crumb}})
+    assert "2t" in panel and "3t" not in panel
+
+
+def test_crumbs_do_not_flip_kill_badge():
+    """Badge classification stays on the FULL ledger: a paper slot with 50
+    rows where one is a crumb must still classify at n=50 (parity with
+    strategy_slot.is_killed), not slip under the threshold."""
+    import web_dashboard as wd
+    FIX = wd.PAPER_HONEST_TS
+    # 10 winning + 39 losing honest paper rows + 1 crumb = 50 ledger rows;
+    # kelly = 0.2 - 0.8/0.5 < 0 (all-loss ledgers return 0.0 by parity)
+    trades = ([{"opened_at": FIX + i, "pnl_usdt": 0.5, "net_pnl": 0.5}
+               for i in range(10)]
+              + [{"opened_at": FIX + 100 + i, "pnl_usdt": -1.0, "net_pnl": -1.0}
+                 for i in range(39)])
+    trades.append({"opened_at": FIX + 99, "pnl_usdt": 0.0,
+                   "exit_reason": "min_margin_skip"})
+    state = {"closed_trades": trades, "positions": {}}
+    card = wd._build_signal_card("SOME_SLOT", "X", state, set(), {}, None, "")
+    assert "KILLED" in card

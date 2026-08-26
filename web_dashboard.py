@@ -223,6 +223,15 @@ def _net_pnl(t: dict) -> float:
     return n if n is not None else t.get("pnl_usdt", 0)
 
 
+def _real_rows(rows: list) -> list:
+    """Rows for DISPLAYED trade counts / win rates: drop min_margin_skip
+    bookkeeping crumbs (skipped entries, not trades — owner order 2026-08-25).
+    Kill/demote classification and cash aggregations (equity curve, today PnL)
+    stay on the full ledger."""
+    return [t for t in rows
+            if (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"]
+
+
 def _sim_net_pnl(t: dict) -> float:
     """Net for a PAPER (sim) trade = the recorded net, unchanged. HISTORY
     (2026-07-31 audit fix): this used to re-subtract fees_usdt whenever
@@ -620,15 +629,13 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
         # Never blend real money with sims, in ANY branch: live-mode trades and
         # paper sims always get separate stat rows (main-state 5m_scalp trades
         # carry no mode field — they are all real).
-        live_rows = ([t for t in trades if t.get("mode") == "live"]
-                     if slot_id != "5m_scalp" else
-                     # min_margin_skip rows are bookkeeping (skipped entries),
-                     # not trades — same exclusion as the STRATEGIES card and
-                     # blotter chips (2026-08-25 audit: 37 crumbs inflated the
-                     # main row's count and diluted its WR%)
-                     [t for t in trades
-                      if (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"])
-        sim_rows = [t for t in trades if t.get("mode") != "live"] if slot_id != "5m_scalp" else []
+        # _real_rows: displayed stats never count min_margin_skip crumbs
+        # (2026-08-25 audit: 37 crumbs inflated the main row's count and
+        # diluted its WR%). Classification below stays on full `trades`.
+        live_rows = _real_rows([t for t in trades if t.get("mode") == "live"]
+                               if slot_id != "5m_scalp" else trades)
+        sim_rows = (_real_rows([t for t in trades if t.get("mode") != "live"])
+                    if slot_id != "5m_scalp" else [])
         # Honest-data rule (2026-08-12): stale-price paper rows never reach a
         # displayed sim stat. Kill/demote CLASSIFICATION stays on the full
         # ledger (badges must not flip because display rows were excluded).
@@ -948,8 +955,18 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
     n_stale = 0
     if slot_id not in ("5m_scalp", "main_gated"):
         trades, n_stale = _honest_paper(trades)
+    # Crumb rule (owner order 2026-08-25): every stat on this card — count,
+    # WR, side rows, era splits, avg win/loss — is real trades only. The
+    # 5m_scalp/main_gated branches already pre-filter upstream (no-op there).
+    # Badges keep the full ledger (kill/demote classification parity).
+    full_trades = trades
+    n_crumbs = len(trades)
+    trades = _real_rows(trades)
+    n_crumbs -= len(trades)
     stale_note = (f" &middot; {n_stale} stale-px pre-8/5 excluded"
                   if n_stale else "")
+    stale_note += (f" &middot; {n_crumbs} crumb skips excluded"
+                   if n_crumbs else "")
 
     n = len(trades)
     wins = [_net_pnl(t) for t in trades if _net_pnl(t) > 0]
@@ -960,7 +977,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
     avg_loss = (sum(losses) / len(losses)) if losses else 0.0
     net_cls = "pos" if net > 0 else "neg" if net < 0 else "dim"
 
-    status_html = _slot_status_html(slot_id, trades, live_ids, modes)
+    status_html = _slot_status_html(slot_id, full_trades, live_ids, modes)
     size_row = _size_row_html(slot_id, live_ids)
 
     # Side half-books (owner split order 2026-08-12): long and short records
