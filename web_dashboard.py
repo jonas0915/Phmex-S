@@ -621,7 +621,13 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
         # paper sims always get separate stat rows (main-state 5m_scalp trades
         # carry no mode field — they are all real).
         live_rows = ([t for t in trades if t.get("mode") == "live"]
-                     if slot_id != "5m_scalp" else trades)
+                     if slot_id != "5m_scalp" else
+                     # min_margin_skip rows are bookkeeping (skipped entries),
+                     # not trades — same exclusion as the STRATEGIES card and
+                     # blotter chips (2026-08-25 audit: 37 crumbs inflated the
+                     # main row's count and diluted its WR%)
+                     [t for t in trades
+                      if (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"])
         sim_rows = [t for t in trades if t.get("mode") != "live"] if slot_id != "5m_scalp" else []
         # Honest-data rule (2026-08-12): stale-price paper rows never reach a
         # displayed sim stat. Kill/demote CLASSIFICATION stays on the full
