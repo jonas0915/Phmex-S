@@ -45,6 +45,13 @@ def parse_trades_from_log(lines: list[str], date_str: str = None) -> list[dict]:
     entry_times = {}  # symbol -> entry timestamp
 
     for line in lines:
+        # "[PAPER] Position opened/closed" lines are simulations (paper slots
+        # since 2026-04, paper-main once bot.py's marker lands) — never count
+        # them as real trades in the daily review. NOTE: until the paper-main
+        # log marker ships, a paper-main close is indistinguishable here; the
+        # state file (mode=="paper") is the authoritative filter.
+        if "[PAPER]" in line:
+            continue
         if date_str and not line.startswith(date_str):
             # Also check previous day for entries that opened yesterday and closed today
             pass

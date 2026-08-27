@@ -727,7 +727,13 @@ class RiskManager:
         file with the exact fee."""
         return notional * (Config.MAKER_FEE_PERCENT + Config.TAKER_FEE_PERCENT) / 100
 
-    def close_position(self, symbol: str, exit_price: float, reason: str, fees_usdt: float = None, mode: str = None):
+    def close_position(self, symbol: str, exit_price: float, reason: str, fees_usdt: float = None, mode: str = None,
+                       log_prefix: str = None):
+        # log_prefix: per-call override of self._log_prefix for the close log line.
+        # The main book's shared RiskManager serves real AND paper closes from two
+        # threads (main loop + live-exit watcher); mutating self._log_prefix around
+        # a call could stamp "[PAPER] " onto a concurrent REAL close's line, which
+        # monitor_daemon would then exclude from loss alerts (review 2026-08-26).
         if symbol not in self.positions:
             return
         pos = self.positions.pop(symbol)
@@ -819,8 +825,9 @@ class RiskManager:
         self._save_state()
 
         sign = "+" if pnl >= 0 else ""
+        _prefix = self._log_prefix if log_prefix is None else log_prefix
         logger.info(
-            f"{self._log_prefix}Position closed: {pos.side.upper()} {symbol} | Exit: {exit_price:.4f} | "
+            f"{_prefix}Position closed: {pos.side.upper()} {symbol} | Exit: {exit_price:.4f} | "
             f"PnL: {sign}{pnl:.2f} USDT ({sign}{pnl_pct:.2f}%) | Reason: {exit_reason}"
         )
 

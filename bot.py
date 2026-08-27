@@ -5024,16 +5024,11 @@ class Phmex2Bot:
         self._set_cooldown_if_loss(symbol, pnl_pct)
         fee = _sim_paper_fee(pos.entry_price * pos.amount)
         # monitor_daemon matches "[PAPER]" on "Position closed" log lines to
-        # exclude sims from hourly-loss/streak alerts. Main's RiskManager keeps
-        # is_paper=False (no ledger flip), so borrow the slot wrapper's prefix
-        # mechanism (strategy_slot.py) for just this close — the line comes out
-        # "[PAPER] Position closed: ..." exactly like slot paper closes.
-        _prev_prefix = self.risk._log_prefix
-        self.risk._log_prefix = "[PAPER] "
-        try:
-            self.risk.close_position(symbol, price, reason, fees_usdt=fee, mode="paper")
-        finally:
-            self.risk._log_prefix = _prev_prefix
+        # exclude sims from hourly-loss/streak alerts. Passed per-call (not via a
+        # self.risk._log_prefix swap): the shared RiskManager also serves real
+        # closes from the watcher thread, and a swap could mislabel one of those.
+        self.risk.close_position(symbol, price, reason, fees_usdt=fee, mode="paper",
+                                 log_prefix="[PAPER] ")
         notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price,
                                    pnl, pnl_pct, reason, slot="main")
         logger.info(f"[PAPER MAIN] EXIT {pos.side.upper()} {symbol} @ {price:.4f} | {reason}")

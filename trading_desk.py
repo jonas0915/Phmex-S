@@ -399,14 +399,20 @@ def _build_api_response():
     cycle_events = [e for e in events if e.get("type") == "cycle"]
     latest_cycle = cycle_events[-1] if cycle_events else None
 
+    # Real-money rows only — simulated rows carry mode=="paper" (paper-main
+    # era 2026-08-26); historical rows have NO mode field and are real money.
+    # Everything below (recent, today, pairs, avg win/loss, strat/exit stats,
+    # total_trades) is real-money truth; labeled paper data lives in
+    # paper_data / slots.
+    all_trades = [t for t in state.get("closed_trades", []) if t.get("mode") != "paper"]
+
     # Recent trades (last 10)
-    recent_trades = state.get("closed_trades", [])[-10:]
+    recent_trades = all_trades[-10:]
 
     # Active events for character animations (last 30 events)
     recent_events = events[-30:]
 
     # Today stats
-    all_trades = state.get("closed_trades", [])
     # "Today" rolls at PACIFIC midnight (project rule) — Mac local clock is Eastern
     today_start = datetime.now(ZoneInfo("America/Los_Angeles")).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
     today_trades = [t for t in all_trades if t.get("closed_at", 0) >= today_start]

@@ -49,18 +49,25 @@ main-paper mechanism — main is live-by-filename (risk_manager.py:304), dashboa
       2 independent traces); 1000PEPE untagged → real path proven incl. restart round-trip; authoritative full
       suite 772 passed 0 failed (A1's 798 was mid-build snapshot). Restart safe with halt armed; halt REMOVAL
       gated on HIGH fixes below.
-- [ ] A5 HIGH fixes (dispatched 8:12 PM PT): mcp_server.py 4 tools mode-blind (status/pnl/recent_trades/
-      open_positions blend paper into real answers); monitor_daemon.py paper-blind (log marker missing on paper
-      main closes — bot.py _close_paper_main gets [PAPER] log line — + state-read hardening).
-- [ ] A6 MEDIUM fixes (dispatched 8:12 PM PT): recalibration.py (feeds kill_switch_check!), scanner.py dead
-      is_paper filter, chart/dashboard/trading_desk/war_room/daily_review, code_health entry-health paper-aware.
-- [ ] A7 test hardening (dispatched 8:12 PM PT): behavioral mock tests for 8 textually-verified guards; holistic
-      no-sentinel regression; mode-homogeneous partial-TP group test in adjudicator.
-- [ ] Full suite green after A5-A7
-- [ ] /pre-restart-audit → present checklist → **Jonas says "go"** → restart → verify new PID + paper entry in log
-- [ ] `touch .paper_main` before restart (sentinel present at boot); `.halt_main_entries` stays until paper mode
-      verified live, then rm (ask Jonas to run rm if permission classifier blocks)
-- [ ] memory-sync: record demotion + new sentinel in MEMORY.md / lessons
+- [x] A5 HIGH fixes DONE 8/26 8:22 PM PT: mcp_server 4 tools real-only + paper_* fields (shapes back-compat);
+      monitor_daemon dual-layer paper exclusion (log marker + state-row match) + real-margin drawdown sum;
+      bot.py _close_paper_main logs "[PAPER] Position closed:" via _log_prefix swap (slot mechanism reused).
+      21 new tests; full suite 793 passed 0 failed (=772 + exactly the 21 new).
+- [x] A6 MEDIUM fixes DONE 8/26 8:21 PM PT: 8 files (recalibration loader-level fix — auto_lifecycle feeds it
+      slot files only, contamination path was CLI/COMBINED; scanner dead is_paper→mode; chart/dashboard/
+      trading_desk/war_room/daily_review; code_health real-vs-paper entry recency). 26 new tests; full suite
+      841 passed 0 failed. BONUS LIVE BUG FIXED: daily_review counted paper-SLOT [PAPER] log lines as real
+      trades (today showed 8, truth 5) — pre-existing, now filtered.
+- [x] A7 test hardening DONE 8/26 8:21 PM PT: 22 behavioral tests (paper never reaches exchange + live mirrors
+      non-vacuous; holistic no-sentinel regression w/ sentinel-consult spy at 0; resize15 mode-homogeneity —
+      leaked mixed group drops entirely, conservative). No production bugs found.
+- [x] Full suite after A5-A7: 841 passed, 0 failed
+- [x] /pre-restart-audit PASSED 8/26 8:35 PM PT (review found 1 race in _log_prefix swap → fixed via per-call
+      log_prefix param, suite 841 green) → Jonas "go" 8:42 PM → `.paper_main` touched 8:42 → restart: old 1181
+      killed, NEW PID 99187, cycle #21171 8:44 PM, halt honored, no errors → `.halt_main_entries` REMOVED 8:46 PM.
+      MAIN BOOK NOW PAPER (shorts-only via .block_longs_main). Last real main trade: 1000PEPE short closed
+      8:19 PM trailing_stop +$0.64 (pre-restart, book flat at cutover).
+- [ ] memory-sync: record demotion + new sentinel in MEMORY.md / lessons (in progress)
 
 ## Notes / surfaced per META-RULE
 - Main book was RUNNING WELL at demotion: this week 18 trades +$5.28, 83.3% WR (phmex_pnl 8/26); owner's call.

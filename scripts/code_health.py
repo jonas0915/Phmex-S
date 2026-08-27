@@ -268,26 +268,64 @@ def check_entry_health() -> CheckResult:
                            f"{len(entry_exceptions)} entry-path exception(s) in {NO_ENTRY_WARN_HOURS}h",
                            "\n".join(entry_exceptions[-8:]))
 
-    # last successful filled entry, from state (authoritative) — opened_at is epoch UTC
-    last_entry_age_h = None
+    # last successful filled entry, from state (authoritative) — opened_at is epoch UTC.
+    # Paper-main era (2026-08-26): simulated closed rows carry mode=="paper" and
+    # simulated open positions carry "paper": true. Real and paper recency are
+    # tracked SEPARATELY so sim activity can never masquerade as a healthy real
+    # funnel — and with the .paper_main sentinel present, zero REAL entries is
+    # by design (main demoted to paper) while zero activity of ANY kind still flags.
+    real_age_h = None
+    paper_age_h = None
     try:
         st = json.load(open(STATE_FILE))
         ct = st.get("closed_trades", [])
-        opens = [t.get("opened_at") for t in ct if t.get("opened_at")]
-        # also count an open position as a live entry
-        if st.get("positions"):
-            last_entry_age_h = 0.0
-        elif opens:
-            last_entry_age_h = (time.time() - max(opens)) / 3600.0
+        real_opens = [t.get("opened_at") for t in ct
+                      if t.get("opened_at") and t.get("mode") != "paper"]
+        paper_opens = [t.get("opened_at") for t in ct
+                       if t.get("opened_at") and t.get("mode") == "paper"]
+        positions = st.get("positions") or {}
+        pos_list = list(positions.values()) if isinstance(positions, dict) else list(positions)
+        # also count an open position as a live entry (real vs paper by its tag)
+        if any(not p.get("paper") for p in pos_list):
+            real_age_h = 0.0
+        elif real_opens:
+            real_age_h = (time.time() - max(real_opens)) / 3600.0
+        if any(p.get("paper") for p in pos_list):
+            paper_age_h = 0.0
+        elif paper_opens:
+            paper_age_h = (time.time() - max(paper_opens)) / 3600.0
     except Exception:
         pass
 
-    if last_entry_age_h is not None and last_entry_age_h >= NO_ENTRY_WARN_HOURS:
-        return CheckResult("entry_health", "WARNING",
-                           f"cycling but no filled entry in {last_entry_age_h:.0f}h "
-                           f"(≥{NO_ENTRY_WARN_HOURS}h) — funnel may be over-gated or execution stuck")
-    age_txt = f"{last_entry_age_h:.1f}h ago" if last_entry_age_h is not None else "unknown"
-    return CheckResult("entry_health", "OK", f"cycling, no entry exceptions; last filled entry {age_txt}")
+    paper_main = os.path.exists(os.path.join(BOT_DIR, ".paper_main"))
+    paper_txt = f"{paper_age_h:.1f}h ago" if paper_age_h is not None else "none"
+
+    if paper_main:
+        # Main is paper by design — zero real entries is NOT unhealthy, but a
+        # cycling bot producing NO entries of any kind (real or paper) still is.
+        real_quiet = real_age_h is None or real_age_h >= NO_ENTRY_WARN_HOURS
+        paper_quiet = paper_age_h is None or paper_age_h >= NO_ENTRY_WARN_HOURS
+        real_txt = f"{real_age_h:.1f}h ago" if real_age_h is not None else "none"
+        if real_quiet and paper_quiet:
+            return CheckResult("entry_health", "WARNING",
+                               f"cycling but no entry of ANY kind in ≥{NO_ENTRY_WARN_HOURS}h "
+                               f"(paper-main active; real entry {real_txt}, paper entry {paper_txt}) "
+                               f"— paper funnel may be over-gated or stuck")
+        return CheckResult("entry_health", "OK",
+                           f"cycling, no entry exceptions; paper-main active — "
+                           f"real entry {real_txt}, paper entry {paper_txt}")
+
+    if real_age_h is not None and real_age_h >= NO_ENTRY_WARN_HOURS:
+        msg = (f"cycling but no filled entry in {real_age_h:.0f}h "
+               f"(≥{NO_ENTRY_WARN_HOURS}h) — funnel may be over-gated or execution stuck")
+        if paper_age_h is not None:
+            msg += f" (paper-sim entry {paper_txt} — does not count)"
+        return CheckResult("entry_health", "WARNING", msg)
+    age_txt = f"{real_age_h:.1f}h ago" if real_age_h is not None else "unknown"
+    msg = f"cycling, no entry exceptions; last filled entry {age_txt}"
+    if paper_age_h is not None:
+        msg += f"; paper-sim entry {paper_txt}"
+    return CheckResult("entry_health", "OK", msg)
 
 
 # ── runner ───────────────────────────────────────────────────────────────

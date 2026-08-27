@@ -1,0 +1,52 @@
+======================================================================
+  PHMEX-S DAILY PERFORMANCE REVIEW — 2026-08-26
+======================================================================
+
+  SUMMARY
+  ──────────────────────────────────────────────────
+  Total Trades:    5
+  Wins / Losses:   4 / 1
+  Win Rate:        80.0%
+  Total PnL:       $+3.20
+  Gross Profit:    $3.20
+  Gross Loss:      $0.00
+  Profit Factor:   inf
+  Avg Win:         $0.80
+  Avg Loss:        $0.00
+
+  Best Trade:      SHORT LTC/USDT:USDT | $+1.08 (+14.3%)
+  Worst Trade:     SHORT LTC/USDT:USDT | $+0.00 (+12.7%)
+
+  PNL BY PAIR
+  ──────────────────────────────────────────────────
+  SUI        2t  $+1.38  WR: 100%
+  LTC        2t  $+1.08  WR: 50%
+  1000PEPE   1t  $+0.74  WR: 100%
+
+  PNL BY EXIT REASON
+  ──────────────────────────────────────────────────
+  early_exit           2t  $+2.03  WR: 100%
+  trailing_stop        2t  $+1.17  WR: 100%
+  exchange_close       1t  $+0.00  WR: 0%
+
+  TRADE LOG
+  ──────────────────────────────────────────────────
+  #   Side   Pair              PnL      ROI     Hold Exit Reason
+  ──────────────────────────────────────────────────────────────────────
+  1   SHORT  SUI          +$0.95    +6.3    %   5h 15m early_exit
+  2   SHORT  SUI          +$0.43    +5.7    %   0h 41m trailing_stop
+  3   SHORT  LTC          +$1.08    +14.3   %   1h 29m early_exit
+  4   SHORT  LTC          +$0.00    +12.7   %    0h 1m exchange_close
+  5   SHORT  1000PEPE     +$0.74    +4.9    %   0h 47m trailing_stop
+
+  CUMULATIVE PNL WALK
+  ──────────────────────────────────────────────────
+  Final PnL:       $+3.20
+  Peak PnL:        $3.20
+  Max Drawdown:    $0.00
+  Max Win Streak:  3
+  Max Loss Streak: 1
+
+======================================================================
+  Generated: 2026-08-26 20:20:23
+======================================================================
