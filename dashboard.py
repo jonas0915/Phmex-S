@@ -28,6 +28,12 @@ def read_state() -> dict:
         return {"peak_balance": 0, "closed_trades": []}
 
 
+def _real_trades(trades: list[dict]) -> list[dict]:
+    """Real-money rows only. Simulated rows carry mode=="paper" (paper-main
+    era 2026-08-26); historical rows have NO mode field and are real money."""
+    return [t for t in trades if t.get("mode") != "paper"]
+
+
 def tail_log(n: int = 200) -> list[str]:
     try:
         result = subprocess.run(
@@ -43,6 +49,8 @@ def parse_open_positions(lines: list[str]) -> list[dict]:
     """Find currently open positions from recent log entries."""
     positions = {}
     for line in lines:
+        if "[PAPER]" in line:
+            continue  # paper-slot / paper-main sim lines — not real positions
         m = re.search(r'Position opened: (\w+) ([\w/:.]+) \| Entry: ([\d.]+)', line)
         if m:
             side, symbol, entry = m.group(1), m.group(2), float(m.group(3))
@@ -118,7 +126,9 @@ def get_recent_activity(lines: list[str], n: int = 8) -> list[str]:
 def render(state: dict, lines: list[str]):
     os.system("clear")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    trades = state.get("closed_trades", [])
+    all_rows = state.get("closed_trades", [])
+    trades = _real_trades(all_rows)  # stats + recent trades = real money only
+    paper_count = len(all_rows) - len(trades)
     stats = compute_stats(trades)
     positions = parse_open_positions(lines)
     cycle = parse_latest_cycle(lines)
@@ -141,6 +151,8 @@ def render(state: dict, lines: list[str]):
     print(f"  Total PnL: ${stats['total_pnl']:+.2f}")
     print(f"  Avg Win: ${stats['avg_win']:.2f} | Avg Loss: ${stats['avg_loss']:.2f}")
     print(f"  Profit Factor: {stats['profit_factor']:.2f}")
+    if paper_count:
+        print(f"  Paper (sim): {paper_count} trades — excluded from stats above")
 
     # Open positions
     print(f"\n  {'─' * 50}")

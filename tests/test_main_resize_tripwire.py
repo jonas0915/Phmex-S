@@ -69,3 +69,31 @@ def test_trip_is_idempotent_preserves_existing_sentinel(tmp_path):
     r = adj.grade_main_resize15(trades, CFG, bot_dir=str(tmp_path))
     assert r["status"] == "TRIP"
     assert sentinel.read_text() == "owner halt 2026-07-31\n"  # not clobbered
+
+
+# ── main-book PAPER mode (.paper_main demotion, 2026-08-26) ────────────────
+def test_paper_rows_never_trip(tmp_path):
+    # Simulated fills (mode="paper") must never advance the registered
+    # real-money tripwire — even a deep sim loss writes NO sentinel.
+    trades = [dict(_t(-1.0, opened_off=i * 10), mode="paper")
+              for i in range(12)]  # sim net -12, would hard-trip if counted
+    r = adj.grade_main_resize15(trades, CFG, bot_dir=str(tmp_path))
+    assert r["status"] == adj.WATCH
+    assert r["n_trades"] == 0  # line holds at last real-money state
+    assert not os.path.exists(tmp_path / ".halt_main_entries")
+
+
+def test_paper_rows_excluded_real_rows_still_group(tmp_path):
+    # Mixed ledger: a real partial-TP pair (no mode field, shared
+    # symbol+opened_at — the 8/17 re-registered counting) still groups into
+    # ONE trade; paper rows drop BEFORE grouping and never contribute.
+    half_a = dict(_t(1.0, margin=7.5, opened_off=100), symbol="BTC/USDT")
+    half_b = dict(_t(0.5, margin=7.5, opened_off=100), symbol="BTC/USDT")
+    sims = [dict(_t(-2.0, opened_off=200 + i * 10), mode="paper")
+            for i in range(5)]  # sim net -10
+    r = adj.grade_main_resize15([half_a, half_b] + sims, CFG,
+                                bot_dir=str(tmp_path))
+    assert r["n_trades"] == 1                # one grouped real trade
+    assert abs(r["net_usd"] - 1.5) < 1e-9    # sim -10 never entered
+    assert r["status"] == adj.WATCH
+    assert not os.path.exists(tmp_path / ".halt_main_entries")

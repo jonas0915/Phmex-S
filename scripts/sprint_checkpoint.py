@@ -63,6 +63,7 @@ def live_pnl_since_sprint() -> dict:
     trades = [
         t for t in state.get("closed_trades", [])
         if t.get("closed_at", 0) >= SPRINT_START
+        and t.get("mode") != "paper"  # real fills only (8/26 main paper demotion)
     ]
     if not trades:
         return {"trades": 0, "net_pnl": 0.0, "win_rate": 0.0}

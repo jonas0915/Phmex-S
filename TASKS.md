@@ -1,352 +1,69 @@
-# TASK: 5m_MR ledger trio (2026-08-01 owner: "how do we fix those weak points") — DONE 8/1
+# TASKS — Main book → PAPER (owner order 8/26 7:26 PM PT)
 
-Three parallel read-only analyses (reports/2026-08-01-mr-*.md, artifacts scripts/research/mr-*-2026-08-01/):
-- [x] Trend-day fuse replay: NULL — 0 trades prevented, $0.00 both eras; anti-clustering prior confirmed; CLOSED
-- [x] Timeout entry-signature mine: NULL — 0/36 tests survive; timeouts net +$0.20 (capacity drag, not loss engine); recheck at ~10 live timeouts, spread_pct single hypothesis
-- [x] Long/short split: SUPPORTED — live shorts 83% WR +$16.57 vs longs 29% WR −$1.17, diff CI [−2.99,−0.03]; paper era same sign; PROPOSED (owner-gated, not taken): adjudicator line KILL long side if next-8-live-longs net ≤ 0
-- [ ] OPEN FOLLOW-UP: MR paper-eval TypeError wrapper warnings (bot.log.1 7/29) — same family as SR_BOUNCE fatal wrapper bug; investigate htf_df drop on MR paper path
-- [ ] Awaiting owner: register the long-side verdict line? (zero behavior change until verdict)
+Owner order: "put the main book on paper" + "make sure this reflects on the dashboard".
+Preflight done (lessons.md + MEMORY.md + code map, 2 agents, 8/26 7:31 PM PT). Finding: no existing
+main-paper mechanism — main is live-by-filename (risk_manager.py:304), dashboard hardcodes main LIVE
+(web_dashboard.py:548). Build required.
 
----
+## Interim safety (DONE)
+- [x] `touch .halt_main_entries` 8/26 7:32 PM PT — main entries blocked instantly, no restart, 0 open positions at cut.
 
-# TASK: MR-universe ranginess scan (2026-07-31 ~10 PM PT, owner: "execute on #1") — DONE 8/1: DO-NOT-BUILD
+## Conventions (all agents follow these)
+- Sentinel: `.paper_main` in repo root, checked fresh via `_main_paper()` helper next to `_longs_blocked` (bot.py:75).
+- Paper positions tagged `"paper": true` in the position dict at open; exits/reconciler/trail branch on the
+  POSITION's tag, not the live sentinel (no mixed-state if sentinel toggles mid-position).
+- Closed rows tagged `mode="paper"`. Main's RiskManager `is_paper` stays False (no gross→net ledger flip mid-file,
+  risk_manager.py:745). Historical main rows have NO mode field = real money; new paper rows have mode="paper".
+- Paper fills use `_fresh_paper_entry_price` (as slots do, bot.py:3275). Simulated SL/TP mirror bot.py:4832-4844.
 
-Thesis: gainer-ranked scanner feeds 5m_MR trend-optimized pairs; test a ranginess-ranked
-top-8 (R1 ADX<25 fraction × R2 band-revert rate, 7d rebalance) vs gainer-proxy control.
-Prereg FROZEN: docs/superpowers/specs/2026-08-01-mr-universe-ranginess-scan-prereg.md
-(train 70% eligibility: net>0 AND ≥control AND ≥1.5× control trades/day; one holdout read).
-Universe-selection only — live slot, gates, strategy untouched. Background agent running;
-report lands at reports/2026-08-01-mr-universe-scan.md.
+## Build (parallel agents)
+- [x] A1 bot.py DONE 8/26 7:55 PM PT: _main_paper() + paper entry branch (all gates identical, zero exchange
+      calls); all 7 exit sites + watcher + trail + SL-verify + startup place_sl_tp + partial-TP branch on
+      POSITION tag; sim SL/TP rides existing software-exit loop (sim trailing free); reconciler excludes tagged
+      positions (phantom-close tested); daily-loss halt + Kelly + STATS exclude mode=="paper".
+      DEVIATION (justified): risk_manager.py edited — Position.paper persisted across restart (else restart
+      strips tag → real SL/TP placed for phantom), partial_close mode=, Kelly/STATS filters. 25 new tests.
+      FULL SUITE: 798 passed, 0 failed.
+- [x] A2 web_dashboard.py DONE 8/26 7:45 PM PT: _main_paper() + _split_main_rows() (split by row's OWN mode,
+      never sentinel); PAPER badge both main cards (coexists w/ HALTED + SHORTS-ONLY); no-mode rows never pass
+      honest filter (8/12 leak class regression-tested both sentinel states); paper stats on separate "paper (sim)"
+      row; equity/ticker/blotter/positions paper-aware. 17 new tests; 100 passed 0 failed across dashboard modules.
+      Note: blotter strategy-chip WRs already blend live+paper by design (pre-existing) — flag to owner.
+- [x] A3 adjudicator + reports DONE 8/26 7:44 PM PT: _real_rows() filter on all registered lines incl. side lines
+      + trail_arm + sizing; tripwire unreachable from sims (tested to sim −$12); digest PAPER banner; daily_report
+      real/paper split + Telegram paper line. 77 passed on owned modules (15 new) + 17 adjacent. Full suite deferred
+      to post-build gate.
+- [x] A4 mode-blind consumers DONE 8/26 7:51 PM PT: 10 scripts fixed w/ uniform `mode != "paper"` predicate —
+      overwatch (4 checks + position-desync phantom-alarm the sweep missed), telegram /status "+n paper sim",
+      reconcile_phemex/backfill_fees structurally can't touch sim rows, strategy_tracker (old-vs-new identical
+      −$126.10/14 files), weekly_forensics, auto_lifecycle, symbol_pnl_audit, postentry_drift, sprint_checkpoint.
+      16 new tests; 36 passed 0 failed. Zero mode="paper" rows exist today → all filters verified no-op.
+      DEPENDENCY: overwatch desync check needs open paper positions tagged "paper": true (A1 convention).
+- [ ] NOTE: real 1000PEPE short opened 7:32:24 PM PT (same minute as halt, boundary trade) — last real main trade;
+      untagged → follows real close path by design; main flat once it closes.
+- [ ] A1 addendum (sent 7:45 PM PT): bot-side daily-loss halt / era loss cap / DD / Kelly sums must exclude
+      mode=="paper" rows; paper rows well-formed for reconcile matching.
 
-- [x] Prereg written + frozen
-- [x] Scan agent ran (1 stall at 10:30 AM re-kicked; numpy-json crash fixed+rerun, metrics reproduced)
-- [x] Numbers verified vs results.json independently
-- [x] Verdict: DO-NOT-BUILD — train cond1 FAIL (−$0.020/t), cond3 FAIL (0.97x control freq vs 1.5x needed); holdout quality reversed (noise); memory reference_mr_universe_scan_2026-08-01 saved
+## After build
+- [x] Cross-audit DONE 8/26 8:11 PM PT: PASS-WITH-NOTES. No real-order leaks (all ~58 exchange call sites traced,
+      2 independent traces); 1000PEPE untagged → real path proven incl. restart round-trip; authoritative full
+      suite 772 passed 0 failed (A1's 798 was mid-build snapshot). Restart safe with halt armed; halt REMOVAL
+      gated on HIGH fixes below.
+- [ ] A5 HIGH fixes (dispatched 8:12 PM PT): mcp_server.py 4 tools mode-blind (status/pnl/recent_trades/
+      open_positions blend paper into real answers); monitor_daemon.py paper-blind (log marker missing on paper
+      main closes — bot.py _close_paper_main gets [PAPER] log line — + state-read hardening).
+- [ ] A6 MEDIUM fixes (dispatched 8:12 PM PT): recalibration.py (feeds kill_switch_check!), scanner.py dead
+      is_paper filter, chart/dashboard/trading_desk/war_room/daily_review, code_health entry-health paper-aware.
+- [ ] A7 test hardening (dispatched 8:12 PM PT): behavioral mock tests for 8 textually-verified guards; holistic
+      no-sentinel regression; mode-homogeneous partial-TP group test in adjudicator.
+- [ ] Full suite green after A5-A7
+- [ ] /pre-restart-audit → present checklist → **Jonas says "go"** → restart → verify new PID + paper entry in log
+- [ ] `touch .paper_main` before restart (sentinel present at boot); `.halt_main_entries` stays until paper mode
+      verified live, then rm (ask Jonas to run rm if permission classifier blocks)
+- [ ] memory-sync: record demotion + new sentinel in MEMORY.md / lessons
 
----
-
-# TASK: SR_BOUNCE v2 — fixed geometry era (2026-07-30, owner order "Set 2.5% on 10x leverage and then 1.5% sl" → "SR_Bounce. 25% roi") — DEPLOYED 7/30 9:52 PM PT PID 63222 (Jonas "Go"; boot verified: slot ACTIVE 0 trades, no halts, 5m_MR LIVE intact)
-
-Re-arm SR_BOUNCE with fixed TP 2.5% price (25% ROI @10x) / SL 1.5% price (−15% ROI),
-replacing structural zone exits. Era 1 (structural) closed KILL at n=50 (net −$0.79,
-23W/27L, neg Kelly −0.076, auto-killed 8:24:54 PM PT 7/30). New era = new experiment,
-fresh ledger, own adjudicator verdict line; era-1 KILL stays final.
-
-- [x] 1. Prereg spec: docs/superpowers/specs/2026-07-30-sr-bounce-v2-fixed-geometry-prereg.md
-- [x] 2. strategy_slot.py: add `exact_geometry: bool = False` field
-- [x] 3. bot.py registration: SR_BOUNCE sl_percent=1.5, tp_percent=2.5, exact_geometry=True
-- [x] 4. bot.py paper entry shim: exact_geometry slots use slot pcts verbatim (atr=0); structural override + stale-skip bypassed for them
-- [x] 5. bot.py live entry site: gate structural stale-check on `not slot.exact_geometry` (consistency; SR_BOUNCE has no live path)
-- [x] 6. adjudicator: pin era-1 grader to trading_state_SR_BOUNCE_era1.json (KILL final stays in digest); add sr_bounce_v2 line (verdict n=50, KILL net<=0, net AS-IS fee-inclusive)
-- [x] 7. dashboard: verify SR_BOUNCE card handles fresh era (no code change expected)
-- [x] 8. tests: exact_geometry shim + v2 grader + fix era-1 assertions; FULL suite green
-- [x] 9. rotate_sr_bounce_era.sh RAN CLEAN at deploy (era1 archived n=50, killed_at cleared)
-- [x] 10. parallel review agents (code + spec audit)
-- [x] 11. /pre-restart-audit — PASSED; STOPPED at owner "go" gate (other session PID 10880 must be closed before restart)
-
-## Review
-Spec audit: GO. Geometry verbatim-verified end-to-end (entry 100 → SL 98.5 / TP 102.5);
-era-1 ledger recomputed independently (n=50, net −$0.7915, 23W/27L, −$0.0158/t); BE-WR
-40.5% verified against the real fee model (0.12% RT of notional; paper funding is $0).
-Code review: NO BLOCKERS. Other-slot isolation airtight (exact_geometry=True count==1,
-False path byte-equivalent to old behavior); killed_at=null re-enables via falsy check;
-no .kill_SR_BOUNCE sentinel on disk; auto_lifecycle can't touch SR_BOUNCE; closed_at and
-deployed_ts both epoch-seconds, era guard has ~39 min margin. Fixed from review: prereg
-now records the 240-cycle (~4h) hard time exit as a third exit (era 1 never tripped it —
-all 50 exits SL/TP — but v2's wider target will); timestamps corrected to actuals (kill
-8:24:54 PM PT, last close 8:20:50 PM PT); rotate script refuses undecided ledger
-(killed_at unset); exact_geometry without both pcts now raises at construction;
-SR_BOUNCE_era1 archive skipped as phantom slot in dashboard cards/desk/today-sums but
-kept in blotter (real history, not a v8-style duplicate). Final suite: 639 passed / 0
-failed (my run; agent-reported totals not trusted per 7/29 lesson). Pre-restart audit:
-all .py compile, rotate script zsh -n clean, no lessons.md parameter conflicts,
-Good-bot not running. Restart NOT executed — owner go pending.
-
----
-
-# TASK: Safety + audit-rules bundle → HTF_L2 LIVE re-promotion (2026-07-23, Jonas GO "but not paper — live testing") — IN PROGRESS
-
-U1 quiet_regime hard-block HTF_L2 slot (57% of slot loss, 0 quiet winners) · U2 cross-book
-ownership + shared daily cap (ETH chase −$1.48) · U3 account-wide daily $5 halt + hoist above
-early returns · U4 DD peak persistence + hysteresis + MAX_DRAWDOWN=20 wired (forward peak,
-NOT retro-46.36) · U5 telemetry (slot peak_price, paper fee subtraction; funding/fee-est = ship
-or spec) · U6 era-based loss cap (fresh −$5 budget per promotion; lifetime −$6.22 would
-insta-demote otherwise).
-
-- [x] TDD build — 590 passed (+43), all 6 units; U5b paper-fee claim DISPROVEN (recon agent
-      double-subtracted — memory corrected); U5c (funding + fee-est) SPECCED not shipped
-- [x] Audit agent — GO, independent 590/0; false-halt risk cleared vs on-disk state; caught
-      that old halt path would have Telegram-spammed (new code writes sentinel once);
-      flags: ghost-slot-position could block main (pre-existing, new consequence — follow-up),
-      cap day-boundary UTC vs halt PT (pre-existing), 2 substring-only wiring tests (harden later)
-- [x] Restart 7/23 9:53 PM PT PID 84738 — no false halts, peak preserved 33.96, ADA short
-      restored ($18.85 free = total ~$33.85 minus locked margin)
-- [x] .promote_HTF_L2 processed 9:54:36 PM — LIVE, fresh era budget (promoted_at stamped),
-      paper BTC flushed promote_reset −$0.53
-- [x] Memory + MEMORY.md updated
-
----
-
-# TASK: VWAP_CROSS owner-strategy paper slot (2026-07-20, Jonas: "build my vwap strategy as a paper slot") — IN PROGRESS
-
-Jonas's rule as its own $0 forward test: 9/15 SMA cross (K=3 recency) + price beyond 5m & 15m
-session VWAP, both sides; SL 1.0/TP 2.4 (same as HTF_L2 slot, effective 2:1 via TP cap);
-paper-only, adjudicator report-only. Prior receipts stand: as a FILTER on htf_l2 = rejected
-7/20; as a standalone SCAN = DOA 7/6. This is the forward-test adjudication of the idea.
-
-- [ ] TDD build agent (strategies.py fn + slot + config + adjudicator + dashboard + tests) — RUNNING
-- [ ] Full suite + audit pass on diff
-- [ ] Pre-restart audit -> restart -> verify slot paper entries
-- [ ] Memory + MEMORY.md
-
----
-
-# TASK: htf_l2 PAPER slot + exit-geometry redesign (2026-07-18, Jonas: "paper slot it… make it 68% WR, winners > losers") — IN PROGRESS
-
-Owner override noted: exit-geometry levers were closed for LIVE (7/6); this re-opens them for a
-PAPER variant only. Target (68% WR AND avg win > avg loss) is a hypothesis to test in replay —
-pre-register whatever the data actually supports. Main stays HALTED; real money untouched.
-
-- [x] Agent A: implementation spec for HTF_L2_PAPER slot — DONE, all anchors verified. Key:
-      slot needs explicit flow-passing branch (ST2.0 trap); per-slot SL/TP override must be
-      built (minimal ext to StrategySlot + open_position, None=inherit); F5 gate reusable
-      strategy-keyed; halt verified NOT to gate slots; snapshot conf=0 + missing htf_adx
-      parity bugs to fix; 15 tests specced
-- [x] Agent B: geometry sweep DONE (agent stalled post-compute; orchestrator synthesized from
-      artifacts + verified sim code). 240 configs × 2 books, 1m-path replay, live trail/partial
-      mechanics mirrored, conservative SL-first. VERDICT: 0/240 configs reach WR≥68 on either
-      book (max ~63%) — 68%∧winners>losers unreachable, trade-off confirmed. BUT 154/240
-      residual configs get avgW>avgL; best: SL−10%/TP+24% ROI no-partial no-trail → WR 47.7%,
-      ratio 1.40, net +$20.60 (vs baseline +$8.15); SL12/TP16 no-partial → ratio 1.04,
-      +$21.65. ALL CIs include 0 (in-sample). Slot structurally has no partial/trail → configs
-      directly realizable via env. Caveats: sim 24h cap vs slot 240-min hard exit truncation;
-      sim optimistic ~$10 vs actual baseline (no SL slippage).
-- [x] Agent C (Jonas 7/18: "stop entering non-winning trades"): mine reconstructable
-      indicator features (RSI/EMA/VWAP/ATR stretch — the F7 family, never historically
-      recorded) vs winner/loser on the 215-trade ledger + residual book; placebo-guarded,
-      multiple-testing-discounted; survivors → flag-controlled pre-registered slot filter
-      spec. Known-null families excluded (L2 conf, tape, gates, time — receipts). DONE:
-      NO deployable filter — all splits fail family-wise placebo (residual best p=0.617,
-      conjunction p=0.127); one real finding (losers ~1 ATR more stretched past VWAP,
-      Bonferroni-surviving) → pre-registered WATCH-ONLY on F7 telemetry at n≥30; entry-axis
-      now fully exhausted. Orchestrator-verified vs artifacts. Memory:
-      reference_htf_l2_entry_features_2026-07-18.md
-- [x] Synthesize: recommendation = HTF_L2_PAPER_SL_PCT=1.0, HTF_L2_PAPER_TP_PCT=2.4 (−10%/+24% ROI), presented to Jonas w/ kill-criteria shape (numbers owner-set)
-- [x] Implement via TDD — DONE: slot registration (env-gated builder), flow-passing branch,
-      ACTIVE thin∧ADX gate (gotAway reason thin_adx_paper_slot), ensemble conf<4 hard-block
-      + counter, snapshot parity fix (real conf + htf_adx, ALL slots), F6 cell tags, per-slot
-      sl_percent/tp_percent (None=inherit, regression-pinned), adjudicator REPORT-ONLY grader
-      (kill lines OWNER-SET pending), dashboard box. Suite 530 passed / 0 failed, py_compile
-      clean. Deviations logged in agent report.
-- [x] Audit agent on diff — GO. Independent suite re-run 530/0; paper purity proven (static
-      trace + tests whose exchange stub would AttributeError on any real order); live-path
-      regression byte-identical (all pre-existing open_position callers keyword-only);
-      F5 gate semantics parity confirmed; results[4] pinned by test; reporting propagation
-      consistent w/ convention. 1 informational: .promote_HTF_L2_PAPER has no code-level
-      refusal (matches existing promotable-slot architecture; promotion not authorized is
-      comment-level) — surface at go-gate.
-- [x] CHANGE OF PLAN (Jonas 7/20: "make this trade live again"): loss_cap −999→−5 (live rail,
-      5m_mean_revert precedent) + geometry defaults SL 1.0/TP 2.4 in config.py (.env append
-      tool-blocked); suite 530/0; pre-restart audit PASS (params clean, review agent PASS incl
-      restart-geometry-revert scenario, Good-bot down) → restart 7:56 PM PT PID 57365 → first
-      paper entry 8:01 PM (gate-passed) → PROMOTED LIVE 8:05 PM PT via .promote_HTF_L2_PAPER
-      (paper BTC flushed promote_reset −$0.10 by design; mode file verified paper_mode:false,
-      loss_cap −5). Main path stays halted.
-- [ ] Watch: first [SLOT LIVE] entry + exchange SL placement; adjudicator line 6 AM PT;
-      owner kill criteria still unset (suggested: verdict n=40, kill if net ≤ $0)
-- [x] Memory: project_htf_l2_live_slot_2026-07-20.md + MEMORY.md updated; lessons grade at session end
-
----
-
-# TASK: htf_l2 debug fix program (2026-07-17, Jonas: "fix those issues") — IN PROGRESS
-
-Scope confirmed by owner: fix the issues found in the 3-round debug. Strategy fixes are
-INERT while .halt_main_entries stands; un-halt remains Jonas's call. Full evidence:
-reports/2026-07-17-htf-l2-action-plan.md + memory reference_htf_l2_diagnosis_2026-07-16.md.
-
-Order (safety first, then strategy defects, one TDD cycle each, batch audited fixes → ONE restart):
-- [x] F1 (LIVE MONEY): pause branch services slots before return + `_slot_entries_blocked()`
-      helper on BOTH slot entry branches (paper gap closed) — 4 tests
-- [x] F2: `cancel_entry_orders` (reduceOnly-safe) + one-shot pause-edge sweep, flag
-      CANCEL_ENTRIES_ON_PAUSE=true, Telegram alert — 6 tests
-- [x] F3: `_pending_cancel_sweep` registry + `sweep_pending_cancels()` per cycle beside
-      reconcile; 24h TTL → Telegram; sweep never adopts — 8 tests
-- [x] F4: Position.adopted/adopted_at set by sync_positions + orphan-adopt, wired through
-      save/load + both closed-trade sites — 7 tests
-- [x] F5: `_thin_adx_blocked()` conjunction gate (HTF_BLOCK_ADX_MIN=35, HTF_BLOCK_TAPE_MAX=20,
-      HTF_THIN_ADX_BLOCK_ENABLED=true), gotAway reason "thin_adx", inert while halted — 6 tests
-- [x] F6: ensemble blocks → gotAway("ensemble_confidence"); main-path pos.gate_tags written
-      (sg_htf_adx_hi / sg_thin_tape / shadow axes; "none" when clean) — 3 tests
-- [x] Full suite 505 passed, py_compile clean, __pycache__ cleared; all RED phases watched fail
-- [x] Audit agent on total diff: clean on all 6 fixes + 3 findings (gate_tags not persisted,
-      THIN-ADX invisible on dashboard label_map, TSM/Donchian paper paths pause-blind) —
-      ALL 3 FIXED + tested (tests/test_audit_findings_0717.py, 4 tests; Donchian guard blocks
-      only exposure INCREASES so de-risking still runs; helper hardened for early-startup)
-- [x] Suite: 509 passed. py_compile clean. __pycache__ cleared.
-- [x] Jonas "go" → restarted 7/17 5:18 PM PT PID 19587 → verified (sentinel honored, slots
-      serviced, no errors); re-restarted 7/18 4:52 PM PT PID 5315 after reboot incident —
-      F7 snapshot extension now live
-NOT in scope (standing directives): exit-geometry changes, existing-gate removals (quiet_regime
-stays), throttle redesign (deliberate cluster-risk design, PnL impact unquantified), un-halt.
-
----
-
-# TASK: STATS line halt-proof fix (2026-07-16 evening) — COMPLETE ✅
-
-Bug (confirmed by 4-agent debug): the every-10-cycles `=== STATS ===` log line
-(risk_manager.py:900) is emitted at the END of `_run_cycle` (bot.py:2086), after
-three early returns — regime pause (~1496), `_trading_paused` (~1511), and
-`.halt_main_entries` (~1530). Since the 7/13 main-entries halt, zero STATS lines
-printed → web_dashboard `_latest_balance` (:1143), trading_desk stats parser (:98),
-scripts/daily_report.py (:144), and monitor_daemon all read balance $0 /
-drawdown 0% or 100%.
-
-Fix: extract the STATS block into `_maybe_print_stats()` and call it once, right
-after `update_peak_balance(real_balance)` (~bot.py:1488), BEFORE all early
-returns. Remove the old inline block at 2086-2097. Content is identical:
-print_stats reads only closed_trades (finalized before the balance fetch) and the
-passed-in real_balance. The 2026-04-26 API-failure guard (skip when available==0
-with margin in use) is preserved verbatim.
-
-## Plan
-- [x] Preflight (lessons.md META-RULES, MEMORY.md) — done at session start
-- [x] Root cause verified with file:line evidence (dashboard-debug agent)
-- [x] RED: tests/test_stats_halt_visibility.py — 4 tests, all watched fail (AttributeError + ordering assert)
-- [x] GREEN: `_maybe_print_stats` added (bot.py:2104), call moved to bot.py:1494, old block deleted
-- [x] Full suite 467 passed (463 + 4 new) + py_compile clean + __pycache__ cleared
-- [x] Review agent: PASS, zero findings ≥80; guard semantics, single call site, cadence all confirmed
-- [x] Lessons crosscheck: no numeric params changed; no STATS/print_stats conflicts in memory
-- [x] Restart on Jonas "go" — 9:00 PM PT, PID 83245, boot clean (3 paper positions
-      restored, balance 41.90, sentinel honored)
-- [x] FOLLOW-UP FIX (Jonas "fix it" 9:05 PM): web_dashboard `_latest_balance` regex
-      only matched STATS `Balance:` — blind for <=10 cycles after every restart.
-      Widened to `[Bb]alance:` so the boot line `Starting balance: X USDT`
-      (bot.py:751) also counts; most-recent-wins. TDD: 2 red -> green, 15 dashboard
-      tests pass. Dashboard-only restart (PID 86987, 9:06 PM PT); stdout now logs to
-      ~/Library/Logs/Phmex-S/web_dashboard.log (was /dev/null). VERIFIED live:
-      ticker BAL $41.90 / DD 9.6% at 9:07 PM PT.
-- [x] Confirmed: first post-restart STATS line 9:13 PM PT WITH halt sentinel active
-      (`=== STATS === ... Balance: 41.90 USDT | Drawdown: 9.6%`) — fix proven live;
-      dashboard ticker matches ($41.90 / 9.6%)
-
-## Review
-- Diff: bot.py only (+ this file + new test file). reports/2026-07-16.md diff is the
-  bot's own 8:22 PM report regeneration, not part of this change.
-- Reviewer's minor note (~55 conf, immaterial): rare `min_margin_skip` close at
-  bot.py:2001 now lands after the STATS print instead of before — consumers parse
-  only the Balance field, so no impact on the fix target.
-
----
-
-# TASK: Donchian Ensemble Slot build (2026-07-16) — DEPLOYED (paper) ✅
-Restart 7/16 7:39 PM PT (PID 47206, Jonas go). Halt honored; 0 errors. DAY-ONE FIDELITY
-PERFECT: paper book == pure-rule replica to 1e-8 (BTC w=0.2336 = $23.36 @ 1x, SL 0/no TP;
-ETH w=0.2350). Both = legitimate 3-4/9 fast-lookback probes, vol-scaled. Known cosmetic:
-generic entry log prints 10x/SL/TP pre-overwrite — final state verified correct.
-Owner go: Jonas "build it". Spec: docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md
-Evidence: reports/2026-07-16-wake-report.md §0.4 (OOS SIDESTEPPED verdict).
-
-- [x] 1. `donchian_slot.py` (321 lines): frozen constants, pure math, atomic state, replica
-      sidecars. GOLDEN FIDELITY: max |w_prod − w_replay| = 2.9e-15 over 518 days; incremental
-      advance bit-exact vs batch fold.
-- [x] 2. bot.py wiring: DONCHIAN_BTC/ETH paper slots + `_evaluate_donchian` in
-      `_evaluate_all_slots` after TSM; per-coin isolation; live-order path REFUSES even if
-      promoted (paper-only invariant in code).
-- [x] 3. Tests: 30 new (golden micro-cases, rebalance rules, state roundtrip/idempotency/
-      reseed, CSV regression anchors, wiring) — tests/test_donchian_slot.py.
-- [x] 4. Reporting: dashboard + daily_report glob trading_state_* generically (verified
-      static); sidecars deliberately non-trading_state-named (no phantom slots). Live-surface
-      check after restart.
-- [x] 5. Adversarial review: 9/9 PASS, zero issues ≥80. BONUS FINDING FIXED: pre-existing
-      `.kill_*` handler sent real exchange orders for PAPER slots (could reduce a real
-      overlapping position); now routes paper slots through _close_slot_position (paper book,
-      WS-price/entry fallback) — +3 targeted tests (tests/test_kill_paper_slot.py).
-      FULL SUITE: 463 passed. py_compile clean.
-- [ ] 6. Jonas "go" → restart (rm -rf __pycache__) → verify first daily eval, replica
-      agreement, [SLOT] lines, dashboards
-- [x] Rollback: `.kill_DONCHIAN_*` now genuinely zero-market-risk (fix above) / revert commit
-
----
-
-# TASK: Overnight research program (2026-07-13 10 PM → 7-14 ~1:30 AM PT) — COMPLETE
-
-Goal: improve 5m_mean_revert trading + consistency. 11 agents (6 research, 2 web, 2 adversarial
-verify, 1 review) + 1 follow-up test. Full results: reports/overnight-2026-07-14-morning-report.md
-
-## Staged (inert until your go — nothing deployed)
-- [x] V17 knob: strategies.py SHORT RSI threshold parameterized as MR_SHORT_RSI_MIN (default 70
-      = today's behavior). Compile OK, 430/430 tests, review agent clean, verified CONFIRMED-
-      WITH-CAVEATS (adversarial). TO ARM: add `MR_SHORT_RSI_MIN=65` to .env → /pre-restart-audit
-      → restart. Expected ~$1-2/mo at current size (scaling-rights test, NOT a needle-mover).
-      KILL CRITERIA: cohort = live MR shorts w/ entry RSI(7) in (65,70] (RSI is in signal reason);
-      hard kill at cohort net ≤ −$5 or 3 consecutive cohort SL losers; review at 30 cohort fills
-      (~2 mo, net<0 → revert); adjudicator CI at 60. REVERT: set 70 / remove line + restart.
-
-## Adjudicated tonight — do NOT revisit (receipts in morning report)
-- [x] Taker fills for MR: DEAD (maker +$7.83 vs taker −$24.22, 3/3 folds negative)
-- [x] Loosening confluence/ADX/longs: DEAD; strength gate 0.80 INERT (emits ≥0.85)
-- [x] Rest extension 60-300s + 2nd requote: DEAD (late fills toxic, monotonic decay; watchdog
-      blocker; prior "misses were winners" partly a placement-price artifact — corrected)
-- [x] OB-imbalance gate removal: REFUTED by verification (4/4-wins CI vacuous, p=0.0625,
-      double-count in cohorts) — GATE STAYS; re-run gate_block_counterfactual.py at n≥10 (~6-8 wk)
-- [x] H1 chase-vs-anchor requote: refuted on own data; H3 candle-turn: NULL/underpowered
-      (passive re-check at 60-80 real trades); H2 depth + LimitIfTouched: parked (live-only A/B)
-- [x] Amend-preserves-queue on Phemex: undocumented, assume NO
-- [x] Symbol map: 1000PEPE only CI+ symbol; curated book fails most-recent fold — data only
-
-## Jonas actions (morning)
-- [ ] PT fee toggle (10% off maker+taker, confirmed official) — PT into futures wallet + flip
-- [x] Decide: arm MR_SHORT_RSI_MIN=65 forward test? → **JONAS 7/15: DO NOT ARM, leave as is.**
-      (2nd independent adversarial verify concurred: diff-CI straddles 0, double selection bias,
-      most-recent fold breakeven, kill-gate ~4 mo away at ~8% live fills. Knob stays dormant @70.)
-- [ ] Held from last night: min-margin $20 (needs TRADE_AMOUNT_USDT too + weekend cap literal
-      bot.py:1830; MIN_TRADE_MARGIN alone only tightens crumb guard — see forensics in chat)
-
----
-
-# TASK: Halt main-bot entries, keep 5m_mean_revert + ETH-TSM (2026-07-13)
-
-## Why
-Session audit (5 agents, cross-verified against state files): main bot is gross-negative
-(gross WR 53.9% < 58.8% break-even) and never had a profitable month (lifetime ≈ −$110).
-Owner directive: halt everything except the 5m_mean_revert live slot and the ETH-TSM paper
-probe. Runtime check confirmed the ONLY real-money exposure is (a) the main bot scalper
-(Config.STRATEGY=confluence → confluence_strategy wrapper → htf_l2_anticipation signals) and
-(b) 5m_mean_revert (live). Everything else already paper (ST2.0/liq_cascade/narrow/ETH-TSM).
-
-## Mechanism
-`.pause_trading` is WRONG: its `return` at bot.py:1452 fires BEFORE the slot evaluators
-(_evaluate_slots @2022, _evaluate_eth_tsm @2030), freezing slot software-exits. Instead add a
-`.halt_main_entries` sentinel that skips only the main entry loop but still services slots +
-their exits. Reversible: delete the file (no restart needed to toggle).
-
-## Changes (bot.py)
-- [ ] 1. Add helper `_evaluate_all_slots(self, prices)` wrapping the two existing slot-eval
-      try/except blocks verbatim (same exception handling / log levels).
-- [ ] 2. Replace the inline slot-eval block (~2020-2032) with `self._evaluate_all_slots(prices)`.
-- [ ] 3. At the entry gate (after the `_trading_paused` return, ~1454), add:
-      if `.halt_main_entries` exists → log once (+Telegram once), run `_evaluate_all_slots(prices)`,
-      then `return`. Reset the one-shot log flag when the file is absent.
-
-## Known tradeoff
-While halted, the `[STATS]` log line (bot.py:2007) is skipped — identical to existing
-regime-pause / daily-halt early-return windows, just longer. Dashboard reads trading_state.json
-directly for balance, so this is cosmetic. Documented, accepted.
-
-## Rollout
-- [ ] py_compile check
-- [ ] /pre-restart-audit (deploy review agent — real money)
-- [ ] Create `.halt_main_entries`, then restart (rm -rf __pycache__)
-- [ ] Verify in log: main/htf_l2 entries halted; 5m_mean_revert + ETH-TSM still evaluating; exits fire
-- [ ] Update MEMORY.md
-
-## Review — DONE 2026-07-13 9:15 PM PT
-- Change made (3 edits): `.halt_main_entries` gate @entry (~1461), `_evaluate_all_slots` helper (~2079),
-  inline slot block replaced with helper call (~2044). py_compile PASS.
-- Pre-restart audit: independent code-reviewer, all 7 checks PASS, 0 issues ≥80% conf; confirmed all
-  safety-critical reconcile/SL/orphan logic runs ABOVE the gate; `.pause_trading` slot-freeze defect avoided.
-- Restart: sentinel created, __pycache__ cleared, PID 20653 killed, PID 7730 launched 9:14 PM.
-  Halt logged active 9:15:49 PM. 0 open positions (WLD short stopped out −$2.17 at 9:11 PM pre-restart via
-  its resting exchange SL). Slots serviced under halt CONFIRMED (Kelly-disable logs fire from inside
-  `_evaluate_slots`). 5m_mean_revert LIVE/ACTIVE (not disabled); ETH-TSM PAPER/ACTIVE. No errors.
-- Resume: `rm .halt_main_entries`. Memory: project_main_scalper_halt_2026-07-13.md + MEMORY.md updated.
+## Notes / surfaced per META-RULE
+- Main book was RUNNING WELL at demotion: this week 18 trades +$5.28, 83.3% WR (phmex_pnl 8/26); owner's call.
+- Owner directive "no shadow, live deploy" (feedback_no_shadow_live_deploy.md) superseded for main book by this order.
+- "Sum all state files" PnL convention: main paper rows now live in trading_state.json tagged mode="paper" —
+  lifetime real-PnL sums must exclude them (A3 checks consumers).

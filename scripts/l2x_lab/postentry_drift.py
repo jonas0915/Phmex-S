@@ -66,6 +66,8 @@ def load_trades():
     state = json.loads(STATE_FILE.read_text())
     out, phantoms = [], 0
     for t in state.get("closed_trades", []):
+        if t.get("mode") == "paper":
+            continue           # sim fill — adverse-selection drift is real-fills-only
         if t.get("strategy") != "htf_l2_anticipation":
             continue
         if not t.get("opened_at") or not t.get("entry_price"):

@@ -279,12 +279,14 @@ def scan_rollbacks():
             logger.warning(msg)
             continue
 
-        # Load current metrics (last 20 trades from main state)
+        # Load current metrics (last 20 REAL trades from main state —
+        # mode=="paper" sims excluded; no-mode rows are historical real money)
         trades = []
         try:
             with open(os.path.join(BOT_DIR, "trading_state.json")) as f:
                 state = json.load(f)
-            trades = state.get("closed_trades", [])[-20:]
+            real = [t for t in state.get("closed_trades", []) if t.get("mode") != "paper"]
+            trades = real[-20:]
         except Exception:
             continue
 

@@ -87,8 +87,11 @@ def get_recent_log_lines(minutes=60):
     return lines
 
 
-def analyze_recent_trades(lines):
-    """Parse entries and exits from recent log lines (LIVE only, excludes paper)."""
+def analyze_recent_trades(lines, paper_closes=None):
+    """Parse entries and exits from recent log lines (LIVE only, excludes paper).
+    `paper_closes` (from recent_paper_closes) is a state-derived belt: exit
+    lines matching a mode=="paper" state row are dropped even if the log line
+    lost its [PAPER] marker (format drift)."""
     entries = []
     exits = []
     for line in lines:
@@ -97,7 +100,7 @@ def analyze_recent_trades(lines):
             continue
         if "[ENTRY]" in line:
             entries.append(line)
-        if "Position closed" in line and "[PAPER]" not in line:
+        if "Position closed" in line and not is_paper_exit_line(line, paper_closes):
             exits.append(line)
     return entries, exits
 
@@ -118,6 +121,50 @@ def parse_reason(exit_line):
     return "unknown"
 
 
+def parse_symbol(exit_line):
+    """Extract symbol from a Position closed line."""
+    match = re.search(r'Position closed: \w+ (\S+)', exit_line)
+    if match:
+        return match.group(1)
+    return None
+
+
+def recent_paper_closes(minutes=180, state=None):
+    """(symbol, pnl-2dp) keys of mode=="paper" rows closed in the last N
+    minutes, read straight from trading_state.json. Belt-and-suspenders for
+    the paper-main demotion (2026-08-26): even if a paper close log line ever
+    loses its [PAPER] marker, the state row still identifies it as a sim."""
+    if state is None:
+        state = load_state()
+    cutoff = datetime.now(timezone.utc).timestamp() - minutes * 60
+    keys = set()
+    for t in state.get("closed_trades", []) or []:
+        if t.get("mode") == "paper" and (t.get("closed_at") or 0) >= cutoff:
+            keys.add((t.get("symbol"), round(t.get("pnl_usdt") or 0, 2)))
+    return keys
+
+
+def is_paper_exit_line(line, paper_closes=None):
+    """True if a Position closed line is a sim: carries the [PAPER] marker
+    (slot + paper-main close format) OR matches a mode=="paper" state row by
+    (symbol, pnl) — robust to log-format drift."""
+    if "[PAPER]" in line or "PAPER" in line:
+        return True
+    if paper_closes:
+        return (parse_symbol(line), round(parse_pnl(line), 2)) in paper_closes
+    return False
+
+
+def locked_real_margin(positions):
+    """Sum of margin locked on-exchange by REAL open positions. Paper-tagged
+    positions ("paper": true) never lock exchange margin — including them
+    would corrupt the stale-STATS drawdown-suppression check."""
+    return sum(
+        (p.get("margin", 0) or 0) for p in positions.values()
+        if isinstance(p, dict) and not p.get("paper")
+    )
+
+
 def load_state():
     """Load trading state."""
     if not os.path.exists(STATE_FILE):
@@ -126,9 +173,11 @@ def load_state():
         return json.load(f)
 
 
-def check_consecutive_losses(lines):
-    """Check for consecutive losses (LIVE only, excludes paper)."""
-    recent_exits = [l for l in lines if "Position closed" in l and "[PAPER]" not in l and "PAPER" not in l]
+def check_consecutive_losses(lines, paper_closes=None):
+    """Check for consecutive losses (LIVE only, excludes paper — both the
+    [PAPER] log marker and state-derived mode=="paper" matches)."""
+    recent_exits = [l for l in lines if "Position closed" in l
+                    and not is_paper_exit_line(l, paper_closes)]
     consecutive = 0
     for exit_line in reversed(recent_exits):
         pnl = parse_pnl(exit_line)
@@ -173,9 +222,12 @@ def run_monitor():
     if not bot_alive:
         alerts.append("BOT IS DOWN — no Python main.py process found!")
 
-    # 2. Get recent activity
+    # 2. Get recent activity (paper_closes = state-derived sim exclusion,
+    #    covers the full 3h streak lookback)
+    state = load_state()
+    paper_closes = recent_paper_closes(minutes=180, state=state)
     lines = get_recent_log_lines(60)
-    entries, exits = analyze_recent_trades(lines)
+    entries, exits = analyze_recent_trades(lines, paper_closes)
 
     # 3. Check for no activity (bot might be frozen)
     cycle_lines = [l for l in lines if "Cycle #" in l]
@@ -196,12 +248,11 @@ def run_monitor():
 
     # 5. Check consecutive losses
     all_recent = get_recent_log_lines(180)  # last 3 hours
-    consec = check_consecutive_losses(all_recent)
+    consec = check_consecutive_losses(all_recent, paper_closes)
     if consec >= 5:
         alerts.append(f"STREAK: {consec} consecutive losses")
 
     # 6. Check drawdown from log (balance not stored in state file)
-    state = load_state()
     peak = state.get("peak_balance", 0)
     # Parse balance from most recent STATS line in logs
     balance = 0
@@ -221,10 +272,10 @@ def run_monitor():
             # reporting margin-only — STALE. Skip the false alert.
             # 2026-04-26 incident: 87% false alarm during 401 IP-mismatch window.
             positions = state.get("positions", {})
-            locked_margin = sum(
-                (p.get("margin", 0) or 0) for p in positions.values()
-                if isinstance(p, dict)
-            )
+            # Paper-tagged positions lock NO exchange margin — exclude them
+            # (2026-08-26 paper-main demotion) or the suppression threshold
+            # inflates and real drawdown alerts get wrongly swallowed.
+            locked_margin = locked_real_margin(positions)
             if locked_margin > 0 and balance <= locked_margin + 0.5:
                 # Stale/bad STATS — skip alert
                 pass

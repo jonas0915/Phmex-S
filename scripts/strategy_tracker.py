@@ -21,6 +21,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "strategy_tracker.html")
 
 
+def _real_trades(trades):
+    """Real-money rows only: drop mode=="paper" sims (main-book paper demotion 8/26).
+    Rows with no mode field are historical real-money trades and pass through."""
+    return [t for t in trades
+            if isinstance(t, dict) and t.get("mode") != "paper"]
+
+
 def read_states():
     rows = []
     total = 0.0
@@ -34,7 +41,7 @@ def read_states():
             continue
         if not isinstance(d, dict):
             continue
-        trades = d.get("closed_trades") or []
+        trades = _real_trades(d.get("closed_trades") or [])
         if not trades:
             continue
         net = sum(
@@ -133,6 +140,8 @@ WATCHING = [
 
 def status_of(base, modes):
     if base == "trading_state.json":
+        if os.path.exists(os.path.join(ROOT, ".paper_main")):
+            return ("PAPER", "paper"), "Main bot — DEMOTED TO PAPER (8/26 owner order)"
         return ("LIVE", "live"), "Main bot — htf_l2 signal (gross-positive, fee drag)"
     if "5m_mean_revert" in base:
         m = modes.get("5m_mean_revert") or {}

@@ -12,6 +12,7 @@ CA_TZ = ZoneInfo("America/Los_Angeles")
 
 BOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE_FILE = os.path.join(BOT_DIR, "trading_state.json")
+PAPER_MAIN_SENTINEL = os.path.join(BOT_DIR, ".paper_main")  # main-book paper mode (8/26 demotion)
 LOG_FILE = os.path.join(BOT_DIR, "logs", "bot.log")
 REPORT_DIR = os.path.join(BOT_DIR, "reports")
 DEFAULT_LIVE_LOSS_CAP = -5.0  # per-slot cap comes from the mode sidecar; this default
@@ -51,6 +52,22 @@ def _fee(t):
     """Return real fees_usdt if present, else 0 (caller can decide to estimate)."""
     f = t.get("fees_usdt")
     return f if f is not None else 0
+
+
+def split_paper(trades):
+    """Split main-book rows into (real, paper). Since the 8/26 .paper_main
+    demotion, simulated main fills land in trading_state.json tagged
+    mode="paper"; historical rows carry NO mode field = real money and stay
+    in the real bucket unchanged. Paper rows must never inflate a real-money
+    PnL total anywhere ("sum ALL trading_state*.json" = real rows only)."""
+    real = [t for t in (trades or []) if t.get("mode") != "paper"]
+    paper = [t for t in (trades or []) if t.get("mode") == "paper"]
+    return real, paper
+
+
+def main_is_paper():
+    """Fresh check of the .paper_main sentinel (main book demoted 2026-08-26)."""
+    return os.path.exists(PAPER_MAIN_SENTINEL)
 
 
 def analyze_trades(state, date_str):
@@ -155,8 +172,11 @@ def generate_report():
 
     closed = state.get("closed_trades", [])
 
-    # Today's trades
-    today_trades = analyze_trades(state, date_str)
+    # Today's trades — real money only; paper-tagged main rows (post-8/26
+    # .paper_main demotion) are split out and NEVER enter the real totals,
+    # breakdowns, or Telegram numbers below.
+    today_trades, paper_today = split_paper(analyze_trades(state, date_str))
+    main_paper = main_is_paper()
     today_wins = sum(1 for t in today_trades if _net(t) > 0)
     today_losses = len(today_trades) - today_wins
     today_pnl = sum(_net(t) for t in today_trades)
@@ -206,6 +226,21 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
 - Gross PnL: ${today_gross:.2f}
 - Fees: ${today_fees:.2f}
 - Net PnL: ${today_pnl:.2f}
+"""
+
+    # Main-book PAPER section (8/26 demotion): simulated fills are labeled
+    # PAPER and live OUTSIDE every real-money number in this report.
+    if main_paper or paper_today:
+        paper_wins = sum(1 for t in paper_today if _net(t) > 0)
+        paper_pnl = sum(_net(t) for t in paper_today)
+        mode_line = (".paper_main present — main book is PAPER; all totals above are real money only"
+                     if main_paper else
+                     ".paper_main absent but paper-tagged main rows found today — investigate")
+        report += f"""
+## Main Book: PAPER (simulated — excluded from all real-money totals)
+- {mode_line}
+- Sim trades today: {len(paper_today)} ({paper_wins}W / {len(paper_today) - paper_wins}L)
+- Sim Net PnL: ${paper_pnl:.2f} (NOT real money)
 """
 
     if exit_reasons:
@@ -284,7 +319,11 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
     if peak > 0 and balance > 0 and (peak - balance) / peak * 100 > 10:
         alerts.append(f"HIGH DRAWDOWN: {((peak - balance) / peak * 100):.1f}%")
     if len(today_trades) == 0:
-        alerts.append("NO TRADES TODAY — bot may be frozen or market very quiet")
+        if main_paper:
+            alerts.append("NO REAL-MONEY MAIN TRADES TODAY — main book is PAPER (.paper_main)"
+                          + (f"; {len(paper_today)} simulated fill(s) logged" if paper_today else ""))
+        else:
+            alerts.append("NO TRADES TODAY — bot may be frozen or market very quiet")
     if not alerts:
         alerts.append("None — all metrics within normal range")
     for a in alerts:
@@ -314,11 +353,13 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
     print(f"Report saved: {report_path}")
 
     # Send via Telegram
-    send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr)
+    send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr,
+                  paper_today=paper_today, main_paper=main_paper)
     return report_path
 
 
-def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
+def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr,
+                  paper_today=None, main_paper=False):
     """Send report summary via Telegram."""
     from dotenv import load_dotenv
     load_dotenv(os.path.join(BOT_DIR, ".env"))
@@ -342,6 +383,13 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
         f"   Gross: ${sum(t.get('pnl_usdt', 0) for t in today_trades):.2f} | "
         f"Fees: ${sum(_fee(t) for t in today_trades):.2f}\n"
     )
+
+    # Main-book PAPER label (8/26 demotion) — sim fills never count above
+    if main_paper or paper_today:
+        pt_list = paper_today or []
+        pp = sum(_net(t) for t in pt_list)
+        msg += (f"\n📄 <b>Main book: PAPER</b> — {len(pt_list)} sim trades today, "
+                f"${pp:+.2f} sim (excluded from all real-money totals above)\n")
 
     if today_trades:
         # Add by-symbol breakdown
@@ -386,7 +434,10 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr):
                     msg += f"  {period}: {h['count']} trades, {h_wr:.0f}% WR, {h_sign}${h['pnl']:.2f}\n"
 
     if len(today_trades) == 0:
-        msg += "\n⚠️ No trades today — market quiet or filters blocking"
+        if main_paper:
+            msg += "\n⚠️ No real-money main trades today — main book is PAPER (.paper_main)"
+        else:
+            msg += "\n⚠️ No trades today — market quiet or filters blocking"
 
     # Promoted live slots (mode sidecar paper_mode false) — absent when none
     for ls in live_slot_summaries(date_str):

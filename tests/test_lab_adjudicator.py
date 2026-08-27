@@ -592,3 +592,60 @@ def test_resize15_group_margin_sums_to_qualify(tmp_path):
     assert r["n_trades"] == 1
     assert abs(r["net_usd"] - (-6.30)) < 1e-9      # group counts, trips hard line
     assert r["status"] == "TRIP"
+
+
+# ── main-book PAPER mode (.paper_main demotion, 2026-08-26) ───────────────
+# Simulated main fills land in trading_state.json tagged mode="paper".
+# Registered real-money lines grade ONLY non-paper rows (_real_rows);
+# no-mode historical rows are real money and grade exactly as before.
+
+def test_real_rows_drops_only_paper():
+    rows = [{"net_pnl": 1.0}, {"net_pnl": 2.0, "mode": "paper"},
+            {"net_pnl": 3.0, "mode": "live"}]
+    kept = adj._real_rows(rows)
+    assert [t["net_pnl"] for t in kept] == [1.0, 3.0]
+    assert adj._real_rows([]) == [] and adj._real_rows(None) == []
+
+
+def test_main_gated_excludes_paper_rows():
+    cfg = adj.EXPERIMENTS["main_gated"]
+
+    def row(net, off, mode=None):
+        t = {"strategy": "htf_l2_anticipation", "exit_reason": "stop_loss",
+             "opened_at": cfg["deployed_ts"] + off, "net_pnl": net}
+        if mode:
+            t["mode"] = mode
+        return t
+
+    real = [row(0.5, i * 10) for i in range(3)]           # no mode = real
+    sims = [row(9.9, 1000 + i * 10, mode="paper") for i in range(40)]
+    r = adj.grade_main_gated(real + sims, cfg)
+    assert r["n_trades"] == 3        # sims can't advance the n=40 verdict
+    assert r["status"] == adj.WATCH  # holds at last real-money state
+    assert abs(r["net_usd"] - 1.5) < 1e-9
+
+
+def test_trail_arm_excludes_paper_rows():
+    sims = [dict(_giveback(10 + i), mode="paper") for i in range(5)]
+    r = adj.grade_trail_arm(sims, TRAIL_CFG)
+    assert r["n_post_deploy"] == 0
+    assert r["status"] == adj.WATCH  # "n=0 — no verdict", never REVERT on sims
+
+
+def test_sizing_excludes_paper_rows():
+    sims = [dict(_trade(opened_off=10 + i), mode="paper") for i in range(5)]
+    r = adj.grade_sizing(sims, "", adj.EXPERIMENTS["sizing_15"], now=DEP + 1000)
+    assert r["n_post_deploy"] == 0
+
+
+def test_digest_flags_paper_main(monkeypatch, tmp_path):
+    (tmp_path / ".paper_main").write_text("owner demotion 8/26\n")
+    monkeypatch.setattr(adj, "BOT_DIR", tmp_path)
+    digest, _ = adj.build_digest(now=1_784_000_000.0)
+    assert "[main book]" in digest and "PAPER" in digest
+
+
+def test_digest_no_paper_banner_without_sentinel(monkeypatch, tmp_path):
+    monkeypatch.setattr(adj, "BOT_DIR", tmp_path)
+    digest, _ = adj.build_digest(now=1_784_000_000.0)
+    assert "[main book]" not in digest

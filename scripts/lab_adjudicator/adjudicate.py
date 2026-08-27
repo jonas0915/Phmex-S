@@ -354,6 +354,24 @@ def _net(t: dict) -> float | None:
     return float(v) if v is not None else None
 
 
+def _real_rows(trades: list) -> list:
+    """Drop simulated main-book rows (mode == "paper" — the 2026-08-26
+    .paper_main demotion tags every simulated fill). Historical real-money
+    rows carry NO mode field and pass through unchanged. Every registered
+    real-money line on trading_state.json (trail_arm_8, sizing_15,
+    main_gated, main_resize15, the main side lines) grades through this
+    filter: a simulated fill must never trip a real-money tripwire nor
+    advance a real-money verdict — with main on paper and no new real rows,
+    each line simply holds at its last real-money state (n frozen)."""
+    return [t for t in (trades or []) if t.get("mode") != "paper"]
+
+
+def _main_paper(bot_dir=None) -> bool:
+    """Fresh check of the .paper_main sentinel (owner demotion 2026-08-26):
+    present = the main book's fills are simulated (rows tagged mode="paper")."""
+    return os.path.exists(os.path.join(str(bot_dir or BOT_DIR), ".paper_main"))
+
+
 def peak_roi_pct(trade: dict, leverage: float = LEVERAGE) -> float | None:
     """Margin-ROI at the bot-tracked favorable extreme (risk_manager peak_price
     semantics: max price for longs, min for shorts). None if untracked."""
@@ -382,7 +400,7 @@ def _fmt_ci(ci) -> str:
 # ── experiment graders (pure: data in, verdict dict out) ──────────────────
 def grade_trail_arm(trades: list[dict], cfg: dict) -> dict:
     dep = cfg["deployed_ts"]
-    post = sorted((t for t in trades if (t.get("opened_at") or 0) >= dep),
+    post = sorted((t for t in _real_rows(trades) if (t.get("opened_at") or 0) >= dep),
                   key=lambda t: t.get("closed_at") or 0)
 
     def _is_win_exit(t):
@@ -436,7 +454,7 @@ def grade_sizing(trades: list[dict], log_text: str, cfg: dict,
                  now: float | None = None) -> dict:
     dep = cfg["deployed_ts"]
     now = now or time.time()
-    ordered = sorted(trades, key=lambda t: t.get("opened_at") or 0)
+    ordered = sorted(_real_rows(trades), key=lambda t: t.get("opened_at") or 0)
     post = [t for t in ordered if (t.get("opened_at") or 0) >= dep]
     pre = [t for t in ordered if (t.get("opened_at") or 0) < dep]
     post_m = [float(t["margin"]) for t in post if t.get("margin")]
@@ -713,8 +731,10 @@ def grade_main_gated(trades: list, cfg: dict) -> dict:
         (sizing discussion earned), else KILL (halt main entries —
         owner action: touch .halt_main_entries)
       - Before n=40: WATCH (report-only). No per-book $ rail by design;
-        account-wide daily/DD halts guard the downside."""
-    era = [t for t in (trades or [])
+        account-wide daily/DD halts guard the downside.
+    Registered on REAL money — mode=="paper" rows (post-8/26 .paper_main
+    demotion) are excluded via _real_rows; n freezes while main is paper."""
+    era = [t for t in _real_rows(trades)
            if t.get("strategy") == "htf_l2_anticipation"
            and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"
            and float(t.get("opened_at") or 0) >= cfg["deployed_ts"]]
@@ -762,8 +782,11 @@ def grade_side_line(trades: list, cfg: dict, bot_dir=None) -> dict:
     Counts only cfg['side'] trades opened AFTER registration (forward-only,
     no lookback), optionally filtered to a strategy and to live-mode fills.
     At n >= verdict_n: net <= $0 → KILL_SIDE (touch cfg['sentinel'],
-    idempotent — never clobbers an existing file); net > $0 → PASS."""
-    era = [t for t in (trades or [])
+    idempotent — never clobbers an existing file); net > $0 → PASS.
+    Registered on REAL money — mode=="paper" rows (post-8/26 .paper_main main
+    demotion) never count via _real_rows (the MR lines additionally require
+    mode=="live", which was already stricter)."""
+    era = [t for t in _real_rows(trades)
            if t.get("side") == cfg["side"]
            and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"
            and float(t.get("opened_at") or 0) >= cfg["registered_ts"]
@@ -834,7 +857,11 @@ def grade_main_resize15(trades: list, cfg: dict, bot_dir=None) -> dict:
     # ledger). Rows now group by (symbol, opened_at) = one entry fill; the
     # GROUP's summed margin must clear min_margin and its summed net counts
     # as one trade. Same trip thresholds, honest ledger.
-    rows = [t for t in (trades or [])
+    # PAPER exclusion (2026-08-26 .paper_main demotion): this tripwire is a
+    # registered REAL-money line — mode=="paper" rows are dropped BEFORE
+    # grouping via _real_rows, so a simulated fill can never touch
+    # .halt_main_entries; while main is paper the line holds (n frozen).
+    rows = [t for t in _real_rows(trades)
             if t.get("strategy") == "htf_l2_anticipation"
             and (t.get("exit_reason") or t.get("reason")) != "min_margin_skip"
             and float(t.get("opened_at") or 0) >= cfg["deployed_ts"]]
@@ -1145,6 +1172,14 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     ]
     stamp = datetime.fromtimestamp(now, tz=PT).strftime("%b %-d %-I:%M %p PT")
     lines = [f"LAB ADJUDICATOR — live forward tests ({stamp})"]
+    if _main_paper():
+        # Owner demotion 2026-08-26: don't silently report frozen n — say why.
+        lines.append("[main book]    PAPER — .paper_main present; main fills are "
+                     "simulated (mode=\"paper\") and excluded from every "
+                     "real-money main line below (trail_arm_8, sizing_15, "
+                     "main_gated, main_resize15, main_*_side) — those lines "
+                     "hold at their last real-money state (n frozen) until "
+                     "real fills resume")
     lines.append(_line_trail(results[0]))
     lines.append(_line_sizing(results[1]))
     lines.append(_line_mr(results[2]))

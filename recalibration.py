@@ -25,6 +25,10 @@ def load_trades(state_file="trading_state.json", days=None):
     with open(path) as f:
         data = json.load(f)
     trades = data.get("closed_trades", [])
+    # Paper-main era (2026-08-26): simulated rows carry mode=="paper" and must
+    # never feed compute_metrics / kill_switch_check / edge_decay_check.
+    # Historical rows have NO mode field and are real money — kept unchanged.
+    trades = [t for t in trades if t.get("mode") != "paper"]
     if days and trades:
         cutoff = time.time() - (days * 86400)
         trades = [t for t in trades if t.get("closed_at", 0) >= cutoff]

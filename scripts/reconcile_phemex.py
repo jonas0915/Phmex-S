@@ -46,7 +46,12 @@ def load_closed_trades(since_ms: int) -> list[dict]:
         print(f"[ERROR] failed to read {STATE_FILE}: {e}")
         return []
     closed = data.get("closed_trades", []) or []
-    return [t for t in closed if (t.get("closed_at") or 0) * 1000 >= since_ms]
+    # Skip mode=="paper" sims entirely — they never hit Phemex, so they can neither
+    # match a fill nor receive a fee fix. Historical rows have no mode field = real.
+    return [
+        t for t in closed
+        if (t.get("closed_at") or 0) * 1000 >= since_ms and t.get("mode") != "paper"
+    ]
 
 
 def fetch_phemex_fills(exchange: Exchange, symbols: list[str], since_ms: int) -> dict[str, list[dict]]:

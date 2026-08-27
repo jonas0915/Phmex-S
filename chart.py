@@ -24,6 +24,12 @@ def _net(t: dict) -> float:
     return n if n is not None else t.get("pnl_usdt", 0)
 
 
+def _real_trades(trades: list[dict]) -> list[dict]:
+    """Real-money rows only. Simulated rows carry mode=="paper" (paper-main
+    era 2026-08-26); historical rows have NO mode field and are real money."""
+    return [t for t in trades if t.get("mode") != "paper"]
+
+
 def read_state() -> dict:
     try:
         with open(STATE_FILE, "r") as f:
@@ -221,7 +227,9 @@ def chart_rolling_win_rate(trades: list[dict], output: str, window: int = 10):
 
 def main():
     state = read_state()
-    trades = state.get("closed_trades", [])
+    all_rows = state.get("closed_trades", [])
+    trades = _real_trades(all_rows)
+    excluded = len(all_rows) - len(trades)
 
     if not trades:
         print("No closed trades found in trading_state.json")
@@ -230,6 +238,8 @@ def main():
     ensure_chart_dir()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    if excluded:
+        print(f"Excluding {excluded} paper-sim trades (mode=paper) from all charts.")
     print(f"Generating charts from {len(trades)} trades...\n")
 
     chart_cumulative_pnl(trades, os.path.join(CHART_DIR, f"cumulative_pnl_{timestamp}.png"))

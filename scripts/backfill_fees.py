@@ -52,7 +52,10 @@ def main():
 
     with open(STATE_PATH) as f:
         state = json.load(f)
-    closed = state.get("closed_trades", [])
+    # Never match exchange fees onto mode=="paper" sims — they have no Phemex
+    # fills. No-mode rows are historical real money and stay in the match pool.
+    # (state is written back whole; paper rows pass through untouched.)
+    closed = [t for t in state.get("closed_trades", []) if t.get("mode") != "paper"]
     print(f"Internal closed_trades: {len(closed)}")
 
     # CSV time window

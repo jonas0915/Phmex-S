@@ -152,6 +152,23 @@ def load_state() -> dict:
         return json.load(f)
 
 
+def real_trades(trades: list) -> list:
+    """Real-money rows only: drop mode=="paper" sims (main-book paper demotion 8/26).
+    Historical rows have NO mode field and are real money — they pass through unchanged."""
+    return [t for t in trades if not (isinstance(t, dict) and t.get("mode") == "paper")]
+
+
+def real_position_syms(state: dict) -> set:
+    """Symbols of REAL open positions in state — paper-tagged positions
+    ("paper": true, main-book paper demotion 8/26) never exist on the exchange
+    and must not be reported as phantoms."""
+    positions = state.get("positions")
+    if not isinstance(positions, dict):
+        return set()
+    return {sym for sym, p in positions.items()
+            if not (isinstance(p, dict) and p.get("paper"))}
+
+
 def utc_to_pt_12hr(utc_hour: int) -> str:
     """Convert UTC hour to 12-hour PT string (DST-aware via America/Los_Angeles)."""
     offset_hours = int(datetime.now(PT_TZ).utcoffset().total_seconds() // 3600)
@@ -325,9 +342,7 @@ def check_position_desync() -> CheckResult:
         # Read state AFTER exchange query to minimize race window.
         # Then re-read to confirm — only flag desync if it persists in both reads.
         state = load_state()
-        local_positions = set()
-        if "positions" in state and isinstance(state["positions"], dict):
-            local_positions = set(state["positions"].keys())
+        local_positions = real_position_syms(state)
 
         exchange_syms = set(exchange_positions.keys())
         ghost = exchange_syms - local_positions
@@ -338,9 +353,7 @@ def check_position_desync() -> CheckResult:
         if ghost or phantom:
             time.sleep(2)
             state2 = load_state()
-            local2 = set()
-            if "positions" in state2 and isinstance(state2["positions"], dict):
-                local2 = set(state2["positions"].keys())
+            local2 = real_position_syms(state2)
             ghost = exchange_syms - local2
             phantom = local2 - exchange_syms
 
@@ -387,7 +400,8 @@ def check_balance_anomaly() -> CheckResult:
 
         state = load_state()
         peak_balance = state.get("peak_balance", 0)
-        closed_trades = state.get("closed_trades", [])
+        # Paper sims never move the real balance — exclude them from the explanation.
+        closed_trades = real_trades(state.get("closed_trades", []))
 
         recent_pnl = 0.0
         for trade in closed_trades[-50:]:
@@ -503,7 +517,8 @@ def check_trade_reconciliation() -> CheckResult:
     """Check 9: Compare recent trading_state.json trades vs Phemex fills."""
     try:
         state = load_state()
-        closed_trades = state.get("closed_trades", [])
+        # Paper rows never hit the exchange — reconciling them would raise false drift alarms.
+        closed_trades = real_trades(state.get("closed_trades", []))
         if not closed_trades:
             return CheckResult("trade_reconciliation", "OK", "No closed trades to reconcile")
 
@@ -595,7 +610,8 @@ def check_report_accuracy() -> CheckResult:
         report_pnl = float(pnl_match.group(1)) if pnl_match else None
 
         state = load_state()
-        closed_trades = state.get("closed_trades", [])
+        # Daily report totals are real-money only — derive from non-paper rows to match.
+        closed_trades = real_trades(state.get("closed_trades", []))
 
         # Date trades the same way daily_report.analyze_trades does:
         # closed_at is a Unix epoch (time.time()) — bucket by PT calendar day.
@@ -647,7 +663,8 @@ def check_fee_capture() -> CheckResult:
     """Check 11: Flag closed trades with missing or suspiciously low fees."""
     try:
         state = load_state()
-        closed_trades = state.get("closed_trades", [])
+        # Sim fees are modeled, not real — only verify fee capture on real fills.
+        closed_trades = real_trades(state.get("closed_trades", []))
         if not closed_trades:
             return CheckResult("fee_capture", "OK", "No closed trades to check")
 

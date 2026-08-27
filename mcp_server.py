@@ -148,6 +148,18 @@ def _period_start(period: str) -> float:
     raise ValueError(f"period must be today|week|month|all (got {period!r})")
 
 
+def _is_paper_trade(t: dict) -> bool:
+    """Simulated closed row (paper-main demotion 2026-08-26): mode == "paper".
+    Historical rows carry NO mode field and are real money — they must keep
+    counting as real."""
+    return t.get("mode") == "paper"
+
+
+def _is_paper_position(p) -> bool:
+    """Open position tagged "paper": true at entry (paper-main convention)."""
+    return bool(isinstance(p, dict) and p.get("paper"))
+
+
 # -- MCP server --------------------------------------------------------------
 try:
     from mcp.server.fastmcp import FastMCP
@@ -167,30 +179,43 @@ mcp = FastMCP("Phmex-S")
 @mcp.tool()
 def phmex_status() -> dict:
     """Bot health + summary. Returns running status, PID, last cycle timestamp,
-    open position count, today's PnL, current balance."""
+    open position count, today's PnL, current balance.
+    open_positions / trades_today / pnl_today_usdt are REAL MONEY ONLY —
+    paper-main sims (mode=="paper") are reported separately in the paper_*
+    fields, never blended."""
     state = _read_state()
     pid = _bot_pid()
     running = bool(pid and _pid_alive(pid))
     positions = state.get("positions", {}) or {}
+    paper_pos = sum(1 for p in positions.values() if _is_paper_position(p))
     closed = state.get("closed_trades", []) or []
     today_start = _today_utc_start()
     today = [t for t in closed if (t.get("closed_at") or t.get("exit_time", 0)) >= today_start]
-    pnl_today = sum((t.get("pnl_usdt") or 0) for t in today)
+    today_real = [t for t in today if not _is_paper_trade(t)]
+    today_paper = [t for t in today if _is_paper_trade(t)]
+    pnl_today = sum((t.get("pnl_usdt") or 0) for t in today_real)
+    paper_pnl_today = sum((t.get("pnl_usdt") or 0) for t in today_paper)
     return {
         "running": running,
         "pid": pid,
         "last_log_ts": _last_log_time(),
-        "open_positions": len(positions),
-        "trades_today": len(today),
+        "open_positions": len(positions) - paper_pos,
+        "trades_today": len(today_real),
         "pnl_today_usdt": round(pnl_today, 2),
         "peak_balance": state.get("peak_balance"),
         "paused": os.path.exists(PAUSE_SENTINEL),
+        # Paper-main sims (2026-08-26 demotion) — explicit, never blended above.
+        "paper_open_positions": paper_pos,
+        "paper_trades_today": len(today_paper),
+        "paper_pnl_today_usdt": round(paper_pnl_today, 2),
     }
 
 
 @mcp.tool()
 def phmex_open_positions() -> list:
-    """List all currently open positions with side, entry, SL, TP, age."""
+    """List all currently open positions with side, entry, SL, TP, age.
+    "paper": true rows are paper-main sims (no exchange position, no real
+    margin at risk); "paper": false rows are real money."""
     state = _read_state()
     positions = state.get("positions", {}) or {}
     out = []
@@ -207,13 +232,17 @@ def phmex_open_positions() -> list:
             "take_profit": p.get("take_profit"),
             "age_minutes": round((now - opened) / 60, 1) if opened else None,
             "strategy": p.get("strategy"),
+            "paper": _is_paper_position(p),
         })
     return out
 
 
 @mcp.tool()
 def phmex_recent_trades(limit: int = 20) -> list:
-    """Last N closed trades with PnL, exit reason, duration. Newest first."""
+    """Last N closed trades with PnL, exit reason, duration. Newest first.
+    "paper": true rows are paper-main sims (not real money); "paper": false
+    rows are real trades. Sims are listed (not hidden) so activity is visible
+    — just never blend their PnL with real numbers."""
     state = _read_state()
     closed = state.get("closed_trades", []) or []
     closed = list(reversed(closed))[: max(1, min(limit, 200))]
@@ -229,6 +258,7 @@ def phmex_recent_trades(limit: int = 20) -> list:
             "reason": t.get("reason") or t.get("exit_reason"),
             "strategy": t.get("strategy"),
             "closed_at": t.get("closed_at"),
+            "paper": _is_paper_trade(t),
         })
     return out
 
@@ -236,16 +266,28 @@ def phmex_recent_trades(limit: int = 20) -> list:
 @mcp.tool()
 def phmex_pnl(period: str = "today") -> dict:
     """Aggregated PnL for period: today | week | month | all.
-    Returns net PnL, win rate, trade count, avg win/loss."""
+    Returns net PnL, win rate, trade count, avg win/loss — REAL MONEY ONLY.
+    Paper-main sims (mode=="paper") are reported separately in paper_trades /
+    paper_pnl_usdt / paper_win_rate, never blended into the real aggregates."""
     try:
         cutoff = _period_start(period)
     except ValueError as e:
         return {"error": str(e)}
     state = _read_state()
     closed = state.get("closed_trades", []) or []
-    trades = [t for t in closed if (t.get("closed_at") or t.get("exit_time", 0)) >= cutoff]
+    in_period = [t for t in closed if (t.get("closed_at") or t.get("exit_time", 0)) >= cutoff]
+    trades = [t for t in in_period if not _is_paper_trade(t)]
+    paper = [t for t in in_period if _is_paper_trade(t)]
+    paper_pnls = [(t.get("pnl_usdt") or 0) for t in paper]
+    paper_fields = {
+        "paper_trades": len(paper),
+        "paper_pnl_usdt": round(sum(paper_pnls), 4),
+        "paper_win_rate": (round(sum(1 for p in paper_pnls if p > 0) / len(paper), 3)
+                           if paper else None),
+    }
     if not trades:
-        return {"period": period, "trades": 0, "pnl_usdt": 0, "win_rate": None}
+        return {"period": period, "trades": 0, "pnl_usdt": 0, "win_rate": None,
+                **paper_fields}
     pnls = [(t.get("pnl_usdt") or 0) for t in trades]
     wins = [p for p in pnls if p > 0]
     losses = [p for p in pnls if p <= 0]
@@ -258,6 +300,7 @@ def phmex_pnl(period: str = "today") -> dict:
         "avg_loss": round(sum(losses) / len(losses), 4) if losses else 0,
         "best": round(max(pnls), 4),
         "worst": round(min(pnls), 4),
+        **paper_fields,
     }
 
 

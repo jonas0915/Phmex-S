@@ -49,6 +49,12 @@ def _net(t: dict) -> float:
     return (v if v is not None else t.get("pnl_usdt", 0)) or 0
 
 
+def _is_paper(t: dict) -> bool:
+    """Main-book paper sim row (mode=="paper", 8/26 demotion). Rows without a
+    mode field are historical real-money trades and must count as real."""
+    return t.get("mode") == "paper"
+
+
 def _read_json(path: str, default=None):
     try:
         with open(path) as f:
@@ -99,7 +105,10 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ca = t.get("closed_at", 0)
             return bool(ca) and datetime.fromtimestamp(ca, tz=PT_TZ).strftime("%Y-%m-%d") == today_pt
 
-        trades_today = [t for t in state.get("closed_trades", []) if _is_today(t)]
+        all_today = [t for t in state.get("closed_trades", []) if _is_today(t)]
+        # Real-money rows only in the headline numbers; paper sims noted separately.
+        trades_today = [t for t in all_today if not _is_paper(t)]
+        paper_today = len(all_today) - len(trades_today)
         pnl_today = sum(_net(t) for t in trades_today)
         wins = sum(1 for t in trades_today if _net(t) > 0)
 
@@ -122,7 +131,8 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = (
             f"📊 <b>Status</b>\n"
             f"Open positions:{pos_str}\n"
-            f"Today (PT): {len(trades_today)} trades ({wins}W/{len(trades_today)-wins}L)\n"
+            f"Today (PT): {len(trades_today)} trades ({wins}W/{len(trades_today)-wins}L)"
+            + (f" (+{paper_today} paper sim)" if paper_today else "") + "\n"
             f"PnL (net): ${pnl_today:+.2f}"
         )
         await update.message.reply_text(msg, parse_mode="HTML")
@@ -392,6 +402,8 @@ async def cmd_fees(update: Update, context: ContextTypes.DEFAULT_TYPE):
             state = json.load(f)
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         for t in state.get("closed_trades", []):
+            if _is_paper(t):
+                continue  # sim fees are modeled, not real money
             opened = t.get("opened_at", 0)
             if datetime.fromtimestamp(opened, tz=timezone.utc).strftime("%Y-%m-%d") == today_str:
                 fee_today += abs(t.get("fees_usdt", 0) or 0)

@@ -62,6 +62,30 @@ def _honest_paper(trades: list) -> tuple[list, int]:
             or (t.get("opened_at") or 0) >= PAPER_HONEST_TS]
     return kept, len(trades) - len(kept)
 
+
+def _main_paper() -> bool:
+    """Fresh check of the .paper_main sentinel (owner demotion 2026-08-26):
+    present = the main book (trading_state.json / 5m_scalp, incl. its
+    main_gated view) runs PAPER — simulated fills, no real orders. Mirrors
+    bot.py's _main_paper(). Checked fresh per call (no cache) so toggling
+    the sentinel shows on the next poll without a dashboard restart.
+    Row-level truth is the trade's own mode field: historical main rows have
+    NO mode field = REAL MONEY; paper-era rows carry mode="paper"."""
+    return os.path.exists(os.path.join(PROJECT_DIR, ".paper_main"))
+
+
+def _split_main_rows(trades: list) -> tuple[list, list]:
+    """Split MAIN-BOOK rows into (real_rows, paper_rows) by the row's own
+    mode field — NEVER by the live sentinel (a sentinel toggle must not
+    reclassify history). No mode field or mode=="live" = real money
+    (historical rows predate the tag); mode=="paper" = simulated fill
+    (post-2026-08-26 demotion). Real main rows must NEVER pass through
+    _honest_paper: its PAPER_HONEST_TS cutoff would silently drop every
+    real trade before 2026-08-06 (the 2026-08-12 main_gated leak class)."""
+    real = [t for t in trades if t.get("mode") != "paper"]
+    paper = [t for t in trades if t.get("mode") == "paper"]
+    return real, paper
+
 # Access token — gates every request so the read-only dashboard (balance/PnL/positions)
 # isn't exposed unauthenticated on untrusted networks the laptop may join (0.0.0.0 binds
 # every interface, not just home WiFi). Persisted in a gitignored file so it survives
@@ -544,8 +568,11 @@ def get_recent_activity(lines: list[str], n: int = 12) -> list[str]:
 # ── Slot guardrails (SLOTS + GUARDRAILS panel) ──────────────────────────
 # Slots that run LIVE (not paper). All others default to paper.
 def _live_slot_ids():
-    """Live slots: the main bot (5m_scalp) plus any slot promoted via mode sidecar."""
-    ids = {"5m_scalp"}
+    """Live slots: the main bot (5m_scalp) plus any slot promoted via mode
+    sidecar. While the .paper_main sentinel exists (owner demotion 2026-08-26)
+    the main book is PAPER — 5m_scalp is NOT live (and main_gated, its view,
+    inherits that)."""
+    ids = set() if _main_paper() else {"5m_scalp"}
     for path in _glob.glob(os.path.join(PROJECT_DIR, "trading_state_*_mode.json")):
         try:
             with open(path) as f:
@@ -627,15 +654,19 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
         n = len(trades)
         name = escape(slot_id)
         # Never blend real money with sims, in ANY branch: live-mode trades and
-        # paper sims always get separate stat rows (main-state 5m_scalp trades
-        # carry no mode field — they are all real).
+        # paper sims always get separate stat rows. Main-state 5m_scalp rows
+        # split by the row's own mode field (no field = real money — historical
+        # rows predate the tag; mode="paper" = post-2026-08-26 demotion sims).
         # _real_rows: displayed stats never count min_margin_skip crumbs
         # (2026-08-25 audit: 37 crumbs inflated the main row's count and
         # diluted its WR%). Classification below stays on full `trades`.
-        live_rows = _real_rows([t for t in trades if t.get("mode") == "live"]
-                               if slot_id != "5m_scalp" else trades)
-        sim_rows = (_real_rows([t for t in trades if t.get("mode") != "live"])
-                    if slot_id != "5m_scalp" else [])
+        if slot_id == "5m_scalp":
+            _main_real, _main_sims = _split_main_rows(trades)
+            live_rows = _real_rows(_main_real)
+            sim_rows = _real_rows(_main_sims)
+        else:
+            live_rows = _real_rows([t for t in trades if t.get("mode") == "live"])
+            sim_rows = _real_rows([t for t in trades if t.get("mode") != "live"])
         # Honest-data rule (2026-08-12): stale-price paper rows never reach a
         # displayed sim stat. Kill/demote CLASSIFICATION stays on the full
         # ledger (badges must not flip because display rows were excluded).
@@ -667,6 +698,17 @@ def _build_slots_guardrails(slot_states: dict = None) -> str:
                     f"<div class='dim'>${hdrm:.2f} of ${cap:.2f} &middot; neg-Kelly @{kmt} live trades "
                     f"({len(live_trades)} so far)</div>"
                     "</td></tr>")
+        elif slot_id == "5m_scalp":
+            # Main book on PAPER (.paper_main sentinel): its real-money
+            # history stays visible on its own row (badged as real), paper
+            # sims get the standard sim row. Must NOT fall through to the
+            # generic kill/paper branches — the lifetime-negative main ledger
+            # would render a false "killed" tombstone.
+            rows += (f"<tr><td><span class='amb'>&#9679;</span> {name}</td>"
+                     f"<td class='amb'>PAPER</td>"
+                     f"<td>real {_stats_html(live_rows)}</td></tr>")
+            if sim_rows:
+                rows += _sim_row_html(sim_rows, sim_note)
         elif modes.get(slot_id, {}).get("killed_at"):
             # Permanent kill (sidecar killed_at) — same precedence as the
             # STRATEGIES-card badge; panels disagreed before (2026-07-31
@@ -762,7 +804,8 @@ def _st2_fill_stats() -> dict:
 # only one carrying the extra maker FILL-RATE headline (special case below).
 #
 # status mode:
-#   "live"  → 5m_scalp (the main confluence bot, always live)
+#   "live"  → 5m_scalp (the main confluence bot; PAPER while the .paper_main
+#             sentinel exists — owner demotion 2026-08-26)
 #   "mode"  → status driven by the _<slot>_mode.json sidecar (paper vs live)
 #             plus the negative-Kelly kill switch (≥50 trades, Kelly<0)
 #   "killed"→ generic: any paper slot with >=50 trades and negative Kelly is
@@ -851,6 +894,22 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
         return "<span class='neg'>&#9679; MAX-DD HALT (entries)</span>"
     if os.path.exists(os.path.join(PROJECT_DIR, f".demote_{slot_id}")):
         return "<span class='neg'>&#9679; DEMOTED</span>"
+    # Main book on PAPER (.paper_main sentinel, owner demotion 2026-08-26):
+    # fills are simulated — the badge must never read LIVE. Checked before
+    # the entries-halt badge so the sim state is unmissable; the halt note is
+    # appended (both sentinels coexist during the demotion transition).
+    if slot_id in ("5m_scalp", "main_gated") and _main_paper():
+        _badge = "<span class='amb'>&#9679; PAPER (sim fills)</span>"
+        if os.path.exists(os.path.join(PROJECT_DIR, ".halt_main_entries")):
+            _badge += " <span class='amb'>&#9679; HALTED (entries)</span>"
+        if os.path.exists(os.path.join(PROJECT_DIR, ".block_longs_main")):
+            _badge += (" <span class='amb'>&#9679; SHORTS-ONLY</span>"
+                       "<span class='dim' style='font-size:8px'> longs blocked"
+                       " (.block_longs_main)</span>")
+        if slot_id == "main_gated":
+            _badge += (" <span class='dim' style='font-size:8px'>view of MAIN "
+                       "PATH — same book, not a separate one</span>")
+        return _badge
     # Main-path book: the halt sentinel stops its entries even though the bot
     # process (and thus _live_slot_ids) is live — badge must say so (2026-07-21,
     # Jonas mistook the green LIVE for an un-halt).
@@ -923,6 +982,13 @@ def _size_row_html(slot_id: str, live_ids: set) -> str:
     size row (they don't trade real money). Empty string = row omitted."""
     if slot_id in ("5m_scalp", "main_gated"):
         sz = _trade_size_env()
+        if _main_paper():
+            # Paper main (owner demotion 2026-08-26): the .env size is SIM
+            # sizing — label it so nobody reads it as money at risk.
+            note = (" <span class='dim' style='font-size:8px'>paper sim sizing"
+                    " &mdash; no money at risk</span>")
+            return (f"<tr><td class='dim'>size</td><td><span class='amb'>"
+                    f"PAPER ${sz:.0f}</span>{note}</td></tr>")
         note = " <span class='dim' style='font-size:8px'>margin/trade &middot; BTC auto-bumps to exch min</span>"
         return f"<tr><td class='dim'>size</td><td>${sz:.0f}{note}</td></tr>"
     if slot_id not in live_ids:
@@ -950,10 +1016,21 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
     positions = st.get("positions") or {}
 
     # Honest-data rule (owner order 2026-08-12): stale-price paper rows never
-    # reach any displayed stat. Main-book cards exempt (5m_scalp + its
-    # main_gated filtered view) — all their rows are real money, no mode field.
+    # reach any displayed stat. Main-book cards (5m_scalp + its main_gated
+    # filtered view): rows WITHOUT mode="paper" are real money (historical
+    # rows carry no mode field) and must NEVER pass through _honest_paper —
+    # its PAPER_HONEST_TS cutoff would silently drop every real trade before
+    # 2026-08-06 (regression 2026-08-12: 34 real trades leaked out of the
+    # CURRENT TEST card this way). Only rows tagged mode="paper" (the
+    # 2026-08-26 paper-main demotion sims) split out as sims and get the
+    # honest filter like any other paper book.
     n_stale = 0
-    if slot_id not in ("5m_scalp", "main_gated"):
+    main_paper_rows: list = []
+    if slot_id in ("5m_scalp", "main_gated"):
+        trades, main_paper_rows = _split_main_rows(trades)
+        main_paper_rows, n_stale = _honest_paper(main_paper_rows)
+        main_paper_rows = _real_rows(main_paper_rows)
+    else:
         trades, n_stale = _honest_paper(trades)
     # Crumb rule (owner order 2026-08-25): every stat on this card — count,
     # WR, side rows, era splits, avg win/loss — is real trades only. The
@@ -979,6 +1056,24 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
 
     status_html = _slot_status_html(slot_id, full_trades, live_ids, modes)
     size_row = _size_row_html(slot_id, live_ids)
+
+    # Paper-era stats row for the main-book cards (owner hard rule 2026-08-12:
+    # paper and real-money numbers NEVER blend — the demotion-era sims render
+    # on their own clearly-badged row, excluded from every real aggregate).
+    main_paper_row = ""
+    if main_paper_rows:
+        _pn = len(main_paper_rows)
+        _pw = sum(1 for t in main_paper_rows if _sim_net_pnl(t) > 0)
+        _pl = sum(1 for t in main_paper_rows if _sim_net_pnl(t) < 0)
+        _pwr = _pw / (_pw + _pl) * 100 if (_pw + _pl) else 0.0
+        _pnet = sum(_sim_net_pnl(t) for t in main_paper_rows)
+        _pcls = "pos" if _pnet > 0 else "neg" if _pnet < 0 else "dim"
+        main_paper_row = (
+            f"<tr><td class='amb'>paper (sim)</td><td>"
+            f"{_pw}W / {_pl}L &middot; {_pwr:.0f}% WR &middot; "
+            f"<span class='{_pcls}'>${_pnet:+.2f}</span>"
+            f"<span class='dim' style='font-size:9px'> &middot; {_pn} tr &middot; "
+            f"sim fills, not money</span></td></tr>")
 
     # Side half-books (owner split order 2026-08-12): long and short records
     # rendered as separate rows. Longs-bad is the robust half of the 8/12
@@ -1032,7 +1127,12 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
 
     # Actual wins/losses counts (real records, not just a win-rate %).
     w_all, l_all = len(wins), len(losses)
-    n_live = sum(1 for t in trades if t.get("mode") == "live")
+    # Main-book cards never take the mixed live/paper branch: their `trades`
+    # are already real-only (paper rows split out above), and mixing mode
+    # semantics here would misread historical no-mode rows (= real money)
+    # as paper sims if live main rows ever carry mode="live".
+    n_live = (0 if slot_id in ("5m_scalp", "main_gated")
+              else sum(1 for t in trades if t.get("mode") == "live"))
     if 0 < n_live < n:
         # Slot has BOTH real (live) and simulated (paper) history — e.g. a slot
         # that traded live then auto-demoted to paper. Never conflate real money
@@ -1117,6 +1217,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"<tr><td class='dim'>net PnL (era)</td><td class='{ecls}'>${enet:+.2f}</td></tr>"
             f"<tr><td class='dim'>avg win (era)</td><td class='pos'>${e_avgw:+.2f}</td></tr>"
             f"<tr><td class='dim'>avg loss (era)</td><td class='neg'>${e_avgl:+.2f}</td></tr>"
+            f"{main_paper_row}"
             f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
         )
     elif slot_id == "SR_BOUNCE" and (n or n_stale):
@@ -1189,6 +1290,7 @@ def _build_signal_card(slot_id: str, title: str, state: dict,
             f"<tr><td class='dim'>net PnL</td><td class='{net_cls}'>${net:+.2f}</td></tr>"
             f"<tr><td class='dim'>avg win</td><td class='pos'>${avg_win:+.2f}</td></tr>"
             f"<tr><td class='dim'>avg loss</td><td class='neg'>${avg_loss:+.2f}</td></tr>"
+            f"{main_paper_row}"
             f"<tr><td class='dim'>open</td><td>{open_html}</td></tr>"
         )
 
@@ -1264,7 +1366,10 @@ def build_equity_series(era: str = "sentinel") -> dict:
     used: (opened_at or closed_at) >= SENTINEL_DEPLOY_TS. era="all" = everything.
     Returns {"t": [unix_ts], "v": [cum_net], "meta": [per-trade dict]}.
     """
-    rows = [("main", t) for t in read_state().get("closed_trades", []) or []]
+    # Main rows tagged mode="paper" (2026-08-26 paper-main demotion) are sims —
+    # the equity curve is REAL MONEY only. No-mode rows are historical real fills.
+    rows = [("main", t) for t in read_state().get("closed_trades", []) or []
+            if t.get("mode") != "paper"]
     for slot_id, state in sorted(read_all_slot_states().items()):
         if slot_id in ("5m_scalp", "v8_245trades", "SR_BOUNCE_era1"):
             continue  # main file already merged above; v8/era1 are archive snapshots
@@ -1348,11 +1453,14 @@ def collect_blotter_rows(limit: int = 500, slot_states: dict = None) -> list[dic
                 time_pt = _from_ts(ts).strftime("%-m/%-d %-I:%M %p") if ts else "?"
             except Exception:
                 time_pt = "?"
-            # Main trades are the live bot. A slot trade is live ONLY when the
-            # record itself carries mode=="live" (stamped at fill time, post-
-            # promotion) — same rule build_equity_series uses. Trades closed
-            # while the slot was still paper stay tagged paper.
-            mode = "live" if owner == "main" else (t.get("mode") or "paper")
+            # Main trades default to live (historical rows carry no mode field
+            # = real money) EXCEPT rows the paper-main demotion (2026-08-26)
+            # tagged mode="paper" — those are sims and must render as paper.
+            # A slot trade is live ONLY when the record itself carries
+            # mode=="live" (stamped at fill time, post-promotion) — same rule
+            # build_equity_series uses. Trades closed while the slot was still
+            # paper stay tagged paper.
+            mode = (t.get("mode") or "live") if owner == "main" else (t.get("mode") or "paper")
             # Honest-data rule (2026-08-12): pre-8/5 paper rows ran on stale
             # cached prices — keep them in the ledger view but tag them so
             # they render as stale and never count toward chip win rates.
@@ -1472,8 +1580,11 @@ def _today_net_pnl(state: dict) -> float:
     (paper) trades never count."""
     try:
         today_start = _now_ca().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        # Main paper-demotion sims (mode="paper", 2026-08-26) never count —
+        # this number sits next to the real balance in the ticker.
         total = sum(_net_pnl(t) for t in state.get("closed_trades", [])
-                    if t.get("closed_at", 0) >= today_start)
+                    if t.get("closed_at", 0) >= today_start
+                    and t.get("mode") != "paper")
         for slot_id, sstate in read_all_slot_states().items():
             if slot_id in ("5m_scalp", "v8_245trades", "SR_BOUNCE_era1"):
                 continue  # 5m_scalp IS the main state; v8/era1 are archives
@@ -1597,7 +1708,11 @@ def _open_pos_count(state: dict = None, slot_states: dict = None) -> int:
     count = 0
     try:
         _state = state if state is not None else read_state()
-        count += len(_state.get("positions") or {})
+        # Paper-tagged main positions (paper-main demotion 2026-08-26) are
+        # sims, not exposure — the ticker POS count is real positions only
+        # (paper slots' positions are likewise never counted here).
+        count += sum(1 for p in (_state.get("positions") or {}).values()
+                     if not p.get("paper"))
         live_ids = _live_slot_ids()
         for slot_id in live_ids:
             if slot_id == "5m_scalp":
@@ -1645,7 +1760,9 @@ def build_ticker(lines: list = None, slot_states: dict = None, state: dict = Non
         parts.append(f"MR-LIVE HDRM ${hdrm:.2f}")
     _sz = _trade_size_env()
     if _sz is not None:
-        parts.append(f"SIZE ${_sz:g}")
+        # Main on paper: the .env size is sim sizing, not money at risk.
+        parts.append(f"SIZE ${_sz:g} (PAPER)" if _main_paper()
+                     else f"SIZE ${_sz:g}")
     parts += [
         f"DD {_drawdown_pct(_state, bal):.1f}%",
         f"POS {_open_pos_count(_state, slot_states)}",
@@ -1693,10 +1810,16 @@ def _build_positions_panel(lines: list = None, slot_states: dict = None) -> str:
     live_px = _snapshot_prices()
 
     pos_rows = []
-    for owner in sorted(_live_slot_ids()):
+    # Main book renders even while on paper (.paper_main drops 5m_scalp from
+    # the live set) — its open positions must stay visible, labeled per the
+    # POSITION's own paper tag (a sentinel toggle mid-position must not
+    # relabel a real position, and vice versa).
+    for owner in sorted(_live_slot_ids() | {"5m_scalp"}):
         src = (slot_states.get(owner) or {}).get("positions") or {}
-        owner_label = "main" if owner == "5m_scalp" else owner
+        base_label = "main" if owner == "5m_scalp" else owner
         for sym, p in src.items():
+            owner_label = (f"{base_label} (PAPER)" if p.get("paper")
+                           else base_label)
             short = escape(str(sym).replace("/USDT:USDT", ""))
             side = str(p.get("side", "?"))[:5].upper()
             side_cls = "pos" if side.startswith("L") else "neg"
@@ -1718,7 +1841,7 @@ def _build_positions_panel(lines: list = None, slot_states: dict = None) -> str:
             pos_rows.append(
                 f"<tr><td>{short}</td><td class='{side_cls}'>{side}</td>"
                 f"<td>{entry:.6g}</td>{upnl_cell}<td>{sl:.6g}</td><td>{tp:.6g}</td>"
-                f"<td>{age}</td><td class='dim'>{escape(str(p.get('strategy', '')))}</td>"
+                f"<td>{age}</td><td class='dim'>{escape(_strat_display(str(p.get('strategy', '')))[0])}</td>"
                 f"<td class='dim'>{escape(owner_label)}</td></tr>"
             )
 
@@ -1753,6 +1876,24 @@ def _build_positions_panel(lines: list = None, slot_states: dict = None) -> str:
             '<div class="sig-desc">Positions open right now across the main bot and live '
             'slots &mdash; entry, unrealized PnL, stop/target, age, and the owning strategy.</div>'
             f'{body}{rec_html}')
+
+
+# Human labels for internal strategy tags that aren't self-explanatory (owner
+# request 2026-08-26: "label this properly"). Display-only — data-strat keeps
+# the raw tag so chip filtering and drill() are unchanged.
+_STRAT_DISPLAY = {
+    "orphan_adopted": (
+        "adopted remnant",
+        "Untracked position found on the exchange and auto-adopted by the "
+        "orphan scanner (SL/TP placed, Telegram alert). In practice these are "
+        "leftover partial-TP runner slivers from main-book trades, closed for "
+        "pennies — bookkeeping recapture, not a strategy."),
+}
+
+
+def _strat_display(s: str) -> tuple:
+    """(visible label, hover tooltip) for a raw strategy tag."""
+    return _STRAT_DISPLAY.get(s, (s, ""))
 
 
 def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
@@ -1798,9 +1939,11 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
     out = ("<div class='strat-chips'>"
            f"<span class='chip active' data-strat='*' onclick='stratFilter(this)'>ALL{_wr(all_rows)}</span>")
     for s in strats:
-        label = escape(s[:16]) if s else "(none)"
+        disp, tip = _strat_display(s)
+        label = escape(disp[:16]) if s else "(none)"
+        title = f" title=\"{escape(tip)}\"" if tip else ""
         wr = _wr([r for r in all_rows if r["strat"] == s])
-        out += (f"<span class='chip' data-strat=\"{escape(s)}\" "
+        out += (f"<span class='chip' data-strat=\"{escape(s)}\"{title} "
                 f"onclick=\"stratFilter(this)\">{label}{wr}</span>")
     out += "</div>"
     # Backfill (2026-08-09, owner report "bb_mean_revert only has 3 rows"):
@@ -1841,6 +1984,8 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
         in_window = r["id"] in window_ids
         bf = "" if in_window else " data-backfill=\"1\""
         style = "cursor:pointer" if in_window else "cursor:pointer;display:none"
+        strat_disp, strat_tip = _strat_display(r["strat"])
+        strat_title = f" title=\"{escape(strat_tip)}\"" if strat_tip else ""
         out += (
             f"<tr{sim_cls} onclick=\"drill(this,this.dataset.id,this.dataset.sym)\" "
             f"data-id=\"{r['id']}\" data-sym=\"{escape(r['sym'])}\" "
@@ -1849,7 +1994,7 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
             f"<td>{escape(r['sym'])}{badge}</td>"
             f"<td class='{side_cls}'>{side}</td>"
             f"{mode_cell}"
-            f"<td class='dim'>{escape(r['strat'][:16])}</td>"
+            f"<td class='dim'{strat_title}>{escape(strat_disp[:16])}</td>"
             f"<td class='{net_cls}'>{r['net']:+.2f} "
             + (f"<span class='dim'>{r['roi']:+.1f}%</span>" if r["roi"] is not None
                else "<span class='dim'>&mdash;</span>")

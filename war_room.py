@@ -47,7 +47,9 @@ def _parse_log_events(lines):
                 event["detail"] = m.group(2)
             else:
                 event["type"] = "hold"
-        elif "Position closed:" in msg:
+        elif "Position closed:" in msg and "[PAPER]" not in msg:
+            # [PAPER] closes (paper slots / paper-main sims) stay visible as
+            # raw "info" lines but must not drive real close events/PnL.
             event["type"] = "close"
             m = re.search(r'(LONG|SHORT) (\S+) .* PnL: ([\-\+\d\.]+) USDT \(([\-\+\d\.]+)%\) .* Reason: (\w+)', msg)
             if m:
@@ -135,14 +137,17 @@ def _build_api_response():
     cycle_events = [e for e in events if e.get("type") == "cycle"]
     latest_cycle = cycle_events[-1] if cycle_events else None
 
-    recent_trades = state.get("closed_trades", [])[-10:]
+    # Real-money rows only — simulated rows carry mode=="paper" (paper-main
+    # era 2026-08-26); historical rows have NO mode field and are real money.
+    real_rows = [t for t in state.get("closed_trades", []) if t.get("mode") != "paper"]
+    recent_trades = real_rows[-10:]
     recent_events = events[-50:]
 
     return {
         "stats": latest_stats,
         "cycle": latest_cycle,
         "peak_balance": state.get("peak_balance", 0),
-        "total_trades": len(state.get("closed_trades", [])),
+        "total_trades": len(real_rows),
         "recent_trades": recent_trades,
         "events": recent_events,
         "timestamp": time.time(),

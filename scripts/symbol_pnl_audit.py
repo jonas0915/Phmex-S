@@ -19,7 +19,9 @@ def pnl(t):
     return t["net_pnl"] if "net_pnl" in t else t.get("pnl_usdt", 0.0)
 
 # Exclude non-executed skips (min_margin_skip / shadow_skip => 0 notional, 0 pnl)
+# and paper sims (mode=="paper", 8/26 main demotion; no-mode rows = real money)
 def is_real(t):
+    if t.get("mode") == "paper": return False
     r = t.get("reason") or t.get("exit_reason") or ""
     if r in ("min_margin_skip",): return False
     if t.get("shadow_skip"): return False
@@ -27,7 +29,10 @@ def is_real(t):
 
 real = [t for t in ct if is_real(t)]
 skipped = len(ct) - len(real)
-print(f"Excluded non-executed (min_margin_skip/shadow): {skipped}")
+paper_n = sum(1 for t in ct if t.get("mode") == "paper")
+if paper_n:
+    print(f"Excluded paper sims (mode=paper): {paper_n}")
+print(f"Excluded non-executed (min_margin_skip/shadow): {skipped - paper_n}")
 print(f"Real executed trades: {len(real)}")
 print(f"TOTAL NET PnL (all real): {sum(pnl(t) for t in real):.2f}")
 print(f"  (net_pnl present: {sum(1 for t in real if 'net_pnl' in t)}, gross-only: {sum(1 for t in real if 'net_pnl' not in t)})")

@@ -50,6 +50,13 @@ class Position:
     # Prevents restart adoptions masquerading as entries in forensics (6/14).
     adopted: bool = False
     adopted_at: float = 0.0
+    # Paper-main tag (.paper_main era, 2026-08-26): True when this MAIN-book
+    # position was opened in paper mode — it does NOT exist on the exchange.
+    # Every exchange-touching branch (exits, reconciler, trail, watcher) keys
+    # on this tag, never on the sentinel. Persisted across restarts: an
+    # untagged restore would let the reconciler fabricate a close AND let the
+    # startup sync place REAL SL/TP for a phantom position.
+    paper: bool = False
 
     def update_trailing_stop(self, current_price: float):
         """Tiered trailing stop — the bigger the winner, the tighter the trail.
@@ -348,6 +355,7 @@ class RiskManager:
                     pos.adopted = pd.get("adopted", False)  # absent in old state files (F4)
                     pos.adopted_at = pd.get("adopted_at", 0.0)
                     pos.gate_tags = pd.get("gate_tags", None)  # forensic attr must survive restart (2026-07-17 audit)
+                    pos.paper = pd.get("paper", False)  # paper-main tag MUST survive restart (2026-08-26)
                     self.positions[sym] = pos
                 if pos_data:
                     logger.info(f"Restored {len(pos_data)} open positions from state")
@@ -376,6 +384,7 @@ class RiskManager:
                     "adopted": getattr(pos, "adopted", False),
                     "adopted_at": getattr(pos, "adopted_at", 0.0),
                     "gate_tags": getattr(pos, "gate_tags", None),
+                    "paper": getattr(pos, "paper", False),
                 }
             with open(self.state_file, "w") as f:
                 json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades, "trade_results": self.trade_results, "positions": pos_data}, f)
@@ -498,9 +507,14 @@ class RiskManager:
         max_margin = float(os.getenv("MAX_TRADE_MARGIN", "10.0"))
         kelly_lookback = int(os.getenv("KELLY_LOOKBACK", "50"))
 
+        # Paper-main exclusion (2026-08-26): mode=="paper" rows are sims and
+        # must never steer real-money sizing. Paper-SLOT books are unaffected
+        # (their rows carry no mode field).
+        _real = [t for t in self.closed_trades if t.get("mode") != "paper"]
+
         # Bootstrap phase: not enough data yet
-        if len(self.closed_trades) < kelly_lookback:
-            logger.debug(f"[KELLY] Bootstrap phase ({len(self.closed_trades)}/{kelly_lookback} trades) — using min margin ${min_margin}")
+        if len(_real) < kelly_lookback:
+            logger.debug(f"[KELLY] Bootstrap phase ({len(_real)}/{kelly_lookback} trades) — using min margin ${min_margin}")
             return min_margin
 
         # Compute Kelly from recent trades
@@ -508,7 +522,7 @@ class RiskManager:
             n = t.get("net_pnl")
             return n if n is not None else t.get("pnl_usdt", 0)
 
-        recent = self.closed_trades[-kelly_lookback:]
+        recent = _real[-kelly_lookback:]
         wins = [t for t in recent if _np(t) > 0]
         losses = [t for t in recent if _np(t) <= 0]
 
@@ -552,8 +566,9 @@ class RiskManager:
         return margin
 
     def calculate_kelly_raw(self) -> float:
-        """Return raw Kelly criterion value. Negative = no edge."""
-        trades = self.closed_trades
+        """Return raw Kelly criterion value. Negative = no edge.
+        Excludes mode=="paper" rows (paper-main sims, 2026-08-26)."""
+        trades = [t for t in self.closed_trades if t.get("mode") != "paper"]
         if len(trades) < 20:
             return 0.0
         def _np(t):
@@ -851,7 +866,7 @@ class RiskManager:
             return "stop_loss"
         return None
 
-    def partial_close_position(self, symbol: str, exit_price: float, fees_usdt: float = None):
+    def partial_close_position(self, symbol: str, exit_price: float, fees_usdt: float = None, mode: str = None):
         """Scale out half the position at exit_price and record it as a 'partial_tp'
         closed_trades entry. The runner half stays in self.positions under the
         existing trail/TP/durable-SL machinery (we deliberately do NOT null the
@@ -921,6 +936,8 @@ class RiskManager:
         }
         if fees_pending:
             trade["fees_pending"] = True
+        if mode is not None:
+            trade["mode"] = mode  # "paper" for paper-main scale-outs (2026-08-26)
         self.closed_trades.append(trade)
 
         # Shrink the live position to the runner half. Leave stop_loss /
@@ -968,23 +985,30 @@ class RiskManager:
         return (self.peak_balance - current_balance) / self.peak_balance * 100
 
     def print_stats(self, current_balance: float):
-        total_trades = len(self.closed_trades)
+        # Paper-main exclusion (2026-08-26): mode=="paper" rows are sims — the
+        # STATS line is real-money truth and must never mix them in. Paper-slot
+        # books are unaffected (their rows carry no mode field).
+        real = [t for t in self.closed_trades if t.get("mode") != "paper"]
+        n_paper = len(self.closed_trades) - len(real)
+        _paper_note = f" | Paper rows excluded: {n_paper}" if n_paper else ""
+        total_trades = len(real)
         if total_trades == 0:
-            logger.info("No closed trades yet.")
+            logger.info(f"No closed trades yet.{_paper_note}")
             return
 
         def _np(t):
             n = t.get("net_pnl")
             return n if n is not None else t.get("pnl_usdt", 0)
-        wins     = [t for t in self.closed_trades if _np(t) > 0]
-        losses   = [t for t in self.closed_trades if _np(t) <= 0]
-        total_pnl = sum(_np(t) for t in self.closed_trades)
+        wins     = [t for t in real if _np(t) > 0]
+        losses   = [t for t in real if _np(t) <= 0]
+        total_pnl = sum(_np(t) for t in real)
         win_rate  = len(wins) / total_trades * 100
-        longs     = [t for t in self.closed_trades if t["side"] == "long"]
-        shorts    = [t for t in self.closed_trades if t["side"] == "short"]
+        longs     = [t for t in real if t["side"] == "long"]
+        shorts    = [t for t in real if t["side"] == "short"]
 
         logger.info(
             f"=== STATS === Trades: {total_trades} (L:{len(longs)} S:{len(shorts)}) | "
             f"Win Rate: {win_rate:.1f}% | Total PnL: {total_pnl:+.2f} USDT | "
             f"Balance: {current_balance:.2f} USDT | Drawdown: {self._drawdown_percent(current_balance):.1f}%"
+            f"{_paper_note}"
         )

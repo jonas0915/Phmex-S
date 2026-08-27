@@ -64,7 +64,9 @@ def _parse_log_events(lines):
                 event["type"] = "hold"
                 event["symbol"] = m.group(1)
                 event["detail"] = m.group(2)
-        elif "Position closed:" in msg:
+        elif "Position closed:" in msg and "[PAPER]" not in msg:
+            # [PAPER] closes (paper slots / paper-main sims) must not drive
+            # real close events/PnL on the desk.
             event["type"] = "close"
             m = re.search(r'(LONG|SHORT) (\S+) .* PnL: ([\-\+\d\.]+) USDT \(([\-\+\d\.]+)%\) .* Reason: (\w+)', msg)
             if m:

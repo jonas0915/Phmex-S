@@ -91,6 +91,31 @@ def test_kill_sentinel_idempotent(tmp_path):
     assert sentinel.read_text() == "existing\n"
 
 
+# ── main-book PAPER mode (.paper_main demotion, 2026-08-26) ────────────
+
+def test_main_paper_rows_excluded(tmp_path):
+    # Simulated main fills (mode="paper") never advance a registered side
+    # line; no-mode rows are real money and still count.
+    sims = [_t(-1.0, mode="paper", opened_off=i * 10) for i in range(10)]
+    r = adj.grade_side_line(sims + [_t(-0.5, opened_off=200)], MAIN_CFG,
+                            bot_dir=str(tmp_path))
+    assert r["n_trades"] == 1
+    assert r["status"] == adj.WATCH
+    assert not os.path.exists(tmp_path / ".block_longs_main")
+
+
+def test_main_short_watch_line_excludes_paper(tmp_path):
+    # The 8/12 watch-only short half-book: sim rows excluded there too.
+    cfg = dict(MAIN_CFG, side="short", verdict_n=None, watch_only=True,
+               sentinel=".block_shorts_main")
+    sims = [_t(2.0, side="short", mode="paper", opened_off=i * 10)
+            for i in range(5)]
+    r = adj.grade_side_line(sims + [_t(1.0, side="short")], cfg,
+                            bot_dir=str(tmp_path))
+    assert r["n_trades"] == 1
+    assert r["status"] == adj.WATCH
+
+
 # ── Bot-side dormant gate ──────────────────────────────────────────────
 
 def test_bot_longs_blocked_helper(tmp_path):

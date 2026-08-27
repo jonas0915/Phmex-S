@@ -94,7 +94,12 @@ def load_recent_trades(days: int = 7) -> list[dict]:
         return []
     data = json.loads(STATE_FILE.read_text())
     cutoff = time.time() - (days * 86400)
-    return [t for t in data.get("closed_trades", []) if (t.get("closed_at") or 0) >= cutoff]
+    # Real-money rows only: mode=="paper" sims (8/26 main demotion) excluded;
+    # historical rows have no mode field and pass through.
+    return [
+        t for t in data.get("closed_trades", [])
+        if (t.get("closed_at") or 0) >= cutoff and t.get("mode") != "paper"
+    ]
 
 
 def write_report(patterns: list[dict], date_str: str) -> Path:

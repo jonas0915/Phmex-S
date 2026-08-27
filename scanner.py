@@ -34,7 +34,10 @@ def _compute_history_scores(state_path: str = "trading_state.json",
     # Accumulate per-symbol net PnL from closed live trades only
     symbol_pnl: dict[str, list[float]] = {}
     for t in state.get("closed_trades", []):
-        if t.get("is_paper"):
+        # Simulated rows carry mode=="paper" (paper-main era 2026-08-26); the
+        # old `is_paper` key checked here was never written anywhere — dead
+        # filter replaced 2026-08-26 so paper PnL can't skew symbol ranking.
+        if t.get("mode") == "paper":
             continue
         sym = t.get("symbol")
         if not sym:

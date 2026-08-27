@@ -76,6 +76,29 @@ def _longs_blocked(book: str, bot_dir: str = ".") -> bool:
     return os.path.exists(os.path.join(bot_dir, f".block_longs_{book}"))
 
 
+# Main-book paper mode (owner order 2026-08-26, TASKS.md): the .paper_main
+# sentinel puts the MAIN book on paper. Entries record simulated fills (no
+# exchange order, no SL/TP placement); every position opened while the sentinel
+# is present is tagged pos.paper=True, and ALL downstream branches (exits,
+# reconciler, durable trail, live exit watcher, partial-TP) key on the
+# POSITION's tag — never on this sentinel — so toggling it mid-position can
+# never strand a position in the wrong mode. Fresh file check per entry
+# (same pattern as _longs_blocked): no restart needed to toggle.
+def _main_paper(bot_dir: str = ".") -> bool:
+    return os.path.exists(os.path.join(bot_dir, ".paper_main"))
+
+
+def _sim_paper_fee(notional: float) -> float:
+    """Simulated round-trip fee for a paper MAIN close, passed explicitly to
+    close_position because main's RiskManager stays is_paper=False (flipping it
+    would switch the ledger gross->net mid-file, risk_manager.py:745). Same
+    model as the paper-slot branch in risk_manager.close_position (:732-734):
+    maker entry leg + taker+slippage exit leg — deliberately above the measured
+    live RT so paper never flatters."""
+    return notional * (Config.MAKER_FEE_PERCENT
+                       + Config.TAKER_FEE_PERCENT + Config.SLIPPAGE_PERCENT) / 100
+
+
 # ST2.0 book×tape absorption short — fixed ~15-min hold (900s / 60s cycle = 15 cycles),
 # matching the backtested exit (docs/2026-06-13-wider-setup-search.md).
 ST2_HOLD_CYCLES = 15
@@ -432,9 +455,13 @@ def _write_l2_snapshot(snapshot_dict: dict, path: str = "l2_snapshot.json") -> N
 def _build_position_owners(main_risk, slots):
     """symbol -> (owner_risk_manager, slot_or_None) for every EXCHANGE-BACKED position.
     Main bot positions map to (main_risk, None); live-slot positions map to
-    (slot.risk, slot). Paper slots are simulation-only and excluded.
+    (slot.risk, slot). Paper slots AND paper-tagged MAIN positions (.paper_main
+    era, pos.paper=True) are simulation-only and excluded — they never existed
+    on-exchange, so including them would make _sync_exchange_closes "close"
+    phantom positions and fabricate trades (real-money incident class).
     Used by _sync_exchange_closes so reconciliation is slot-aware."""
-    owners = {s: (main_risk, None) for s in main_risk.positions}
+    owners = {s: (main_risk, None) for s, p in main_risk.positions.items()
+              if not getattr(p, "paper", False)}
     for slot in slots:
         if slot.paper_mode:
             continue
@@ -1114,6 +1141,8 @@ class Phmex2Bot:
                             logger.debug(f"Could not refresh peak_price for {sym}: {e}")
                     # Place exchange SL/TP for synced positions (they have sl_order_id=None)
                     for sym, pos in self.risk.positions.items():
+                        if getattr(pos, "paper", False):
+                            continue  # paper main position restored from state — never place real orders
                         if pos.sl_order_id is None:
                             self.exchange.cancel_open_orders(sym)
                             sl_tp = self.exchange.place_sl_tp(sym, pos.side, pos.amount, pos.stop_loss, pos.take_profit)
@@ -1285,7 +1314,14 @@ class Phmex2Bot:
         mode: a slot demoted mid-day (HTF_L2 7/22, −$6.22 then auto-demoted at
         11:34 AM PT) still lost real money today. Paper records (mode missing
         or !="live") never count."""
-        total = _compute_today_net_pnl(getattr(self.risk, "closed_trades", []) or [])
+        # Paper-main exclusion (2026-08-26 .paper_main era): main rows tagged
+        # mode=="paper" are simulations — they must NEVER count toward the real
+        # daily-loss kill switch (a sim loss halting live slot entries would be
+        # a paper->real coupling). Historical main rows have no mode field and
+        # keep counting as real money.
+        _main_real = [t for t in (getattr(self.risk, "closed_trades", []) or [])
+                      if t.get("mode") != "paper"]
+        total = _compute_today_net_pnl(_main_real)
         for slot in getattr(self, "slots", []) or []:
             live = [t for t in slot.risk.closed_trades if t.get("mode") == "live"]
             total += _compute_today_net_pnl(live)
@@ -1647,22 +1683,30 @@ class Phmex2Bot:
                     self._closing.add(symbol)
                 try:
                     half = pos.amount / 2
-                    if pos.side == "long":
-                        order = self.exchange.close_long(symbol, half)
+                    _is_paper_pos = getattr(pos, "paper", False)
+                    if _is_paper_pos:
+                        # Paper main: simulate the scale-out — no exchange order,
+                        # fill at the cycle price, sim fee on the half notional.
+                        fill_price = price
+                        fee = _sim_paper_fee(pos.entry_price * half)
                     else:
-                        order = self.exchange.close_short(symbol, half)
-                    if not order:
-                        if self.exchange.pop_reduce_only_abort(symbol):
-                            logger.info(f"[PARTIAL TP] {symbol} half-close aborted (reduceOnly) — position closing elsewhere")
+                        if pos.side == "long":
+                            order = self.exchange.close_long(symbol, half)
                         else:
-                            logger.error(f"[PARTIAL TP] half-close order failed for {symbol} — position unchanged")
-                        continue
-                    fill_price = self._extract_fill_price(order, price, is_exit=True)
-                    fee = self.exchange.extract_order_fee(order, symbol)
+                            order = self.exchange.close_short(symbol, half)
+                        if not order:
+                            if self.exchange.pop_reduce_only_abort(symbol):
+                                logger.info(f"[PARTIAL TP] {symbol} half-close aborted (reduceOnly) — position closing elsewhere")
+                            else:
+                                logger.error(f"[PARTIAL TP] half-close order failed for {symbol} — position unchanged")
+                            continue
+                        fill_price = self._extract_fill_price(order, price, is_exit=True)
+                        fee = self.exchange.extract_order_fee(order, symbol)
                     # Capture the trigger ROI BEFORE partial_close_position halves
                     # pos.margin (else the logged ROI reads ~2x the real trigger).
                     trigger_roi = pos.pnl_percent(fill_price)
-                    result = self.risk.partial_close_position(symbol, fill_price, fees_usdt=fee)
+                    result = self.risk.partial_close_position(symbol, fill_price, fees_usdt=fee,
+                                                              mode="paper" if _is_paper_pos else None)
                     if result:
                         pnl, pnl_pct = result
                         logger.info(f"[PARTIAL TP] {symbol} scaled out half @ {fill_price:.4f} (+{trigger_roi:.1f}% ROI) — runner continues")
@@ -1672,14 +1716,20 @@ class Phmex2Bot:
                         # new target. Only flip to "software" on a CONFIRMED cancel — a
                         # failed cancel leaves the old TP resting (runner caps at the old
                         # level) rather than risking two live TPs.
-                        if Config.PARTIAL_RUNNER_TP_ROI > 0 and pos.tp_order_id and pos.tp_order_id != "software":
+                        if (not _is_paper_pos and Config.PARTIAL_RUNNER_TP_ROI > 0
+                                and pos.tp_order_id and pos.tp_order_id != "software"):
                             if self.exchange.cancel_order_by_id(symbol, pos.tp_order_id):
                                 pos.tp_order_id = "software"
                                 logger.info(f"[PARTIAL TP] {symbol} runner TP -> {pos.take_profit:.4f} (+{Config.PARTIAL_RUNNER_TP_ROI:.0f}% ROI, software-enforced)")
                             else:
                                 logger.warning(f"[PARTIAL TP] {symbol} could not cancel stale exchange TP — runner keeps original TP level")
                         try:
-                            notifier.notify_partial_tp(symbol, pos.side, fill_price, pnl, pnl_pct)
+                            if _is_paper_pos:
+                                notifier.notify_paper_exit(symbol, pos.side, pos.entry_price,
+                                                           fill_price, pnl, pnl_pct,
+                                                           "partial_tp", slot="main")
+                            else:
+                                notifier.notify_partial_tp(symbol, pos.side, fill_price, pnl, pnl_pct)
                         except Exception as ne:
                             logger.warning(f"[PARTIAL TP] Telegram notify failed for {symbol}: {ne}")
                 except Exception as e:
@@ -1700,6 +1750,9 @@ class Phmex2Bot:
                 df_check = add_all_indicators(df_check)
                 if pos.should_exit_early(price, df_check):
                     logger.info(f"[EARLY EXIT] {symbol} — momentum reversal at {pos.pnl_percent(price):.1f}% profit")
+                    if getattr(pos, "paper", False):
+                        self._close_paper_main(symbol, pos, price, "early_exit")
+                        continue
                     if pos.side == "long":
                         order = self.exchange.close_long(symbol, pos.amount)
                     else:
@@ -1727,6 +1780,9 @@ class Phmex2Bot:
                 cycles_held = self.cycle_count - pos.entry_cycle
                 held_min = cycles_held * Config.LOOP_INTERVAL / 60
                 logger.info(f"[FLAT EXIT] {symbol} — {roi:.1f}% ROI after {held_min:.0f}min (no momentum)")
+                if getattr(pos, "paper", False):
+                    self._close_paper_main(symbol, pos, price, "flat_exit")
+                    continue
                 # No protective deadline — worth resting a maker limit first
                 if pos.side == "long":
                     order = self.exchange.close_long(symbol, pos.amount, urgent=False)
@@ -1755,6 +1811,9 @@ class Phmex2Bot:
             should_flip, flip_reason = _check_htf_trend_flip_exit(pos.side, htf_df)
             if should_flip:
                 logger.info(f"[TREND-FLIP EXIT] {symbol} {pos.side} — 1h EMA flipped, closing")
+                if getattr(pos, "paper", False):
+                    self._close_paper_main(symbol, pos, price, flip_reason)
+                    continue
                 if pos.side == "long":
                     order = self.exchange.close_long(symbol, pos.amount)
                 else:
@@ -1781,6 +1840,9 @@ class Phmex2Bot:
                 held_min = cycles_held * Config.LOOP_INTERVAL / 60
                 roi = pos.pnl_percent(price)
                 logger.info(f"[ADVERSE EXIT] {symbol} — {roi:.1f}% ROI after {held_min:.0f}min")
+                if getattr(pos, "paper", False):
+                    self._close_paper_main(symbol, pos, price, "adverse_exit")
+                    continue
                 if pos.side == "long":
                     order = self.exchange.close_long(symbol, pos.amount)
                 else:
@@ -1821,6 +1883,8 @@ class Phmex2Bot:
         for symbol, pos in list(self.risk.positions.items()):
             if symbol in self._closing:
                 continue  # watcher mid-close — cancel_open_orders here could kill its in-flight close order
+            if getattr(pos, "paper", False):
+                continue  # paper main position — no exchange orders exist to verify/re-place
             if pos.sl_order_id == "software":
                 continue  # managed by bot's check_positions loop
             if pos.sl_order_id and not self.exchange.verify_sl_order(symbol, pos.sl_order_id):
@@ -1855,6 +1919,9 @@ class Phmex2Bot:
                     held_min = cycles_held * Config.LOOP_INTERVAL / 60
                     exit_type = "hard_time_exit" if is_hard else "time_exit"
                     logger.info(f"[{exit_type.upper()}] {symbol} — {pnl_pct:.1f}% PnL after {held_min:.0f}min (strat={pos.strategy or 'default'})")
+                    if getattr(pos, "paper", False):
+                        self._close_paper_main(symbol, pos, price, exit_type)
+                        continue
                     # No protective deadline — worth resting a maker limit first
                     if pos.side == "long":
                         order = self.exchange.close_long(symbol, pos.amount, urgent=False)
@@ -1884,6 +1951,8 @@ class Phmex2Bot:
             old_sl = pos.stop_loss
             pos.check_breakeven(price)
             pos.update_trailing_stop(price)
+            if getattr(pos, "paper", False):
+                continue  # paper main: software levels ratchet above, but NEVER amend exchange orders
             if not pos.sl_order_id or pos.sl_order_id == "software":
                 continue  # software-managed SL — check_positions handles exits
             # Durable backstop: wide band from peak once the trail is armed. Software
@@ -1930,6 +1999,12 @@ class Phmex2Bot:
             if price:
                 pos = self.risk.positions.get(symbol)
                 if pos:
+                    if getattr(pos, "paper", False):
+                        # Simulated SL/TP for paper MAIN positions: no resting
+                        # exchange orders exist — check_positions IS the simulator,
+                        # close in the ledger at the software level's trigger price.
+                        self._close_paper_main(symbol, pos, price, reason)
+                        continue
                     # take_profit is in-the-money with no protective deadline — patient
                     # maker close; stop_loss/trailing_stop must hit market immediately
                     urgent = reason != "take_profit"
@@ -2502,6 +2577,36 @@ class Phmex2Bot:
                         f"ATR={_regime_snap.get('atr_pct', 0):.3%} vol={_regime_snap.get('vol_ratio', 0):.1f}x "
                         f"(shadow-tagged only)"
                     )
+
+                if _main_paper():
+                    # ── PAPER MAIN (.paper_main sentinel, owner order 2026-08-26) ──
+                    # Identical signal path up to this point (every gate/filter
+                    # above ran exactly as live); from here the fill is simulated:
+                    # NO exchange order, NO SL/TP placement. SL/TP are enforced by
+                    # the existing software check_positions loop + live exit
+                    # watcher, which branch on pos.paper.
+                    pos = self._open_paper_main_position(
+                        symbol, direction, margin, price, atr_val=atr_val,
+                        regime=regime, strat_name=strat_name, signal=signal,
+                        confidence=confidence, layers=layers)
+                    available -= pos.margin
+                    self._last_entry_time = time.time()
+                    if strat_name in ("htf_confluence_pullback", "htf_l2_anticipation"):
+                        self._last_htf_entry_time = time.time()
+                    # Telemetry identical to the live path (snapshot + F6 gate tags)
+                    _htf_adx_val = float(htf_df.iloc[-1].get("adx", 0)) if htf_df is not None and len(htf_df) > 0 else None
+                    pos.entry_snapshot = self._log_entry_snapshot(symbol, direction, "5m_scalp", strat_name, signal.strength, pos.entry_price, confidence, ob, flow, ohlcv_last=df.iloc[-1], ohlcv_df=df, htf_adx=_htf_adx_val, extra_tags=_shadow_gates or None)
+                    _active_tags = [k for k, v in (_shadow_gates or {}).items() if v]
+                    if _htf_adx_val is not None and _htf_adx_val >= Config.HTF_BLOCK_ADX_MIN:
+                        _active_tags.append("sg_htf_adx_hi")
+                    if (flow or {}).get("trade_count", 0) <= Config.HTF_BLOCK_TAPE_MAX:
+                        _active_tags.append("sg_thin_tape")
+                    pos.gate_tags = ",".join(_active_tags) if _active_tags else "none"
+                    try:
+                        self.risk._save_state()
+                    except Exception as _e:
+                        logger.debug(f"[PAPER MAIN] save_state after entry failed: {_e}")
+                    continue
 
                 order = self.exchange.open_long(symbol, margin, price) if direction == "long" else self.exchange.open_short(symbol, margin, price)
                 if order:
@@ -3714,6 +3819,11 @@ class Phmex2Bot:
                         if pos is None:
                             continue
                         logger.info(f"[LIVE EXIT] {symbol} {reason} @ {price:.6f} (WS age {lp[1]:.1f}s)")
+                        if getattr(pos, "paper", False):
+                            # Paper main: simulate the enforcement close at the WS
+                            # price — no exchange order, no cancel sweep.
+                            self._close_paper_main(symbol, pos, price, reason)
+                            continue
                         if pos.side == "long":
                             order = self.exchange.close_long(symbol, pos.amount)
                         else:
@@ -4870,6 +4980,63 @@ class Phmex2Bot:
         except Exception as e:
             logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} {reason} close error: {e} — retry next cycle")
             return False
+
+    def _open_paper_main_position(self, symbol, direction, margin, price, atr_val,
+                                  regime, strat_name, signal, confidence, layers):
+        """Paper-mode MAIN entry (.paper_main sentinel): record the position in
+        the main RiskManager at a fresh paper price — NO exchange call of any
+        kind (no order, no SL/TP; treat this path as order-capable until tests
+        prove otherwise, lessons.md). Tags pos.paper=True so every downstream
+        branch keys on the position, not the sentinel. Returns the Position;
+        the entry loop handles telemetry (snapshot/gate tags) and bookkeeping.
+        Attribute names copied from __init__/call sites: _ws_feed (NOT ws_feed
+        — 2026-07-27 ETH_TSM_28 crash lesson)."""
+        px, _px_age, _px_src = _fresh_paper_entry_price(
+            getattr(self, "_ws_feed", None), getattr(self, "exchange", None),
+            symbol, price)
+        self.risk.open_position(symbol, px, margin, side=direction, atr=atr_val,
+                                regime=regime, cycle=self.cycle_count,
+                                strategy=strat_name)
+        pos = self.risk.positions[symbol]
+        pos.paper = True
+        pos.entry_strength = signal.strength
+        pos.confidence = confidence
+        pos.ensemble_layers = ",".join(layers)
+        logger.info(
+            f"[PAPER MAIN] ENTRY {direction.upper()} {symbol} | Price: {px:.4f} | "
+            f"Margin: ${pos.margin:.2f} | Conf: {confidence}/7 | {signal.reason} | "
+            f"Strength: {signal.strength:.2f} | px_src={_px_src} px_age={_px_age:.1f}s"
+        )
+        notifier.notify_paper_entry(symbol, direction, px, margin, signal.strength,
+                                    signal.reason, slot="main")
+        return pos
+
+    def _close_paper_main(self, symbol: str, pos, price: float, reason: str) -> None:
+        """Simulated close for a paper-tagged MAIN position (.paper_main era):
+        NO exchange calls of any kind — the position never existed on-exchange.
+        Mirrors _close_slot_position's paper arm. The sim fee is passed
+        explicitly (main's RiskManager stays is_paper=False, so close_position
+        would otherwise estimate a LIVE fee and tag fees_pending — summoning
+        the reconciler to backfill a fee for a trade Phemex never saw).
+        Cooldowns still fire so the paper entry stream keeps live fidelity."""
+        pnl = pos.pnl_usdt(price)
+        pnl_pct = pos.pnl_percent(price)
+        self._set_cooldown_if_loss(symbol, pnl_pct)
+        fee = _sim_paper_fee(pos.entry_price * pos.amount)
+        # monitor_daemon matches "[PAPER]" on "Position closed" log lines to
+        # exclude sims from hourly-loss/streak alerts. Main's RiskManager keeps
+        # is_paper=False (no ledger flip), so borrow the slot wrapper's prefix
+        # mechanism (strategy_slot.py) for just this close — the line comes out
+        # "[PAPER] Position closed: ..." exactly like slot paper closes.
+        _prev_prefix = self.risk._log_prefix
+        self.risk._log_prefix = "[PAPER] "
+        try:
+            self.risk.close_position(symbol, price, reason, fees_usdt=fee, mode="paper")
+        finally:
+            self.risk._log_prefix = _prev_prefix
+        notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price,
+                                   pnl, pnl_pct, reason, slot="main")
+        logger.info(f"[PAPER MAIN] EXIT {pos.side.upper()} {symbol} @ {price:.4f} | {reason}")
 
     def _adopt_orphan_position(self, orphan: dict):
         """Adopt an exchange-visible position that the bot isn't tracking.
