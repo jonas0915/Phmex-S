@@ -3,8 +3,8 @@
   "counters": {
     "requote_miss": 30,
     "requote_fill": 7,
-    "mr_rsi_floor": 9,
+    "mr_rsi_floor": 10,
     "requote_abort_drift": 2
   },
-  "last_run": 1787839487.650518
+  "last_run": 1787857487.9637918
 }
