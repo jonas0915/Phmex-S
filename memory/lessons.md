@@ -17,8 +17,9 @@
   deducts fees from paper net_pnl at close (is_paper branch + net_pnl = gross - fees).
   The adjudicator version would have biased SR_BOUNCE's n=50 verdict KILL-ward by a full
   fee basis ($3.00/50t); caught by the final whole-branch review, fixed pre-restart.
-  The dashboard version is PRE-EXISTING and still live (all paper-slot "fee-adj" rows
-  double-subtract) — follow-up queued. Presented-to-owner correction: 5m_MR paper record
+  The dashboard version was FIXED 2026-07-31 (_sim_net_pnl now returns _net_pnl unchanged,
+  web_dashboard.py ~:259-270; re-verified 2026-08-29 audit — writer risk_manager.py:766-780
+  nets fees, dashboard sums net_pnl once). Presented-to-owner correction: 5m_MR paper record
   is ~10W/10L +$2.50 raw (correct), not "9W/11L -$1.13 fee-adj" as stated 7/27.
 - RULE: before applying any fee/cost adjustment in reporting or grading, read the code
   that WRITES the number being adjusted. The 7/23 retraction ("paper-fee claim RETRACTED")

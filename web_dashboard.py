@@ -555,7 +555,10 @@ def _reconcile_summary() -> dict:
 
 def get_recent_activity(lines: list[str], n: int = 12) -> list[str]:
     activity = []
-    keywords = ["ENTRY:", "Position closed:", "EARLY EXIT", "TIME EXIT",
+    # Entry lines: "[ENTRY]" (main), "[SLOT LIVE] <slot> ENTRY <side>" and
+    # "Position opened:" (paper) — there is no "ENTRY:" form in bot.log.
+    keywords = ["[ENTRY]", " ENTRY LONG", " ENTRY SHORT", "Position opened:",
+                "Position closed:", "EARLY EXIT", "TIME EXIT",
                 "HARD_TIME_EXIT", "REGIME", "DRAWDOWN", "SCANNER"]
     for line in reversed(lines):
         if any(kw in line for kw in keywords):
@@ -982,6 +985,8 @@ def _size_row_html(slot_id: str, live_ids: set) -> str:
     size row (they don't trade real money). Empty string = row omitted."""
     if slot_id in ("5m_scalp", "main_gated"):
         sz = _trade_size_env()
+        if sz is None:
+            return ""
         if _main_paper():
             # Paper main (owner demotion 2026-08-26): the .env size is SIM
             # sizing — label it so nobody reads it as money at risk.
@@ -2621,7 +2626,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Set-Cookie", f"dash_token={DASHBOARD_TOKEN}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Strict")
             self.end_headers()
             self.wfile.write(html.encode())
-        elif self.path == "/api/content":
+        elif _route == "/api/content":
             _lines = tail_log(3000)       # single log tail for the entire poll
             _state = read_state()         # single state read
             _slot_states = read_all_slot_states()  # single slot-states glob+read
@@ -2637,7 +2642,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(data)
-        elif self.path == "/trades" or self.path.startswith("/trades?"):
+        elif _route == "/trades":
             # The standalone trades page is gone — the merged blotter on the
             # main dashboard replaced it (Task 3).
             self.send_response(301)
@@ -2655,9 +2660,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
         elif self.path.startswith("/api/equity"):
-            era = "sentinel"
-            if "era=" in self.path:
-                era = self.path.split("era=", 1)[1].split("&")[0]
+            era = (parse_qs(urlparse(self.path).query).get("era") or ["sentinel"])[0]
             if era not in ("sentinel", "all"):
                 era = "sentinel"
             data = json.dumps(build_equity_series(era)).encode()
