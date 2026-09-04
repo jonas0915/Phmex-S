@@ -74,3 +74,25 @@ main-paper mechanism — main is live-by-filename (risk_manager.py:304), dashboa
 - Owner directive "no shadow, live deploy" (feedback_no_shadow_live_deploy.md) superseded for main book by this order.
 - "Sum all state files" PnL convention: main paper rows now live in trading_state.json tagged mode="paper" —
   lifetime real-PnL sums must exclude them (A3 checks consumers).
+
+# TASKS — Regime-pause slot freeze fix (owner order 9/3 9:22 PM PT)
+- [x] Bug verified (4-agent deep dive + adversarial check): regime `return` skipped _evaluate_all_slots; fed by paper main since 8/26
+- [x] TDD: tests/test_regime_pause_slot_service.py RED → bot.py regime branch calls _evaluate_all_slots(prices) → GREEN; suite 843✓
+- [x] /pre-restart-audit: compile OK, no params changed, review PASS, Good-bot off
+- [x] Jonas "go" 9:30 PM → PID 1444 killed, NEW PID 78531 9:31 PM PT, 0 open positions at cutover
+## Review
+One-line production change mirroring two existing branches. Behavior: slots (entries + exits + ratchet) run during a
+main-book regime pause; main entries still pause. Paper main closes still feed the main regime window (affects paper only).
+
+# TASKS — 5m_mean_revert edge search (owner order 9/3 9:37 PM PT; plan approved 9:51 PM PT)
+Plan: ~/.claude/plans/hidden-conjuring-kazoo.md. Prereg: docs/superpowers/specs/2026-09-03-mr-edge-search-prereg.md (frozen 9:55 PM).
+- [x] Preflight: research ledger (30 dead levers) + data/tooling inventory (2 agents)
+- [x] Universe frozen: 35 symbols → reports/mr_edge_2026/universe.json
+- [x] Prereg doc written BEFORE any read
+- [x] A: scripts/slot_lab/mr_edge_fetch.py DONE (21 tests; 1000PEPE June parity 100%)
+- [ ] A-run: fetch launched 9:57 PM PT PID 92534 nice 19 (5,950 calls, 35 syms; ~3.2 min/sym → ~11:50 PM ETA); manifest reports/cache/mr_edge_20260601_20260903/manifest.json
+- [ ] C: scripts/slot_lab/mr_edge_signal_table.py (TDD) → signals.json; fidelity gate vs 45 real MR entries
+- [x] D: scripts/slot_lab/mr_edge_screen.py DONE 10:05 PM (23 tests; 110 trials = 79+3+3+3+22; holdout guard: train_results + prereg sha + per-family lock)
+- [x] H0 sink: scripts/slot_lab/mr_gate_block_archiver.py (5 tests) + launchd com.phmex.mr-gate-archiver (6h, nice 19) DEPLOYED 10:02 PM; 13 blocks archived (4 OB)
+- [ ] Train read → holdout read (one per family) → verification agent re-derives → report
+- [ ] E (only if survivor): adjudicator line + live ship via TDD + /pre-restart-audit + go

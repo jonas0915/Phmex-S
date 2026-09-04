@@ -2078,7 +2078,17 @@ class Phmex2Bot:
             remaining = int(self._regime_pause_until - time.time())
             if self.cycle_count % 20 == 0:  # log every ~5 min
                 logger.info(f"[REGIME] Entries paused — {remaining}s remaining")
-            return  # skip entire entry section, but exits still processed above
+            # 2026-09-03: service slots before returning — mirrors the
+            # _trading_paused (F1) and .halt_main_entries branches. This was the
+            # only main-book early return that skipped _evaluate_all_slots, so a
+            # 3/5-loss streak froze the LIVE 5m_mean_revert slot (no entries, no
+            # software exits, no durable-SL ratchet) for 30 min. Since the main
+            # book went paper (8/26) every trade in that window is a sim — paper
+            # losses were freezing the real-money slot. The regime filter is a
+            # MAIN-book signal-quality pause, not an account halt, so slot
+            # entries are NOT blocked here (_slot_entries_blocked is unchanged).
+            self._evaluate_all_slots(prices)
+            return  # skip main entry section; main exits processed above, slots serviced
 
         # Pre-compute indicators for entry signals
         indicator_cache = {}

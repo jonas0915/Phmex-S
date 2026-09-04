@@ -646,3 +646,13 @@ advised against both. He pushed back: "why would you propose to go live on main 
 RULE: if the ask can't be met without reversing a prior owner decision or re-opening closed research, say so in one line
 and stop. Never enumerate the rejected paths, even hedged — it reads as a proposal. Applies to main-live, ST2.0 re-arm,
 BTC blacklist, gate loosening, anything under "don't re-propose" in MEMORY.md.
+
+## 2026-09-03 — Every main-book early return in _run_cycle must service slots
+Found: the REGIME "3/5 losses — pausing 30 min" branch was the only early `return` in _run_cycle that did NOT call
+`_evaluate_all_slots(prices)` first (F1 7/17 fixed _trading_paused; .halt_main_entries and .max_dd_halt already did).
+Effect: live 5m_mean_revert frozen 30 min per trip — no entries, no software exits, no durable-SL ratchet (exchange SL/TP
+still rested). After the 8/26 paper-main demotion every trade feeding the window was a SIM: 4 paper-loss streaks froze the
+real slot (8/28, 8/29, 9/1, 9/2). The 8/26 "sims can't touch real halts" only covered the daily-loss halt.
+RULE: any new early return in _run_cycle → call _evaluate_all_slots first; grep `return  # skip` in _run_cycle when auditing.
+RULE: when a book goes paper, audit EVERY consumer of its closes (cooldown/regime/notify/halt), not just the halt.
+Fixed + deployed 9/3 9:31 PM PT, PID 78531, tests/test_regime_pause_slot_service.py, 843✓.
