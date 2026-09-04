@@ -99,5 +99,11 @@ Plan: ~/.claude/plans/hidden-conjuring-kazoo.md. Prereg: docs/superpowers/specs/
 - [x] Verification agent re-derived all 113 trials: 0 discrepancies; paired tp2.0/4h +1.5¢ note (fails BH); verdict stands
 - [x] Report + memory (reference_mr_edge_search_2026-09-04.md)
 - [x] E: not triggered (no survivor)
-## Review
+## Review (written 9/4 2:05 PM PT, on closeout via executing-plans)
+- Plan fully executed 9/3 9:51 PM → 9/4 2:23 AM PT. Every checklist item above is ticked; nothing remains in Phases A-D and Phase E has no survivor to ship.
+- Verdict: NULL in all six families. Source: reports/mr_edge_2026/train_report.md (generated 2026-09-04T09:17:40Z, prereg sha c68e9ea0…): baseline live cell n=608 mean −$0.024/trade CI [−0.138, +0.087]; 113 trials, "Winners: none" for H1-H6; holdout n=227 never read (no lock files). Independent re-derivation: 0 discrepancies.
+- Artifacts present on disk 9/4: universe.json, signals.json (6.1 MB, 840 rows), fidelity_real_trades.{md,json}, train_results.json, train_report.md.
+- H0 sink still live: launchd com.phmex.mr-gate-archiver runs=3 last exit 0 (launchctl print, 9/4 2:03 PM PT); logs/mr_gate_blocks.jsonl = 14 lines. Registered n≥10 OB-episode read stays pending on this sink.
+- Live bot untouched throughout (research scripts isolated, own ccxt client, nice 19).
+- Standing rule (memory reference_mr_edge_search_2026-09-04.md): do NOT re-run H1-H6 without a new mechanism; the 8/4-9/3 holdout remains available for one future pre-registered family.
 Result NULL across all six families. No code path to the live bot was touched by this program. New research assets: fetch/signal-table/screen scripts (97 tests), 3-month 35-symbol cache, forming-bar replay fidelity gate, H0 archiver. Holdout window preserved unread for one future pre-registered family.
