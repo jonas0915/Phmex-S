@@ -639,3 +639,10 @@ one counter/file is never the fleet.
 ### Pseudo-slot ids can alias the MAIN book (2026-08-12)
 - `main_gated` is a filtered VIEW of trading_state.json (real money, no mode field), not a slot. Any slot_id-keyed filter over paper data must exempt BOTH `5m_scalp` and `main_gated` — the first honest-data deploy silently dropped 34 real main-book trades from the CURRENT TEST card.
 - The catch came from cross-verifying every rendered number against an independent state-file computation AFTER deploy — render-side notes mapped back to card titles exposed the one that shouldn't exist. Always map aggregate badges/notes back to their owning card when auditing a display change.
+
+## 2026-09-03 — Don't offer a demoted strategy as an option (owner correction)
+Jonas asked to "see the bot trade today." I said the only paths were main book back live or loosening dead gates, and
+advised against both. He pushed back: "why would you propose to go live on main book? it's a bad strategy."
+RULE: if the ask can't be met without reversing a prior owner decision or re-opening closed research, say so in one line
+and stop. Never enumerate the rejected paths, even hedged — it reads as a proposal. Applies to main-live, ST2.0 re-arm,
+BTC blacklist, gate loosening, anything under "don't re-propose" in MEMORY.md.
