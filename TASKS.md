@@ -90,9 +90,9 @@ Plan: ~/.claude/plans/hidden-conjuring-kazoo.md. Prereg: docs/superpowers/specs/
 - [x] Universe frozen: 35 symbols → reports/mr_edge_2026/universe.json
 - [x] Prereg doc written BEFORE any read
 - [x] A: scripts/slot_lab/mr_edge_fetch.py DONE (21 tests; 1000PEPE June parity 100%)
-- [ ] A-run: fetch PID 92534 9:57 PM → DIED 10:58 PM at symbol 21/35 (parent agent killed by usage limit); 20 syms cached, June parity 14/14 = 100%, 0 gaps>2; early-END series (delist/thin): ALLO 8/11, BICO 6/30, DEXE 7/31, EIGEN 8/7, GIGGLE 8/7, INJ 8/18. RESUMED 1:02 AM 9/4 PID 9875 detached (nohup, nice 19) for remaining 15
+- [ ] A-run: fetch PID 92534 9:57 PM → DIED 10:58 PM at symbol 21/35 (parent agent killed by usage limit); 20 syms cached, June parity 14/14 = 100%, 0 gaps>2; early-END series (delist/thin): ALLO 8/11, BICO 6/30, DEXE 7/31, EIGEN 8/7, GIGGLE 8/7, INJ 8/18. RESUMED 1:02 AM 9/4 PID 9875 → COMPLETE 35/35 by ~1:40 AM (141 files)
 - [x] C: scripts/slot_lab/mr_edge_signal_table.py DONE 10:15 PM (31 tests; parity with validated rig to 1e-16)
-- [ ] C2: FIDELITY FAILED 2/5 on closed bars — live fires on the FORMING candle. Prereg AMENDMENT v2 10:20 PM: forming-bar regen (fire_minute, confirmed_at_close) + family H6 entry-timing (+3 trials → 113) + real-money confirmed-vs-forming read. screen H6 DONE 10:24 PM (26 tests, 113 trials); signal-table forming-bar regen in progress
+- [ ] C2: FIDELITY FAILED 2/5 on closed bars — live fires on the FORMING candle. Prereg AMENDMENT v2 10:20 PM: forming-bar regen (fire_minute, confirmed_at_close) + family H6 entry-timing (+3 trials → 113) + real-money confirmed-vs-forming read. screen H6 DONE 10:24 PM (26 tests, 113 trials); forming-bar regen BUILT (tests green, review clean); preview fidelity 12/12 = 100% on 20 syms (fire_minute hist 2:1 3:2 4:4 5:5; confirmed_at_close 8/12); full run pending
 - [x] D: scripts/slot_lab/mr_edge_screen.py DONE 10:05 PM (23 tests; 110 trials = 79+3+3+3+22; holdout guard: train_results + prereg sha + per-family lock)
 - [x] H0 sink: scripts/slot_lab/mr_gate_block_archiver.py (5 tests) + launchd com.phmex.mr-gate-archiver (6h, nice 19) DEPLOYED 10:02 PM; 13 blocks archived (4 OB)
 - [ ] Train read → holdout read (one per family) → verification agent re-derives → report

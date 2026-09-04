@@ -680,14 +680,11 @@ def test_forming_only_evaluates_candidate_bars(df5, df1m, monkeypatch):
     assert all(r["bar_open_ts"] in epoch_c for r in rows)
 
 
-def test_forming_fires_mid_bar_but_not_at_close(df5, df1m, regen):
-    """Craft a bar that is inside the band with full volume at minute 2 (fires) but
-    collapses 1.5% by the close (RSI(7) falls below 70 -> HOLD at close): forming
-    mode emits fire_minute=2, confirmed_at_close=False; closed mode emits nothing."""
-    shorts = [r for r in regen if r["side"] == "short"]
-    assert shorts
-    done = False
-    for r in shorts:
+def _mid_bar_fixture(df5, df1m, regen):
+    """A closed-mode short bar rebuilt so it is inside the band with full volume at
+    minute 2 (fires) but collapses 1.5% by the close (RSI(7) < 70 -> HOLD at close).
+    Returns (df5', df1m', bar_open_ts, original close)."""
+    for r in [r for r in regen if r["side"] == "short"]:
         bar_ts = pd.Timestamp(r["bar_open_ts"], unit="s", tz="UTC")
         i = df5.index.get_loc(bar_ts)
         if i < T.LIVE_LOOKBACK:
@@ -698,20 +695,27 @@ def test_forming_fires_mid_bar_but_not_at_close(df5, df1m, regen):
         arr = blk.to_numpy()
         if _fires(df5_2, i, T.partial_candle(arr, 2)) != "short" or _fires(df5_2, i, None) is not None:
             continue  # lookback-frame drift on this candidate; try the next short
-        b = r["bar_open_ts"]
-        closed_rows = T.regen_signals(df5_2, SYM, start_ts=b + 300, end_ts=b + 300)
-        assert closed_rows == []
-        rows = T.regen_signals_forming(df5_2, df1m_2, SYM, start_ts=b, end_ts=b + 300)
-        assert len(rows) == 1
-        row = rows[0]
-        assert row["bar_open_ts"] == b and row["side"] == "short"
-        assert row["fire_minute"] == 2 and row["confirmed_at_close"] is False
-        assert row["ts"] == b + 120 and row["entry_px"] == pytest.approx(oc)
-        assert row["partial_vol_ratio"] == pytest.approx(row["vol_ratio"])
-        assert row["partial_vol_ratio"] > 1.3
-        done = True
-        break
-    assert done, "no short candidate survived the crafted mid-bar construction"
+        return df5_2, df1m_2, r["bar_open_ts"], oc
+    raise AssertionError("no short candidate survived the crafted mid-bar construction")
+
+
+def test_forming_fires_mid_bar_but_not_at_close(df5, df1m, regen):
+    """Forming mode emits fire_minute=2, confirmed_at_close=False; closed mode emits
+    nothing for the same bar."""
+    df5_2, df1m_2, b, oc = _mid_bar_fixture(df5, df1m, regen)
+    closed_rows = T.regen_signals(df5_2, SYM, start_ts=b + 300, end_ts=b + 300)
+    assert closed_rows == []
+    rows = T.regen_signals_forming(df5_2, df1m_2, SYM, start_ts=b, end_ts=b + 300)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["bar_open_ts"] == b and row["side"] == "short"
+    assert row["fire_minute"] == 2 and row["confirmed_at_close"] is False
+    assert row["ts"] == b + 120 and row["entry_px"] == pytest.approx(oc)
+    assert row["partial_vol_ratio"] == pytest.approx(row["vol_ratio"])
+    assert row["partial_vol_ratio"] > 1.3
+    # whole-frame forming run contains that row too (cooldown/other bars untouched)
+    allrows = T.regen_signals_forming(df5_2, df1m_2, SYM)
+    assert any(r["bar_open_ts"] == b and r["fire_minute"] == 2 and not r["confirmed_at_close"] for r in allrows)
 
 
 def test_forming_fires_only_at_close(df5, df1m, regen):
@@ -772,32 +776,37 @@ def test_forming_rsi_floor_and_cooldown(df5, df1m, monkeypatch):
     b2 = {}
     rows2 = T.regen_signals_forming(df5, df1m, SYM, blocked=b2)
     assert all(r["side"] == "short" for r in rows2)
-    assert b2.get("mr_rsi_floor", 0) == sum(1 for r in rows if r["side"] == "long")
+    # every long that fired in the base run + every bar the base floor already blocked
+    assert b2.get("mr_rsi_floor", 0) == sum(1 for r in rows if r["side"] == "long") + blocked.get("mr_rsi_floor", 0)
 
 
 def test_forming_early_ending_series(df5, df1m):
     """5m and 1m series that end before the window end: no crash, bars without 1m
     data fall back to the closed-bar evaluation (fire_minute=5)."""
-    mask = T.forming_candidates(df5)
-    cand_idx = np.flatnonzero(mask)
-    cut_i = cand_idx[-3]                     # keep >= 3 candidate bars without 1m data
-    cut_ts = df5.index[cut_i]
-    df1m_short = df1m[df1m.index < cut_ts]
     end_ts = int(df5.index[-1].timestamp()) + 10 * 86400   # window runs past both series
+    full = T.regen_signals_forming(df5, df1m, SYM, end_ts=end_ts)
+    conf = [r for r in full if r["confirmed_at_close"]]
+    assert conf
+    r_cut = conf[-1]
+    cut_ts = pd.Timestamp(r_cut["bar_open_ts"], unit="s", tz="UTC")
+    df1m_short = df1m[df1m.index < cut_ts]                 # 1m data ends BEFORE this bar
     stats = {}
     rows = T.regen_signals_forming(df5, df1m_short, SYM, end_ts=end_ts, stats=stats)
-    assert stats["bars_no_1m"] >= 3
-    for r in rows:
-        if r["bar_open_ts"] >= int(cut_ts.timestamp()):
-            assert r["fire_minute"] == 5 and r["confirmed_at_close"] is True
-    full = T.regen_signals_forming(df5, df1m, SYM, end_ts=end_ts)
-    tail_full = [(r["bar_open_ts"], r["side"]) for r in full if r["bar_open_ts"] >= int(cut_ts.timestamp())]
-    tail_short = [(r["bar_open_ts"], r["side"]) for r in rows if r["bar_open_ts"] >= int(cut_ts.timestamp())]
-    assert set(tail_short) <= set(tail_full) | {(b, s) for b, s in tail_full}
+    assert stats["bars_no_1m"] >= 1
+    tail = [r for r in rows if r["bar_open_ts"] >= r_cut["bar_open_ts"]]
+    assert tail and all(r["fire_minute"] == 5 and r["confirmed_at_close"] is True for r in tail)
+    assert (r_cut["bar_open_ts"], r_cut["side"]) in {(r["bar_open_ts"], r["side"]) for r in tail}
+    # every closed-bar fire in the 1m-less tail was also a confirmed fire on the full data
+    full_conf = {(r["bar_open_ts"], r["side"]) for r in full if r["confirmed_at_close"]}
+    assert {(r["bar_open_ts"], r["side"]) for r in tail} <= full_conf
     # build_symbol_rows in forming mode on the truncated 1m frame: outcomes -> no_path
     out = T.build_symbol_rows(SYM, df5, df1m_short, flow=None, funding=None,
-                              start_ts=int(cut_ts.timestamp()), end_ts=end_ts, eval_mode="forming")
+                              start_ts=r_cut["bar_open_ts"], end_ts=end_ts, eval_mode="forming")
     assert out and all(r["exit_by_cell"]["live"] == "no_path" for r in out)
+    # a 5m series that itself ends early (truncate) with a window past its end: fine too
+    df5_short = df5.iloc[:-50]
+    rows2 = T.regen_signals_forming(df5_short, df1m, SYM, end_ts=end_ts)
+    assert all(r["bar_open_ts"] <= int(df5_short.index[-1].timestamp()) for r in rows2)
 
 
 def test_closed_rows_carry_forming_fields(regen):
@@ -882,21 +891,23 @@ def test_bootstrap_mean_ci_deterministic():
     assert T.bootstrap_mean_ci([], n_boot=10) == (None, None)
 
 
-def test_real_trade_fidelity_join_and_cohorts(df5, df1m):
-    rows = T.regen_signals_forming(df5, df1m, SYM)
+def test_real_trade_fidelity_join_and_cohorts(df5, df1m, regen):
+    df5_2, df1m_2, b, _ = _mid_bar_fixture(df5, df1m, regen)
+    rows = T.regen_signals_forming(df5_2, df1m_2, SYM)
     early = [r for r in rows if r["fire_minute"] < 5 and not r["confirmed_at_close"]]
-    late = [r for r in rows if r["confirmed_at_close"]]
-    assert early and late
+    late = [r for r in rows if r["confirmed_at_close"] and r["bar_open_ts"] != b]
+    assert early and len(late) >= 2
+    early = early + early                        # two forming-only trades on the same signal
     snaps, trades = [], []
     for k, r in enumerate(early[:2] + late[:2]):
         sn = _snap(r, ts_off=60 * r["fire_minute"] - 30)
         snaps.append(sn)
-        trades.append({"symbol": SYM, "side": r["side"], "opened_at": sn["ts"] + 7.5,
+        trades.append({"symbol": SYM, "side": r["side"], "opened_at": sn["ts"] + 7.5 + k,
                        "net_pnl": [0.4, -0.3, 0.9, -0.2][k], "exit_reason": "tp", "mode": "live"})
     # a live trade whose snapshot is 200 s away -> no snapshot; a paper trade; an out-of-universe symbol
     trades.append({"symbol": SYM, "side": "short", "opened_at": snaps[0]["ts"] + 200,
                    "net_pnl": 5.0, "exit_reason": "sl", "mode": "live"})
-    trades.append(dict(trades[0], mode=None, net_pnl=9.0))
+    trades.append(dict(trades[0], mode=None, net_pnl=9.0, opened_at=trades[0]["opened_at"] + 1))
     snaps.append(dict(snaps[0], symbol="ZZZ/USDT:USDT"))
     trades.append({"symbol": "ZZZ/USDT:USDT", "side": snaps[0]["direction"], "opened_at": snaps[0]["ts"],
                    "net_pnl": 1.0, "exit_reason": "tp", "mode": "live"})

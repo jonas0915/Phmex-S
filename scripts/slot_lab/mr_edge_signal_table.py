@@ -172,7 +172,7 @@ MODE_CAVEATS = {
         "live evaluates the FORMING bar on a 300-bar frame — known to miss most live entries",
     ],
     "forming": [
-        "eval_mode=forming: partial candle rebuilt from exchange 1m bars at minute m=1..5 and "
+        "eval_mode=forming: partial candle rebuilt from cached 1m bars at minute m=1..5 and "
         "evaluated on a 300-bar frame (ws_feed cache cap); first firing minute = the signal",
         "timing parity gap: evaluation on a 60 s grid (1m closes) vs the live ~90 s cycle at "
         "arbitrary seconds into the bar -> the live bot can fire between grid points",
@@ -410,19 +410,20 @@ def regen_signals_forming(df5_raw: pd.DataFrame, df1m: pd.DataFrame | None, symb
                 break
             fr = forming_frame(df5_raw, i, None if m == FORMING_MINUTES else partial, lookback)
             st["strategy_calls"] += 1
-            side = _verdict(bb_mean_reversion_strategy(fr, orderbook=None))
+            sig = bb_mean_reversion_strategy(fr, orderbook=None)
+            side = _verdict(sig)
             if side == "long" and round(float(fr["rsi_fast"].iloc[-1]), 1) < LONG_RSI_MIN:
                 floor_hit = True                  # bot.py:3195 (_rsi_from_reason -> 0.1 rounding)
                 side = None
             if m == FORMING_MINUTES:
                 close_side = side
             if side is not None and fired is None:
-                fired = (m, side, fr, partial)
+                fired = (m, side, fr, partial, float(sig.strength))
         if fired is None:
             if floor_hit and blocked is not None:
                 blocked["mr_rsi_floor"] = blocked.get("mr_rsi_floor", 0) + 1
             continue
-        m, side, fr, partial = fired
+        m, side, fr, partial, strength = fired
         ts = b + 60 * m
         last = fr.iloc[-1]
         vol_avg = float(fr["volume"].to_numpy()[-20:].mean())
@@ -432,7 +433,7 @@ def regen_signals_forming(df5_raw: pd.DataFrame, df1m: pd.DataFrame | None, symb
         h = hour_pt(ts)
         row = {
             "symbol": symbol, "ts": ts, "bar_open_ts": b, "side": side,
-            "entry_px": float(partial["close"]), "strength": float(_strength_of(fr)),
+            "entry_px": float(partial["close"]), "strength": strength,
             "rsi": float(last["rsi"]), "rsi_fast": float(last["rsi_fast"]),
             "vol_ratio": vr, "bb_width_pct": bb_w * 100.0, "adx5m": float(last["adx"]),
             "hour_pt": h, "session": session_for_hour(h),
@@ -447,12 +448,6 @@ def regen_signals_forming(df5_raw: pd.DataFrame, df1m: pd.DataFrame | None, symb
             cooldown_until = ts + COOLDOWN_S
     st["prune_ratio"] = (st["candidates"] / st["bars"]) if st["bars"] else 0.0
     return sigs
-
-
-def _strength_of(fr: pd.DataFrame) -> float:
-    """Strength of the (already known non-HOLD) verdict on this frame — a second
-    strategy call is cheaper to read than to thread through the loop."""
-    return bb_mean_reversion_strategy(fr, orderbook=None).strength
 
 
 # ---------------------------------------------------------------------------
