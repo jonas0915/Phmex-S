@@ -95,3 +95,4 @@ Engineering ~1.5 days of agent work (parallel: fetch script + prereg + signal-ta
 - Phase C signal-table builder in progress. Then: fidelity gate → train read → one holdout read per family → independent verification → report.
 - Live checklist: `TASKS.md` (section "5m_mean_revert edge search").
 - 10:17 PM: fidelity gate FAILED on closed-bar regen (2/5). Cause: live fires on the FORMING candle. Prereg AMENDMENT v2 (10:20 PM, before any read): forming-bar regen + family H6 entry-timing (113 trials) + real-money confirmed-vs-forming read. Memory: reference_mr_forming_bar_signals_2026-09-03.md.
+- 9/4 2:14 AM: full forming-bar run — fidelity 28/30 PASS, 840 signals. 2:17 AM TRAIN read: baseline −$0.024/trade (n=608), 113 trials, 0 winners in every family → no holdout read. 2:23 AM independent verification: 0 discrepancies. RESULT: NULL. Memory: reference_mr_edge_search_2026-09-04.md.

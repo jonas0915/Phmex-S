@@ -90,10 +90,14 @@ Plan: ~/.claude/plans/hidden-conjuring-kazoo.md. Prereg: docs/superpowers/specs/
 - [x] Universe frozen: 35 symbols → reports/mr_edge_2026/universe.json
 - [x] Prereg doc written BEFORE any read
 - [x] A: scripts/slot_lab/mr_edge_fetch.py DONE (21 tests; 1000PEPE June parity 100%)
-- [ ] A-run: fetch PID 92534 9:57 PM → DIED 10:58 PM at symbol 21/35 (parent agent killed by usage limit); 20 syms cached, June parity 14/14 = 100%, 0 gaps>2; early-END series (delist/thin): ALLO 8/11, BICO 6/30, DEXE 7/31, EIGEN 8/7, GIGGLE 8/7, INJ 8/18. RESUMED 1:02 AM 9/4 PID 9875 → COMPLETE 35/35 by ~1:40 AM (141 files)
+- [x] A-run: fetch PID 92534 9:57 PM → DIED 10:58 PM at symbol 21/35 (parent agent killed by usage limit); 20 syms cached, June parity 14/14 = 100%, 0 gaps>2; early-END series (delist/thin): ALLO 8/11, BICO 6/30, DEXE 7/31, EIGEN 8/7, GIGGLE 8/7, INJ 8/18. RESUMED 1:02 AM 9/4 PID 9875 → COMPLETE 35/35 by ~1:40 AM (141 files)
 - [x] C: scripts/slot_lab/mr_edge_signal_table.py DONE 10:15 PM (31 tests; parity with validated rig to 1e-16)
-- [ ] C2: FIDELITY FAILED 2/5 on closed bars — live fires on the FORMING candle. Prereg AMENDMENT v2 10:20 PM: forming-bar regen (fire_minute, confirmed_at_close) + family H6 entry-timing (+3 trials → 113) + real-money confirmed-vs-forming read. screen H6 DONE 10:24 PM (26 tests, 113 trials); forming-bar regen BUILT (tests green, review clean); preview fidelity 12/12 = 100% on 20 syms (fire_minute hist 2:1 3:2 4:4 5:5; confirmed_at_close 8/12); full run pending
+- [x] C2: FIDELITY FAILED 2/5 on closed bars — live fires on the FORMING candle. Prereg AMENDMENT v2 10:20 PM: forming-bar regen (fire_minute, confirmed_at_close) + family H6 entry-timing (+3 trials → 113) + real-money confirmed-vs-forming read. screen H6 DONE 10:24 PM (26 tests, 113 trials); forming-bar regen BUILT (tests green, review clean); preview fidelity 12/12 = 100% on 20 syms (fire_minute hist 2:1 3:2 4:4 5:5; confirmed_at_close 8/12); FULL RUN 2:14 AM 9/4: fidelity 28/30 = 93.3% PASS, 840 signals, signals.json written (sha c68e9ea0)
 - [x] D: scripts/slot_lab/mr_edge_screen.py DONE 10:05 PM (23 tests; 110 trials = 79+3+3+3+22; holdout guard: train_results + prereg sha + per-family lock)
 - [x] H0 sink: scripts/slot_lab/mr_gate_block_archiver.py (5 tests) + launchd com.phmex.mr-gate-archiver (6h, nice 19) DEPLOYED 10:02 PM; 13 blocks archived (4 OB)
-- [ ] Train read → holdout read (one per family) → verification agent re-derives → report
-- [ ] E (only if survivor): adjudicator line + live ship via TDD + /pre-restart-audit + go
+- [x] TRAIN read 2:17 AM 9/4: n=608, baseline −$0.024/trade, 113 trials, 0 winners in H1-H6 → NO holdout read (holdout n=227 unread, no locks)
+- [x] Verification agent re-derived all 113 trials: 0 discrepancies; paired tp2.0/4h +1.5¢ note (fails BH); verdict stands
+- [x] Report + memory (reference_mr_edge_search_2026-09-04.md)
+- [x] E: not triggered (no survivor)
+## Review
+Result NULL across all six families. No code path to the live bot was touched by this program. New research assets: fetch/signal-table/screen scripts (97 tests), 3-month 35-symbol cache, forming-bar replay fidelity gate, H0 archiver. Holdout window preserved unread for one future pre-registered family.
