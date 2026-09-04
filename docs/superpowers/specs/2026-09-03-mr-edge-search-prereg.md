@@ -61,3 +61,25 @@ filter, streaks, weekday, small caps, capital scale, ATR%/band-boundness/ADX sym
 One grid per family, one holdout read per family, thresholds fixed above. Any deviation discovered during execution
 (data gaps, fidelity-gate misses, bucket-count differences) is REPORTED as a finding, not fixed and re-run.
 The fidelity gate (≥ 90% of the 45 real MR entries reproduced at the same bar and side) must pass before any train read.
+
+## AMENDMENT v2 — 2026-09-03 10:20 PM PT (before any train/holdout read; no outcome data has been seen)
+**Finding:** the fidelity gate on the first 6 cached symbols matched 2 of 5 real MR entries (40%). The misses are
+entries the live bot fired on the FORMING 5m candle (it evaluates `df.iloc[-1]` every ~90 s cycle; RSI(7)/volume on the
+partial bar): ADA short 8/9 13:30:21 UTC, ADA short 8/13 00:19:21 UTC, 1000PEPE short 8/28 22:55:54 UTC — none qualifies
+on the closed bar (±1). Closed-bar regeneration (also what every prior MR replay used) does not reproduce the live entry
+population. This is reported as a finding per the anti-fishing clause; the simulator is corrected BEFORE any read.
+**Change 1 — signal engine:** regeneration evaluates the forming bar minute by minute from 1m bars (partial candle at
+minute m = 1..5, indicators on closed frame + partial bar, first firing minute = the signal; m = 5 equals the closed bar).
+New row fields: `fire_minute` (1-5), `confirmed_at_close` (closed-bar strategy also fires on that bar). Fidelity gate
+semantics unchanged (≥90% of in-window real entries reproduced, ±1 bar, same side). Known residual parity gaps to report:
+live cycle ≈ 90 s vs 60 s evaluation; ws-feed candle-builder volume ≠ exchange 1m volume.
+**Change 2 — new family H6 "entry timing within the bar"** (listed as never-tested in the plan): H6a kept =
+confirmed_at_close; H6b kept = fire_minute ≤ 2; H6c kept = fire_minute ≥ 3. Filter rules, min-n and verdicts identical to
+H2-H5. Trial total becomes 113 (79 + 3 + 3 + 3 + 22 + 3).
+**Change 3 — real-money companion read (screening grade, n ≈ 30-45):** the 45 real MR trades are split by
+confirmed_at_close (from the regen match) and compared on real net PnL with independent-resample diff CI. Reported
+alongside, never as a verdict on its own.
+Everything else in this document is unchanged. The sha256 of this amended file is the one recorded in signals.json.
+**Clarification (10:25 PM PT, before any read):** the "removed ≥ 15" floor is a TRAIN-selection requirement. In HOLDOUT
+the verdict is defined on the kept cohort (kept ≥ 20, CI, mean); the removed count is reported (removed≥15 Y/n) but is
+not a verdict gate. The screen script implements exactly this.

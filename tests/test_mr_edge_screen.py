@@ -42,10 +42,11 @@ SYMS = ["AAA/USDT:USDT", "BBB/USDT:USDT", "CCC/USDT:USDT"]
 
 
 def make_rows(seed=1, n=600, base_mean=0.3, bad_mean=-1.0, sd=0.5, noise=False,
-              t0=None, t1=None):
+              t0=None, t1=None, plant="h3"):
     """~n rows spread uniformly over the whole window with a PLANTED effect:
-    shorts with flow.buy_ratio >= 0.90 (and trade_count > 20) have mean
-    `bad_mean`; everything else `base_mean`. noise=True -> every row N(0, 1).
+    plant="h3": shorts with flow.buy_ratio >= 0.90 (and trade_count > 20) have mean
+    `bad_mean`; plant="h6": rows with confirmed_at_close False have mean `bad_mean`;
+    everything else `base_mean`. noise=True -> every row N(0, 1).
     Every grid cell = live + N(0, 0.05) (no cell beats live); the live twin
     cell equals live exactly."""
     rnd = random.Random(seed)
@@ -64,8 +65,14 @@ def make_rows(seed=1, n=600, base_mean=0.3, bad_mean=-1.0, sd=0.5, noise=False,
                     "trade_count": 10 if r < 0.15 else 50,
                     "cvd_slope": 0.0, "divergence": None,
                     "large_trade_bias": 0.0, "spread_pct": 0.05, "dt_s": 30}
-        planted_bad = (side == "short" and flow is not None
-                       and flow["buy_ratio"] >= 0.90 and flow["trade_count"] > 20)
+        # prereg amendment v2: forming-bar timing fields (~5% null each)
+        fire_minute = None if rnd.random() < 0.05 else rnd.randint(1, 5)
+        confirmed = None if rnd.random() < 0.05 else (rnd.random() < 0.6)
+        if plant == "h3":
+            planted_bad = (side == "short" and flow is not None
+                           and flow["buy_ratio"] >= 0.90 and flow["trade_count"] > 20)
+        else:  # "h6": the closed-bar strategy NOT confirming the entry is the bad cohort
+            planted_bad = confirmed is False
         if noise:
             live = rnd.gauss(0.0, 1.0)
         else:
@@ -87,6 +94,7 @@ def make_rows(seed=1, n=600, base_mean=0.3, bad_mean=-1.0, sd=0.5, noise=False,
             "flow": flow, "scanner_active": rnd.random() < 0.3,
             "funding_rate": None if fr < 0.1 else rnd.uniform(-0.0007, 0.0007),
             "funding_ts": ts - 3600,
+            "fire_minute": fire_minute, "confirmed_at_close": confirmed,
             "net_by_cell": net,
             "exit_by_cell": {c: rnd.choice(["tp", "sl", "time"]) for c in net},
         })
@@ -247,7 +255,23 @@ def test_h5_bbwidth_thresholds_frozen_from_train_in_holdout():
 
 def test_trial_total_is_79_plus_9_plus_h5_count():
     rows = make_rows(seed=5, n=200)
-    assert mes.trial_total(["live"] + CELLS, rows) == 79 + 3 + 3 + 3 + H5_COUNT == 110
+    assert mes.trial_total(["live"] + CELLS, rows) == 79 + 3 + 3 + 3 + H5_COUNT + 3 == 113
+
+
+def test_h6_variants_and_null_excluded_from_both_cohorts():
+    rows = [
+        {"fire_minute": 1, "confirmed_at_close": True},
+        {"fire_minute": 2, "confirmed_at_close": False},
+        {"fire_minute": 3, "confirmed_at_close": None},
+        {"fire_minute": None, "confirmed_at_close": True},
+        {"fire_minute": 5, "confirmed_at_close": False},
+    ]
+    assert mes.apply_h6(rows, "confirmed_at_close") == ([0, 3], [1, 4], [2])
+    assert mes.apply_h6(rows, "fire_minute<=2") == ([0, 1], [2, 4], [3])
+    assert mes.apply_h6(rows, "fire_minute>=3") == ([2, 4], [0, 1], [3])
+    assert mes.H6_VARIANTS == ("confirmed_at_close", "fire_minute<=2", "fire_minute>=3")
+    with pytest.raises(ValueError):
+        mes.apply_h6(rows, "fire_minute>=9")
 
 
 # ---------------------------------------------------------------------------
@@ -266,20 +290,21 @@ def test_train_bh_is_pooled_once_over_all_trials(rig, monkeypatch):
     rig.write(make_rows(seed=7))
     res = rig.train()
     assert len(calls) == 1
-    assert len(calls[0][0]) == res["trial_total"] == 110
+    assert len(calls[0][0]) == res["trial_total"] == 113
     assert calls[0][1] == pytest.approx(0.10)
 
 
 def test_train_planted_effect_selects_h3_090_only(rig):
     rig.write(make_rows(seed=11))
     res = rig.train()
-    assert res["trial_total"] == 110
+    assert res["trial_total"] == 113
     assert res["prereg_sha"] == rig.prereg_sha
     w = res["winners"]
+    assert set(w) == {"H1", "H2", "H3", "H4", "H5", "H6"}
     assert w["H3"] is not None
     assert w["H3"]["label"] == "short_skip_buy_ratio>=0.90"
     assert w["H1"] is None  # every cell == live + noise
-    assert w["H2"] is None and w["H4"] is None and w["H5"] is None
+    assert w["H2"] is None and w["H4"] is None and w["H5"] is None and w["H6"] is None
     h3 = {t["label"]: t for t in res["families"]["H3"]["trials"]}
     t = h3["short_skip_buy_ratio>=0.90"]
     assert t["removed"]["ci"][1] < 0
@@ -296,6 +321,28 @@ def test_train_planted_effect_selects_h3_090_only(rig):
     assert mes.LIVE_TWIN not in {t["label"] for t in res["families"]["H1"]["trials"]}
     assert len(res["families"]["H1"]["trials"]) == 79
     assert "conservative" in md.lower()
+
+
+def test_train_planted_confirmed_at_close_selects_h6a(rig):
+    rig.write(make_rows(seed=12, plant="h6"))
+    res = rig.train()
+    w = res["winners"]
+    assert w["H6"] is not None
+    assert w["H6"]["label"] == "confirmed_at_close"
+    assert w["H1"] is None and w["H3"] is None
+    h6 = {t["label"]: t for t in res["families"]["H6"]["trials"]}
+    assert len(h6) == 3
+    t = h6["confirmed_at_close"]
+    assert t["selected"] and t["removed"]["ci"][1] < 0 and t["n_null"] > 0
+    assert not h6["fire_minute<=2"]["selected"] and not h6["fire_minute>=3"]["selected"]
+    md = open(os.path.join(rig.out_dir, "train_report.md")).read()
+    assert "## H6" in md and "fire_minute<=2" in md and "fire_minute>=3" in md
+    # holdout reads the H6 winner only and locks it
+    hres = rig.holdout()
+    assert set(hres["evaluated"]) == {"H6"}
+    assert hres["evaluated"]["H6"]["verdict"] in ("WEAK", "STRONG")
+    assert hres["evaluated"]["H6"]["verdict"] == "WEAK"  # planted +0.3 < $0.50
+    assert os.path.exists(os.path.join(rig.out_dir, "holdout_read_H6.lock"))
 
 
 def test_train_pure_noise_has_no_winners(rig):
@@ -377,6 +424,7 @@ def test_holdout_weak_verdict_for_planted_0_3(rig):
     assert v["kept"]["ci"][0] > 0
     assert v["kept"]["mean"] < 0.50
     assert v["verdict"] == "WEAK"
+    assert "removed_n_ok" in v  # removed floor is reported in holdout, not a verdict gate
     assert os.path.exists(os.path.join(rig.out_dir, "holdout_results.json"))
     md = open(os.path.join(rig.out_dir, "holdout_report.md")).read()
     assert "WEAK" in md and "H3" in md
@@ -401,6 +449,16 @@ def test_holdout_null_when_effect_vanishes(rig):
     rig.train()
     res = rig.holdout()
     assert res["evaluated"]["H3"]["verdict"] == "NULL"
+
+
+def test_holdout_verdict_null_when_kept_below_20(rig):
+    # thin holdout: only 12 rows land after the embargo -> kept < 20 -> NULL (min_n)
+    train_rows = make_rows(seed=37, n=500, t1=_utc(2026, 8, 3, 23))
+    hold_rows = make_rows(seed=38, n=12, t0=_utc(2026, 8, 4, 8))
+    rig.write(sorted(train_rows + hold_rows, key=lambda r: r["ts"]))
+    rig.train()
+    v = rig.holdout()["evaluated"]["H3"]
+    assert v["kept"]["n"] < 20 and v["verdict"] == "NULL" and v["verdict_reasons"] == ["min_n"]
 
 
 def test_holdout_with_no_train_winners_reads_nothing(rig):

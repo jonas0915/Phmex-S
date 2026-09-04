@@ -94,3 +94,4 @@ Engineering ~1.5 days of agent work (parallel: fetch script + prereg + signal-ta
 - H0 sink deployed: `scripts/slot_lab/mr_gate_block_archiver.py` + launchd `com.phmex.mr-gate-archiver` (6 h); 13 blocks archived.
 - Phase C signal-table builder in progress. Then: fidelity gate → train read → one holdout read per family → independent verification → report.
 - Live checklist: `TASKS.md` (section "5m_mean_revert edge search").
+- 10:17 PM: fidelity gate FAILED on closed-bar regen (2/5). Cause: live fires on the FORMING candle. Prereg AMENDMENT v2 (10:20 PM, before any read): forming-bar regen + family H6 entry-timing (113 trials) + real-money confirmed-vs-forming read. Memory: reference_mr_forming_bar_signals_2026-09-03.md.

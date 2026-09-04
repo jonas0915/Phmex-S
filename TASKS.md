@@ -91,7 +91,8 @@ Plan: ~/.claude/plans/hidden-conjuring-kazoo.md. Prereg: docs/superpowers/specs/
 - [x] Prereg doc written BEFORE any read
 - [x] A: scripts/slot_lab/mr_edge_fetch.py DONE (21 tests; 1000PEPE June parity 100%)
 - [ ] A-run: fetch launched 9:57 PM PT PID 92534 nice 19 (5,950 calls, 35 syms; ~3.2 min/sym → ~11:50 PM ETA); manifest reports/cache/mr_edge_20260601_20260903/manifest.json
-- [ ] C: scripts/slot_lab/mr_edge_signal_table.py (TDD) → signals.json; fidelity gate vs 45 real MR entries
+- [x] C: scripts/slot_lab/mr_edge_signal_table.py DONE 10:15 PM (31 tests; parity with validated rig to 1e-16)
+- [ ] C2: FIDELITY FAILED 2/5 on closed bars — live fires on the FORMING candle. Prereg AMENDMENT v2 10:20 PM: forming-bar regen (fire_minute, confirmed_at_close) + family H6 entry-timing (+3 trials → 113) + real-money confirmed-vs-forming read. screen H6 DONE 10:24 PM (26 tests, 113 trials); signal-table forming-bar regen in progress
 - [x] D: scripts/slot_lab/mr_edge_screen.py DONE 10:05 PM (23 tests; 110 trials = 79+3+3+3+22; holdout guard: train_results + prereg sha + per-family lock)
 - [x] H0 sink: scripts/slot_lab/mr_gate_block_archiver.py (5 tests) + launchd com.phmex.mr-gate-archiver (6h, nice 19) DEPLOYED 10:02 PM; 13 blocks archived (4 OB)
 - [ ] Train read → holdout read (one per family) → verification agent re-derives → report

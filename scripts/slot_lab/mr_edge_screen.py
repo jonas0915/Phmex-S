@@ -12,8 +12,10 @@ docs/superpowers/specs/2026-09-03-mr-edge-search-prereg.md:
   H4  funding context — skip shorts when funding <= -X, longs when funding >= +X,
                         X in {0.0001, 0.0003, 0.0005}                 (null funding: kept)
   H5  sub-populations — the single-dimension buckets of mean_revert_filters._buckets (kept = in bucket)
+  H6  entry timing    — prereg amendment v2 (forming-bar signal table): kept = confirmed_at_close True /
+                        fire_minute <= 2 / fire_minute >= 3           (null field: out of both cohorts)
 
-The live cell is the baseline for every family; H2-H5 are FILTERS on the live cell.
+The live cell is the baseline for every family; H2-H6 are FILTERS on the live cell.
 
 Anti-artifact stack (all from scripts/st2_lab): one pooled Benjamini-Hochberg (alpha 0.10)
 across ALL trial p-values, deflated Sharpe charged for the total trial count, 3-fold
@@ -53,14 +55,15 @@ from mean_revert_filters import _buckets as _mrf_buckets  # noqa: E402
 # ---------------------------------------------------------------------------
 # frozen parameters (prereg 2026-09-03) — do not tune
 # ---------------------------------------------------------------------------
-FAMILIES = ("H1", "H2", "H3", "H4", "H5")
-FILTER_FAMILIES = ("H2", "H3", "H4", "H5")
+FAMILIES = ("H1", "H2", "H3", "H4", "H5", "H6")
+FILTER_FAMILIES = ("H2", "H3", "H4", "H5", "H6")
 LIVE_CELL = "live"
 LIVE_TWIN = "tp1.6_sl1.2_t4h"          # H1 grid cell identical to the live geometry
 H2_CAPS = (35, 40, 50)
 H3_BUY_RATIOS = (0.80, 0.90, 0.95)
 H3_MIN_TRADES = 20                     # tape filter only counts when trade_count > this
 H4_X = (0.0001, 0.0003, 0.0005)
+H6_VARIANTS = ("confirmed_at_close", "fire_minute<=2", "fire_minute>=3")
 
 N_BOOT_DEFAULT = 2000
 SEED_DEFAULT = 0
@@ -291,12 +294,35 @@ def apply_h5(rows, label, buckets):
     return kept, removed, null
 
 
+def apply_h6(rows, variant):
+    """Entry timing within the forming 5m bar (prereg amendment v2). A null field
+    excludes the row from both cohorts (counted)."""
+    if variant not in H6_VARIANTS:
+        raise ValueError(f"unknown H6 variant {variant!r}")
+    field = "confirmed_at_close" if variant == "confirmed_at_close" else "fire_minute"
+    kept, removed, null = [], [], []
+    for i, r in enumerate(rows):
+        v = r.get(field)
+        if v is None:
+            null.append(i)
+            continue
+        if variant == "confirmed_at_close":
+            ok = bool(v)
+        elif variant == "fire_minute<=2":
+            ok = v <= 2
+        else:
+            ok = v >= 3
+        (kept if ok else removed).append(i)
+    return kept, removed, null
+
+
 def trial_total(cells, rows):
-    return len(h1_cells(cells)) + len(H2_CAPS) + len(H3_BUY_RATIOS) + len(H4_X) + len(h5_buckets(rows))
+    return (len(h1_cells(cells)) + len(H2_CAPS) + len(H3_BUY_RATIOS) + len(H4_X)
+            + len(h5_buckets(rows)) + len(H6_VARIANTS))
 
 
 def _filter_specs(rows, bb_thresholds=None):
-    """Ordered list of (family, label, (kept, removed, null)) for H2-H5."""
+    """Ordered list of (family, label, (kept, removed, null)) for H2-H6."""
     out = []
     for cap in H2_CAPS:
         out.append(("H2", f"adx1h<={cap}", apply_h2(rows, cap)))
@@ -307,6 +333,8 @@ def _filter_specs(rows, bb_thresholds=None):
     buckets = h5_buckets(rows, bb_thresholds)
     for label in buckets:
         out.append(("H5", label, apply_h5(rows, label, buckets)))
+    for v in H6_VARIANTS:
+        out.append(("H6", v, apply_h6(rows, v)))
     return out
 
 
@@ -357,7 +385,10 @@ def _eval_filter(rows, family, label, cohorts, live_all, n_boot, seed, min_kept,
         "p": kept["p"],              # H0: kept mean <= 0
         "sharpe": kept["sharpe"],
         "wf_signs": wf,
-        "min_n_ok": kept["n"] >= min_kept and removed["n"] >= min_removed,
+        # min_removed=None -> the removed floor is reported (removed_n_ok) but not required
+        # (holdout: the verdict is defined on the kept cohort; the removed floor guards train SELECTION)
+        "min_n_ok": kept["n"] >= min_kept and (min_removed is None or removed["n"] >= min_removed),
+        "removed_n_ok": removed["n"] >= MIN_REMOVED,
     }
 
 
@@ -566,7 +597,7 @@ def run_holdout(signals_path, prereg_path, out_dir, n_boot=N_BOOT_DEFAULT, seed=
             if (fam, label) not in spec:
                 raise GuardError(f"train winner {fam}/{label!r} has no holdout trial definition")
             t = _eval_filter(rows, fam, label, spec[(fam, label)], live, n_boot, seed,
-                             MIN_KEPT_HOLDOUT, MIN_REMOVED)
+                             MIN_KEPT_HOLDOUT, min_removed=None)
             fk = full_spec[(fam, label)][0]
             t["wf_full_signs"] = _wf_signs([(full_rows[i]["ts"], full_rows[i]["net_by_cell"][LIVE_CELL])
                                             for i in fk])
@@ -586,7 +617,7 @@ def run_holdout(signals_path, prereg_path, out_dir, n_boot=N_BOOT_DEFAULT, seed=
         "train_results": os.path.abspath(tr_path), "train_generated_at": train.get("generated_at"),
         "split": dict(train["split"], n_holdout=len(rows), n_train=len(train_rows), n_dropped=len(dropped)),
         "params": {"n_boot": n_boot, "seed": seed, "min_kept": MIN_KEPT_HOLDOUT,
-                   "min_removed": MIN_REMOVED, "strong_mean": STRONG_MEAN, "wf_folds": WF_FOLDS,
+                   "min_removed_reported_only": MIN_REMOVED, "strong_mean": STRONG_MEAN, "wf_folds": WF_FOLDS,
                    "n_trials_charged": n_trials},
         "baseline": baseline, "h5_bb_thresholds": bb_thr,
         "evaluated": evaluated,
@@ -644,7 +675,8 @@ def _train_report_md(res):
          f"sharpe {_f(b['sharpe'])}\n",
          f"- trials: {res['trial_total']} total (H1 {res['families']['H1']['n_trials']} cells, live twin "
          f"`{LIVE_TWIN}` excluded; H2 {res['families']['H2']['n_trials']}; H3 {res['families']['H3']['n_trials']}; "
-         f"H4 {res['families']['H4']['n_trials']}; H5 {res['families']['H5']['n_trials']} buckets)\n",
+         f"H4 {res['families']['H4']['n_trials']}; H5 {res['families']['H5']['n_trials']} buckets; "
+         f"H6 {res['families']['H6']['n_trials']} entry-timing, prereg amendment v2)\n",
          f"- guards: pooled BH α={BH_ALPHA} over all {res['trial_total']} p-values; DSR n_trials={res['trial_total']} "
          f"(var of trial Sharpes {res['var_trial_sharpes']:.5f}); WF {WF_FOLDS}-fold; min-n kept≥{MIN_KEPT_TRAIN} "
          f"(H5 ≥{MIN_H5}), removed≥{MIN_REMOVED}; bootstrap {res['params']['n_boot']} reps seed {res['params']['seed']}\n",
@@ -692,22 +724,24 @@ def _holdout_report_md(res):
          f"- train results: `{res['train_results']}` ({res['train_generated_at']})\n",
          f"- baseline (live cell, all holdout signals): n={b['n']} mean ${_f(b['mean'])} CI {_ci(b['ci'])}\n",
          "\n## Caveats\n"] + [f"- {c}\n" for c in res["caveats"]]
-    L.append("\n## Verdicts\n\n| family | train winner | n kept | kept mean | kept CI | n removed | removed mean | "
+    L.append("\n## Verdicts\n\n| family | train winner | n kept | kept mean | kept CI | n removed | removed≥15 | removed mean | "
              "removed CI | diff | diff CI | WF holdout | WF full window | DSR (info) | verdict | reasons |\n")
-    L.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+    L.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n")
     for fam in FAMILIES:
         t = res["evaluated"].get(fam)
         if not t:
-            L.append(f"| {fam} | — | | | | | | | | | | | | not read | {res['not_evaluated'].get(fam, '')} |\n")
+            L.append(f"| {fam} | — | | | | | | | | | | | | | not read | {res['not_evaluated'].get(fam, '')} |\n")
             continue
         rm = t["removed"] or {"n": "—", "mean": None, "ci": None}
+        rm_ok = "—" if t["removed"] is None else ("Y" if t.get("removed_n_ok") else "n")
         L.append(f"| {fam} | {t['label']} | {t['kept']['n']} | {_f(t['kept']['mean'])} | {_ci(t['kept']['ci'])} | "
-                 f"{rm['n']} | {_f(rm['mean'])} | {_ci(rm['ci'])} | {_f(t['diff']['mean'])} ({t['diff']['vs']}) | "
+                 f"{rm['n']} | {rm_ok} | {_f(rm['mean'])} | {_ci(rm['ci'])} | {_f(t['diff']['mean'])} ({t['diff']['vs']}) | "
                  f"{_ci(t['diff']['ci'])} | {_wf_str(t['wf_signs'])} | {_wf_str(t['wf_full_signs'])} | "
                  f"{t['dsr']:.3f} | **{t['verdict']}** | {','.join(t['verdict_reasons']) or '—'} |\n")
     L.append(f"\nVerdict rule (frozen): STRONG = kept/cell mean ≥ +${STRONG_MEAN:.2f} AND one-sample CI excl 0 AND "
              "(H1) diff-vs-live CI > 0 AND full-window WF 3/3; WEAK = CI excl 0 but mean < $0.50; NULL = anything else "
-             f"(incl. n kept < {MIN_KEPT_HOLDOUT}). Locks written: " + ", ".join(res["locks"].values()) + "\n")
+             f"(incl. n kept < {MIN_KEPT_HOLDOUT}). The removed ≥ {MIN_REMOVED} floor gates TRAIN selection only; in "
+             "holdout it is reported (removed≥15 column) because the verdict is defined on the kept cohort. Locks written: " + ", ".join(res["locks"].values()) + "\n")
     return "".join(L)
 
 
