@@ -1,10 +1,10 @@
 {
-  "last_closed_at": 1788525100.730419,
+  "last_closed_at": 1788567654.53289,
   "counters": {
     "requote_miss": 35,
     "requote_fill": 9,
     "mr_rsi_floor": 11,
     "requote_abort_drift": 5
   },
-  "last_run": 1788555550.792355
+  "last_run": 1788573552.122228
 }
