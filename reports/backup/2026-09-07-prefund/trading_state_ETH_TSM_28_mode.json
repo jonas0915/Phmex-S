@@ -1,0 +1,1 @@
+{"paper_mode": true, "capital_pct": 0.0, "promoted_at": 0.0, "loss_cap_usdt": -10.0, "trade_amount_usdt": null, "kelly_min_trades": 1000000000, "killed_at": 1785272217.0672262, "_note": "retired 2026-07-27 by tracking-drift line; killed_at written 2026-07-28 so the persistent-kill fix holds it down from first boot"}

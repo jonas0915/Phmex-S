@@ -1,109 +1,34 @@
-# TASKS — Main book → PAPER (owner order 8/26 7:26 PM PT)
+# TASKS — Funding + fee capture (owner pick 9/7 8:14 PM PT)
 
-Owner order: "put the main book on paper" + "make sure this reflects on the dashboard".
-Preflight done (lessons.md + MEMORY.md + code map, 2 agents, 8/26 7:31 PM PT). Finding: no existing
-main-paper mechanism — main is live-by-filename (risk_manager.py:304), dashboard hardcodes main LIVE
-(web_dashboard.py:548). Build required.
+Owner chose backlog item "Funding + fee capture (Recommended)" from `project_bot_backlog_2026-09-07.md`.
+Preflight done 9/7 8:16–8:40 PM PT (3 research agents + 2 read-only Phemex probes).
+Plan: `docs/superpowers/plans/2026-09-07-funding-fee-capture.md` (spec + diagnosis receipts inside).
+Baseline: bot PID 78531 (since 9/3 9:31 PM PT), HEAD 4d4bcf7 (auto-backup 9/7 6:17 PM PT).
 
-## Interim safety (DONE)
-- [x] `touch .halt_main_entries` 8/26 7:32 PM PT — main entries blocked instantly, no restart, 0 open positions at cut.
+## Diagnosis (verified)
+- funding_usdt = 0 on all 51 keyed 5m_MR rows; 12 live rows straddled a settlement. Main book: last nonzero funding 4/7 (one-shot CSV backfill).
+- Phemex sign: funding amount positive = PAID, negative = RECEIVED (ETH short 9/4 5:00 PM PT, +rate → −0.00175251). Matches writer net = gross − fees − funding.
+- fetch_my_trades interleaves funding rows (info.tradeType "4", action "13") with fills → must be filtered.
+- `_save_state` dumps in-memory rows → reconciler patches reverted on next close; only re-applied inside 7-day window.
+- Reconciler is main-book only; slot ledgers never reconciled; exchange_close sums last fill only; crumb closes charge the 0.07% estimate.
 
-## Conventions (all agents follow these)
-- Sentinel: `.paper_main` in repo root, checked fresh via `_main_paper()` helper next to `_longs_blocked` (bot.py:75).
-- Paper positions tagged `"paper": true` in the position dict at open; exits/reconciler/trail branch on the
-  POSITION's tag, not the live sentinel (no mixed-state if sentinel toggles mid-position).
-- Closed rows tagged `mode="paper"`. Main's RiskManager `is_paper` stays False (no gross→net ledger flip mid-file,
-  risk_manager.py:745). Historical main rows have NO mode field = real money; new paper rows have mode="paper".
-- Paper fills use `_fresh_paper_entry_price` (as slots do, bot.py:3275). Simulated SL/TP mirror bot.py:4832-4844.
+## Build
+- [x] T0 Snapshot all trading_state*.json → reports/backup/2026-09-07-prefund/ (25 files, 8:33 PM PT); pre-PID commit for audit diff = b3d88ad (9/3 9:17 PM); baseline suite 484✓ then 1 pre-existing fail (test_mr_edge_screen::test_isolation_never_imports_live_bot_modules — passes alone, fails only in full-suite order because earlier tests import bot modules; order flake, unrelated)
+- [x] T1+T2 Reconciler (helpers + ledger discovery + funding fetch + atomic per-file apply + `--lookback-days`) — commit 48a243d, 17 tests; LIVE under launchd from the 9:00 PM PT run; 100d dry-run receipts in reports/reconcile_backfill_dryrun_2026-09-07.txt (331 real rows / 5 ledgers; MR: 12 fee patches, 17 funding stamps (6 nonzero), 17 pre-7/25 rows unmatched — cause under audit)
+- [x] Full suite after all four commits: 969 passed, 1 failed (same pre-existing order flake) — 8:51 PM PT
+- [x] T3 RiskManager `_merge_reconciled` on save + tests — commit 36dceb8 8:35 PM PT; 4 new tests, 41✓ on adjacent set. Plan error caught: open_position never calls _save_state (only set_initial_balance/sync/close do); test triggers merge via a 2nd close instead.
+- [x] T4 bot.py `_close_fills_summary` (all reduce fills, skip funding rows, VWAP) + crumb-close real fee + tests — commit 8d5db08 8:37 PM PT; 4 new tests, 40✓ adjacent; zero deviation
+- [x] T5 daily_report funding line (Telegram + markdown) — commit 6f2e211; live at next scheduled run (display-only)
+- [x] First LIVE launchd run of new reconciler 8:59 PM PT: 4 MR rows / 1 ledger, 2 fee patches (ETH 9/1 0.058→0.1015, XRP 9/4 0.088→0.1030), funding stamped ×4 (ETH 9/1 +0.002404, ETH 9/4 −0.001753), exit 0. Values match independent probe. NOTE: old bot code (PID 78531) reverts patches on its next MR save → job re-patches every 15 min + Telegram drift alert until restart (expected).
+- [x] Audits (3 parallel, 8:49–9:00 PM PT):
+  - Independent re-derivation: 11 sampled rows (fees + funding) match raw Phemex to printed precision; DOGE 8/8 "0.0009" is a real 19-DOGE crumb; Phemex fetch_my_trades history floor ≈ 40 days (earliest fill 7/29) → rows before ~7/29 can NEVER be backfilled from the API (kept as estimates, never patched).
+  - Reconciler review: BLOCKER per-ledger claim sets (cross-ledger double count) + should-fix reversal fill theft + should-fix apply window clobbering `positions` → FIX AGENT DISPATCHED 8:57 PM. "partial" bucket = correct improvement (never patches a one-leg fee).
+  - RiskManager/bot review: BLOCKER unlocked in-place dict mutation vs json.dump on the 2-thread main book → FIXED c1faefe (`_state_lock` RLock around merge+dump, spy test; 42✓). Crumb-close fee = one bounded extra API call on rare path, accepted + documented.
+- [x] Reconciler audit fixes — commit 5279b8a 9:05 PM PT: global claim-once across ledgers (`reconcile_ledgers`), qty-capped side matching (`QTY_COVERED_FRAC` 0.999), stat-signature apply guard (inode+mtime_ns+size); 22 reconciler tests; v2 dry-run values identical to v1 (4 rows already applied by the 8:59 launchd run). Live under launchd from 9:05 PM.
+- [x] Final full suite 9:10 PM PT: 975 passed, 1 failed (same pre-existing order flake)
+- [x] T6 /pre-restart-audit 9:08–9:13 PM PT: steps 1-3 PASS (no numeric params changed in bot-loaded files; reconciler constants no lessons conflict; 4 files compile; Good-bot not running); step 4 review RESTART-SAFE (estimator floor, mark-price fallback, cancel_open_orders, cooldown, notify_exit, auto-demote, lock order, paper/live separation all intact). Restart diff vs PID 78531 code (b3d88ad): bot.py +118/−, risk_manager.py +78. → WAITING FOR OWNER "go"
+- [ ] T7 (post-restart) 100-day `--apply` backfill + MR ledger verification + memory update
+- [ ] T7 (post-restart) 100-day `--apply` backfill + MR ledger verification + memory update
 
-## Build (parallel agents)
-- [x] A1 bot.py DONE 8/26 7:55 PM PT: _main_paper() + paper entry branch (all gates identical, zero exchange
-      calls); all 7 exit sites + watcher + trail + SL-verify + startup place_sl_tp + partial-TP branch on
-      POSITION tag; sim SL/TP rides existing software-exit loop (sim trailing free); reconciler excludes tagged
-      positions (phantom-close tested); daily-loss halt + Kelly + STATS exclude mode=="paper".
-      DEVIATION (justified): risk_manager.py edited — Position.paper persisted across restart (else restart
-      strips tag → real SL/TP placed for phantom), partial_close mode=, Kelly/STATS filters. 25 new tests.
-      FULL SUITE: 798 passed, 0 failed.
-- [x] A2 web_dashboard.py DONE 8/26 7:45 PM PT: _main_paper() + _split_main_rows() (split by row's OWN mode,
-      never sentinel); PAPER badge both main cards (coexists w/ HALTED + SHORTS-ONLY); no-mode rows never pass
-      honest filter (8/12 leak class regression-tested both sentinel states); paper stats on separate "paper (sim)"
-      row; equity/ticker/blotter/positions paper-aware. 17 new tests; 100 passed 0 failed across dashboard modules.
-      Note: blotter strategy-chip WRs already blend live+paper by design (pre-existing) — flag to owner.
-- [x] A3 adjudicator + reports DONE 8/26 7:44 PM PT: _real_rows() filter on all registered lines incl. side lines
-      + trail_arm + sizing; tripwire unreachable from sims (tested to sim −$12); digest PAPER banner; daily_report
-      real/paper split + Telegram paper line. 77 passed on owned modules (15 new) + 17 adjacent. Full suite deferred
-      to post-build gate.
-- [x] A4 mode-blind consumers DONE 8/26 7:51 PM PT: 10 scripts fixed w/ uniform `mode != "paper"` predicate —
-      overwatch (4 checks + position-desync phantom-alarm the sweep missed), telegram /status "+n paper sim",
-      reconcile_phemex/backfill_fees structurally can't touch sim rows, strategy_tracker (old-vs-new identical
-      −$126.10/14 files), weekly_forensics, auto_lifecycle, symbol_pnl_audit, postentry_drift, sprint_checkpoint.
-      16 new tests; 36 passed 0 failed. Zero mode="paper" rows exist today → all filters verified no-op.
-      DEPENDENCY: overwatch desync check needs open paper positions tagged "paper": true (A1 convention).
-- [ ] NOTE: real 1000PEPE short opened 7:32:24 PM PT (same minute as halt, boundary trade) — last real main trade;
-      untagged → follows real close path by design; main flat once it closes.
-- [ ] A1 addendum (sent 7:45 PM PT): bot-side daily-loss halt / era loss cap / DD / Kelly sums must exclude
-      mode=="paper" rows; paper rows well-formed for reconcile matching.
-
-## After build
-- [x] Cross-audit DONE 8/26 8:11 PM PT: PASS-WITH-NOTES. No real-order leaks (all ~58 exchange call sites traced,
-      2 independent traces); 1000PEPE untagged → real path proven incl. restart round-trip; authoritative full
-      suite 772 passed 0 failed (A1's 798 was mid-build snapshot). Restart safe with halt armed; halt REMOVAL
-      gated on HIGH fixes below.
-- [x] A5 HIGH fixes DONE 8/26 8:22 PM PT: mcp_server 4 tools real-only + paper_* fields (shapes back-compat);
-      monitor_daemon dual-layer paper exclusion (log marker + state-row match) + real-margin drawdown sum;
-      bot.py _close_paper_main logs "[PAPER] Position closed:" via _log_prefix swap (slot mechanism reused).
-      21 new tests; full suite 793 passed 0 failed (=772 + exactly the 21 new).
-- [x] A6 MEDIUM fixes DONE 8/26 8:21 PM PT: 8 files (recalibration loader-level fix — auto_lifecycle feeds it
-      slot files only, contamination path was CLI/COMBINED; scanner dead is_paper→mode; chart/dashboard/
-      trading_desk/war_room/daily_review; code_health real-vs-paper entry recency). 26 new tests; full suite
-      841 passed 0 failed. BONUS LIVE BUG FIXED: daily_review counted paper-SLOT [PAPER] log lines as real
-      trades (today showed 8, truth 5) — pre-existing, now filtered.
-- [x] A7 test hardening DONE 8/26 8:21 PM PT: 22 behavioral tests (paper never reaches exchange + live mirrors
-      non-vacuous; holistic no-sentinel regression w/ sentinel-consult spy at 0; resize15 mode-homogeneity —
-      leaked mixed group drops entirely, conservative). No production bugs found.
-- [x] Full suite after A5-A7: 841 passed, 0 failed
-- [x] /pre-restart-audit PASSED 8/26 8:35 PM PT (review found 1 race in _log_prefix swap → fixed via per-call
-      log_prefix param, suite 841 green) → Jonas "go" 8:42 PM → `.paper_main` touched 8:42 → restart: old 1181
-      killed, NEW PID 99187, cycle #21171 8:44 PM, halt honored, no errors → `.halt_main_entries` REMOVED 8:46 PM.
-      MAIN BOOK NOW PAPER (shorts-only via .block_longs_main). Last real main trade: 1000PEPE short closed
-      8:19 PM trailing_stop +$0.64 (pre-restart, book flat at cutover).
-- [ ] memory-sync: record demotion + new sentinel in MEMORY.md / lessons (in progress)
-
-## Notes / surfaced per META-RULE
-- Main book was RUNNING WELL at demotion: this week 18 trades +$5.28, 83.3% WR (phmex_pnl 8/26); owner's call.
-- Owner directive "no shadow, live deploy" (feedback_no_shadow_live_deploy.md) superseded for main book by this order.
-- "Sum all state files" PnL convention: main paper rows now live in trading_state.json tagged mode="paper" —
-  lifetime real-PnL sums must exclude them (A3 checks consumers).
-
-# TASKS — Regime-pause slot freeze fix (owner order 9/3 9:22 PM PT)
-- [x] Bug verified (4-agent deep dive + adversarial check): regime `return` skipped _evaluate_all_slots; fed by paper main since 8/26
-- [x] TDD: tests/test_regime_pause_slot_service.py RED → bot.py regime branch calls _evaluate_all_slots(prices) → GREEN; suite 843✓
-- [x] /pre-restart-audit: compile OK, no params changed, review PASS, Good-bot off
-- [x] Jonas "go" 9:30 PM → PID 1444 killed, NEW PID 78531 9:31 PM PT, 0 open positions at cutover
 ## Review
-One-line production change mirroring two existing branches. Behavior: slots (entries + exits + ratchet) run during a
-main-book regime pause; main entries still pause. Paper main closes still feed the main regime window (affects paper only).
-
-# TASKS — 5m_mean_revert edge search (owner order 9/3 9:37 PM PT; plan approved 9:51 PM PT)
-Plan: ~/.claude/plans/hidden-conjuring-kazoo.md. Prereg: docs/superpowers/specs/2026-09-03-mr-edge-search-prereg.md (frozen 9:55 PM).
-- [x] Preflight: research ledger (30 dead levers) + data/tooling inventory (2 agents)
-- [x] Universe frozen: 35 symbols → reports/mr_edge_2026/universe.json
-- [x] Prereg doc written BEFORE any read
-- [x] A: scripts/slot_lab/mr_edge_fetch.py DONE (21 tests; 1000PEPE June parity 100%)
-- [x] A-run: fetch PID 92534 9:57 PM → DIED 10:58 PM at symbol 21/35 (parent agent killed by usage limit); 20 syms cached, June parity 14/14 = 100%, 0 gaps>2; early-END series (delist/thin): ALLO 8/11, BICO 6/30, DEXE 7/31, EIGEN 8/7, GIGGLE 8/7, INJ 8/18. RESUMED 1:02 AM 9/4 PID 9875 → COMPLETE 35/35 by ~1:40 AM (141 files)
-- [x] C: scripts/slot_lab/mr_edge_signal_table.py DONE 10:15 PM (31 tests; parity with validated rig to 1e-16)
-- [x] C2: FIDELITY FAILED 2/5 on closed bars — live fires on the FORMING candle. Prereg AMENDMENT v2 10:20 PM: forming-bar regen (fire_minute, confirmed_at_close) + family H6 entry-timing (+3 trials → 113) + real-money confirmed-vs-forming read. screen H6 DONE 10:24 PM (26 tests, 113 trials); forming-bar regen BUILT (tests green, review clean); preview fidelity 12/12 = 100% on 20 syms (fire_minute hist 2:1 3:2 4:4 5:5; confirmed_at_close 8/12); FULL RUN 2:14 AM 9/4: fidelity 28/30 = 93.3% PASS, 840 signals, signals.json written (sha c68e9ea0)
-- [x] D: scripts/slot_lab/mr_edge_screen.py DONE 10:05 PM (23 tests; 110 trials = 79+3+3+3+22; holdout guard: train_results + prereg sha + per-family lock)
-- [x] H0 sink: scripts/slot_lab/mr_gate_block_archiver.py (5 tests) + launchd com.phmex.mr-gate-archiver (6h, nice 19) DEPLOYED 10:02 PM; 13 blocks archived (4 OB)
-- [x] TRAIN read 2:17 AM 9/4: n=608, baseline −$0.024/trade, 113 trials, 0 winners in H1-H6 → NO holdout read (holdout n=227 unread, no locks)
-- [x] Verification agent re-derived all 113 trials: 0 discrepancies; paired tp2.0/4h +1.5¢ note (fails BH); verdict stands
-- [x] Report + memory (reference_mr_edge_search_2026-09-04.md)
-- [x] E: not triggered (no survivor)
-## Review (written 9/4 2:05 PM PT, on closeout via executing-plans)
-- Plan fully executed 9/3 9:51 PM → 9/4 2:23 AM PT. Every checklist item above is ticked; nothing remains in Phases A-D and Phase E has no survivor to ship.
-- Verdict: NULL in all six families. Source: reports/mr_edge_2026/train_report.md (generated 2026-09-04T09:17:40Z, prereg sha c68e9ea0…): baseline live cell n=608 mean −$0.024/trade CI [−0.138, +0.087]; 113 trials, "Winners: none" for H1-H6; holdout n=227 never read (no lock files). Independent re-derivation: 0 discrepancies.
-- Artifacts present on disk 9/4: universe.json, signals.json (6.1 MB, 840 rows), fidelity_real_trades.{md,json}, train_results.json, train_report.md.
-- H0 sink still live: launchd com.phmex.mr-gate-archiver runs=3 last exit 0 (launchctl print, 9/4 2:03 PM PT); logs/mr_gate_blocks.jsonl = 14 lines. Registered n≥10 OB-episode read stays pending on this sink.
-- Live bot untouched throughout (research scripts isolated, own ccxt client, nice 19).
-- Standing rule (memory reference_mr_edge_search_2026-09-04.md): do NOT re-run H1-H6 without a new mechanism; the 8/4-9/3 holdout remains available for one future pre-registered family.
-Result NULL across all six families. No code path to the live bot was touched by this program. New research assets: fetch/signal-table/screen scripts (97 tests), 3-month 35-symbol cache, forming-bar replay fidelity gate, H0 archiver. Holdout window preserved unread for one future pre-registered family.
+(filled in at completion)
