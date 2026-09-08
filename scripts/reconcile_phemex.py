@@ -14,7 +14,13 @@ default 7):
   1. Match Phemex fills (``fetch_my_trades``) near opened_at (±60 s) and
      closed_at (−300 s … +60 s — sync-loop closes are stamped late). Funding
      settlement rows interleaved in the fill stream (``info.tradeType == "4"``
-     / ``action == "13"``) are skipped; each fill is claimed by at most one row.
+     / ``action == "13"``) are skipped. Matching is ONE global pass over every
+     ledger's rows in closed_at order with a single claimed set, so a fill (or
+     a funding settlement) can be absorbed by at most one row across all books.
+     Fills are taken in time order and only until the row's matched quantity
+     covers ``amount`` (0.1% lot-rounding slack), so a reversal (long exits
+     with a sell, short enters with a sell seconds later) cannot leak the next
+     entry into this exit.
   2. Sum the real fees (entry + exit) and compare to local ``fees_usdt``.
   3. Attribute Phemex funding payments (``fetch_funding_history``) to the row
      of the same symbol whose (opened_at, closed_at] contains the settlement.
@@ -30,8 +36,10 @@ Run with ``--apply`` to patch each ledger in place: writes ``fees_usdt`` /
 ``fees_source`` / ``fees_reconciled_at`` (and drops ``fees_pending``) when
 fees drifted, ``funding_usdt`` / ``funding_source`` / ``funding_reconciled_at``
 when funding changed or was never stamped, and recomputes ``net_pnl``. Each
-file is written atomically (temp + ``os.replace``) and the write aborts if the
-bot appended a closed trade in between.
+file is written atomically (temp + ``os.replace``): the patch is applied to a
+state re-read immediately before the dump, and the replace is skipped (retried)
+if the file's mtime/size moved in that window — the bot's ``_save_state``
+rewrites ``positions`` in place every cycle and must never be reverted.
 """
 from __future__ import annotations
 
@@ -53,6 +61,8 @@ ENTRY_MATCH_BEFORE_SEC = 300        # MR slot stamps opened_at 60-80s AFTER the 
                                     # (9/7 dry run: ADA 8/9 63s, 1000SHIB 8/24 67s, BTC 8/30 79s)
 EXIT_MATCH_BEFORE_SEC = 300         # exchange_close rows are stamped by the sync loop up to
                                     # a few minutes AFTER the real fill (cycle ≤ 180s watchdog)
+QTY_COVERED_FRAC = 0.999            # a leg is covered (stops taking fills) once matched qty ≥ amount × this;
+                                    # the 0.1% slack absorbs exchange lot rounding on the last fill
 PRINT_CAP = 15                      # max lines per category per ledger in the report
 FEE_TOLERANCE_USDT = 0.01           # patch fees when |local - phemex| > this
 FUNDING_TOLERANCE_USDT = 1e-6       # funding is exact: patch on any change
@@ -115,6 +125,23 @@ def _fill_fee(fill: dict) -> float:
     return total
 
 
+def _qty_cap(trade: dict) -> float | None:
+    """Per-leg quantity at which the row counts as covered, or None when the
+    row has no usable amount (None/0 → no cap, today's behavior)."""
+    try:
+        amount = float(trade.get("amount") or 0)
+    except Exception:
+        return None
+    return amount * QTY_COVERED_FRAC if amount > 0 else None
+
+
+def _fill_qty(fill: dict) -> float:
+    try:
+        return abs(float(fill.get("amount") or 0))
+    except Exception:
+        return 0.0
+
+
 def _leg_sides(trade: dict) -> tuple[str | None, str | None]:
     """(entry_side, exit_side) in fill terms for this row; (None, None) = unknown."""
     side = str(trade.get("side") or "").lower()
@@ -137,13 +164,22 @@ def match_trade_to_fills(trade: dict, fills: list[dict], claimed: set | None = N
     skipped. `claimed` (fill ids already assigned to an earlier trade) prevents
     a crumb close and the real entry that followed it seconds later from
     sharing fills.
+
+    Fills are visited in ascending timestamp and each leg stops accepting
+    fills once its matched quantity covers ``amount`` (× QTY_COVERED_FRAC), so a
+    same-side fill from the NEXT trade (a long's exit sell followed by a
+    short's entry sell inside the exit window) is left for that trade. Rows
+    without a usable ``amount`` (None/0) have no cap. Crumb rows carry the
+    intended amount, larger than what filled, so the cap never binds there.
     """
     opened_at = trade.get("opened_at") or 0
     closed_at = trade.get("closed_at") or 0
     entry_side, exit_side = _leg_sides(trade)
+    qty_cap = _qty_cap(trade)
     entry_fills: list[dict] = []
     exit_fills: list[dict] = []
-    for f in fills:
+    entry_qty = exit_qty = 0.0
+    for f in sorted(fills, key=lambda x: x.get("timestamp") or 0):
         if is_funding_row(f):
             continue
         k = fill_key(f)
@@ -151,12 +187,17 @@ def match_trade_to_fills(trade: dict, fills: list[dict], claimed: set | None = N
             continue
         f_ts = (f.get("timestamp") or 0) / 1000
         f_side = str(f.get("side") or "").lower()
+        f_qty = _fill_qty(f)
         in_entry = bool(opened_at) and (opened_at - ENTRY_MATCH_BEFORE_SEC) <= f_ts <= (opened_at + FILL_MATCH_WINDOW_SEC)
         in_exit = bool(closed_at) and (closed_at - EXIT_MATCH_BEFORE_SEC) <= f_ts <= (closed_at + FILL_MATCH_WINDOW_SEC)
-        if in_entry and (entry_side is None or f_side == entry_side):
+        if (in_entry and (entry_side is None or f_side == entry_side)
+                and (qty_cap is None or entry_qty < qty_cap)):
             entry_fills.append(f)
-        elif in_exit and (exit_side is None or f_side == exit_side):
+            entry_qty += f_qty
+        elif (in_exit and (exit_side is None or f_side == exit_side)
+                and (qty_cap is None or exit_qty < qty_cap)):
             exit_fills.append(f)
+            exit_qty += f_qty
         else:
             continue
         if claimed is not None:
@@ -278,55 +319,100 @@ def build_patches(rows: list[dict], fills_by_sym: dict[str, list[dict]],
         patches.append({"key": trade_key(t), "fees_usdt": new_fee, "funding_usdt": new_funding,
                         "local_fee": float(local_fee or 0), "local_funding": local_funding,
                         "partial": not complete, "phemex_fee": phemex_fee,
-                        "legs": f"{len(entry_fills)}e/{len(exit_fills)}x"})
+                        "legs": f"{len(entry_fills)}e/{len(exit_fills)}x", "row": t})
     return patches, unmatched
+
+
+def reconcile_ledgers(ledgers: list[tuple[Path, str, list[dict]]], fills_by_sym: dict[str, list[dict]],
+                      funding_rows: list[dict]) -> dict[Path, tuple[list[dict], list[dict]]]:
+    """ONE matching pass across every ledger, then regroup per file.
+
+    Claims are global: all rows from all ledgers are matched in closed_at
+    order against a single claimed set, and funding is attributed over the
+    union, so a main-book row and a slot row on the same symbol minutes apart
+    can never both absorb the same fill or the same settlement — the
+    earlier-closing row owns it and the other lands partial/unmatched.
+    Returns {path: (patches, unmatched)} in ledger order."""
+    owner: dict[int, Path] = {}
+    all_rows: list[dict] = []
+    for path, _kind, rows in ledgers:
+        for t in rows:
+            owner[id(t)] = path
+            all_rows.append(t)
+    funding_by_key = attribute_funding(all_rows, funding_rows)
+    patches, unmatched = build_patches(all_rows, fills_by_sym, funding_by_key)
+    out: dict[Path, tuple[list[dict], list[dict]]] = {path: ([], []) for path, _, _ in ledgers}
+    for p in patches:
+        out[owner[id(p["row"])]][0].append(p)
+    for t in unmatched:
+        out[owner[id(t)]][1].append(t)
+    return out
+
+
+def _patch_closed_rows(closed: list[dict], by_key: dict[tuple, dict], now: int) -> int:
+    """Write the precomputed patch values onto matching rows in place; returns count."""
+    modified = 0
+    for t in closed:
+        p = by_key.get(trade_key(t))
+        if not p:
+            continue
+        gross = float(t.get("pnl_usdt") or 0)
+        if p["fees_usdt"] is not None:
+            t["fees_usdt"] = round(float(p["fees_usdt"]), 6)
+            t["fees_source"] = "phemex_reconcile"
+            t["fees_reconciled_at"] = now
+            t.pop("fees_pending", None)
+        if p["funding_usdt"] is not None:
+            t["funding_usdt"] = round(float(p["funding_usdt"]), 8)
+            t["funding_source"] = "phemex_reconcile"
+            t["funding_reconciled_at"] = now
+        fees = float(t.get("fees_usdt") or 0)
+        funding = float(t.get("funding_usdt") or 0)
+        t["net_pnl"] = round(gross - fees - funding, 6)
+        modified += 1
+    return modified
+
+
+def _file_sig(path: Path) -> tuple | None:
+    """(inode, mtime_ns, size) — moves on any write, including the bot's
+    in-place ``_save_state`` (open("w")) that rewrites ``positions``."""
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (st.st_ino, st.st_mtime_ns, st.st_size)
 
 
 def apply_patches(path: Path, patches: list[dict]) -> int:
     """Patch closed_trades rows in `path` with Phemex-truth fees/funding.
-    Atomic temp+rename; only closed_trades rows are edited, everything else in
-    the file (positions, peak) is whatever was on disk at the final re-read.
-    Aborts (returns -1) if the bot keeps writing concurrently."""
+
+    The patch values are decided before this runs (``patches``); here the
+    read→replace window is kept to a single fresh read, an in-memory row
+    update and one JSON dump: the state re-read at the top of each attempt is
+    exactly what gets written, so ``positions``/``peak_balance`` are whatever
+    the bot last saved. Before ``os.replace`` the file's (inode, mtime_ns,
+    size) must still equal what it was just before that read — a bot write
+    landing in the window (positions rewrite or a closed_trades append) makes
+    it move and the attempt is retried on a fresh read. Aborts (returns -1)
+    if the bot keeps writing concurrently."""
     if not patches:
         return 0
     by_key = {p["key"]: p for p in patches}
+    now = int(time.time())
+    tmp = path.with_suffix(".json.reconcile.tmp")
     for attempt in range(5):
+        sig_before = _file_sig(path)
         try:
             state = json.loads(path.read_text())
         except Exception as e:
             print(f"[ERROR] cannot read {path.name} for apply: {e}")
             return -1
         closed = state.get("closed_trades") or []
-        original_count = len(closed)
-        modified = 0
-        now = int(time.time())
-        for t in closed:
-            p = by_key.get(trade_key(t))
-            if not p:
-                continue
-            gross = float(t.get("pnl_usdt") or 0)
-            if p["fees_usdt"] is not None:
-                t["fees_usdt"] = round(float(p["fees_usdt"]), 6)
-                t["fees_source"] = "phemex_reconcile"
-                t["fees_reconciled_at"] = now
-                t.pop("fees_pending", None)
-            if p["funding_usdt"] is not None:
-                t["funding_usdt"] = round(float(p["funding_usdt"]), 8)
-                t["funding_source"] = "phemex_reconcile"
-                t["funding_reconciled_at"] = now
-            fees = float(t.get("fees_usdt") or 0)
-            funding = float(t.get("funding_usdt") or 0)
-            t["net_pnl"] = round(gross - fees - funding, 6)
-            modified += 1
+        modified = _patch_closed_rows(closed, by_key, now)
         if modified == 0:
             return 0
-        tmp = path.with_suffix(".json.reconcile.tmp")
         tmp.write_text(json.dumps(state))
-        try:
-            current = json.loads(path.read_text())
-        except Exception:
-            current = {}
-        if len(current.get("closed_trades") or []) != original_count:
+        if sig_before is None or _file_sig(path) != sig_before:
             tmp.unlink(missing_ok=True)
             time.sleep(0.25)
             continue
@@ -368,13 +454,14 @@ def main():
     fills_by_sym = fetch_phemex_fills(exchange, symbols, since_ms)
     funding_rows = [r for sym in symbols for r in fetch_funding_rows(exchange, sym, since_ms)]
 
+    results = reconcile_ledgers(ledgers, fills_by_sym, funding_rows)
+
     grand_unmatched = 0
     grand_patches = 0
     grand_applied = 0
     funding_applied = 0.0
     for path, kind, rows in ledgers:
-        funding_by_key = attribute_funding(rows, funding_rows)
-        patches, unmatched = build_patches(rows, fills_by_sym, funding_by_key)
+        patches, unmatched = results[path]
         fee_patches = [p for p in patches if p["fees_usdt"] is not None]
         fund_patches = [p for p in patches if p["funding_usdt"] is not None]
         fund_changes = [p for p in fund_patches

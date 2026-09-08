@@ -289,3 +289,154 @@ def test_build_patches_runner_row_gets_exit_only_fee():
     assert by_key[rp.trade_key(partial)]["fees_usdt"] == pytest.approx(0.0594)
     assert by_key[rp.trade_key(runner)]["fees_usdt"] == pytest.approx(0.0443)
     assert by_key[rp.trade_key(runner)]["partial"] is False
+
+
+# ---------------------------------------------------------------------------
+# 9/7 code-review findings on 48a243d
+# ---------------------------------------------------------------------------
+
+
+def test_reconcile_ledgers_claims_fills_and_funding_once_across_ledgers(tmp_path):
+    # FINDING 1: a main-book row and a slot row on the same symbol, minutes
+    # apart, both overlap the same exit fill and the same funding settlement.
+    # Per-ledger matching let BOTH absorb them; the global pass must give each
+    # to exactly one row (the earlier-closing one) and leave the other partial.
+    main_row = _trade(1000.0, 5000.0, fees_usdt=0.05, amount=1.0)
+    slot_row = _trade(1100.0, 5100.0, fees_usdt=0.05, amount=1.0, mode="live")
+    fills = {SYM: [
+        _fill(1001, "sell", 1.0, 1.0, 0.015, fid="main-entry"),
+        _fill(1101, "sell", 1.0, 1.0, 0.016, fid="slot-entry"),
+        _fill(4990, "buy", 1.0, 1.0, 0.088, fid="only-exit"),
+    ]}
+    funding = [{"timestamp": 3000 * 1000, "symbol": SYM, "paid": 0.01}]
+    main_p = tmp_path / "trading_state.json"
+    slot_p = tmp_path / "trading_state_5m_mean_revert.json"
+    out = rp.reconcile_ledgers([(main_p, "main", [main_row]), (slot_p, "slot", [slot_row])], fills, funding)
+    main_patches, main_unmatched = out[main_p]
+    slot_patches, slot_unmatched = out[slot_p]
+    assert main_unmatched == [] and slot_unmatched == []
+    assert [p["key"] for p in main_patches] == [rp.trade_key(main_row)]
+    assert [p["key"] for p in slot_patches] == [rp.trade_key(slot_row)]
+    mp, sp = main_patches[0], slot_patches[0]
+    # earlier-closing main row owns the exit fill and the settlement
+    assert mp["partial"] is False and mp["legs"] == "1e/1x"
+    assert mp["fees_usdt"] == pytest.approx(0.015 + 0.088)
+    assert mp["funding_usdt"] == pytest.approx(0.01)
+    # slot row keeps only its own entry: partial, fee untouched, funding 0 (not double-counted)
+    assert sp["partial"] is True and sp["legs"] == "1e/0x"
+    assert sp["fees_usdt"] is None
+    assert sp["funding_usdt"] == 0.0
+
+
+def test_reversal_entry_fill_not_stolen_by_prior_exit():
+    # FINDING 2: A long exits with a sell at 4990; B short ENTERS with a sell
+    # at 5031 — inside A's exit window (closed_at-300..+60) and the same side.
+    # The quantity cap (matched qty < amount*1.001, fills in time order) stops
+    # A after its 1.0 is covered so B keeps its entry.
+    a = _trade(1000.0, 5000.0, side="long", amount=1.0, fees_usdt=0.05)
+    b = _trade(5030.0, 9000.0, side="short", amount=1.0, fees_usdt=0.05)
+    fills = [
+        _fill(5031, "sell", 1.0, 1.0, 0.015, fid="b-entry"),   # listed first: order in the list must not matter
+        _fill(1001, "buy", 1.0, 1.0, 0.014, fid="a-entry"),
+        _fill(4990, "sell", 1.0, 1.0, 0.088, fid="a-exit"),
+        _fill(8999, "buy", 1.0, 1.0, 0.090, fid="b-exit"),
+    ]
+    claimed = set()
+    ea, xa, fa = rp.match_trade_to_fills(a, fills, claimed)
+    eb, xb, fb = rp.match_trade_to_fills(b, fills, claimed)
+    assert [f["id"] for f in ea] == ["a-entry"] and [f["id"] for f in xa] == ["a-exit"]
+    assert fa == pytest.approx(0.014 + 0.088)
+    assert [f["id"] for f in eb] == ["b-entry"] and [f["id"] for f in xb] == ["b-exit"]
+    assert fb == pytest.approx(0.015 + 0.090)
+    assert claimed == {"a-entry", "a-exit", "b-entry", "b-exit"}
+    # end to end: both rows complete, B's fee is its own round trip
+    funding = {rp.trade_key(a): 0.0, rp.trade_key(b): 0.0}
+    patches, unmatched = rp.build_patches([a, b], {SYM: fills}, funding)
+    assert unmatched == []
+    by_key = {p["key"]: p for p in patches}
+    assert by_key[rp.trade_key(a)]["partial"] is False and by_key[rp.trade_key(a)]["fees_usdt"] == pytest.approx(0.102)
+    assert by_key[rp.trade_key(b)]["partial"] is False and by_key[rp.trade_key(b)]["fees_usdt"] == pytest.approx(0.105)
+
+
+def test_qty_cap_only_applies_with_usable_amount():
+    # Rows without a usable amount (None / 0) keep today's behavior: every
+    # side-matching fill in the window is taken.
+    fills = [
+        _fill(1001, "buy", 1.0, 1.0, 0.014, fid="a-entry"),
+        _fill(4990, "sell", 1.0, 1.0, 0.088, fid="a-exit"),
+        _fill(5031, "sell", 1.0, 1.0, 0.015, fid="stray-sell"),
+    ]
+    for amt in (None, 0, 0.0):
+        a = _trade(1000.0, 5000.0, side="long", amount=amt)
+        _, xa, _ = rp.match_trade_to_fills(a, fills)
+        assert [f["id"] for f in xa] == ["a-exit", "stray-sell"]
+    # crumb rows carry the INTENDED amount (larger than what filled): cap never binds
+    crumb = _trade(1000.0, 1000.5, exit_reason="min_margin_skip", amount=5.0)
+    cfills = [_fill(1000.2, "sell", 1.0, 0.5, 0.001, fid="ce"), _fill(1000.4, "buy", 1.0, 0.5, 0.006, fid="cx")]
+    e, x, fee = rp.match_trade_to_fills(crumb, cfills)
+    assert {f["id"] for f in e + x} == {"ce", "cx"} and fee == pytest.approx(0.007)
+    # lot rounding: a 103.8 fill covers a 103.84 row (0.1% slack), so a later
+    # same-side fill inside the window is left for the next trade
+    xrp = _trade(1000.0, 5000.0, side="long", symbol="XRP/USDT:USDT", amount=103.84)
+    xfills = [_fill(1001, "buy", 1.44, 103.8, 0.089, fid="x-entry"),
+              _fill(4990, "sell", 1.45, 103.8, 0.090, fid="x-exit"),
+              _fill(5020, "sell", 1.45, 103.8, 0.090, fid="next-short-entry")]
+    e, x, _ = rp.match_trade_to_fills(xrp, xfills)
+    assert [f["id"] for f in e] == ["x-entry"] and [f["id"] for f in x] == ["x-exit"]
+    assert rp.QTY_COVERED_FRAC == 0.999
+
+
+def test_apply_patches_writes_positions_from_the_final_read(tmp_path, monkeypatch):
+    # FINDING 3: the bot rewrites `positions` every cycle (trailing stops).
+    # Whatever positions dict the LAST read saw must be what lands on disk —
+    # the patch may only be applied to the freshest state.
+    path = tmp_path / "trading_state.json"
+    row = _trade(1000.0, 5000.0, fees_usdt=0.05, pnl_usdt=1.0, net_pnl=0.95)
+
+    def _state(v):
+        return json.dumps({"closed_trades": [row], "positions": {"ETH": {"trailing_stop_price": v}}})
+
+    path.write_text(_state(0))
+    calls = {"n": 0}
+    real_read_text = Path.read_text
+
+    def fake_read_text(self, *a, **kw):
+        if self == path:
+            calls["n"] += 1
+            return _state(calls["n"])          # each read sees a newer positions dict
+        return real_read_text(self, *a, **kw)
+
+    monkeypatch.setattr(Path, "read_text", fake_read_text)
+    n = rp.apply_patches(path, [{"key": rp.trade_key(row), "fees_usdt": 0.1, "funding_usdt": None,
+                                 "local_fee": 0.05, "local_funding": 0.0}])
+    got = json.loads(real_read_text(path))
+    assert n == 1 and calls["n"] >= 1
+    assert got["positions"]["ETH"]["trailing_stop_price"] == calls["n"]   # last read wins
+    assert got["closed_trades"][0]["fees_usdt"] == pytest.approx(0.1)
+
+
+def test_apply_patches_retries_when_bot_writes_between_read_and_replace(tmp_path, monkeypatch):
+    # A bot _save_state (in-place open("w")) landing after our read but before
+    # os.replace must be detected; the retry re-reads and preserves its positions.
+    path = tmp_path / "trading_state.json"
+    row = _trade(1000.0, 5000.0, fees_usdt=0.05, pnl_usdt=1.0, net_pnl=0.95)
+    path.write_text(json.dumps({"closed_trades": [row], "positions": {}}))
+    bot_state = {"closed_trades": [row], "positions": {"ETH": {"trailing_stop_price": 7}}}
+    real_write_text = Path.write_text
+    fired = {"done": False}
+
+    def fake_write_text(self, data, *a, **kw):
+        if self.name.endswith(".reconcile.tmp") and not fired["done"]:
+            fired["done"] = True
+            with open(path, "w") as f:            # the bot's write, mid-window
+                json.dump(bot_state, f)
+        return real_write_text(self, data, *a, **kw)
+
+    monkeypatch.setattr(Path, "write_text", fake_write_text)
+    n = rp.apply_patches(path, [{"key": rp.trade_key(row), "fees_usdt": 0.1, "funding_usdt": None,
+                                 "local_fee": 0.05, "local_funding": 0.0}])
+    got = json.loads(path.read_text())
+    assert n == 1
+    assert got["positions"] == {"ETH": {"trailing_stop_price": 7}}      # bot's write survived
+    assert got["closed_trades"][0]["fees_usdt"] == pytest.approx(0.1)
+    assert not path.with_suffix(".json.reconcile.tmp").exists()
