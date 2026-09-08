@@ -452,6 +452,54 @@ def _write_l2_snapshot(snapshot_dict: dict, path: str = "l2_snapshot.json") -> N
         logger.debug(f"[L2_SNAPSHOT] write failed: {e}")
 
 
+def _close_fills_summary(recent: list, pos) -> tuple:
+    """(exit_price, fee_total) for a position the exchange closed on its own.
+
+    Uses EVERY post-entry fill on the REDUCE side of pos (short → 'buy', long →
+    'sell'), skipping Phemex 8h funding-settlement rows that fetch_my_trades
+    interleaves with fills (info.tradeType "4" / action "13"). exit_price is the
+    size-weighted average. Returns (None, 0.0) when no close fill is visible yet;
+    a 0.0 fee makes close_position substitute _estimate_live_fees + fees_pending
+    (never $0), and the reconciler writes the exact number within 15 min.
+    Pre-9/7 this summed only the LAST fill (ADA 7/22: $0.015 recorded vs ~$0.10).
+    """
+    entry_ts_ms = int(getattr(pos, "opened_at", 0) * 1000)
+    reduce_side = "buy" if getattr(pos, "side", "") == "short" else "sell"
+    fills = []
+    for tr in recent or []:
+        info = tr.get("info") or {}
+        if str(info.get("tradeType")) == "4" or str(info.get("action")) == "13":
+            continue
+        if (tr.get("timestamp") or 0) <= entry_ts_ms:
+            continue
+        if tr.get("side") and tr.get("side") != reduce_side:
+            continue
+        fills.append(tr)
+    if not fills:
+        return None, 0.0
+    fee_total = 0.0
+    notional = 0.0
+    qty = 0.0
+    last_px = 0.0
+    for tr in sorted(fills, key=lambda t: t.get("timestamp") or 0):
+        fee = tr.get("fee") or {}
+        if fee.get("cost") is not None:
+            fee_total += abs(float(fee.get("cost") or 0))
+        else:
+            for f in tr.get("fees") or []:
+                if f.get("cost") is not None:
+                    fee_total += abs(float(f.get("cost") or 0))
+        px = float(tr.get("price") or 0)
+        amt = float(tr.get("amount") or 0)
+        if px > 0:
+            last_px = px
+            if amt > 0:
+                notional += px * amt
+                qty += amt
+    exit_px = (notional / qty) if qty > 0 else (last_px if last_px > 0 else None)
+    return exit_px, fee_total
+
+
 def _build_position_owners(main_risk, slots):
     """symbol -> (owner_risk_manager, slot_or_None) for every EXCHANGE-BACKED position.
     Main bot positions map to (main_risk, None); live-slot positions map to
@@ -2630,13 +2678,16 @@ class Phmex2Bot:
                         # Partial fill below minimum — close immediately to free the slot
                         logger.warning(f"[SKIP] {symbol} partial fill ${actual_margin:.4f} < ${_min_margin:.2f} min — closing to free slot")
                         self.exchange.cancel_open_orders(symbol)
-                        close_ok = (
+                        close_order = (
                             self.exchange.close_long(symbol, fill_amount)
                             if direction == "long"
                             else self.exchange.close_short(symbol, fill_amount)
                         )
-                        if close_ok:
-                            self.risk.close_position(symbol, fill_price, "min_margin_skip")
+                        if close_order:
+                            # Real exit-leg fee (crumb = one immediate reduce-only market
+                            # order); 0.0 → estimator floor; reconciler adds the entry leg.
+                            self.risk.close_position(symbol, fill_price, "min_margin_skip",
+                                                     fees_usdt=self.exchange.extract_order_fee(close_order, symbol))
                         else:
                             logger.error(f"[SKIP] {symbol} emergency close failed — leaving in tracker for exit loop")
                         continue
@@ -3592,7 +3643,8 @@ class Phmex2Bot:
                                 closed = (self.exchange.close_long(symbol, fill_amount) if direction == "long"
                                           else self.exchange.close_short(symbol, fill_amount))
                                 if closed:
-                                    slot.risk.close_position(symbol, fill_price, "min_margin_skip", mode="live")
+                                    slot.risk.close_position(symbol, fill_price, "min_margin_skip", mode="live",
+                                                             fees_usdt=self.exchange.extract_order_fee(closed, symbol))
                                 else:
                                     logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} crumb close FAILED — reconcile will catch")
                                 continue
@@ -4129,47 +4181,17 @@ class Phmex2Bot:
                     pos = owner_risk.positions[symbol]
                     # Try to get actual fill price from recent trades
                     exit_price = prices.get(symbol, pos.entry_price)
-                    # TODO(U5c spec, 2026-07-23 — NOT shipped, >1h robust fix):
-                    # exchange_close fees are UNDERESTIMATED two ways: (1) only
-                    # last_trade's fee is summed, so a close split across
-                    # multiple fills undercounts (ADA 7/22: $0.015 recorded vs
-                    # ~$0.10 actual, ~$0.31/week cumulative); (2) a non-zero
-                    # but wrong sync_fee bypasses close_position's zero-fee
-                    # estimator floor. Robust fix: filter post-entry fills to
-                    # the REDUCE side matching pos.side, sum fee across ALL of
-                    # them, and floor at _estimate_live_fees when the exchange
-                    # omits fee.cost — needs careful re-entry disambiguation
-                    # (same-cycle new entry on the symbol would poison the
-                    # sum). The 15-min reconciler (reconcile_phemex --apply)
-                    # remains the exact-fee backstop for the state FILE; the
-                    # in-memory daily-loss sum wears the underestimate until
-                    # then.
+                    # Fee/price from ALL reduce-side post-entry fills (funding rows
+                    # skipped, same-side re-entries excluded); 0.0 → estimator floor.
                     sync_fee = 0.0
                     try:
                         recent = self.exchange.client.fetch_my_trades(symbol, limit=10)
-                        if recent:
-                            # Filter to trades after position entry to avoid picking up the entry fill
-                            entry_ts_ms = int(pos.opened_at * 1000)
-                            close_trades = [tr for tr in recent if (tr.get("timestamp") or 0) > entry_ts_ms]
-                            last_trade = close_trades[-1] if close_trades else None
-                            if last_trade:
-                                fill = float(last_trade.get("price", 0))
-                                if fill > 0:
-                                    exit_price = fill
-                                    logger.info(f"[SYNC] {symbol} real exit fill: {exit_price}")
-                                # Sum fees from the confirmed close trade
-                                try:
-                                    fee = last_trade.get("fee") or {}
-                                    if fee.get("cost") is not None:
-                                        sync_fee = abs(float(fee.get("cost") or 0))
-                                    else:
-                                        for f in last_trade.get("fees") or []:
-                                            if f.get("cost") is not None:
-                                                sync_fee += abs(float(f.get("cost") or 0))
-                                except Exception:
-                                    pass
-                            else:
-                                logger.debug(f"[SYNC] {symbol} no post-entry close trade found yet — using mark price")
+                        fill_px, sync_fee = _close_fills_summary(recent, pos)
+                        if fill_px:
+                            exit_price = fill_px
+                            logger.info(f"[SYNC] {symbol} real exit fill: {exit_price} (fee {sync_fee:.5f})")
+                        else:
+                            logger.debug(f"[SYNC] {symbol} no post-entry close fill found yet — using mark price")
                     except Exception:
                         pass
                     if slot is None:
