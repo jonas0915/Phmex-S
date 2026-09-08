@@ -126,7 +126,7 @@ def test_fee_capture_still_flags_real_missing_fee(tmp_path, monkeypatch):
     assert result.severity == "WARNING"
 
 
-# ── reconcile_phemex.load_closed_trades ──────────────────────────────────────
+# ── reconcile_phemex.load_rows (main ledger) ──────────────────────────────────────
 
 def test_reconcile_skips_paper_rows(tmp_path, monkeypatch):
     from scripts import reconcile_phemex
@@ -137,8 +137,7 @@ def test_reconcile_skips_paper_rows(tmp_path, monkeypatch):
     ]}
     state_file = tmp_path / "trading_state.json"
     state_file.write_text(json.dumps(state))
-    monkeypatch.setattr(reconcile_phemex, "STATE_FILE", Path(state_file))
-    got = reconcile_phemex.load_closed_trades(since_ms=0)
+    got = reconcile_phemex.load_rows(Path(state_file), "main", since_ms=0)
     assert len(got) == 2
     assert all(t.get("mode") != "paper" for t in got)
 
@@ -150,8 +149,7 @@ def test_reconcile_no_paper_rows_unchanged(tmp_path, monkeypatch):
     rows = [_real_row(1.0, now), _real_row(2.0, now)]
     state_file = tmp_path / "trading_state.json"
     state_file.write_text(json.dumps({"closed_trades": rows}))
-    monkeypatch.setattr(reconcile_phemex, "STATE_FILE", Path(state_file))
-    got = reconcile_phemex.load_closed_trades(since_ms=0)
+    got = reconcile_phemex.load_rows(Path(state_file), "main", since_ms=0)
     assert [t["pnl_usdt"] for t in got] == [1.0, 2.0]
 
 

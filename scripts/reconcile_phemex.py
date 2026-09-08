@@ -1,19 +1,37 @@
 #!/usr/bin/env python3
-"""Reconcile bot's closed_trades vs Phemex fills by time+PnL matching.
+"""Reconcile every real-money ledger's closed_trades vs Phemex fills + funding.
 
-For each local closed_trade in the lookback window:
-  1. Fetch Phemex fills for that symbol near opened_at and closed_at
-  2. Sum real fees from matching fills (entry + exit)
-  3. Compare Phemex fees to local fees_usdt
-  4. Flag any trade with no Phemex match, or fee delta > tolerance
+Ledgers covered (``ledger_files``):
+  * ``trading_state.json``          (main book; rows with no ``mode`` key are
+    historical real money, ``mode == "paper"`` rows are sims since 8/26)
+  * ``trading_state_<slot>.json``   (slot ledgers; only ``mode == "live"`` rows
+    ever touched Phemex — no-mode slot rows are paper era)
+  Sidecars (``*_blocked``, ``*_mode``) and archives (``v8_245trades``,
+  ``SR_BOUNCE_era1``) are skipped.
+
+For each real closed_trade in the lookback window (``--lookback-days N``,
+default 7):
+  1. Match Phemex fills (``fetch_my_trades``) near opened_at (±60 s) and
+     closed_at (−300 s … +60 s — sync-loop closes are stamped late). Funding
+     settlement rows interleaved in the fill stream (``info.tradeType == "4"``
+     / ``action == "13"``) are skipped; each fill is claimed by at most one row.
+  2. Sum the real fees (entry + exit) and compare to local ``fees_usdt``.
+  3. Attribute Phemex funding payments (``fetch_funding_history``) to the row
+     of the same symbol whose (opened_at, closed_at] contains the settlement.
+     Sign convention (verified read-only 9/7 on the real account):
+     ``amount`` positive = PAID (cost), negative = RECEIVED. That is exactly
+     the writer's ``net_pnl = pnl_usdt - fees_usdt - funding_usdt``.
+  4. Flag rows with no Phemex fills (UNMATCHED — reported, never patched),
+     fee drift > ``FEE_TOLERANCE_USDT``, and any funding change.
 
 By default this is a print-only desync detector.
 
-Run with ``--apply`` to also patch ``trading_state.json`` in place:
-overwrites ``fees_usdt`` and recomputes ``net_pnl = pnl_usdt - fees_usdt -
-funding_usdt`` for every trade whose fees drifted beyond tolerance. The
-write is atomic (temp file + ``os.replace``) and aborts if the state file
-grew in between (to avoid clobbering a trade the bot just closed).
+Run with ``--apply`` to patch each ledger in place: writes ``fees_usdt`` /
+``fees_source`` / ``fees_reconciled_at`` (and drops ``fees_pending``) when
+fees drifted, ``funding_usdt`` / ``funding_source`` / ``funding_reconciled_at``
+when funding changed or was never stamped, and recomputes ``net_pnl``. Each
+file is written atomically (temp + ``os.replace``) and the write aborts if the
+bot appended a closed trade in between.
 """
 from __future__ import annotations
 
@@ -21,7 +39,6 @@ import json
 import os
 import sys
 import time
-from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,27 +48,37 @@ from config import Config  # noqa: E402
 from exchange import Exchange  # noqa: E402
 
 LOOKBACK_DAYS = 7
-FILL_MATCH_WINDOW_SEC = 60          # fills within 60s of opened_at/closed_at count as match
-FEE_TOLERANCE_USDT = 0.05            # drift if |local_fee - phemex_fee| > this
-STATE_FILE = ROOT / "trading_state.json"
+FILL_MATCH_WINDOW_SEC = 60          # fills up to 60s AFTER opened_at / closed_at
+ENTRY_MATCH_BEFORE_SEC = 300        # MR slot stamps opened_at 60-80s AFTER the maker fill
+                                    # (9/7 dry run: ADA 8/9 63s, 1000SHIB 8/24 67s, BTC 8/30 79s)
+EXIT_MATCH_BEFORE_SEC = 300         # exchange_close rows are stamped by the sync loop up to
+                                    # a few minutes AFTER the real fill (cycle ≤ 180s watchdog)
+PRINT_CAP = 15                      # max lines per category per ledger in the report
+FEE_TOLERANCE_USDT = 0.01           # patch fees when |local - phemex| > this
+FUNDING_TOLERANCE_USDT = 1e-6       # funding is exact: patch on any change
+MAIN_STATE_FILE = ROOT / "trading_state.json"
+STATE_FILE = MAIN_STATE_FILE        # back-compat alias
+ARCHIVE_MARKERS = ("_blocked", "_mode", "v8_245trades", "SR_BOUNCE_era1")
 
 
-def load_closed_trades(since_ms: int) -> list[dict]:
-    if not STATE_FILE.exists():
-        print(f"[WARN] {STATE_FILE} not found")
-        return []
-    try:
-        data = json.loads(STATE_FILE.read_text())
-    except Exception as e:
-        print(f"[ERROR] failed to read {STATE_FILE}: {e}")
-        return []
-    closed = data.get("closed_trades", []) or []
-    # Skip mode=="paper" sims entirely — they never hit Phemex, so they can neither
-    # match a fill nor receive a fee fix. Historical rows have no mode field = real.
-    return [
-        t for t in closed
-        if (t.get("closed_at") or 0) * 1000 >= since_ms and t.get("mode") != "paper"
-    ]
+def trade_key(t: dict) -> tuple:
+    return (t.get("opened_at"), t.get("symbol"), t.get("closed_at"))
+
+
+def is_funding_row(fill: dict) -> bool:
+    """Phemex fetch_my_trades interleaves 8h funding settlements with fills.
+    Verified 9/7: settlement rows carry info.tradeType "4" / action "13"
+    (real fills: tradeType "1", action "1"). Their fee.cost is the funding
+    amount, so counting them as fees would corrupt the round-trip sum."""
+    info = fill.get("info") or {}
+    return str(info.get("tradeType")) == "4" or str(info.get("action")) == "13"
+
+
+def fill_key(fill: dict) -> str:
+    fid = fill.get("id")
+    if fid:
+        return str(fid)
+    return f"{fill.get('timestamp')}:{fill.get('side')}:{fill.get('price')}:{fill.get('amount')}"
 
 
 def fetch_phemex_fills(exchange: Exchange, symbols: list[str], since_ms: int) -> dict[str, list[dict]]:
@@ -88,199 +115,313 @@ def _fill_fee(fill: dict) -> float:
     return total
 
 
-def match_trade_to_fills(trade: dict, fills: list[dict]) -> tuple[list[dict], list[dict], float]:
-    """Return (entry_fills, exit_fills, total_fee) matching this trade by timestamp proximity."""
+def _leg_sides(trade: dict) -> tuple[str | None, str | None]:
+    """(entry_side, exit_side) in fill terms for this row; (None, None) = unknown."""
+    side = str(trade.get("side") or "").lower()
+    if side in ("long", "buy"):
+        return "buy", "sell"
+    if side in ("short", "sell"):
+        return "sell", "buy"
+    return None, None
+
+
+def match_trade_to_fills(trade: dict, fills: list[dict], claimed: set | None = None) -> tuple[list[dict], list[dict], float]:
+    """Return (entry_fills, exit_fills, total_fee) for this trade.
+
+    Entry window: opened_at-300s .. opened_at+60s (the slot stamps opened_at a
+    cycle after the maker fill). Exit window: closed_at-300s .. closed_at+60s
+    (sync-loop closes are stamped late). Matching is side-aware: a long's entry
+    is a buy and its exit a sell (the reverse for a short), so the next trade's
+    same-symbol entry landing seconds after this exit (PUMP 8/10 8:51 PM) is
+    never counted as part of this round trip. Funding settlement rows are
+    skipped. `claimed` (fill ids already assigned to an earlier trade) prevents
+    a crumb close and the real entry that followed it seconds later from
+    sharing fills.
+    """
     opened_at = trade.get("opened_at") or 0
     closed_at = trade.get("closed_at") or 0
-    entry_fills = []
-    exit_fills = []
+    entry_side, exit_side = _leg_sides(trade)
+    entry_fills: list[dict] = []
+    exit_fills: list[dict] = []
     for f in fills:
+        if is_funding_row(f):
+            continue
+        k = fill_key(f)
+        if claimed is not None and k in claimed:
+            continue
         f_ts = (f.get("timestamp") or 0) / 1000
-        if opened_at and abs(f_ts - opened_at) <= FILL_MATCH_WINDOW_SEC:
+        f_side = str(f.get("side") or "").lower()
+        in_entry = bool(opened_at) and (opened_at - ENTRY_MATCH_BEFORE_SEC) <= f_ts <= (opened_at + FILL_MATCH_WINDOW_SEC)
+        in_exit = bool(closed_at) and (closed_at - EXIT_MATCH_BEFORE_SEC) <= f_ts <= (closed_at + FILL_MATCH_WINDOW_SEC)
+        if in_entry and (entry_side is None or f_side == entry_side):
             entry_fills.append(f)
-        elif closed_at and abs(f_ts - closed_at) <= FILL_MATCH_WINDOW_SEC:
+        elif in_exit and (exit_side is None or f_side == exit_side):
             exit_fills.append(f)
+        else:
+            continue
+        if claimed is not None:
+            claimed.add(k)
     total_fee = sum(_fill_fee(f) for f in entry_fills + exit_fills)
     return entry_fills, exit_fills, total_fee
 
 
-def apply_fee_fixes(fixes: list[tuple[dict, float, float]]) -> int:
-    """Patch trading_state.json in place with Phemex-truth fees.
+def attribute_funding(trades: list[dict], funding_rows: list[dict]) -> dict[tuple, float]:
+    """Sum funding PAID (positive = paid, negative = received — Phemex
+    convention verified 9/7) per trade. A payment belongs to the trade of the
+    same symbol whose (opened_at, closed_at] contains it; when a partial_tp row
+    and its runner both contain it, the earliest-closing row claims it, so each
+    settlement is counted exactly once."""
+    ordered = sorted(trades, key=lambda t: (t.get("closed_at") or 0))
+    out: dict[tuple, float] = {trade_key(t): 0.0 for t in ordered}
+    for row in sorted(funding_rows, key=lambda r: r.get("timestamp") or 0):
+        ts = (row.get("timestamp") or 0) / 1000
+        for t in ordered:
+            if t.get("symbol") != row.get("symbol"):
+                continue
+            o, c = t.get("opened_at") or 0, t.get("closed_at") or 0
+            if o < ts <= c:
+                out[trade_key(t)] += float(row.get("paid") or 0)
+                break
+    return out
 
-    fixes = list of (trade_dict, local_fee, phemex_fee).
-    Trades are matched back into state by (opened_at, symbol, closed_at).
-    Uses atomic temp+rename. Aborts if the state file's closed_trades count
-    shrinks between read and write (meaning the bot wrote concurrently and
-    we'd lose data by overwriting).
-    """
-    if not fixes:
+
+def ledger_files() -> list[tuple[Path, str]]:
+    """Main book + every slot ledger; skips sidecars (_blocked/_mode) and archives."""
+    out: list[tuple[Path, str]] = []
+    if MAIN_STATE_FILE.exists():
+        out.append((MAIN_STATE_FILE, "main"))
+    for p in sorted(ROOT.glob("trading_state_*.json")):
+        if any(m in p.name for m in ARCHIVE_MARKERS):
+            continue
+        out.append((p, "slot"))
+    return out
+
+
+def is_real_row(t: dict, kind: str) -> bool:
+    """Main: historical rows have no mode = real; mode=="paper" = sim (8/26 demotion).
+    Slot: only mode=="live" rows ever touched Phemex (no-mode slot rows are paper era)."""
+    if kind == "main":
+        return t.get("mode") != "paper"
+    return t.get("mode") == "live"
+
+
+def load_rows(path: Path, kind: str, since_ms: int) -> list[dict]:
+    try:
+        data = json.loads(path.read_text())
+    except Exception as e:
+        print(f"[ERROR] failed to read {path.name}: {e}")
+        return []
+    closed = data.get("closed_trades", []) or []
+    return [t for t in closed
+            if (t.get("closed_at") or 0) * 1000 >= since_ms and is_real_row(t, kind)]
+
+
+def fetch_funding_rows(exchange: Exchange, symbol: str, since_ms: int) -> list[dict]:
+    """Phemex funding payments for symbol since since_ms, as
+    {"timestamp": ms, "symbol": unified, "paid": float}. Phemex ignores `since`
+    and pages by offset (max 200/page), so page until a short page or 5 pages.
+    Sign: positive = paid, negative = received (verified 9/7 on the real account)."""
+    out: list[dict] = []
+    for page in range(5):
+        try:
+            rows = exchange.client.fetch_funding_history(symbol, limit=200, params={"offset": page * 200}) or []
+        except Exception as e:
+            print(f"[WARN] fetch_funding_history({symbol}, offset={page*200}) failed: {e}")
+            break
+        for r in rows:
+            ts = int(r.get("timestamp") or 0)
+            if ts < since_ms:
+                continue
+            out.append({"timestamp": ts, "symbol": symbol, "paid": float(r.get("amount") or 0)})
+        if len(rows) < 200:
+            break
+    return out
+
+
+def build_patches(rows: list[dict], fills_by_sym: dict[str, list[dict]],
+                  funding_by_key: dict[tuple, float]) -> tuple[list[dict], list[dict]]:
+    """Decide per row what to write. Rows with no matching fills are reported as
+    unmatched and never patched (they did not exist on Phemex).
+
+    Fees are patched only from a complete round trip (entry AND exit legs
+    matched). The one exception is a runner: a row sharing (opened_at, symbol)
+    with an earlier-closing row (partial_tp) — its entry fee already lives in
+    the sibling, so its exit leg alone is its complete fee. Any other one-leg
+    match (entry older than Phemex's fill-history horizon, adopted position)
+    is a `partial` patch: funding is stamped (the row is proven real) and the
+    local fee is left alone."""
+    patches: list[dict] = []
+    unmatched: list[dict] = []
+    claimed: set = set()
+    seen_positions: set = set()
+    for t in sorted(rows, key=lambda r: (r.get("closed_at") or 0)):
+        sym = t.get("symbol") or "?"
+        entry_fills, exit_fills, phemex_fee = match_trade_to_fills(t, fills_by_sym.get(sym, []), claimed)
+        if not entry_fills and not exit_fills:
+            unmatched.append(t)
+            continue
+        position = (t.get("opened_at"), sym)
+        is_runner = position in seen_positions
+        seen_positions.add(position)
+        complete = bool(entry_fills and exit_fills) or (is_runner and bool(exit_fills))
+        local_fee = t.get("fees_usdt")
+        new_fee = None
+        if complete and (local_fee is None or abs(float(local_fee) - phemex_fee) > FEE_TOLERANCE_USDT):
+            new_fee = phemex_fee
+        local_funding = float(t.get("funding_usdt") or 0)
+        paid = float(funding_by_key.get(trade_key(t), 0.0))
+        new_funding = None
+        if abs(paid - local_funding) > FUNDING_TOLERANCE_USDT or not t.get("funding_source"):
+            new_funding = paid
+        if new_fee is None and new_funding is None:
+            continue
+        patches.append({"key": trade_key(t), "fees_usdt": new_fee, "funding_usdt": new_funding,
+                        "local_fee": float(local_fee or 0), "local_funding": local_funding,
+                        "partial": not complete, "phemex_fee": phemex_fee,
+                        "legs": f"{len(entry_fills)}e/{len(exit_fills)}x"})
+    return patches, unmatched
+
+
+def apply_patches(path: Path, patches: list[dict]) -> int:
+    """Patch closed_trades rows in `path` with Phemex-truth fees/funding.
+    Atomic temp+rename; only closed_trades rows are edited, everything else in
+    the file (positions, peak) is whatever was on disk at the final re-read.
+    Aborts (returns -1) if the bot keeps writing concurrently."""
+    if not patches:
         return 0
+    by_key = {p["key"]: p for p in patches}
     for attempt in range(5):
         try:
-            state = json.loads(STATE_FILE.read_text())
+            state = json.loads(path.read_text())
         except Exception as e:
-            print(f"[ERROR] cannot read state for apply: {e}")
+            print(f"[ERROR] cannot read {path.name} for apply: {e}")
             return -1
         closed = state.get("closed_trades") or []
         original_count = len(closed)
-        by_key: dict[tuple, dict] = {}
-        for t in closed:
-            key = (t.get("opened_at"), t.get("symbol"), t.get("closed_at"))
-            by_key[key] = t
-
         modified = 0
-        for t, _lf, phemex_fee in fixes:
-            key = (t.get("opened_at"), t.get("symbol"), t.get("closed_at"))
-            live = by_key.get(key)
-            if not live:
+        now = int(time.time())
+        for t in closed:
+            p = by_key.get(trade_key(t))
+            if not p:
                 continue
-            old_fee = float(live.get("fees_usdt") or 0)
-            if abs(old_fee - phemex_fee) <= FEE_TOLERANCE_USDT:
-                continue
-            gross = float(live.get("pnl_usdt") or 0)
-            funding = float(live.get("funding_usdt") or 0)
-            live["fees_usdt"] = round(phemex_fee, 6)
-            live["net_pnl"] = round(gross - phemex_fee - funding, 6)
-            live["fees_source"] = "phemex_reconcile"
-            live["fees_reconciled_at"] = int(time.time())
+            gross = float(t.get("pnl_usdt") or 0)
+            if p["fees_usdt"] is not None:
+                t["fees_usdt"] = round(float(p["fees_usdt"]), 6)
+                t["fees_source"] = "phemex_reconcile"
+                t["fees_reconciled_at"] = now
+                t.pop("fees_pending", None)
+            if p["funding_usdt"] is not None:
+                t["funding_usdt"] = round(float(p["funding_usdt"]), 8)
+                t["funding_source"] = "phemex_reconcile"
+                t["funding_reconciled_at"] = now
+            fees = float(t.get("fees_usdt") or 0)
+            funding = float(t.get("funding_usdt") or 0)
+            t["net_pnl"] = round(gross - fees - funding, 6)
             modified += 1
-
         if modified == 0:
             return 0
-
-        tmp = STATE_FILE.with_suffix(".json.reconcile.tmp")
+        tmp = path.with_suffix(".json.reconcile.tmp")
         tmp.write_text(json.dumps(state))
-
-        # Sanity: re-read current state right before swap. If the bot has
-        # closed a new trade in the meantime, retry rather than clobber it.
         try:
-            current = json.loads(STATE_FILE.read_text())
+            current = json.loads(path.read_text())
         except Exception:
             current = {}
         if len(current.get("closed_trades") or []) != original_count:
             tmp.unlink(missing_ok=True)
             time.sleep(0.25)
             continue
-
-        os.replace(tmp, STATE_FILE)
+        os.replace(tmp, path)
         return modified
-
-    print("[WARN] apply aborted after 5 retries — bot writing concurrently")
+    print(f"[WARN] apply aborted for {path.name} after 5 retries — bot writing concurrently")
     return -1
+
+
+def _fmt_ts(sec: float) -> str:
+    return time.strftime('%m-%d %I:%M %p', time.localtime(sec or 0))
 
 
 def main():
     apply_mode = "--apply" in sys.argv
+    lookback = LOOKBACK_DAYS
+    if "--lookback-days" in sys.argv:
+        lookback = int(sys.argv[sys.argv.index("--lookback-days") + 1])
     now_ms = int(time.time() * 1000)
-    since_ms = now_ms - LOOKBACK_DAYS * 86400 * 1000
+    since_ms = now_ms - lookback * 86400 * 1000
+    stamp = time.strftime('%Y-%m-%d %H:%M:%S')
 
-    print(f"=== Phemex Reconciliation (last {LOOKBACK_DAYS}d){' [APPLY]' if apply_mode else ''} ===")
+    print(f"=== Phemex Reconciliation (last {lookback}d){' [APPLY]' if apply_mode else ''} ===")
     print(f"Window: since={time.strftime('%Y-%m-%d %I:%M %p', time.localtime(since_ms/1000))}")
 
-    local_trades = load_closed_trades(since_ms)
-    print(f"Local closed_trades in window: {len(local_trades)}")
-    if not local_trades:
-        print("Nothing to reconcile.")
+    ledgers = [(p, k, load_rows(p, k, since_ms)) for p, k in ledger_files()]
+    ledgers = [(p, k, rows) for p, k, rows in ledgers if rows]
+    total_rows = sum(len(r) for _, _, r in ledgers)
+    print(f"Real closed_trades in window: {total_rows} across {len(ledgers)} ledger(s)")
+    if not ledgers:
+        print(f"{stamp} Total discrepancies: 0")
         return
 
-    # Discover symbols
-    symbols = sorted({t.get("symbol") for t in local_trades if t.get("symbol")})
-
+    if not Config.is_live():
+        print("[WARN] Not in live mode — cannot reconcile against Phemex")
+        return
     exchange = Exchange()
+    symbols = sorted({t.get("symbol") for _, _, rows in ledgers for t in rows if t.get("symbol")})
     fills_by_sym = fetch_phemex_fills(exchange, symbols, since_ms)
+    funding_rows = [r for sym in symbols for r in fetch_funding_rows(exchange, sym, since_ms)]
 
-    # Reconcile trade-by-trade
-    unmatched: list[dict] = []          # local trades with no Phemex fills nearby
-    fee_drift: list[tuple[dict, float, float]] = []  # (trade, local_fee, phemex_fee)
-    matched_count = 0
+    grand_unmatched = 0
+    grand_patches = 0
+    grand_applied = 0
+    funding_applied = 0.0
+    for path, kind, rows in ledgers:
+        funding_by_key = attribute_funding(rows, funding_rows)
+        patches, unmatched = build_patches(rows, fills_by_sym, funding_by_key)
+        fee_patches = [p for p in patches if p["fees_usdt"] is not None]
+        fund_patches = [p for p in patches if p["funding_usdt"] is not None]
+        fund_changes = [p for p in fund_patches
+                        if abs(p["funding_usdt"] - p["local_funding"]) > FUNDING_TOLERANCE_USDT]
+        partials = [p for p in patches if p["partial"]]
+        print()
+        print(f"--- {path.name} ({kind}): {len(rows)} rows | unmatched {len(unmatched)} | partial {len(partials)} | "
+              f"fee drift > ${FEE_TOLERANCE_USDT:.2f}: {len(fee_patches)} | "
+              f"funding updates: {len(fund_patches)} ({len(fund_changes)} nonzero)")
+        for t in unmatched[:PRINT_CAP]:
+            print(f"  UNMATCHED {_fmt_ts(t.get('closed_at'))} {t.get('symbol'):<18} {t.get('side',''):<5} pnl={t.get('pnl_usdt',0):+.4f}")
+        if len(unmatched) > PRINT_CAP:
+            print(f"  ... and {len(unmatched) - PRINT_CAP} more unmatched")
+        for p in partials[:PRINT_CAP]:
+            print(f"  PARTIAL {p['key'][1]:<18} {_fmt_ts(p['key'][2])} legs={p['legs']} local={p['local_fee']:.4f} "
+                  f"phemex_seen={p['phemex_fee']:.4f} (fee kept)")
+        for p in fee_patches[:PRINT_CAP]:
+            print(f"  FEE  {p['key'][1]:<18} {_fmt_ts(p['key'][2])} local={p['local_fee']:.4f} phemex={p['fees_usdt']:.4f} Δ={p['fees_usdt']-p['local_fee']:+.4f}")
+        if len(fee_patches) > PRINT_CAP:
+            print(f"  ... and {len(fee_patches) - PRINT_CAP} more fee drifts")
+        for p in fund_changes[:PRINT_CAP]:
+            print(f"  FUND {p['key'][1]:<18} {_fmt_ts(p['key'][2])} paid={p['funding_usdt']:+.6f} (was {p['local_funding']:+.6f})")
+        if len(fund_changes) > PRINT_CAP:
+            print(f"  ... and {len(fund_changes) - PRINT_CAP} more funding changes")
+        grand_unmatched += len(unmatched)
+        grand_patches += len(fee_patches)
+        if apply_mode and patches:
+            n = apply_patches(path, patches)
+            if n > 0:
+                grand_applied += n
+                funding_applied += sum(p["funding_usdt"] - p["local_funding"] for p in fund_patches)
+                print(f"  [APPLY] patched {n} rows in {path.name}")
+            elif n < 0:
+                print(f"  [APPLY] aborted for {path.name} — concurrent bot write")
 
-    for t in local_trades:
-        sym = t.get("symbol") or "?"
-        fills = fills_by_sym.get(sym, [])
-        entry_fills, exit_fills, phemex_fee = match_trade_to_fills(t, fills)
-        if not entry_fills and not exit_fills:
-            unmatched.append(t)
-            continue
-        matched_count += 1
-        local_fee = t.get("fees_usdt")
-        if local_fee is None:
-            # Any missing fee is itself a drift (pre-fix trades OR I7 silent zero)
-            fee_drift.append((t, 0.0, phemex_fee))
-        elif abs(float(local_fee) - phemex_fee) > FEE_TOLERANCE_USDT:
-            fee_drift.append((t, float(local_fee), phemex_fee))
-
-    # Per-symbol summary
-    by_sym: dict[str, dict] = defaultdict(lambda: {"count": 0, "local_fee": 0.0, "phemex_fee": 0.0})
-    for t in local_trades:
-        sym = t.get("symbol") or "?"
-        fills = fills_by_sym.get(sym, [])
-        _, _, phemex_fee = match_trade_to_fills(t, fills)
-        by_sym[sym]["count"] += 1
-        by_sym[sym]["local_fee"] += float(t.get("fees_usdt") or 0)
-        by_sym[sym]["phemex_fee"] += phemex_fee
-
+    discrepancies = grand_unmatched + grand_patches
     print()
-    print(f"{'Symbol':<18}{'Trades':>8}{'LocalFee':>12}{'PhemexFee':>12}{'Δfee':>10}")
-    print("-" * 60)
-    sym_drift = 0
-    for sym in sorted(by_sym.keys()):
-        b = by_sym[sym]
-        d = b["phemex_fee"] - b["local_fee"]
-        flag = ""
-        if abs(d) > FEE_TOLERANCE_USDT:
-            flag = "  <-- DIFF"
-            sym_drift += 1
-        print(f"{sym:<18}{b['count']:>8}{b['local_fee']:>12.4f}{b['phemex_fee']:>12.4f}{d:>10.4f}{flag}")
-    print("-" * 60)
+    print(f"{stamp} Total discrepancies: {discrepancies} (unmatched {grand_unmatched}, fee drift {grand_patches})")
+    if apply_mode:
+        print(f"{stamp} Applied: {grand_applied} rows, funding delta {funding_applied:+.4f} USDT")
 
-    discrepancies = len(unmatched) + len(fee_drift)
-    print()
-    print(f"Matched: {matched_count}/{len(local_trades)}")
-    print(f"Unmatched (no Phemex fill within {FILL_MATCH_WINDOW_SEC}s): {len(unmatched)}")
-    print(f"Fee drift > ${FEE_TOLERANCE_USDT:.2f}: {len(fee_drift)}")
-    print(f"Total discrepancies: {discrepancies}")
-
-    if unmatched:
-        print()
-        print("UNMATCHED TRADES:")
-        for t in unmatched[:10]:
-            ts = time.strftime('%m-%d %I:%M %p', time.localtime((t.get('closed_at') or 0)))
-            print(f"  {ts} {t.get('symbol'):<18} {t.get('side',''):<5} pnl={t.get('pnl_usdt',0):+.4f}")
-        if len(unmatched) > 10:
-            print(f"  ... and {len(unmatched)-10} more")
-
-    if fee_drift:
-        print()
-        print("FEE DRIFT:")
-        for t, lf, pf in fee_drift[:10]:
-            ts = time.strftime('%m-%d %I:%M %p', time.localtime((t.get('closed_at') or 0)))
-            print(f"  {ts} {t.get('symbol'):<18} local={lf:.4f} phemex={pf:.4f} Δ={pf-lf:+.4f}")
-        if len(fee_drift) > 10:
-            print(f"  ... and {len(fee_drift)-10} more")
-
-    # Apply fixes to local state if requested
-    applied = 0
-    if apply_mode and fee_drift:
-        applied = apply_fee_fixes(fee_drift)
-        print()
-        if applied > 0:
-            print(f"[APPLY] Patched fees on {applied} trades in {STATE_FILE.name}")
-        elif applied == 0:
-            print("[APPLY] Nothing to patch (already within tolerance)")
-        else:
-            print("[APPLY] Patch aborted — concurrent bot write detected")
-
-    # Telegram alert on drift
     if discrepancies > 0:
         try:
             from notifier import send  # type: ignore
-            suffix = f" | applied={applied}" if apply_mode else ""
-            msg = (
-                f"⚠️ Phmex-S reconcile: {len(unmatched)} unmatched, "
-                f"{len(fee_drift)} fee drift > ${FEE_TOLERANCE_USDT:.2f} "
-                f"(last {LOOKBACK_DAYS}d){suffix}. Check logs."
-            )
-            send(msg)
+            suffix = f" | applied={grand_applied}, funding Δ{funding_applied:+.4f}" if apply_mode else ""
+            send(f"⚠️ Phmex-S reconcile: {grand_unmatched} unmatched, {grand_patches} fee drift > "
+                 f"${FEE_TOLERANCE_USDT:.2f} across {len(ledgers)} ledgers (last {lookback}d){suffix}.")
         except Exception as e:
             print(f"[WARN] telegram alert failed: {e}")
 
