@@ -306,10 +306,21 @@ class Position:
 
 
 class RiskManager:
+    # Ledger fields only the reconciler writes (Phemex-exact fees + funding).
+    # _save_state copies these from disk into memory before every write so a
+    # close can never revert them (pre-9/7 every patch was clobbered on the
+    # next close and re-applied only inside the reconciler's 7-day window).
+    RECONCILED_FIELDS = ("fees_usdt", "net_pnl", "fees_source", "fees_reconciled_at",
+                         "funding_usdt", "funding_source", "funding_reconciled_at")
+
     def __init__(self, state_file: str = None):
         self.state_file = os.path.join(os.path.dirname(__file__), state_file or "trading_state.json")
         self.is_paper = state_file is not None and state_file != "trading_state.json"
         self._log_prefix = "[PAPER] " if self.is_paper else ""
+        # 2026-09-07: mtime of the state file as of OUR last write. If the file
+        # changed since, another writer (scripts/reconcile_phemex.py) patched
+        # ledger rows and _save_state must merge them before overwriting.
+        self._last_saved_mtime: float | None = None
         self.positions: dict[str, Position] = {}
         self.initial_balance: float = 0.0
         self.peak_balance: float = 0.0
@@ -363,8 +374,46 @@ class RiskManager:
             except Exception as e:
                 logger.warning(f"Could not load state: {e}")
 
+    def _merge_reconciled(self) -> int:
+        """Adopt reconciler-written fields from the on-disk ledger into memory.
+        Cheap: an os.stat per save; the file is only re-read when its mtime
+        differs from our last write. Returns rows merged."""
+        try:
+            mtime = os.path.getmtime(self.state_file)
+        except OSError:
+            return 0
+        if self._last_saved_mtime is not None and mtime == self._last_saved_mtime:
+            return 0
+        try:
+            with open(self.state_file) as f:
+                on_disk = json.load(f).get("closed_trades") or []
+        except Exception as e:
+            logger.warning(f"[STATE] merge skipped — could not read {os.path.basename(self.state_file)}: {e}")
+            return 0
+        patched = {}
+        for t in on_disk:
+            if t.get("fees_source") or t.get("funding_source"):
+                patched[(t.get("opened_at"), t.get("symbol"), t.get("closed_at"))] = t
+        if not patched:
+            return 0
+        merged = 0
+        for t in self.closed_trades:
+            src = patched.get((t.get("opened_at"), t.get("symbol"), t.get("closed_at")))
+            if src is None:
+                continue
+            for k in self.RECONCILED_FIELDS:
+                if k in src:
+                    t[k] = src[k]
+            if src.get("fees_source"):
+                t.pop("fees_pending", None)
+            merged += 1
+        if merged:
+            logger.debug(f"[STATE] merged {merged} reconciled row(s) from disk")
+        return merged
+
     def _save_state(self):
         try:
+            self._merge_reconciled()
             # Serialize open positions for paper slot persistence across restarts
             pos_data = {}
             for sym, pos in self.positions.items():
@@ -388,6 +437,10 @@ class RiskManager:
                 }
             with open(self.state_file, "w") as f:
                 json.dump({"peak_balance": self.peak_balance, "closed_trades": self.closed_trades, "trade_results": self.trade_results, "positions": pos_data}, f)
+            try:
+                self._last_saved_mtime = os.path.getmtime(self.state_file)
+            except OSError:
+                self._last_saved_mtime = None
         except Exception as e:
             logger.warning(f"Could not save state: {e}")
 
@@ -766,15 +819,11 @@ class RiskManager:
         if self.is_paper:
             pnl -= fees_usdt
         pnl_pct  = pnl / pos.margin * 100 if pos.margin > 0 else 0.0
-        # TODO(U5c spec, 2026-07-23 — NOT shipped, >1h robust fix): funding is
-        # NEVER captured (funding_usdt == 0.0 on every record ever written), so
-        # ~$0.04/day leaks into unexplained balance drift (7/23 recon). Robust
-        # fix: on live close, fetch the position's funding payments
-        # (fetch_funding_history sinceOpen→now per symbol, or Phemex
-        # /api-data/futures/funding-fees) via _call_with_timeout OUTSIDE the
-        # order path, sum into funding_usdt, and teach reconcile_phemex.py to
-        # backfill it like fees. Until then net_pnl slightly overstates on
-        # positions held across 8h funding marks.
+        # Funding is captured by scripts/reconcile_phemex.py (launchd, every 15 min)
+        # from Phemex fetch_funding_history and merged back into this list by
+        # _save_state → _merge_reconciled (2026-09-07). Convention: funding_usdt =
+        # amount PAID (positive = cost, negative = received), so net = gross - fees - funding.
+        # The close path stays API-free; net_pnl is funding-blind for ≤15 min.
         funding_usdt = 0.0  # placeholder for future funding tracking
         gross_pnl = pos.pnl_usdt(exit_price)
         net_pnl = gross_pnl - fees_usdt - funding_usdt
