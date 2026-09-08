@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -321,6 +322,12 @@ class RiskManager:
         # changed since, another writer (scripts/reconcile_phemex.py) patched
         # ledger rows and _save_state must merge them before overwriting.
         self._last_saved_mtime: float | None = None
+        # The main book's RiskManager is written from the main loop AND the
+        # live-exit watcher thread. _merge_reconciled mutates trade dicts in
+        # place, so merge + json.dump must run under one lock or the other
+        # thread's dump can raise mid-write and leave a truncated state file
+        # (review 2026-09-07). RLock: _save_state may nest via close paths.
+        self._state_lock = threading.RLock()
         self.positions: dict[str, Position] = {}
         self.initial_balance: float = 0.0
         self.peak_balance: float = 0.0
@@ -412,6 +419,10 @@ class RiskManager:
         return merged
 
     def _save_state(self):
+        with self._state_lock:
+            self._save_state_locked()
+
+    def _save_state_locked(self):
         try:
             self._merge_reconciled()
             # Serialize open positions for paper slot persistence across restarts

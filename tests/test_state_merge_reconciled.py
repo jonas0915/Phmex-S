@@ -86,3 +86,22 @@ def test_merge_survives_unreadable_file(tmp_path):
         f.write("{not json")
     rm._save_state()   # must not raise; rewrites a valid file
     assert json.loads(open(rm.state_file).read())["closed_trades"][0]["fees_usdt"] == 0.097074
+
+
+def test_save_runs_merge_and_dump_under_state_lock(tmp_path):
+    """Review 2026-09-07: the main book's RiskManager is shared by the main loop
+    and the live-exit watcher thread; merge (in-place dict mutation) and
+    json.dump must be serialized by one lock."""
+    rm = _rm(tmp_path)
+    _close_one(rm)
+    seen = []
+    real_merge = rm._merge_reconciled
+
+    def spy():
+        seen.append(rm._state_lock._is_owned())
+        return real_merge()
+
+    rm._merge_reconciled = spy
+    rm._save_state()
+    assert seen == [True]
+    assert not rm._state_lock._is_owned()   # released after the save
