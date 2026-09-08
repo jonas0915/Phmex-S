@@ -54,6 +54,12 @@ def _fee(t):
     return f if f is not None else 0
 
 
+def _funding(t):
+    """Funding PAID on the trade (positive = cost, negative = received); 0 if unset."""
+    f = t.get("funding_usdt")
+    return f if f is not None else 0
+
+
 def split_paper(trades):
     """Split main-book rows into (real, paper). Since the 8/26 .paper_main
     demotion, simulated main fills land in trading_state.json tagged
@@ -182,6 +188,7 @@ def generate_report():
     today_pnl = sum(_net(t) for t in today_trades)
     today_gross = sum(t.get("pnl_usdt", 0) for t in today_trades)
     today_fees = sum(_fee(t) for t in today_trades)
+    today_funding = sum(_funding(t) for t in today_trades)
     today_wr = (today_wins / len(today_trades) * 100) if today_trades else 0
 
     # By exit reason
@@ -225,6 +232,7 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
 - Win Rate: {today_wr:.1f}% (net)
 - Gross PnL: ${today_gross:.2f}
 - Fees: ${today_fees:.2f}
+- Funding: ${today_funding:+.4f}
 - Net PnL: ${today_pnl:.2f}
 """
 
@@ -381,7 +389,7 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr,
         f"📊 Trades: {len(today_trades)} | WR: {today_wr:.0f}% (net)\n"
         f"💵 Net PnL: <b>{sign}${today_pnl:.2f}</b>\n"
         f"   Gross: ${sum(t.get('pnl_usdt', 0) for t in today_trades):.2f} | "
-        f"Fees: ${sum(_fee(t) for t in today_trades):.2f}\n"
+        f"Fees: ${sum(_fee(t) for t in today_trades):.2f} | Funding: ${sum(_funding(t) for t in today_trades):+.4f}\n"
     )
 
     # Main-book PAPER label (8/26 demotion) — sim fills never count above
