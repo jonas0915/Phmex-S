@@ -868,6 +868,19 @@ _SIGNAL_BOXES = [
      "8/5 fresh-price fix &mdash; pre-fix rows carry phantom stale-px entries); "
      "KILL if net &le; $0 (adjudicator-graded, sr_bounce_v2 line). Fresh I3 "
      "strict-fill pass gates any live path."),
+    ("DONCHIAN_BTC",   "DONCHIAN_BTC &mdash; TREND ENSEMBLE (PAPER)",
+     "BTC-only Donchian-ensemble trend, long/flat (Concretum replica): 9 "
+     "close-only Donchian lookbacks {5&ndash;360}, ratcheting midline stops, 25% "
+     "vol target. Sole survivor of the 2026-07-15 no-barriers search &mdash; own-data "
+     "OOS replay sidestepped the bear (BTC &minus;11.5% vs &minus;44% B&amp;H). "
+     "PAPER since 2026-07-16 7:39 PM PT. Registered lines: |w&minus;replica|&gt;0.10 "
+     "on &gt;3d/14d = bug; paper net &le; &minus;$15 = KILL; 90-day review "
+     "2026-10-14."),
+    ("DONCHIAN_ETH",   "DONCHIAN_ETH &mdash; TREND ENSEMBLE (PAPER)",
+     "ETH-only twin of the BTC Donchian ensemble (same 9 lookbacks, stops, "
+     "vol target; long/flat). OOS replay: ETH &minus;4.9% vs &minus;48% B&amp;H "
+     "through the bear. PAPER since 2026-07-16 7:39 PM PT. Same registered "
+     "lines: paper net &le; &minus;$15 = KILL; 90-day review 2026-10-14."),
     ("ETH_TSM_28",     "ETH-TSM-28 &mdash; SLOW TREND (PAPER)",
      "Daily-horizon time-series momentum: long 0.01 ETH when the 28-day return is "
      "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "
