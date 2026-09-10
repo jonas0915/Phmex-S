@@ -30,5 +30,16 @@ Baseline: bot PID 78531 (since 9/3 9:31 PM PT), HEAD 4d4bcf7 (auto-backup 9/7 6:
 - [ ] T7 (post-restart) 100-day `--apply` backfill + MR ledger verification + memory update
 - [ ] T7 (post-restart) 100-day `--apply` backfill + MR ledger verification + memory update
 
+- [ ] T7 (post-restart) 100-day `--apply` backfill — NOT RUN: bot never restarted; owner wound the system down 9/9 instead (see below).
+
 ## Review
-(filled in at completion)
+Funding/fee capture: 5 commits (36dceb8, 8d5db08, 6f2e211, 48a243d, c1faefe, 5279b8a), 975✓ suite, 3 audits + 1 independent re-derivation, pre-restart audit RESTART-SAFE 9/7 9:13 PM PT. Reconciler went LIVE under launchd 9/7 8:59 PM PT and patched 4 MR rows with exchange-exact fees + funding. The bot-side commits were never loaded: owner did not say "go", and on 9/9 ordered the wind-down.
+
+## Wind-down (owner order 9/9/2026 7:48 PM PT) — see docs/2026-09-09-winddown.md
+- [x] GitHub snapshot tag `pre-winddown-2026-09-08` + branch (9/8 7:58 PM PT)
+- [x] 5m_mean_revert demoted to paper (9/8 6:28 PM PT) — no live book
+- [x] Market data archived: ~/Desktop/Phmex-S-archive/phmex-s-market-data-2026-09-09.tar.gz 1.97 GB, 470 entries, sha256 recorded (originals kept)
+- [x] 22 launchd jobs booted out, plists → ~/Library/LaunchAgents/disabled/phmex-winddown-2026-09-09/ (no crontab / system daemons)
+- [x] Bot PID 78531 stopped 7:50:28 PM PT after 0 positions / 0 open orders confirmed on Phemex; $87.12 idle
+- [x] Nothing deleted; restore ≈10 min per the winddown doc
+- [ ] Owner: copy the archive + repo to the external drive; decide on the $87
