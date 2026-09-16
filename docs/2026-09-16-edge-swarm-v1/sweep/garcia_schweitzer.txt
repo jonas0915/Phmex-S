@@ -1,0 +1,1135 @@
+                                                                                   David Garcia, Frank Schweitzer:
+                                              Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+                                                       Social signals and algorithmic trading of Bitcoin
+
+                                                                          David Garcia, Frank Schweitzer
+                                                                           Chair of Systems Design, ETH Zurich
+                                                                       Weinbergstrasse 56/58, 8092 Zurich, Switzerland
+
+                                                                                   September 25, 2015
+                                                                 Published in Royal Society Open Science 2:150288 (2015)
+
+
+
+
+arXiv:1506.01513v2 [cs.SI] 24 Sep 2015
+                                                            http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+                                                                                             Abstract
+                                                   The availability of data on digital traces is growing to unprecedented sizes, but inferring ac-
+                                               tionable knowledge from large-scale data is far from being trivial. This is especially important for
+                                               computational finance, where digital traces of human behavior offer a great potential to drive trading
+                                               strategies. We contribute to this by providing a consistent approach that integrates various data-
+                                               sources in the design of algorithmic traders. This allows us to derive insights into the principles
+                                               behind the profitability of our trading strategies. We illustrate our approach through the analysis of
+                                               Bitcoin, a cryptocurrency known for its large price fluctuations. In our analysis, we include economic
+                                               signals of volume and price of exchange for USD, adoption of the Bitcoin technology, and transac-
+                                               tion volume of Bitcoin. We add social signals related to information search, word of mouth volume,
+                                               emotional valence, and opinion polarization as expressed in tweets related to Bitcoin for more than
+                                               3 years. Our analysis reveals that increases in opinion polarization and exchange volume precede
+                                               rising Bitcoin prices, and that emotional valence precedes opinion polarization and rising exchange
+                                               volumes. We apply these insights to design algorithmic trading strategies for Bitcoin, reaching very
+                                               high profits in less than a year. We verify this high profitability with robust statistical methods that
+                                               take into account risk and trading costs, confirming the long-standing hypothesis that trading based
+                                               social media sentiment has the potential to yield positive returns on investment.
+
+
+
+                                         1    Introduction
+                                         Our online society generates data on the digital traces of human behavior at unprecedented scales and
+                                         resolutions. This produces a data deluge, in which researchers are confronted with a vast amount of obser-
+                                         vational data that is not the product of carefully designed experiments [1]. One of the main challenges of
+                                         the scientific community is to develop methods to extract meaningful knowledge from that data beyond
+                                         mere descriptive analyses [2]. This is particularly important in financial trading: Data can be available
+                                         to all financial agents, but it is the analysis and its applications what makes a difference. Within com-
+                                         putational finance, the field of algorithmic trading [3] deals with the implementation and evaluation of
+                                         automatic trading strategies, which are often kept in private companies and away from publicly accessible
+                                         research. The most common kind of algorithmic trading is based on the principles of technical analysis
+                                         [4], using the time series of prices to formulate predictions about returns. Technical analysis is often
+                                         insufficient to derive satisfactory returns [5], motivating the inclusion of large-scale social signals and the
+                                         evaluation through data-driven simulations on historical data, called backtesting [6, 7]. In this article,
+                                         we present a set of methods to derive stylized facts from the analysis of multidimensional economic and
+
+
+
+                                                                                                1/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+social signals, and to apply that knowledge in the design and evaluation of algorithmic trading strategies.
+We illustrate an application of our approach to algorithmic trading of the Bitcoin cryptocurrency, using
+a wide variety of digital traces about economic and social aspects of the Bitcoin ecosystem.
+Bitcoin (BTC) is a digital currency designed to operate in a distributed system without any central
+authority, based on a cryptographic protocol that does not require a trusted third party [8]. Introduced
+in a 2008 paper written under the pseudonym of Satoshi Nakamoto [9], Bitcoin serves as a technology to
+transfer money quickly for negligible fees [10]. One of the first markets to adopt Bitcoin was the Silk Road,
+a website where illegal commerce became possible thanks to the relative anonymity of Bitcoin [11], in line
+with the evidence in search trends that relates Bitcoin usage to computer expertise and illegal activities
+[12]. Since then, the use of Bitcoin has widely expanded beyond criminal activities: At the time of writing,
+Bitcoin is accepted by many legal merchants and charities [13], including large businesses like Dell [14].
+Bitcoin-accepting businesses, exchange markets, and wallet services compose the Bitcoin ecosystem [8],
+where different kinds of agents interact, trade, and communicate through digital channels. The increasing
+adoption of Bitcoin and its online nature allow us to simultaneously monitor its social and economic
+aspects. Every purchase of goods or services in Bitcoin leaves a trace in a public ledger called the Block
+Chain, creating a publicly accessible economic network [15]. Bitcoin’s delocalized technology aligns with
+the online interaction of its users through social networks and forums, motivating its adoption by new
+users through word-of-mouth [16]. Previous research has shown how search trends and Wikipedia views
+are related to price changes [17] and to the speculative and monetary aspects of Bitcoin [18], leading to
+dynamics that combine search interest, user adoption, word-of-mouth, and prices [16].
+
+
+Contributions of this article. Based on established principles of time series analysis and financial
+trading, we present a framework to derive general knowledge from multidimensional data on social and
+economic aspects of a market. We apply a general statistical model to detect temporal patterns in the
+co-movement of price and other signals. Those patterns are tested through a method robust to the em-
+pirical properties of the analyzed data, formulating concise principles on which signals precede market
+movements. We combine those principles to produce tractable trading strategies, which we evaluate over
+a leave-out sample of the data, quantifying their profitability. Our approach, rather than focusing on
+improving a particular method, takes a multidisciplinary stance in which we combine principles from
+social psychology and economics with methods from information retrieval, time series analysis, and com-
+putational finance.
+We apply our framework to the Bitcoin ecosystem, monitoring the digital traces of Bitcoin users with daily
+resolution. We combine economic signals related to market growth, trading volume, and use of Bitcoin as
+means of exchange, with social signals including search volumes, word-of-mouth levels, emotional valence,
+and opinion polarization about Bitcoin. Our results reveal which signals precede changes of Bitcoin prices,
+a knowledge that we use to design algorithmic trading strategies. We evaluate the power of our strategies
+through backtesting data-driven simulations, comparing returns with technical analysis strategies. As a
+consequence, we test the hypothesis that social media sentiment predicts financial returns in the Bitcoin
+ecosystem.
+
+
+Social signals in finance. Understanding the role of social signals in finance not only has the potential
+to generate significant profits, but also has scientific relevance as a research question [19]. Two different
+
+
+
+                                                    2/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+research approaches give insights to this question: One is the statistical analysis of social and financial
+signals in order to test the existence of temporal correlations that lead financial markets. The second one
+applies these signals in prediction scenarios, measuring their accuracy as a validation of the underlying
+behavior of the system, but not necessarily of their profitability. The statistical analysis of search engine
+data reveals that search trends can predict trading volumes of individual stocks [20]. In addition, stock
+prices in S&P 500 are correlated with tweet volumes [21], but the applicability of these patterns into
+trading strategies is yet to be evaluated.
+Sentiment in social media is closely related to socio-economic phenomena, including public opinion [22].
+This motivates the application of sentiment indicators in the statistical analysis of financial data. Early
+works on the sentiment in specialized forums gave negative results about their impact on returns [23].
+Further research showed that emotions in private instant messaging between workers of a trading company
+precede stages of market volatility [24]. The expression of anxiety in publicly accessible data from general
+blogs precedes trading peaks and price drops in the S&P 500 [25], and sentiment in Twitter can be used
+to predict movements in large-scale stock indices [26]. It is important to note that, to date, there is no
+evidence that such sentiment-based predictions produce significant returns on investment [19].
+
+
+Online Polarization. While most of previous works on sentiment in financial markets focus on di-
+mensions of valence or mood, the collective phenomenon of polarization of opinions is often overlooked.
+The emergence of polarization in a society gives early warnings on political and economic phenomena:
+Polarization in social networks of Swiss politicians precedes controversial elections [27], and polarization
+patterns in the Eurovision Song Contest appear before states of distrust in the European economy [28].
+With respect to financial markets, speculation theories point to the role of diverse beliefs in financial
+transactions [29], leading to the hypothesis that polarization and disagreement influence trading volumes
+and prices [30]. In this line, the empirical analysis of polarization in stock message boards shows that
+states of disagreement lead to increased volatility [31].
+
+
+The missing link. To date, there is a significant knowledge gap between the analysis and application
+of social signals to trading scenarios. Findings from statistical analyses alone are not guaranteed to lead to
+profitable strategies at all [25]. For example, movements of the Dow Jones Industrial Average (DJIA) can
+be predicted with mass media sentiment [32] and Twitter mood [26], but to date no research has shown
+that such prediction methods can be profitable in trading scenarios. Similarly, the analysis of discussion
+patterns in specialized blogs predict returns of some technology companies [33], but it is still open to
+evaluate the potential returns of such a predictor. The application of methods that process arbitrarily
+large datasets lead to results difficult to apply, for example the predicting power of search volumes of the
+query "moon patrol" [34] in backtesting over the DJIA [6]. Furthermore, analyses of Twitter discussions
+about companies can be applied in a portfolio strategy, yet its evaluation through backtesting leads
+to very moderate returns and their statistical significance is not assessed [35]. In addition, no previous
+research has proposed a prediction technique that derives significant returns on investment from online
+sentiment data [19]. Our research aims at closing the gap between these lines of research. To do so,
+we unify the statistical analysis and its application to design and evaluate trading strategies, based on
+tractable principles with potential impact in the finance community.
+
+
+
+
+                                                    3/19
+                                            David Garcia, Frank Schweitzer:
+       Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+2      Trading strategy framework
+To design and evaluate trading strategies, we present a framework that uses a set of economic and social
+signals related to the agents of the market under scrutiny. Among those signals, the only required one
+is an economic signal of prices of an asset, namely a stock, currency, or tradable index. To understand
+profitability, we convert the price time series P (t) into a return time series:
+
+                                                             P (t) − P (t − 1)
+                                            Ret(t) =                                                                    (1)
+                                                                 P (t − 1)
+
+which quantifies proportional changes in the price at every time step. The data on these signals is divided
+in an analysis period and a leave-out period, as depicted in Figure 1. The division in these periods needs
+to allocate enough data in the leave-out sample to provide the testing power to assess the statistical
+significance of strategy profits. For daily trading, a leave-out period of about one year is usually sufficient,
+but this ultimately depends on the expected profitability and variance of the trading strategies.
+
+    Economic Signals
+     Price, Volume, Trade
+                                                                                                          Backtesting
+      Social Signals                                                                                      evaluation
+    Search, WoM, Emotions
+                                          Analysis period                            Leave-out period
+
+
+                                          V(t)=φV(t−1) + rt + c + ϵ                                     Trading strategy
+                                       Multidimensional Model                    Impulse Analysis           design
+
+
+Figure 1: Framework for analysis of social and economic signals and trading strategy de-
+sign and evaluation.
+
+
+Multidimensional analysis. The first step in our framework focuses on the analysis period, applying
+a multidimensional model of Vector Auto-Regression (VAR) [36], which is commonly used in the analysis
+of multidimensional time series in finance [23, 37, 16]. A VAR models multidimensional linear relations
+with given lags, which in our analysis we set to one day. Thus, given the vector of signals V (t) we fit the
+equation
+                                     V (t) = φV (t − 1) + r ∗ t + c +                                   (2)
+where φ is a matrix of weights of the linear relations between variables, r is a deterministic trend vector, c
+is the vector of constant intercepts, and  is a vector of uncorrelated errors. While more advanced models
+can be considered, including longer lags and non-linear terms, we choose the VAR model of lag 1 for its
+general character and its proved power to reveal patterns in finance [23, 16]. More complex models might
+have higher power to reveal nuance patterns, but at the expense of a loss of generality due to the focus
+on particular systems.
+We include all the time series in a single model to avoid the false positives associated with pairwise
+Granger tests. To ensure the correct application of the VAR model, we need to verify that our analysis is
+consistent with its fundamental assumptions: i) that the elements of V (t) do not have a unit root, and ii)
+
+
+
+                                                              4/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+that the error term  has no temporal nor structural correlations. We verify the first set of assumptions
+on the properties of V (t) by applying a set of tests and transformations prior to the application of the
+VAR model. We ensure that our conclusions are robust to the second set of assumptions by correcting
+for correlations in the noise term, as explained in the Materials and methods section.
+
+
+Impulse analysis. The VAR weights φ are only informative when there are no correlations in the
+error term  of equation 2, which is usually not the case in practice. To extract stylized facts that can be
+used in the design of trading strategies, we perform an impulse analysis by measuring Impulse Response
+Functions (IRF) [38] while correcting for correlations in the empirical error. This method simulates the
+system dynamics when it receives a shock in one of the variables, applying the VAR dynamics of Equation
+2 to reproduce the changes in the rest of the variables through time. By recording the changes in each
+variable, we can estimate the total size and the timespan of the perturbation produced by the shock.
+In essence, the IRF method creates a computational equivalent of the system under scrutiny, to test its
+reaction to exogenous impulses in each of its elements.
+
+
+Trading strategy design and evaluation. The output of the impulse analysis step, shown in Figure
+1, is a set of patterns of Granger-type "causation", i.e. it tests the null hypothesis of the absence of
+temporal correlations among the variables. We use these patterns as stylized facts that indicate which
+variables precede changes in price returns. For example, if variable Y (t) has a significant impact on Ret(t)
+in the impulse analysis, we will include Y (t) in our trading strategy design with sign sY , which takes the
+value 1 if the response of Ret(t) to Y (t) was positive, and −1 otherwise. Thus, a predictor based on Y (t)
+would be
+                             sign(Ret(t + 1)) = sign(sY ∗ (Y (t) − Y (t − 1)))                            (3)
+This way, we predict increases (decreases) in price between time t and t + 1 if signals with positive
+responses increase (decrease) between time t − 1 and t, and vice versa for signals with negative responses.
+Since our multidimensional analysis is robust to confounds between multiple time series, the findings of
+impulse analysis can be integrated in a Combined strategy based on a voting mechanism. The Combined
+strategy applies the other predictors and formulates a prediction corresponding to the sign of the sum of
+their outputs, i.e. the majority vote.
+We evaluate the profitability of the designed strategies in comparison to the benchmark of standard
+strategies, based on the backtesting over the leave-out sample as indicated in Figure 1. For each strategy,
+we make a data-driven simulation of a trader following that strategy, and we record the profits of that
+trader on a daily basis. Details on the computational simulation of financial traders can be found in the
+Materials and methods section.
+
+
+Bitcoin social economic and signals We apply our approach to the case of trading Bitcoin based
+on social and economic signals of the Bitcoin ecosystem. We set up a system that monitors different data
+sources, retrieving data in real time in combination with historical time series. The data volumes recorded
+during our study period of almost four years is shown in Figure 2, and can be interactively browsed in
+our online visualization1 . The signals we measure, explained more in detail in the Materials and methods
+
+
+  1 www.sg.ethz.ch/btc
+
+
+
+                                                    5/19
+                                                             David Garcia, Frank Schweitzer:
+                        Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+section include economic signals of price P (t) and returns Ret(t), trading volume in a wide range of
+Bitcoin exchange markets F XV ol (t). Furthermore, we measure the economic signal of transaction volume
+in the Block Chain BCT ra (t), which measures the volume of usage of Bitcoin as a currency, and the
+amount of downloads of the most important Bitcoin client Dwn(t) as a measure of growth in adoption of
+the Bitcoin technology. The social signals we measure are the level of search volume in Google for the term
+"bitcoin" S(t), the word-of-mouth level as measured by the amount of tweets containing Bitcoin-related
+terms TN (t), and the emotional valence TV al (t) and opinion polarization TP ol (t) expressed in those tweets
+using lexicon-based approaches from psycholinguistics [39, 40] (more details in Materials and methods).
+All these signals are shown in Figure 2, illustrating the large oscillations of price and other signals related
+to Bitcoin.
+
+
+
+
+                                                                                                                                                                                 BC Transactions [x1000]
+                                                                                                                                                                                100
+               50                                                                                                               leave−out
+
+
+
+
+                                                                                                                                                         FX Volume [BTCx1000]
+                                        1000
+                                                         Price (BPI)
+
+
+
+
+Downloads [x1000]
+                                                                                                                                  period             1200
+
+
+
+
+                        Price [USD/BTC]
+                                                         Exchange Volume                                                                                                        80
+                                        750
+                                                         SourceForge Downloads
+                                                         Block Chain Transactions                                                                    800
+                                                                                                                                                                                60
+               25
+                                        500
+                                                                                                                                                                                40
+                                                                                                                                                     400
+                                        250                                                                                                                                     20
+
+               0                        0                                                                                                            0                          0
+                                               02/2011   07/2011     01/2012        07/2012      01/2013    07/2013   01/2014        07/2014   12/2014
+              1                                                                                                                                                                 0.5
+                                                         Number of Tweets           Valence (weekly)
+
+
+
+
+Google search volume   Tweets Number [x1000]
+                                        120                                                                                                          6.0
+                                                         Search Volume              Polarization (weekly)
+                                                                                                                                                                                0.4
+
+
+
+
+                                                                                                                                                         Valence                    Polarization
+                                        80                                                                                                           5.8
+                                                                                                                                                                                0.3
+              0.5
+                                                                                                                                                     5.6
+                                        40                                                                                                                                      0.2
+
+                                                                                                                                                     5.4                        0.1
+              0                         0
+                                               02/2011   07/2011     01/2012        07/2012      01/2013    07/2013   01/2014        07/2014   12/2014
+                                                                                                 Date
+
+Figure 2: Time series of data volumes in the Bitcoin ecosystem. Interactive version:
+www.sg.ethz.ch/btc
+
+
+
+3                         Results
+
+3.1                                  Data-driven Bitcoin trading strategy design
+
+For our statistical analysis, we include all the data up to January 1st, 2014, covering almost 3 years.
+After applying stationarity tests, we conclude that the time series of price returns Ret(t) can be assumed
+to be stationary, as well as the first differences of the other seven signals (details on the stationarity test
+results can be browsed in www.sg.ethz.ch/btc and in the SI). As a consequence, we define our variable
+
+
+
+
+                                                                                                  6/19
+                                                           David Garcia, Frank Schweitzer:
+                      Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+                                                                                                                                                 Polarization to Valence
+                                                                                                                           B
+    Response of Return [%]
+                                               Return to Polarization
+                             A                                                                                                                   Polarization to Return
+
+
+
+
+                                                                         Response [sd]
+                                               Return to FX Volume
+                                                                                                             0.10
+
+
+                                                                                                             0.00
+
+
+    −0.2  0.2     0.6
+                                                                                                             −0.15
+                             0   1   2     3     4     5      6     7                                                      0     1         2     3        4      5      6       7
+
+
+
+
+                                                                         Cumulative response of Return [%]
+                                                                                                                               Downloads       BC Transactions       Tweets Number
+
+
+
+
+                                                                                                             0.2 0.4 0.6
+                                                                                                                               Search          FX Volume             Valence
+                                         FX Volume to Valence
+
+
+
+
+Response [sd]
+                                                                                                                                                                     Polarization
+
+                                         FX Volume to Polarization
+            0.05
+
+
+
+            −0.05                                                 C                                          −0.2                                                             D
+                             0   1   2     3     4     5     6      7                                                      0     1         2     3        4      5      6       7
+                                         t [days]                                                                                               t [days]
+
+
+   Figure 3: Results of Impulse Response Function analysis. (A) Impulse Response Functions of
+   return to shocks in Twitter polarization and exchange volume, (B) of Twitter polarization to shocks in
+   return and Twitter valence, and (C) of exchange volume to shocks in Twitter valence and polarization
+   (right). Solid lines show responses, dashed lines show 95% confidence intervals. (D) Cumulative Impulse
+   Response Functions of price return to changes in the other signals. Dashed lines indicate responses below
+   the 0.1% level.
+
+   vector as:
+                                          V (t) = [Ret(t), ∆F XV ol (t), ∆BCT ra (t), ∆Dwn(t),
+                                                           ∆S(t), ∆TN (t), ∆TV al (t), ∆TP ol (t)]
+   composing the input to the multivariate analysis of our framework. We fit a VAR as explained in Materials
+   and methods over the analysis period. We compute IRF for all pairs of variables, all results including
+   VAR estimates and IRF values can be browsed in www.sg.ethz.ch/btc and in the SI. Here, we comment
+   on the most relevant results, which serve as input for our trading strategy design.
+   Figure 3 A shows the IRF of returns to shocks in polarization and volume in exchange markets, where
+   the response is measured in return percentages. Both polarization and exchange volume have significantly
+   positive influences in price returns one day after the shock, decreasing rapidly afterwards. The increase of
+   returns with polarization is consistent with the hypothesis that disagreement fuels trading in speculative
+   scenarios [30, 31], where information asymmetries fuel price bubbles. Exchange volume also increases with
+   polarization, as shown in Figure 3 C, but the the relationship is instantaneous rather than lagged as in
+   the case of returns.
+
+
+
+                                                                        7/19
+                                           David Garcia, Frank Schweitzer:
+      Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+Figure 3 B shows the response of polarization in Twitter to shocks in returns and valence. The negative
+effect of polarization shows that price drops lead to increases in polarization, signaling the disagreement
+in the Bitcoin community due to price crashes. The pattern linking valence to polarization is relevant,
+revealing that periods with increasing positivity in expression precede stages of higher polarization. The
+role of valence can further be observed in the IRF of exchange volumes in Figure 3 C, in which valence has
+a significant effect. The combination of patterns of increasing polarization and exchange volume following
+stages of increasing valence show the relevance of valence in price returns, in addition to the effects of
+polarization and exchange volume.
+We further validated these results in two ways. First, we fit a VAR with lags longer than a day, selecting
+the optimal lag that optimizes the Bayesian Information Criterion. We found that a lag of 2 is optimal,
+but the results of the fits and IRF analysis did not qualitatively change (see SI). Second, we performed a
+Monte Carlo test, computing the impulse response functions for time series with randomized permutations
+of the values. The results of these permutation tests show are consistent with the above results, as reported
+in the SI, showing the robustness of our approach.
+
+
+Turning analysis into strategy We summarize the above findings as stylized facts that can drive the
+decisions of an algorithmic trader. We focus closer on the role of each signal into returns, by computing
+the cumulative changes given by the IRF analysis. This way, we can identify which signals show a sizable
+pattern that precedes changes in returns, and filter out those that are not significant or can be explained
+as confounds of the others. Figure 3 D shows the results, measuring the cumulative change in return
+percentage when each one of the other signals receives a shock of size one standard deviation. The
+three signals with effects above the 0.1% level are polarization, valence, and exchange volume, reaching
+effects up to 0.5% in one day that prevail through time. Note that this is a relatively large value, because
+trading results in multiplicative returns. Such effect sizes have strong potential impact on the profitability
+of trading strategies over long time periods. This allows us to discard the rest of the signals, feeding
+into our trading strategy design by producing four strategies: three strategies of positive sign, Valence,
+Polarization, and FXVolume, and a fourth Combined strategy determined by a voting mechanism as
+explained in the Trading strategy framework section.
+
+
+3.2    Bitcoin strategy evaluation
+
+To evaluate the profitability of our four strategies, we set up a benchmark against random strategies
+and technical strategies, using the actual exchange rate of BTC for USD in bitfinex.com as well as the
+Bitcoin Price Index (see www.sg.ethz.ch/btc for results with BPI). Random strategies sample a random
+number with 0 mean at every time t, and formulate a prediction based on the sign of the random number.
+Among technical strategies, the simplest is Buy and Hold, which simply buys BTC with the initial capital
+at time t = 1, selling it only once at the time when profits are evaluated. The technical strategies we use
+are a benchmark of simple standard predictions [5]: i) the Momentum strategy, which predicts that price
+changes at time t + 1 will be the same as at time t, ii) the Up and Down Persistency strategy UPD, which
+predicts that price increases at time t are followed by decreases at time t + 1, and vice versa, and iii) the
+Relative Strength Index strategy RSI, which computes an additional time series of ratios of return sign
+
+
+
+
+                                                     8/19
+                                                         David Garcia, Frank Schweitzer:
+                    Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+                             Combined                                                                                      250
+             200             Valence
+                             Polarization
+
+
+
+Profit [%]
+                                                                                                                     Profit [%]
+                             FXVolume
+             100             Random
+
+                                                                                                                      50      150
+                                                                                                                           0
+             −50
+
+                                                                                                                           −100
+                2014−01−01          2014−03−01         2014−05−01    2014−07−01    2014−09−01   2014−11−01   2015−01−01         0.000 0.005 0.010 0.015 0.020
+
+             100             Momentum            RSI                                                                       100
+                             Buy and Hold        UPD
+             50
+
+
+
+Profit [%]
+                                                                                                                     Profit [%]
+
+                                                                                                                       0       50
+             0
+
+
+             −50                                                                                                           −50
+
+
+             −100                                                                                                          −100
+                                                                                                                                    0.000 0.005 0.010 0.015 0.020
+               2014−01−01           2014−03−01         2014−05−01    2014−07−01    2014−09−01   2014−11−01   2015−01−01
+                                                                        Date                                                                  P(Profit)
+
+  Figure 4: Profits of trading strategies. Left: Time series of profit for our strategies (top), and technical
+  strategies (bottom). Shaded areas show one standard deviation of the random strategy. Interactive version:
+  www.sg.ethz.ch/btc Right: Kernel density plots of the profit of each strategy (bandwidth=15%).
+
+
+  frequencies over a rolling window of five days, and predicts price changes based on reversals of this time
+  series (more details in [5]).
+  The simulation of each strategy produces a time series of profits
+
+                                                                                  C(t) − C(0)
+                                                                    Profit(t) =               ∗ 100                                                           (4)
+                                                                                     C(0)
+
+  where C(t) is the capital of the trader at time t and C(0) is the initial investment capital. Figure 4 shows
+  the time series of profits for our four strategies and the technical strategies. In addition, we compute
+  the profit of Buy and Hold, and the results of the simulation of 10000 random traders. The Valence,
+  Polarization and Combined strategies clearly perform better than a random trader, while the FXVolume
+  is not very far from the result of random traders. Among the technical strategies, only RSI and Momentum
+  are able to eventually reach beyond the outcome of random traders, but are still clearly outperformed by
+  the Polarization and Combined strategies.
+  The stopping time of the simulation of a trading strategy is given by our data, but a variety of factors
+  might trigger a trader to stop trading earlier in a real scenario [3]. For that reason, we explore the
+  distribution of profits of each strategy, assuming that the trading stops at any arbitrary point of our
+  backtesting period. Thus, for each strategy we have a set of profit values, one for each possible trading
+  end date. The right panel of Figure 4 shows the Kernel Density Plots of the distributions of profits for each
+  strategy. It can be appreciated that the most profitable strategy is Combined, followed by Polarization
+  and then Valence and RSI. We quantitatively assessed this result, through Wilcoxon tests [41] over the
+  distributions of profits (more details in SI), confirming the observation that the most profitable strategies
+  are Combined, and Polarization. More precisely, the Combined strategy gives profits beyond 100% for
+  most of the time during the trading period.
+
+
+
+                                                                                  9/19
+                                           David Garcia, Frank Schweitzer:
+      Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+While surveying cumulative returns is illustrative of the performance of the strategies, the multiplicative
+nature of cumulative returns overweights early positions and is biased towards the beginning of the
+evaluation period. To properly evaluate trading strategies, we calculated the Sharpe Ratio [42], measuring
+                                   µ −R
+risk-corrected profits as: SR = RσR f , where µR and σR are the mean and standard deviation of the
+daily rate of return of a strategy R(t) = (C(t) − C(t − 1))/C(t − 1). Rf is the "risk- free" return rate of
+a theoretical investment that would give certain profit under no risk at all, which is often estimated as
+the interest rate of high-quality sovereign bonds. At the time of writing, some European sovereign bonds
+are giving interest rates close to zero or even negative [43], which motivates our conservative choice of
+Rf = 0. The value of SR is calculated in annualized units, taking into account that Bitcoin can be traded
+365 days a year.
+
+                        Combined      Polarization    Valence    FXVolume       Buy and hold
+                 SR        1.7653           1.0120     0.6410       0.5738           -0.7741
+                 µR        0.3229           0.1779     0.1183       0.1082           -0.1635
+                       Momentum              UPD          RSI        DJIA           Random
+                 SR        0.9146          -0.8990    -0.1772       0.7995           -1.6590
+                 µR        0.1625          -0.1736    -0.0346       0.0345           -0.0963
+
+                       Table 1: Sharpe Ratios and mean daily returns of strategies.
+
+Table 1 reports the Sharpe Ratio SR and the mean daily return µR for all strategies, as well as for the
+DJIA and the average of 10000 random traders. The Sharpe Ratio analysis is consistent with the results
+of the cumulative returns analysis, showing that the Combined strategy provides the highest returns,
+with the best SR value above 1.75 and with daily returns above 0.3 % per day. The profitability of these
+strategies illustrate how social media sentiment can produce positive returns on investment, especially
+when including polarization measures beyond the trivial quantification of valence or mood.
+
+
+3.3    Costs and risks of the Combined strategy
+
+To understand better the possible weaknesses of the Combined strategy, we run a series of tests to evaluate
+the role of trading costs and additional risks. Trading Bitcoin in an online market usually comes at a cost,
+which often depends on the activity and the traded capital. These trading costs should not be confused
+with the transaction fees in the Block Chain [9], which do not depend on the transacted cost and are
+not associated to any market of exchange to other currencies. Trading costs can potentially erode the
+profitability of trading strategies, especially if they require many movements. We simulated the same
+backtests for costs increasing from 0 to 0.3% of the exchanged capital, a value well above the maximum
+costs of major trading platforms [44]. As a simplification, we assume that buying, selling, and borrowing
+costs are the same, yet their values might depend on the trading volume of a strategy [44]. Figure 5 shows
+the final profits of the Combined strategy, which decrease monotonically with trading costs. The strategy
+is still highly profitable for low costs, but for costs above 0.25%, the strategy is not profitable any more.
+Furthermore, we repeat this analysis assuming the limitation that daily positions need to be forcefully
+closed at the end of each trading period (shown in SI), finding a decrease in returns but that the strategy
+is still profitable for trading costs of 0.1%, a typically high cost of current exchange platforms [45].
+
+
+
+                                                     10/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+                                         100 150
+
+                            Profit [%]   50
+
+                                         0
+
+
+                                                   0.00   0.05   0.10   0.15   0.20   0.25   0.30
+
+                                                                 Trading cost [%]
+
+              Figure 5: Final profit of the Combined strategy versus trading cost.
+
+
+In this application, the leave-out period is characterized by decreasing BTC prices. Thus, it is important
+to evaluate the role of each possible trading action: longing when BTC are bought to be sold later,
+and shorting when they are borrowed and traded as explained above. We repeat the backtesting of the
+Combined strategy allowing only short and only long positions, following the methodology of [6]. As
+reported more in detail in the SI, the only short strategy yields higher cumulative returns than the only
+long strategy, as expected from a period in which prices decrease steadily.
+We test further properties of the behavior of the Combined strategy in the leave-out period. The distribu-
+tion of daily returns of the Combined strategy during the leave-out period follows a lognormal distribution,
+as tested through maximum likelihood fits and Kolmogorov-Smirnov tests (see SI). The time series of
+returns of this strategy is also not autocorrelated and can be considered stationary (see SI for stationarity
+tests of daily returns). This additional analysis shows that the high profitability of the Combined strategy
+is not due to risky correlations in the behavior of the trading strategy.
+
+
+4    Concluding remarks
+Our work applies established methods of time series analysis and computational finance to integrate the
+analysis, design, and evaluation of trading strategies and social and economic signals. We have shown
+that our approach successfully reveals temporal patterns in the Bitcoin ecosystem, in particular the
+relation between price returns and the signals of exchange volume and Twitter valence and polarization.
+Our statistical analysis is robust to noise correlations and the finite nature of time series, providing
+a consistent set of results that we can apply to strategy design. We evaluated the profitability of our
+strategies through data-driven simulations of a computational model of a trader, showing that a strategy
+that combines valence, polarization, and exchange volume can reach very high profits in less than a year.
+The added value of including polarization in our analysis constitutes evidence that collective factors
+of emotions and opinions have the potential to predict financial returns, beyond trivial macroscopic
+aggregates like average valence.
+
+
+
+
+                                                                  11/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+Our framework can be applied to other trading scenarios in which social signals are available, like in the
+case of company stock trading driven by sales data, news information, and social media sentiment towards
+a company. The general nature of our methods are of special relevance for real trading scenarios, as the
+stylized facts we use to design strategies provide a tractable explanation for their mechanisms. This allows
+traders to understand and evaluate the principles of the algorithmic trading strategies designed in our
+framework. Such tractability is an advantage in comparison to more complex, non-linear, or subsymbolic
+models that do not have straightforward interpretations. Nevertheless, improvements can be expected
+from the addition of longer time lags, higher frequency trading, and real-time optimization approaches.
+Furthermore, the rules that drive our trading strategies do not require retraining or calibration during
+trading, and the social and economic signals we employ can be quantified during a day in order to have
+an instant trading decision ready at the beginning of the next day. Our application to Bitcoin trading
+is thus realistic, making use of shorting options and performing well under the typical trading costs of
+Bitcoin markets [44].
+The application of our results should be taken with caution. Historical profit through backtesting do
+not necessarily predict future ones, and the information sources analyzed here could be adopted by
+Bitcoin traders. Our evaluation goes as far as the representativity of the leave-out sample, and future
+research should evaluate the performance of our approach when prices rise and when traders are aware
+of the existence of our trading strategies. Financial markets are known to quickly absorb knowledge, as
+it happened with the inclusion of search trends data in stock trading [7]. It is also difficult to estimate
+the scalability of automatic trading strategies, as financial markets are complex adaptive systems that
+react to trades of large volume. Furthermore, systemic risk emerges from algorithmic trading, creating
+flash crashes due to algorithmic resonance [8]. In addition, structural changes and additional risks in
+borrowing and lending Bitcoin for shorting can emerge when exchange markets close or governments
+regulate Bitcoin, changing the rules of the game in a way such that our trading strategies might not work
+any more.
+With our study, we have shown that it is possible to turn social signals into profit. This extends the range
+of typical business applications for social media data like viral marketing or user engagement. Specifically,
+our combination of statistical analysis and backtesting serves as a framework for future applications of
+social media data in algorithmic trading. It allows a robust validation of strategy profits and a clear
+understanding of the system dynamics behind these profits. The application of our framework to Bitcoin
+trading illustrates that (asymmetric) information and profit are two manifestations of the same thing,
+and how traders can apply these macroscopic information sources to derive large profits. We foresee that
+the applications of social signals to finance will reach far beyond Bitcoin, not only to make private profit
+but also to understand the dynamics of individual and collective decisions and emotions.
+
+
+5    Materials and methods
+Stationarity tests. Before fitting the VAR model, we test the stationarity of each time series through
+two alternative tests: i) the Augmented Dickey Fuller (ADF) test [46], which has the null hypothesis that
+the tested time series is non-stationary, and ii) the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test [47],
+with the null hypothesis that the time series is stationary. Under these two tests, it can be considered
+
+
+
+                                                   12/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+safe that a time series is stationary if it passes the ADF test with a p-value below 0.05 and does not
+pass the KPSS test, giving a p-value above 0.1 [38, 16]. We first analyze the time series of levels of each
+signal X(t), applying the differentiation operator ∆X(t) = X(t) − X(t − 1) until each time series is
+stationary. This step is inspired in the Box-Jenkins method of ARIMA time series analysis [48], and it
+is usual to reach stationarity after first differences [38, 16]. The stationary properties of these time series
+imply that their means and standard deviations are bound, allowing us to renormalize them through the
+Z-transformation Z(t) = (X(t) − µX )/σX , where µX and σX are the mean and standard deviation of
+each time series. This way, all time series have the same scale and variance, and their effects in statistical
+analysis can be compared.
+
+
+Impulse response function analysis. In the impulse analysis, we correct for the correlations in  in
+two ways. First, we apply orthogonalized impulses of unit covariance, creating a shock of one standard
+deviation in a variable under the error correlations of the VAR [49]. Second, we apply bootstrapping on
+the resulting responses by producing surrogate time series from resampling the residuals [38]. This way,
+we numerically compute confidence intervals of the responses in a very strict way, avoiding false positives
+and taking into account the finite size of the analysis period. In our case, we create 10, 000 bootstrap
+samples to estimate 95% confidence intervals of the responses. As a result, we simultaneously measure
+the dynamics of the system and test their statistical significance.
+
+
+Trading based on predictions. During each timestep, the prediction function makes a forecast either
+based on Equation 3, or based on the price time series for technical strategies. Positive predictions
+translate into buy decisions when the trader does not own the asset, and hold if it does. When the
+predictor takes value 0, no change is done and the previous position is imitated. Negative predictions
+translate into sell positions when the trader owns the asset or short when it does not own it. Shorting
+works as follows: Traders can make profit from correct predictions of price drops even if they do not
+own the asset predicted to drop in price. This is implemented by borrowing the asset, selling it first and
+buying it later for a lower price. The limitation for borrowing is usually imposed on the amount of capital
+already held by the trader, and often incurs in additional trading costs and legal regulations [50]. The
+simulation of each strategy produces a time series of profits, allowing us to measure their profitability
+based on historical data.
+Buy and sell orders have respective costs cb and cs , which are proportional to the total traded capital.
+In our case we assume all costs are equal c = cb = cs , leaving particular realizations of the costs as open
+for future research. We compute daily cumulative returns when trading stops at t+1, holding USD or
+selling BTC at the price of t+1. Our trading simulations have a limit on short selling set by the amount of
+capital held by the trader and assume that short selling needs to be instantly executed, i.e. short positions
+are limited to one iteration. In summary, the strategy we execute is a single-asset backtesting scenario in
+which 100% of the capital is invested at each time step and shorting is limited. The pseudocode of this
+simulation is shown in Algorithm 1.
+
+
+Economic signals from financial data The establishment and bankruptcy of various Bitcoin ex-
+change markets motivated the creation of the Bitcoin Price Index (BPI) [51]. The BPI combines a set of
+price indices from well-performing exchange marketplaces to provide a reference for BTC/USD exchange
+
+
+
+                                                    13/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+nUSD = 1; CR[1]=1;
+for each t from 1 to T-1 do
+   if prediction(X,t) == 1 and nBTC == 0 then
+       nBTC = nUSD * (1-cb ) / P[t] ;
+       nUSD = 0
+   else if prediction(X,t) == -1 and nBTC > 0 then
+       nUSD= nBTC * (1-cs ) * P[t] ;
+       nBTC = 0
+   else if prediction(X,t) == -1 and nBTC == 0 then
+       nBTCb = nUSD / P[t] ;
+       nUSD = nUSD + nBTCb * (1-cs ) * P[t] - nBTCb * P[t+1] / (1-cb )
+   CR[t+1] = nUSD + nBTC * P[t+1] *(1-cs );
+end
+                           Algorithm 1: Algorithm of trading simulation.
+
+
+rates, and is accepted as a standard measure of Bitcoin price in economics [52, 53, 18]. We use the daily
+closing prices of each day t at 23:59 GMT from coindesk.com, composing the time series of price P (t)
+from February 1st, 2011 to December 31th, 2014, shown in the top panel of Figure 2. The BPI is not nec-
+essarily tradeable, and for that reason we evaluate our trading strategies with the actual exchange rate of
+BTC for USD in bitfinex.com, one of the largest markets reported in coindesk.com. We also retrieved
+the daily volume of BTC exchanged in 80 online markets for other currencies from bitcoincharts.com.
+Aggregating all these data sources, we compose an Internet-wide measurement of Foreign eXchange (FX)
+volume of BTC traded every day F XV ol (t), including more than 152 Million BTC in exchange trades as
+we recorded in early 2015.
+Every purchase of products and services in BTC leaves a trace in the Block Chain, the distributed ledger
+that records all transactions in the Bitcoin network. We construct a time series with the daily amount
+of Block Chain transactions BCT ra (t), as measured by blockchain.info every day at 18:15:05 UTC,
+which we approximate to 00:00 GMT of the next day. While some data is lost in this additional delay of
+few hours, further research can provide more precise measurements up to the minute level using the raw
+information in the Block Chain itself as in [16]. This way, we include more than 55 million transactions
+in the studied period, measuring the overall activity of the system when using Bitcoin as means of
+exchange. In addition, we measure the growth of the Bitcoin market through its amount of adopters,
+using the operationalization of measuring the amount of downloads of the most popular Bitcoin client2
+[16], daily binned in line with other time series. The resulting time series of downloads Dwn(t) is shown
+in the top panel of Figure 2.
+
+
+Social signals We record the overall interest towards Bitcoin through information search, as quantified
+by the Google trends volume for the term "bitcoin", S(t), as recorded in early 2015 and shown in the
+bottom panel of Figure 2. We choose the search term "bitcoin" instead of the "Bitcon - Currency"
+topic, which was introduced as a functionality of Google Trends during our analysis period. While the
+topic approach can be more precise for demographics and motive analysis [12], we follow a homogeneous
+
+
+
+  2 http://sourceforge.net/projects/bitcoin
+
+
+
+                                                   14/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+approach including only the term trend data that was available during the whole study period. It is
+important to note that Google Trends data is provided with an additional lag of one day and on the basis
+of Pacific Standard Time instead of GMT, adding almost another day of lag. While this is not an issue
+for the historical analysis, the evaluation of any trading strategy using S(t) needs to take into account
+this additional delay.
+We track the attention of social media about Bitcoin in Twitter via the Topsy data service3 . From the
+full track of data accessible by Topsy [54], we focus on tweets that contain Bitcoin terms as in previous
+research [16], finding a total of 19, 578, 671 Bitcoin-related tweets. The first social signal we extract from
+Twitter is the daily amount of unique tweets about Bitcoin TN (t) binned in 24 hour windows starting at
+00:00 GMT, measuring the level of word-of-mouth and attention towards Bitcoin and shown in the bottom
+panel of Figure 2. We continue by measuring the collective emotional valence with respect to Bitcoin, as
+expressed through the text of Bitcoin-related tweets. Valence is considered the most important dimension
+of affect, quantifying the degree of pleasure or displeasure of an emotional experience [55]. The expression
+of valence through text is a common practice in psychological research, in which lexicon techniques are
+used to empirically measure emotions [56, 57]. We measure the average daily valence of Bitcoin-related
+tweets through a state-of-the-art lexicon technique [40], which improves the previous ANEW lexicon
+method [56] with more than 13000 valence-coded words. We compute the daily average Twitter valence
+about Bitcoin during day t in two steps: First we measure the frequency of each term in the lexicon
+during that day, and second we compute the average valence weighting each word by its frequency. This
+measurement matches more than 50 million valence-carrying tokens, and produces the time series of
+Twitter valence TV al (t).
+Our last social signal is opinion polarization, which builds up on measuring the semantic orientation of
+words into positive and negative evaluation terms [58]. We apply the LIWC psycholinguistics lexicon-
+based method [39], and expand its lexicon of stems into words by matching them against the most
+frequent English words of the Google Books dataset [59]. As a result, we consider 3463 positive and 4061
+negative terms that appear as more than 8 million Twitter tokens. We compute the daily polarization of
+opinions in Twitter around the Bitcoin topic TP ol (t), calculating the geometric mean of the daily ratios of
+positive and negative words per Bitcoin-related tweet. Note that, instead of repeating a measurement of
+valence through two different lexica, we quantify polarization as a complementary dimension to emotional
+valence. This way, opinion polarization measures the simultaneous coexistence of positive and negative
+subjective content, rather than its overall orientation [58, 23].
+
+
+References
+ [1] Lazer, D., Pentland, A. S., Adamic, L., Aral, S., Barabasi, A. L., Brewer, D., Christakis, N., Contrac-
+     tor, N., Fowler, J., Gutmann, M. et al., 2009 Life in the network: the coming age of computational
+     social science. Science (New York, NY) 323, 721.
+ [2] Schweitzer, F. & Vespignani, A., 2012 Editorial. EPJ Data Science 1, 1. ISSN 2193-1127. (doi:
+     10.1140/epjds1).
+
+
+  3 http://topsy.com/
+
+
+
+
+                                                   15/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+ [3] Treleaven, P., Galas, M. & Lalchand, V., 2013 Algorithmic trading review. Communications of the
+     ACM 56, 76–85.
+
+ [4] Park, C.-H. & Irwin, S. H., 2004 The profitability of technical analysis: A review. Technical report,
+     University of Illinois at Urbana-Champaign, Department of Agricultural and Consumer Economics.
+
+ [5] Biondo, A. E., Pluchino, A., Rapisarda, A. & Helbing, D., 2013 Are random trading strategies more
+     successful than technical ones? PloS one 8, e68344.
+
+ [6] Preis, T., Moat, H. S. & Stanley, H. E., 2013 Quantifying trading behavior in financial markets using
+     google trends. Scientific reports 3.
+
+ [7] Curme, C., Preis, T., Stanley, H. E. & Moat, H. S., 2014 Quantifying the semantics of search behavior
+     before stock market moves. Proceedings of the National Academy of Sciences 111, 11600–11605.
+
+ [8] Cusumano, M. A., 2014 The bitcoin ecosystem. Communications of the ACM 57, 22–24.
+
+ [9] Nakamoto, S., 2008 Bitcoin: A peer-to-peer electronic cash system. Technical report, Bitcoin Foun-
+     dation.
+
+[10] Van Alstyne, M., 2014 Why bitcoin has value. Communications of the ACM 57, 30–32.
+
+[11] Christin, N., 2013 Traveling the silk road: A measurement analysis of a large anonymous online
+     marketplace. In Proceedings of the 22nd international conference on World Wide Web, pp. 213–224.
+
+[12] Yelowitz, A. & Wilson, M., 2015 Characteristics of bitcoin users: an analysis of google search data.
+     Applied Economics Letters 22, 1030–1036.
+
+[13] Bitpay.         Over 44,000 businesses           and    charities    accept    bitcoin    with    bitpay.
+     (https://bitpay.com/directory#).
+
+[14] Dell. Dell now accepts bitcoin. (http://dell.to/1uk8ocZ).
+
+[15] Schweitzer, F., Fagiolo, G., Sornette, D., Redondo, F. V., Vespignani, A. & White, D. R., 2009
+     Economic networks: The new challenges. Science 325, 422– 425. ISSN 1095-9203. (doi:10.1126/
+     science.1173644).
+
+[16] Garcia, D., Tessone, C. J., Mavrodiev, P. & Perony, N., 2014 The digital traces of bubbles: Feedback
+     cycles between socio-economic signals in the bitcoin economy. Journal of the Royal Society Interface
+     11, 20140623. (doi:10.1098/rsif.2014.0623).
+
+[17] Kristoufek, L., 2013 Bitcoin meets google trends and wikipedia: Quantifying the relationship between
+     phenomena of the internet era. Scientific reports 3.
+
+[18] Kristoufek, L., 2015 What are the main drivers of the bitcoin price? evidence from wavelet coherence
+     analysis. PLoS ONE 10(4): e0123923 .
+
+[19] Schoen, H., Gayo-Avello, D., Metaxas, P. T., Mustafaraj, E., Strohmaier, M. & Gloor, P., 2013 The
+     power of prediction with social media. Internet Research 23, 528–543.
+
+
+
+
+                                                   16/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+[20] Bordino, I., Battiston, S., Caldarelli, G., Cristelli, M., Ukkonen, A. & Weber, I., 2012 Web search
+     queries can predict stock market volumes. PloS one 7, e40014.
+
+[21] Mao, Y., Wei, W., Wang, B. & Liu, B., 2012 Correlating s&p 500 stocks with twitter data. In
+     Proceedings of the First ACM International Workshop on Hot Topics on Interdisciplinary Social
+     Networks Research, pp. 69–72. ACM.
+
+[22] Gonzalez-Bailon, S., Banchs, R. E. & Kaltenbrunner, A., 2010 Emotional reactions and the pulse
+     of public opinion: Measuring the impact of political events on the sentiment of online discussions.
+     arXiv preprint arXiv:1009.4019 .
+
+[23] Tumarkin, R. & Whitelaw, R. F., 2001 News or noise? internet postings and stock prices. Financial
+     Analysts Journal pp. 41–51.
+
+[24] Saavedra, S., Duch, J. & Uzzi, B., 2011 Tracking traders’ understanding of the market using e-
+     communication data. PloS one 6, e26705.
+
+[25] Gilbert, E. & Karahalios, K., 2010 Widespread worry and the stock market. In ICWSM, pp. 59–65.
+
+[26] Bollen, J., Mao, H. & Zeng, X., 2011 Twitter mood predicts the stock market. Journal of Compu-
+     tational Science 2, 1–8.
+
+[27] Garcia, D., Abisheva, A., Schweighofer, S., Serdult, U. & Schweitzer, F., 2015 Network polarization
+     in online politics participatory media. To appear in Policy and Internet (http://bit.ly/1zGCPOv).
+
+[28] Garcia, D. & Tanase, D., 2013 Measuring cultural dynamics through the eurovision song contest.
+     Advances in Complex Systems 16, 33.
+
+[29] Hirshleifer, J., 1977 The theory of speculation under alternative regimes of markets. The Journal of
+     Finance 32, 975–999.
+
+[30] Harris, M. & Raviv, A., 1993 Differences of opinion make a horse race. Review of Financial studies
+     6, 473–506.
+
+[31] Antweiler, W. & Frank, M. Z., 2004 Is all that talk just noise? the information content of internet
+     stock message boards. The Journal of Finance 59, 1259–1294.
+
+[32] Tetlock, P. C., 2007 Giving content to investor sentiment: The role of media in the stock market.
+     The Journal of Finance 62, 1139–1168.
+
+[33] De Choudhury, M., Sundaram, H., John, A. & Seligmann, D. D., 2008 Can blog communication
+     dynamics be correlated with stock market activity? In Proceedings of the Nineteenth ACM Conference
+     on Hypertext and Hypermedia, HT ’08, pp. 55–60. ISBN 978-1-59593-985-2.
+
+[34] Challet, D. & Bel Hadj Ayed, A., 2013 Predicting financial markets with google trends and not so
+     random keywords. Predicting Financial Markets with Google Trends and Not so Random Keywords
+     (August 14, 2013) .
+
+
+
+
+                                                   17/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+[35] Ruiz, E. J., Hristidis, V., Castillo, C., Gionis, A. & Jaimes, A., 2012 Correlating financial time series
+     with micro-blogging activity. In Proceedings of the Fifth ACM International Conference on Web
+     Search and Data Mining, WSDM ’12, pp. 513–522. ISBN 978-1-4503-0747-5. (doi:10.1145/2124295.
+     2124358).
+
+[36] Whittle, P., 1953 The analysis of multiple stationary time series. Journal of the Royal Statistical
+     Society. Series B (Methodological) 15, pp. 125–139.
+
+[37] Adamic, L., Brunetti, C., Harris, J. & Kirilenko, A., 2009 On the informational properties of trading
+     networks. SSRN eLibrary .
+
+[38] Lütkepohl, H., 2007 New introduction to multiple time series analysis. Springer.
+
+[39] Pennebaker, J. W., Chung, C. K., Ireland, M., Gonzales, A. & Booth, R. J., 2007 The development
+     and psychometric properties of liwc2007. LIWC.net .
+
+[40] Warriner, A. B., Kuperman, V. & Brysbaert, M., 2013 Norms of valence, arousal, and dominance
+     for 13,915 english lemmas. Behavior research methods 45, 1191–1207.
+
+[41] Wilcoxon, F., 1945 Individual comparisons by ranking methods. Biometrics bulletin pp. 80–83.
+
+[42] Sharpe, W. F. & Sharpe, W., 1970 Portfolio theory and capital markets, volume 217. McGraw-Hill
+     New York.
+
+[43] Edwards, B., 2014 European bond yields go negative. The Wall Street Journal .
+
+[44] Bitfinex. Features - short. (https://www.bitfinex.com/pages/features).
+
+[45] Bitfinex. Fees schedule. (https://www.bitfinex.com/pages/fees).
+
+[46] Fuller, W. A., 2009 Introduction to statistical time series, volume 428. John Wiley & Sons.
+
+[47] Kwiatkowski, D., Phillips, P. C., Schmidt, P. & Shin, Y., 1992 Testing the null hypothesis of station-
+     arity against the alternative of a unit root: How sure are we that economic time series have a unit
+     root? Journal of econometrics 54, 159–178.
+
+[48] Anderson, O. D., 1976 Time series analysis and forecasting: the Box-Jenkins approach. Butterworths
+     London.
+
+[49] Zeileis, A., 2004 Econometric computing with hc and hac covariance matrix estimators. Journal of
+     Statistical Software 11, 1–17.
+
+[50] Chance, D. & Brooks, R., 2015 Introduction to derivatives and risk management. Cengage Learning.
+
+[51] Coindesk. Coindesk launches proprietary bitcoin price index. (http://bit.ly/11dDAAK).
+
+[52] Brito, J., Shadab, H. B. & Castillo, A., 2014 Bitcoin financial regulation: Securities, derivatives,
+     prediction markets, & gambling. Derivatives, Prediction Markets, & Gambling (April 10, 2014) .
+
+[53] Shadab, H. B., 2014 Regulating bitcoin and block chain derivatives. SSRN Preprint 2508707 .
+
+
+
+                                                   18/19
+                                          David Garcia, Frank Schweitzer:
+     Royal Society Open Science 2:150288 (2015) http://rsos.royalsocietypublishing.org/content/2/9/150288
+
+
+
+
+[54] Aitken, T., 2013 Topsy: The social search engine allows you to scan every public tweet ever published
+     on twitter. CEO World Magazine .
+
+[55] Russell, J. A., 2003 Core affect and the psychological construction of emotion. Psychological review
+     110, 145.
+
+[56] Bradley, M. M. & Lang, P. J., 1999 Affective norms for english words (anew): Instruction manual
+     and affective ratings. Technical report, The Center for Research in Psychophysiology, University of
+     Florida.
+
+[57] Garcia, D. & Schweitzer, F., 2012 Modeling online collective emotions. In Proceedings of the 2012
+     Workshop on Data-driven User Behavioral Modelling and Mining from Social Media, DUBMMSM
+     ’12, pp. 37–38. (doi:10.1145/2390131.2390147).
+
+[58] Osgood, C. E., 1964 Semantic differential technique in the comparative study of cultures. American
+     Anthropologist 66, 171–200.
+
+[59] Lin, Y., Michel, J.-B., Aiden, E. L., Orwant, J., Brockman, W. & Petrov, S., 2012 Syntactic annota-
+     tions for the google books ngram corpus. In Proceedings of the ACL 2012 System Demonstrations,
+     pp. 169–174.
+
+Acknowledgements: We thank Emre Sarigol for his technical assistance.
+Funding: This work was funded by the Swiss National Science Foundation (CR21I1_146499).
+Authors’ contributions: DG conceived the research, retrieved data, and performed the analyses. DG
+and FS wrote the manuscript.
+Competing interests: The authors declare that they have no competing financial interests.
+Ethics statement: This research is based on observational data shared publicly. No personal or indi-
+vidual information was retrieved, stored, or analyzed.
+Data and materials availability: All data used for this article is publicly available through the corre-
+sponding Application Programming Interfaces. Processed data and scripts to reproduce these results are
+available at https://www.sg.ethz.ch/btc
+
+
+
+
+                                                   19/19
+

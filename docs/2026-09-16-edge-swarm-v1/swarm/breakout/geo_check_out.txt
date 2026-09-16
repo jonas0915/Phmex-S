@@ -1,0 +1,11 @@
+SET-A M2 prior-NR-day TP=0.5H SL=1.0H: n=363 medH/price=3.44% (TP dist=1.72%, SL dist=3.44%) net=-0.4bps symbols net>0: 19/35 median bars held=10
+SET-B M2 prior-NR-day TP=0.5H SL=1.0H: n=1299 medH/price=3.46% (TP dist=1.73%, SL dist=3.46%) net=-8.3bps symbols net>0: 7/19 median bars held=10
+SET-A M2 prior-NR-day TP=1.0H SL=0.5H: n=385 medH/price=3.45% (TP dist=3.45%, SL dist=1.73%) net=-26.7bps symbols net>0: 18/35 median bars held=9
+SET-B M2 prior-NR-day TP=1.0H SL=0.5H: n=1416 medH/price=3.44% (TP dist=3.44%, SL dist=1.72%) net=-13.3bps symbols net>0: 6/19 median bars held=9
+SET-A M2 prior-NR-day TP=1.0H SL=1.0H: n=325 medH/price=3.44% (TP dist=3.44%, SL dist=3.44%) net=-51.0bps symbols net>0: 15/35 median bars held=22
+SET-B M2 prior-NR-day TP=1.0H SL=1.0H: n=1185 medH/price=3.40% (TP dist=3.40%, SL dist=3.40%) net=-5.5bps symbols net>0: 10/19 median bars held=19
+SET-A M4 1h box-comp TP=1.0H SL=0.5H: n=113 medH/price=2.27% (TP dist=2.27%, SL dist=1.13%) net=-82.5bps symbols net>0: 10/31 median bars held=6
+SET-B M4 1h box-comp TP=1.0H SL=0.5H: n=531 medH/price=2.24% (TP dist=2.24%, SL dist=1.12%) net=3.2bps symbols net>0: 10/19 median bars held=4
+SET-A M4 1h box-comp TP=0.5H SL=1.0H: n=111 medH/price=2.15% (TP dist=1.07%, SL dist=2.15%) net=-17.5bps symbols net>0: 16/31 median bars held=6
+SET-B M4 1h box-comp TP=0.5H SL=1.0H: n=509 medH/price=2.24% (TP dist=1.12%, SL dist=2.24%) net=-14.3bps symbols net>0: 5/19 median bars held=4
+5m M1 box-comp TP=1.0H SL=0.5H: n=2071 medH/price=0.438% symbols net>0: 1/35

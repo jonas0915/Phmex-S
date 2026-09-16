@@ -1,0 +1,2654 @@
+BITCOIN’S REACTION TO U.S.  
+FOMC AND CPI ANNOUNCEMENTS 
+by 
+Illia Nazaruk 
+A thesis submitted in partial fulfillment of the 
+requirements for the degree of 
+MA in Business and Financial Economics  
+Kyiv School of Economics 
+2025 
+Thesis Supervisor:  
+                                Professor Olesia Verchenko 
+ 
+Approved by  ___________________________________________________  
+                Head of the KSE Defense Committee, Professor [Type surname, name] 
+ __________________________________________________  
+ __________________________________________________  
+ __________________________________________________  
+ 
+Date ___________________________________ 
+ 
+ 
+
+i 
+ACKNOWLEDGMENTS 
+I would like to thank my thesis advisor, Professor Olesia Verchenko, for the time she 
+devoted to our conversations and for her guidance in writing this thesis.  
+I would also like to thank the friends I made while studying at KSE. They inspired and 
+supported me throughout my time there. 
+
+ii 
+TABLE OF CONTENTS 
+ 
+LIST OF FIGURES .......................................................................................................... iii 
+LIST OF TABLES ............................................................................................................. iv 
+LIST OF ABBREVIATIONS ......................................................................................... v 
+CHAPTER 1. INTRODUCTION ................................................................................. 1 
+CHAPTER 2. INDUSTRY OVERVIEW AND RELATED STUDIES .............. 3 
+CHAPTER 3. METHODOLOGY ................................................................................ 8 
+CHAPTER 4. DATA ....................................................................................................... 15 
+CHAPTER 5. RESULTS ................................................................................................ 21 
+CHAPTER 6. CONCLUSIONS AND RECOMMENDATIONS ...................... 29 
+REFERENCES ................................................................................................................. 31 
+APPENDIX ....................................................................................................................... 33 
+ 
+ 
+ 
+
+iii 
+LIST OF FIGURES 
+Figure 1. BTC vs SPX daily log returns, scatter plot ................................................................ 18 
+Figure 2. Distributions of daily volatility (σ, RS and Parkinson) ............................................ 19 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+iv 
+LIST OF TABLES 
+Table 1. Descriptive statistics for daily open, high, low, close prices .................................... 16 
+Table 2. Event pipeline ................................................................................................................... 17 
+Table 3. Descriptive statistics: daily returns of Bitcoin and S&P 500 ................................... 17 
+Table 4. CPI event-study results for each day of the event window ..................................... 21 
+Table 5. FOMC event-study results for each day of the event window ............................... 22 
+Table 6. CPI event-study results window average ..................................................................... 23 
+Table 7. FOMC event-study results window average ............................................................... 24 
+Table 8. CPI event-study results by YoY inflation direction window average .................... 25 
+Table 9. FOMC event-study results by policy-rate move window average .......................... 26 
+Table 10. Event count by direction .............................................................................................. 33 
+Table 11. CPI event-study results by YoY inflation direction for each day of the event 
+window ................................................................................................................................ 33 
+Table 12. FOMC event-study results by policy-rate move for each day of the event window
+ .............................................................................................................................................. 35 
+Table 13. CPI daily volatility .......................................................................................................... 37 
+Table 14. FOMC daily volatility .................................................................................................... 37 
+ 
+
+v 
+LIST OF ABBREVIATIONS 
+BTC Bitcoin 
+CPI Consumer Price Index 
+FOMC Federal Open Market Committee 
+CAR Cumulative Abnormal Return 
+USDT Tether USD 
+USDC USD Coin 
+GDP Gross domestic product 
+ETF Exchange Traded Fund 
+OHLC Open-High-Low-Close  
+RS Rogers–Satchell 
+PK Parkinson
+
+1 
+CHAPTER 1 
+INTRODUCTION 
+The cryptocurrency market often reacts strongly when U.S. macroeconomic 
+announcements are released or when the Federal Reserve announces its policy decisions. 
+Examples include monthly inflation data (CPI) and the eight scheduled FOMC rate 
+meetings each year. Market participants routinely observe rapid price moves around these 
+events. 
+ 
+Despite the growing importance of cryptocurrencies and huge size of the cryptocurrency 
+market, few academic studies have systematically measured the reaction of bitcoin to 
+planned macroeconomic announcements. This paper aims to fill this gap by measuring 
+exactly how large these volatility spikes typically are and, more importantly, how long the 
+increased uncertainty lasts after a major release. 
+ 
+We focus on the 2020-2025 period. These years include the initial shock from the COVID-
+19 pandemic, record-high inflation levels in 2022 and fastest cycle of interest rate increases 
+in the United States in more than forty years. Given this context, analyzing this particular 
+time period offers an opportunity to understand Bitcoin's behavior under different 
+macroeconomic and policy conditions. 
+ 
+Studying Bitcoin's reaction to chosen events also gives insights about whether the 
+cryptocurrency market behaves similarly to traditional financial markets or not. Traditional 
+assets such as stocks, bonds and foreign exchange rates have long been known to 
+systematically respond to economic data releases as shown by Kim, McKenzie and Faff 
+(2004). If Bitcoin shows similar reactions, it could mean that crypto market is becoming 
+more integrated with the traditional financial system. Alternatively, if Bitcoin reacts in a 
+
+2 
+different way: perhaps stronger, shorter or even in opposite directions, this could show 
+differences between cryptocurrencies and traditional markets. 
+ 
+From a personal perspective, understanding these dynamics is not just an academic 
+exercise, but a practical need. Practically, clearer short-horizon volatility expectations help 
+traders and risk managers anticipate swings, size positions, set stop-losses, and choose 
+leverage and hedges more effectively. A clearer understanding of the timing and magnitude 
+of market reactions will allow for more effective risk management, including making better-
+informed decisions about leverage, hedging and when to enter and exit positions. 
+ 
+In addition, studying these reactions helps to expand knowledge that is useful to many 
+stakeholders. More accurate volatility expectations help traders and risk managers make 
+decisions about position sizes, stop-loss levels and risk control strategies before major 
+economic releases. This knowledge also makes it easier for exchanges and market makers 
+to improve their liquidity planning and margin setting processes, helping to prevent 
+potential failures caused by sudden spikes in trading volumes or extreme price fluctuations. 
+Researchers and policymakers might gain useful insights into how effectively and quickly 
+crypto markets incorporate publicly available macroeconomic information, a topic that is 
+important to the continuing debate on market efficiency, financial stability and appropriate 
+regulatory structures. 
+ 
+To answer the research question, this study uses a daily event-study approach with a market 
+model benchmark against the S&P 500 to compute CAR, and changes in volatility using 
+Rogers–Satchell and Parkinson volatility measures. 
+
+3 
+CHAPTER 2 
+ INDUSTRY OVERVIEW AND RELATED STUDIES  
+2.1 Brief overview of the Bitcoin industry 
+Bitcoin was introduced in January 2009, and a year earlier, in 2008, Satoshi Nakamoto's 
+white paper was published and the open-source Bitcoin network was launched. At its core, 
+Bitcoin is a peer-to-peer electronic‐cash system that records ownership on a public, 
+append-only ledger known as the blockchain (Nakamoto, 2008). Transactions are grouped 
+into blocks, miners compete to add each block by solving a proof-of-work puzzle, thereby 
+securing the network and earning newly created Bitcoins plus transaction fees. The 
+protocol issues a fixed reward that halves roughly every four years, limiting total supply at 
+21 million coins – a design feature intended to mimic the shortage of digital money. 
+Because no central authority can alter this monetary rule, Bitcoin is often described as 
+programmable hard money. 
+ 
+Bitcoin’s development can be sketched in three main stages. From its launch in 2009 until 
+the mid-2010s it was traded almost entirely by retail users on lightly regulated online 
+platforms and peer-to-peer networks. The second stage began in 2017, when large, 
+conventional exchanges started listing cash-settled Bitcoin futures and options. Those 
+listings gave hedge funds, private companies and corporates a regulated hedge and marked 
+Bitcoin’s first real bridge to traditional capital markets. The third, still ongoing stage is 
+characterized by rapid institutionalization. Since 2020 asset managers, pension funds and 
+publicly listed companies have built dedicated crypto teams. Global custodians provide 
+insured cold-storage solutions and scores of exchange-traded products offer Bitcoin 
+exposure through the world’s major stock exchanges. As a result, Bitcoin’s turnover is now 
+spread across a multi-layered market structure: order-book spot exchanges, futures, options 
+and exchange-traded funds. 
+ 
+
+4 
+ Liquidity has deepened alongside this institutionalization. Average daily spot volume 
+across the ten largest exchanges: Binance, Coinbase, Kraken and others, regularly exceeds 
+ten billion U.S. dollar equivalents, while open interest in listed derivatives has climbed 
+above thirty billion on peak days. Market depth is no longer dominated by a handful of 
+retail exchanges – instead, algorithmic liquidity providers and high-frequency trading firms 
+arbitrage prices across exchanges, narrowing spreads and speeding the incorporation of 
+new information. 
+ 
+The main part of spot Bitcoin today is quoted against dollar-linked stablecoins instead of 
+the fiat USD.  In 2024 the combined market value of USDT and USDC exceeded $150 
+billion and BTC-USDT pairs on major platforms regularly exceeded the volume of BTC-
+USD pairs by four times. In this way, supply of stablecoins acts as a shadow supply of 
+dollars in the crypto market: when monetary conditions in the U.S. tighten, demand for 
+stablecoins can decline, reducing Bitcoin liquidity, when conditions soften, new stablecoin 
+supply often follows bull cycles. This stablecoin channel provides an additional way 
+through which U.S. policy decisions affect Bitcoin price dynamics. 
+ 
+The market around Bitcoin has grown far beyond simple spot trading. Regulated futures 
+were the first big step: since their launch in late 2017, open interest on the Chicago 
+Mercantile Exchange has climbed to about 6 billion USD and volume in Binance’s 
+perpetual-swap contracts is even higher. Options activity on platforms such as Deribit now 
+competes with options on mid-cap stocks. These derivatives let traders hedge or take 
+leverage and research shows that prices on the Chicago Mercantile Exchange often move 
+ahead of spot markets, making regulated futures an important guide for price discovery. 
+Access expanded again on 10 January 2024, when the U.S. Securities and Exchange 
+Commission approved eleven spot-Bitcoin exchange-traded funds, leading products from 
+BlackRock and Fidelity drew more than 10 billion USD in their first month. ETFs allow 
+anyone with a brokerage account to own Bitcoin, so they are expected to deepen liquidity 
+and link the asset more closely to mainstream finance. 
+
+5 
+ 
+Changes on the technical side have been just as large. After China banned industrial mining 
+in 2021, most of the network’s computing power shifted to the United States and 
+Kazakhstan. U.S. now hosts roughly 40 percent of global hash-rate. Because many U.S. 
+miners are listed companies, they publish energy-mix data and buy renewable power when 
+possible, adding transparency to a long-debated environmental issue. Finally, holder base 
+has become diverse. Long-term “Whale” wallets move coins rarely, while high frequency 
+trading firms arbitrage tiny price gaps across exchanges around the clock. Each group reacts 
+differently to economic news, which helps explain why Bitcoin sometimes behaves like a 
+tech stock, sometimes like a commodity and sometimes doesn't react at all.  
+ 
+Regulation remains fragmented and country dependent, but there is a clear global trend 
+toward bringing Bitcoin within existing financial market frameworks. Most major 
+economies now apply anti-money-laundering and know-your-customer rules to crypto 
+asset brokers. Derivatives markets operate under commodity and securities laws. Insurance 
+as well as audit standards have emerged for custodians. Although the details of the policy 
+differ from country to country, but general direction is towards gradual integration rather 
+than a complete ban. 
+ 
+2.2 Related studies review 
+Ma et al. (2022) provide the most detailed daily-frequency test of Federal Reserve surprises 
+to date. Using Fed funds futures pricing to isolate the unexpected portion of every FOMC 
+decision between 2018 and 2021, they estimate the effect on Bitcoin’s close-to-close 
+returns. Policy tightening reliably pushes Bitcoin lower by about 0.25% on the day of the 
+meeting. The authors also show that the impact is state dependent: it is strongest during 
+bull-market phases when leverage and speculative flows are elevated. In short, once 
+institutional money and regulated futures arrive, Bitcoin began to trade much like other 
+high-beta assets that reprice when the Fed shifts the discount rate forecast. 
+ 
+
+6 
+Pyo and Lee (2020), working with an earlier sample of 2010-2018. Their event-study and 
+GARCH tests show that broad U.S. macro releases (inflation, payrolls, growth) sometimes 
+interrupt Bitcoin’s typical drift, but FOMC days themselves do not generate significant 
+abnormal returns. That result suggested an early-period “macro disconnect,” consistent 
+with a retail-dominated market that paid little attention to central-bank signals. 
+ 
+Corbet et al. (2020) examine the relationship between macroeconomic news 
+announcements and Bitcoin returns, extending previous research on traditional financial 
+assets to the digital asset market. Their findings indicate that positive news surrounding 
+unemployment rates and durable goods leads to a decrease in Bitcoin returns, while 
+negative news for these indicators correlates with an increase in Bitcoin returns. News 
+related to GDP and CPI, however, does show no statistically significant relationship with 
+Bitcoin returns. This suggests that Bitcoin may act as a safe-haven asset during times of 
+economic negativity and that the cryptocurrency market is maturing, showing unique 
+interactions with macroeconomic news. The authors note the high volatility of Bitcoin 
+compared to traditional financial markets, explaining this by the relative novelty of the 
+market, its speculative nature, and lower liquidity. 
+ 
+Kim, McKenzie, and Faff (2004) investigate the impact of scheduled government 
+macroeconomic news announcements on the risk and return of three major U.S. financial 
+markets: bond, stock, and foreign exchange. They find that these markets do not primarily 
+react to the release of information itself, but rather to the "news" content, defined as the 
+deviation between actual and expected announcement numbers. Specifically, unexpected 
+balance of trade news had the greatest impact on mean returns in the foreign exchange 
+market. In the bond market, news related to the internal economy (excluding CPI) was 
+significant, while for the U.S. stock market, consumer and producer price information 
+proved important. They observed that financial market volatility increased in response to 
+some announcements and decreased for others, a phenomenon partly explained by 
+differential "policy feedback" effects. This study highlights the importance of a 
+
+7 
+comprehensive approach when studying macroeconomic news in different financial 
+markets in order to distinguish the type of news to which each market reacts. 
+ 
+An industry perspective from S&P Global (2023) connects the two academic findings. 
+Reviewing 2020–2022, this analysis documents a clear negative correlation between Bitcoin 
+and U.S. real-rate expectations: as the Fed moved from emergency easing to rapid 
+tightening, Bitcoin fell in tandem with valued technology shares. The report's simple 
+regressions show that rising interest rate expectations and a stronger dollar explain a 
+significant portion of Bitcoin's decline in 2022, supporting the view that cryptocurrencies 
+are now behaving as risky assets sensitive to liquidity cycles. 
+ 
+Taken together, these studies paint a solid but still incomplete picture Early evidence 
+(2010–2018) points to limited or mixed reactions and even safe-haven-type patterns in 
+some news dimensions, whereas post-2018 work using policy-surprise measures detects a 
+measurable, directionally intuitive effect of Fed decisions on Bitcoin returns. Cross-market 
+research shows that assets react to the surprise component rather than the release itself, 
+and industry analysis for 2020–2022 confirms stronger macro sensitivity as crypto moved 
+closer to high-beta equities during the tightening cycle. This paper contributes to the 
+literature by offering a single, coherent daily design that jointly examines CPI releases and 
+scheduled FOMC meetings across 2020–2025, a period spanning COVID-19, high 
+inflation and the fastest tightening cycle in decades. Unlike most prior studies that focus 
+on one event type or earlier subperiods, we analyze both series in one dataset, and report 
+results by the direction of the change (hike/cut, CPI up/down) as well as “no-change” 
+events. This design allows us to quantify not only the immediate price impact but also how 
+long elevated volatility persists after announcements. 
+
+8 
+CHAPTER 3 
+METHODOLOGY 
+3.1 Research question and hypotheses 
+This study examines whether Bitcoin reacts to scheduled United States announcements. 
+We focus on two announcement types that regularly attract market attention: monthly CPI 
+releases and Federal Reserve FOMC policy announcements. We compare the behavior of 
+Bitcoin around an announcement day with its typical behavior outside of such days. The 
+goal is to isolate the short-term reaction, which is likely related to new public information 
+coming in at a known time. 
+ 
+The analysis considers two outcomes. The first outcome is daily return, which captures the 
+immediate price response to news. The second outcome is daily volatility, which reflects 
+changes in uncertainty and trading intensity that often follow important announcements. 
+An event day gives a clean time marker for when information becomes public. By aligning 
+many events on a common event-time scale and then averaging them, we can estimate 
+whether there is a systematic pattern rather than just random post-announcement 
+movements. 
+ 
+Macroeconomic announcements can move Bitcoin because they change the relative 
+attractiveness of safe assets and investors’ risk appetite. On FOMC days, when the policy 
+rate is raised, U.S. Treasuries become more attractive, the U.S. dollar often strengthens, 
+and liquidity for risky assets tightens, so Bitcoin return can move down. When the rate is 
+cut, the opposite forces may support Bitcoin. On CPI days, lower inflation is read as less 
+pressure for future rate hikes and a more stable macro outlook, so investors may take more 
+risk, higher inflation points to tighter policy ahead and can reduce demand for risky assets. 
+ 
+ 
+ 
+
+9 
+To test this, we formulate two hypotheses: 
+▪ H1: Bitcoin’s volatility increases on days when FOMC decisions are announced 
+and CPI data are released. 
+▪ H2: Bitcoin’s cumulative abnormal return differs from zero on days when FOMC 
+decisions are announced and CPI data are released. 
+ 
+3.2 Events and sample construction 
+An event is defined at the daily frequency as a calendar day on which either a CPI release 
+or an FOMC policy announcement occurs. If the both announcements fall on the same 
+calendar day, we exclude that day from the event sample so that each event is uniquely 
+linked to a single source of information. We then store metadata for each event, including 
+its positional index in the daily panel. We work with calendar time 𝑡 and event time 𝜏. 
+ 
+For each saved event we build an event-time grid 𝜏∈{−2, −1, 0, +1, +2} where 𝜏= 0 
+is the announcement day. The grid is constructed by index around 𝑡0. A given (𝑒𝑣𝑒𝑛𝑡, 𝜏) 
+observation is kept only if the corresponding calendar date exists in the merged daily panel. 
+Since measures require information from the pre-event window [𝑡0 −20, 𝑡0 −3], we also 
+require that this full window is available in the data. This guarantees that all data necessary 
+for basic indicators and further modeling are available for each event. 
+ 
+Return-based abnormal measure that relies on the market factor is computed only on days 
+when the S&P 500 is open. If the S&P 500 is closed on a given 𝜏-day, the corresponding 
+return-based abnormal measure is treated as missing for that (𝑒𝑣𝑒𝑛𝑡, 𝜏), while volatility-
+based measures remain available, if required Open-High-Low-Close (OHLC) data exist. 
+ 
+ 
+ 
+ 
+ 
+
+10 
+3.3 Market Model 
+For each event at calendar date 𝑡0 we estimate a single-factor market model on the pre-
+event window [𝑡0 −20, 𝑡0 −3]. The dependent variable is Bitcoin’s daily log return 𝑟𝑡
+𝐵𝑇𝐶. 
+The regressor is the S&P 500 daily log return 𝑟𝑡
+𝑆𝑃𝑋. The specification is 
+ 
+𝑟𝑡
+𝐵𝑇𝐶= 𝛼𝑖+ 𝛽𝑖𝑟𝑡
+𝑆𝑃𝑋+ 𝜀𝑡,
+𝑡 ∈𝐸(𝑡0)                            (3.1)  
+ 
+where 𝑖 indexes the event and 𝐸(𝑡0) is the set of SPX trading days in [𝑡0 −20, 𝑡0 −3] 
+for which both 𝑟𝑡
+𝐵𝑇𝐶 and 𝑟𝑡
+𝑆𝑃𝑋 are observed. The model is estimated by OLS separately 
+for each event. We save the estimated coefficients 𝛼̂𝑖 and 𝛽̂𝑖, the coefficient of 
+determination 𝑅𝑖
+2, and the sample size 𝑛𝑖
+𝑒𝑠𝑡= |𝐸(𝑡0)|. 
+ 
+To guarantee minimum data quality, an event passes the model-estimation filter only if  
+𝑛𝑖
+𝑒𝑠𝑡 ≥10. Events that fail this pre-event market model filter are excluded from the 
+analysis sample used for both return- and volatility-based measures to keep a common set 
+of events. The model-estimation stage uses only information that is available prior to the 
+announcement day. 
+ 
+The fitted parameters are later used to form the event-time expected return on day 𝑡=
+ 𝑡0 + 𝜏 𝑎𝑠 𝑟̂𝑡
+𝑒𝑥𝑝= 𝛼̂𝑖+ 𝛽̂𝑖 𝑟𝑡
+𝑆𝑃𝑋. Bitcoin’s abnormal return for a given (𝑖, 𝜏) is then 
+defined as 𝐴𝑅𝑖,𝜏= 𝑟𝑡
+𝐵𝑇𝐶−𝑟̂𝑡
+𝑒𝑥𝑝and is computed only on SPX-open days, as per the SPX-
+day rule in Section 3.2. Volatility-based measures do not depend on this model and are 
+defined in the next subsection. 
+ 
+3.4 Volatility measures and baselines 
+We use two high–low–open–close proxies of daily variance that are standard to the 
+literature (Oprisor et al. (2024), Vivek et al. (2025)). The Rogers–Satchell variance for day 
+𝑡 (Rogers and Satchell, 1991) is 
+
+11 
+ 
+𝑅𝑆𝑡= ln (𝐻𝑡
+𝐶𝑡
+) ln (𝐻𝑡
+𝑂𝑡
+) + ln (𝐿𝑡
+𝐶𝑡
+) ln (𝐿𝑡
+𝑂𝑡
+)                           (3.2) 
+ 
+and the Parkinson variance (Parkinson, 1980) is 
+ 
+𝑃𝑡=
+(ln (𝐻𝑡
+𝐿𝑡))
+2
+4𝑙𝑛2
+                                                 (3.3) 
+Here 𝑂𝑡, 𝐻𝑡, 𝐿𝑡, 𝐶𝑡 are Bitcoin’s open, high, low and close on day 𝑡. For each proxy we 
+report daily volatility as 𝜎𝑡
+𝑅𝑆= √max {𝑅𝑆𝑡, 0} and 𝜎𝑡
+𝑃= √max {𝑃𝑡, 0}, where 
+max {𝑥, 0} denotes zero-truncation of the scalar {𝑥}. This prevents taking a square root 
+of tiny negative values caused by floating-point rounding or rare OHLC inconsistencies, in 
+clean data 𝑅𝑆𝑡, 𝑃𝑡 ≥0 and the truncation has no effect. 
+ 
+For each event 𝑖 with announcement date 𝑡0 we construct a pre-event volatility baseline on 
+the window [𝑡0 −20, 𝑡0 −3]. The baseline is defined separately for the two proxies as 
+the simple average of daily volatilities in that window:  𝜎𝑡
+𝑅𝑆,𝑝𝑟𝑒= 𝑚𝑒𝑎𝑛(𝜎𝑡
+𝑅𝑆: 𝑡0 −20 ≤
+𝑡≤𝑡0 −3) and 𝜎𝑡
+𝑃,𝑝𝑟𝑒= 𝑚𝑒𝑎𝑛(𝜎𝑡
+𝑅𝑆: 𝑡0 −20 ≤𝑡≤𝑡0 −3. To reduce the influence 
+of outliers when building the baseline, we winsorize the pre-event daily volatilities at the 
+1st and 99th percentiles before averaging. We require 18 valid days in [𝑡0 −20, 𝑡0 −3], 
+if any OHLC inputs are missing or non-finite, the event does not receive a baseline and its 
+observations are dropped at this stage. This rule matches the pre-event window used 
+elsewhere in the analysis and avoids look-ahead. 
+ 
+ 
+Abnormal volatility on an event-time day 𝜏 is defined as the difference between the day-
+𝑡0 +  𝜏  volatility and the event’s pre-event baseline. We compute it in percentage points 
+of daily volatility, separately for each proxy: 
+
+12 
+ 
+𝐴𝑉𝑂𝐿𝑖,𝜏
+𝑅𝑆= (𝜎𝑡0+ 𝜏
+𝑅𝑆
+−𝜎𝑖
+𝑅𝑆,𝑝𝑟𝑒) ∗100                                 (3.4) 
+ 
+𝐴𝑉𝑂𝐿𝑖,𝜏
+𝑃= (𝜎𝑡0+ 𝜏
+𝑃
+−𝜎𝑖
+𝑃,𝑝𝑟𝑒) ∗100                                  (3.5) 
+ 
+These measures are well defined whenever the required OHLC data exist on day 𝑡0 +  𝜏. 
+They do not depend on whether the S&P 500 is open. 
+  
+3.5 Aggregation, windows, and inference 
+All reactions are aggregated across events in an equal-weighted way. At the day level, we 
+align observations by event time 𝜏 and compute the cross-sectional mean of each measure 
+over the set of events that have a valid value at that 𝜏. For returns we report the mean of 
+the within event cumulative abnormal return (𝐶𝐴𝑅𝑖,𝜏), which is the cumulative sum of 
+abnormal returns from the start of the event grid up to day 𝜏. This object can be read as 
+the conventional cross-sectional average cumulative abnormal return at day 𝜏. For volatility 
+we report the cross-sectional mean of abnormal volatility 𝐴𝑉𝑂𝐿𝑖,𝜏 separately for the 
+Rogers–Satchell and Parkinson proxies. 
+ 
+To summarize reactions over short windows, we form event-level statistics and then 
+average them across events. For returns, the event-level window statistic is the sum of 
+abnormal returns within the window, an event affects a window if it contains at least one 
+valid abnormal-return day in that window. For volatility, the event-level window statistic is 
+the simple average of daily abnormal volatility within the window, an event contributes 
+only if all daily values in the window are finite. We use two symmetric windows that exclude 
+the announcement day, a pre-window [−2, −1] and a post-window [+1, +2]. The 
+announcement day 𝜏= 0 is reported in the day-by-day. 
+ 
+
+13 
+Statistical inference is based on cross-sectional t-tests of the mean. For a given cell (event 
+type and day or window), let 𝑥𝑖 denote the event-level statistic and 𝑛 the number of 
+contributing events. Compute the sample mean 𝑥̅, the sample standard deviation 𝑠, and 
+the t-statistic 𝑡= 𝑥̅/(
+𝑠
+√𝑛) with 𝑛−1 degrees of freedom. We report two-sided p-values. 
+This choice is conservative with respect to the directional hypotheses. Units are kept 
+consistent with construction: CAR is reported in daily log-return units and abnormal 
+volatility is reported in percentage points of daily volatility. For readability, we also display 
+a reference annualized scale for abnormal volatility by multiplying the daily mean by √365. 
+This rescaling is for interpretation only and does not affect testing.  
+ 
+3.6 Limitations 
+This design has several limitations that impact interpretation. First, all return-based 
+abnormal measures depend on days when the S&P 500 is open, if the index is closed, the 
+corresponding observations are missing. This rule protects the market-model logic but 
+mechanically reduces sample size and power and it can impact selection if event-time days 
+fall on U.S. holidays or weekends. Second, the event-time grid is short, restricted to −2 
+through +2. This focuses attention on the immediate reaction, but may miss earlier leaks 
+of information or slower adjustments after the announcement. The end of the day also 
+compresses intraday dynamics, while the CPI and FOMC are published at specific times in 
+the US that do not coincide with daily OHLC bars. Third, volatility proxies use daily high–
+low–open–close information and are only approximations of true volatility, Rogers–
+Satchell and Parkinson have different sensitivities to microstructure noise and to how 
+exchanges form daily OHLC candles for Bitcoin (we use UTC-based days). The design 
+provides non-negativity and averages pre-event daily volatilities after winsorization at the 
+1st and 99th percentiles. Fourth, events are allowed to occur close in calendar time, so 
+windows for different events may overlap. The analysis treats each event independently, 
+which is typical in event studies, but can leave residual dependence across observations. 
+Also, scheduled announcements are used as clean timing markers, yet other news can 
+
+14 
+coincide with the same dates and data sources may contain minor inconsistencies in OHLC 
+values or time-zone mapping. These issues do not invalidate the design but suggest that 
+results should be read as average short-run reactions under the stated assumptions rather 
+than as structural causal effects. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+15 
+CHAPTER 4  
+DATA 
+4.1 Data 
+Bitcoin historical data come from Yahoo Finance and the S&P 500 historical data come 
+from Stooq, both sources offer daily open, high, low, close and volume series in U.S. dollar. 
+Using OHLC rather than close-only data is advantageous because the high-low range 
+supplies a richer volatility proxy: if a macro shock produces an intraday spike that partially 
+reverses before midnight, the closing price alone would understate the disturbance, whereas 
+the range captures it. 
+ 
+Macroeconomic announcement information is collected from publicly available calendar: 
+Investing.com, which lists the release date and the consensus (median) market forecast for 
+every CPI and FOMC. After each release, the same calendar publishes the actual figure, 
+permitting a straightforward calculation of the surprise component. Official data (for 
+example, CPI from the Bureau of Labor Statistics and FOMC statements from the Federal 
+Reserve) are cross-checked for accuracy but do not provide consensus forecasts.  
+ 
+The study period spans 1 January 2020 through 31 May 2025, delivering sixty-five inflation 
+prints and forty-four FOMC decision days. Two dates on which CPI and FOMC coincided 
+are excluded to keep each event tied to a single information source. Bitcoin trades 
+continuously, yet daily bars are timestamped at 00:00 UTC on Yahoo Finance. U.S. 
+announcements occur within the same UTC calendar day covered by the bar, all series are 
+merged by calendar date. 
+ 
+Two limitations arise from daily frequency. Firstly, any price reaction shorter than a day, an 
+intraday spike and full reversal, can be muted in the close-to-close return, although the 
+high-low range reduces this risk. Secondly, by linking a whole day to a single 
+
+16 
+announcement, there is a risk of noise from other news and averaging across many events 
+and using a narrow event window reduces this problem. 
+ 
+4.2 Data description 
+ 
+Table 1. Descriptive statistics for daily open, high, low, close prices 
+Variable Count 
+Min 
+Max 
+Mean 
+Median 
+Open 
+1,978 
+5,002.58 111,679.36 40,682.71 35,881.46 
+High 
+1,978 
+5,331.83 111,970.17 41,551.55 37,241.01 
+Low 
+1,978 
+4,106.98 109,285.07 39,778.52 34,746.78 
+Close 
+1,978 
+4,970.79 111,673.28 40,729.78 35,954.35 
+ 
+As shown in Table 1, the closing price of Bitcoin ranged from a minimum of $4,971 to a 
+maximum of $111,673, with a mean of $40,730 and a median of $35,954. Open, high and 
+low prices display similar ranges and central trends, showing day-to-day volatility of Bitcoin. 
+The daily high–low range, which is informative about volatility (in the analysis we use the 
+Rogers–Satchell and Parkinson proxies), averaged $1,773 per day with a maximum single-
+day change of $12,865. The median high–low range is $1,306, which shows that most 
+trading days have price fluctuations in the range of one to two thousand dollars. 
+ 
+Overall, these descriptive statistics highlight both high average price level and volatility that 
+have characterized Bitcoin market during the sample period. 
+ 
+ 
+ 
+ 
+ 
+ 
+
+17 
+Table 2. Event pipeline 
+Event type 
+Events 
+Overlaps 
+After 
+removal 
+MM 
+(n<10) 
+Final events 
+CPI 
+65 
+2 
+63 
+1 
+62 
+FOMC 
+44 
+2 
+42 
+0 
+42 
+ 
+As described in Table 2, the investigated period contains sixty-five CPI dates and forty-
+four FOMC dates over the sample. Two calendar overlaps, when CPI and FOMC fell on 
+the same day, are excluded so that each event is related to a single source of information. 
+After removing these overlaps, the sample includes sixty-three CPI and forty-two FOMC 
+days, we then apply the pre-event market-model quality check that requires at least ten 
+SPX-open observations in the [𝑡0 −20, 𝑡0 −3] window. One CPI date fails this filter, 
+while all FOMC dates pass. The final sample incudes sixty-two CPI and forty-two FOMC 
+events or one hundred and four events in total. After all checks, we dropped five events. 
+Groups by direction used in Section 5.2 are summarized in Appendix Table 10. 
+ 
+Table 3. Descriptive statistics: daily returns of Bitcoin and S&P 500 
+Metric 
+Count 
+Min 
+Max 
+Mean 
+Median 
+BTC simple return 
+(daily) 
+1,977 
+-37.17% 18.75% 
+0.19% 
+0.06% 
+BTC log return 
+(daily) 
+1,977 
+-46.47% 17.18% 
+0.14% 
+0.06% 
+S&P 500 Simple 
+return (daily) 
+1,359 
+-11.98% 
+9.52% 
+0.05% 
+0.09% 
+S&P 500 Log 
+return (daily) 
+1,359 
+-12.77% 
+9.09% 
+0.04% 
+0.09% 
+ 
+
+18 
+Table 3 contains descriptive statistics for daily returns of Bitcoin and S&P 500 during the 
+investigated period. There are 1,977 observations because the first calendar day misses a 
+lagged close, and 1,359 S&P 500 observations reflecting the U.S. trading-day calendar. 
+Central tendency is small: the mean is 0.19% for simple returns and 0.14% for log returns, 
+while the median is 0.06% in both cases, indicating that a typical day shows only a modest 
+price change. The range is wide, with periodic large moves: from −37.17% to +18.75% for 
+simple returns and from −46.47% to +17.18% for log returns. For the S&P 500, the mean 
+is lower 0.05% for simple and 0.04% for log with a 0.09% median for both, and the range 
+is much narrower from −11.98% to +9.52% for simple and from −12.77% to +9.09% for 
+log, showing that the index is less volatile than Bitcoin. The log transformation leaves the 
+center nearly unchanged, but slightly compresses large positives and makes big negatives 
+more noticeable, which is expected. In what follows we work with daily log returns for 
+consistency with the modeling framework in Chapter 3. 
+ 
+Figure 1. BTC vs SPX daily log returns, scatter plot 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+19 
+Figure 1 plots Bitcoin’s daily log return against the S&P 500 daily log return for all days 
+with both series available. The cloud of points is concentrated near zero with a clear upward 
+tilt, and the fitted OLS line has a positive slope. The Pearson correlation is about 0.39, 
+which is moderate: Bitcoin tends to rise when the S&P 500 rises, but the dispersion around 
+the line is large, indicating a substantial idiosyncratic component. A few outliers reflect days 
+with very large moves in one or both markets.  
+ 
+Figure 2. Distributions of daily volatility (σ, RS and Parkinson) 
+ 
+ 
+Figure 2 shows the distribution of Bitcoin’s daily volatility measured by the Parkinson 
+proxy on the left and by the Rogers–Satchell proxy on the right. Both distributions are non-
+negative and strongly right-skewed: most days have low σ, while a small number of days 
+exhibit very high σ, so the mean exceeds the median. The two proxies produce very similar 
+shapes, indicating that they capture the same volatility pattern. The RS proxy has a slightly 
+
+20 
+longer right tail, which is reasonable because it uses both the high–low range and the open–
+close positions and can react more on days with a large intraday move and a shift between 
+open and close.  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+21 
+CHAPTER 5 
+RESULTS 
+The final sample contains sixty-two CPI events and forty-two FOMC events after 
+removing overlap days and applying the pre-event market-model filter. Results are reported 
+for two outcomes: cumulative abnormal return (CAR), measured as log returns (natural 
+logs) and abnormal volatility (AVOL), defined as the change in daily volatility 𝜎 relative to 
+the event’s pre-event baseline, expressed in percentage points (p.p.). Volatility is shown 
+using two proxies: Rogers–Satchell (RS) and Parkinson (PK).  
+5.1 Event-study results for each day of the event window 
+Table 4. CPI event-study results for each day of the event window 
+Day 
+Measure 
+N 
+Mean 
+Mean 
+(ann.) 
+t-test 
+p 
+ 
+-2 
+AVOL (PK) 
+62 
+0.70 
+13.28 
+2.49 
+0.015 
+* 
+-1 
+AVOL (PK) 
+62 
+0.53 
+10.19 
+2.34 
+0.023 
+* 
+0 
+AVOL (PK) 
+62 
+0.81 
+15.52 
+3.68 
+<0.001 
+*** 
+1 
+AVOL (PK) 
+62 
+0.68 
+13.05 
+1.43 
+0.157 
+ 
+2 
+AVOL (PK) 
+62 
+0.40 
+7.71 
+1.18 
+0.244 
+ 
+-2 
+AVOL (RS) 
+62 
+0.60 
+11.52 
+2.04 
+0.046 
+* 
+-1 
+AVOL (RS) 
+62 
+0.44 
+8.34 
+2.39 
+0.020 
+* 
+0 
+AVOL (RS) 
+62 
+0.81 
+15.40 
+3.98 
+<0.001 
+*** 
+1 
+AVOL (RS) 
+62 
+0.41 
+7.84 
+1.68 
+0.098 
+ 
+2 
+AVOL (RS) 
+62 
+0.47 
+9.06 
+1.12 
+0.269 
+ 
+-2 
+CAR 
+45 
+0.0029 
+ 
+0.44 
+0.664 
+ 
+-1 
+CAR 
+62 
+-0.0006 
+ 
+-0.08 
+0.937 
+ 
+0 
+CAR 
+61 
+0.003 
+ 
+0.35 
+0.726 
+ 
+1 
+CAR 
+58 
+-0.0012 
+ 
+-0.10 
+0.923 
+ 
+2 
+CAR 
+43 
+0.0045 
+ 
+0.31 
+0.759 
+ 
+
+22 
+As presented in Table 4, abnormal volatility rises already two days before the CPI release 
+and peaks on the announcement day. Using the Parkinson proxy, AVOL averages 0.70 p.p. 
+on 𝜏= −2 (p=0.015), 0.53 p.p. on 𝜏= −1 (p=0.023), and 0.81 p.p. on 𝜏= 0 (p<0.001), 
+which corresponds to about 15 p.p. in annualized terms. The Rogers–Satchell proxy shows 
+the same pattern and similar results: 0.60 p.p. on 𝜏= −2 (p=0.046), 0.44 p.p. on 𝜏=
+−1 (p=0.020), and 0.81 p.p. on 𝜏= 0 (p<0.001). After the release, AVOL becomes 
+statistically insignificant on 𝜏= +1 and 𝜏= +2 for Parkinson, and only marginally 
+significant for RS on 𝜏= +1 (p=0.098). Cumulative abnormal returns are insignificant on 
+all days in the event window, the lower N reflects the SPX-day rule from Section 3.2.  
+Table 5. FOMC event-study results for each day of the event 
+window 
+Day 
+Measure 
+N 
+Mean 
+Mean 
+(ann.) 
+t-test 
+p 
+ 
+-2 
+AVOL (PK) 
+42 
+1.26 
+24.06 
+2.39 
+0.022 
+* 
+-1 
+AVOL (PK) 
+42 
+0.21 
+3.95 
+0.89 
+0.381 
+ 
+0 
+AVOL (PK) 
+42 
+1.03 
+19.65 
+4.09 
+<0.001 
+*** 
+1 
+AVOL (PK) 
+42 
+0.60 
+11.51 
+2.20 
+0.034 
+* 
+2 
+AVOL (PK) 
+42 
+0.34 
+6.52 
+1.54 
+0.130 
+ 
+-2 
+AVOL (RS) 
+42 
+1.23 
+23.41 
+1.93 
+0.061 
+ 
+-1 
+AVOL (RS) 
+42 
+0.24 
+4.59 
+1.21 
+0.235 
+ 
+0 
+AVOL (RS) 
+42 
+0.93 
+17.85 
+3.02 
+0.004 
+** 
+1 
+AVOL (RS) 
+42 
+0.70 
+13.42 
+2.14 
+0.039 
+* 
+2 
+AVOL (RS) 
+42 
+0.53 
+10.07 
+2.06 
+0.046 
+* 
+-2 
+CAR 
+41 
+-0.0109 
+ 
+-1.59 
+0.120 
+ 
+-1 
+CAR 
+40 
+-0.0049 
+ 
+-0.54 
+0.595 
+ 
+0 
+CAR 
+40 
+0.0113 
+ 
+1.11 
+0.272 
+ 
+1 
+CAR 
+42 
+0.0101 
+ 
+0.78 
+0.437 
+ 
+2 
+CAR 
+40 
+0.0090 
+ 
+0.55 
+0.584 
+ 
+
+23 
+As presented in Table 5, on the FOMC announcement days the volatility response is strong 
+and extends beyond the announcement day. With the Parkinson proxy, abnormal volatility 
+is already high 1.26 p.p. on 𝜏= −2 (p=0.022), 1.03 p.p. on 𝜏= 0 (p<0.001), and remains 
+positive 0.6 p.p. on 𝜏= +1 (p=0.034). The Rogers–Satchell proxy shows similar results: 
+significant 0.93 p.p. on 𝜏= 0 (p=0.004), significant 0.70 p.p. on 𝜏= +1 (p=0.039) and 
+0.53 p.p. 𝜏= +2 (p=0.046), with a borderline rise on 𝜏= −2 (p=0.061) and no effect on 
+𝜏= −1. Cumulative abnormal returns are insignificant on all days in the event window, 
+the lower N reflects the SPX-day rule from Section 3.2. 
+5.2 Event-study results aggregated over the event window 
+Table 6. CPI event-study results window average 
+Window 
+Measure 
+N 
+Mean  
+Mean 
+(ann.) 
+t-test 
+p 
+ 
+[-2,-1] 
+CAR 
+62 
+-0.0006 
+ 
+-0.08 
+0.937 
+ 
+[-2,-1] 
+AVOL (RS) 
+62 
+0.52 
+9.93 
+2.59 
+0.012 
+* 
+[-2,-1] 
+AVOL (PK) 
+62 
+0.61 
+11.74 
+2.89 
+0.005 
+** 
+[1,2] 
+CAR 
+58 
+-0.0030 
+ 
+-0.43 
+0.672 
+ 
+[1,2] 
+AVOL (RS) 
+62 
+0.44 
+8.45 
+1.45 
+0.153 
+ 
+[1,2] 
+AVOL (PK) 
+62 
+0.54 
+10.38 
+1.37 
+0.176 
+ 
+ 
+As presented in Table 6, the two-day pre-event window [-2,-1] shows a clear volatility build-
+up: AVOL equals 0.52 p.p. with RS (p=0.012) and 0.61 p.p. with Parkinson (p=0.005), 
+about 10–12 p.p. in annualized terms. In the post-event window [1,2] volatility remains 
+positive but is smaller and not statistically significant (0.44–0.54 p.p., p=0.153–0.176). 
+CARs are near zero and insignificant in both windows (pre: −0.0006, p=0.937, post: 
+−0.0030, p=0.672), the lower N reflects the SPX-day rule from Section 3.2.  
+ 
+
+24 
+Table 7. FOMC event-study results window average 
+Window 
+Measure 
+N 
+Mean 
+Mean 
+(ann.) 
+t-test 
+p 
+ 
+[-2,-1] 
+CAR 
+42 
+-0.0064 
+ 
+-0.72 
+0.473 
+ 
+[-2,-1] 
+AVOL (RS) 
+42 
+0.73 
+14.00 
+1.99 
+0.053 
+ 
+[-2,-1] 
+AVOL (PK) 
+42 
+0.73 
+14.01 
+2.22 
+0.032 
+* 
+[1,2] 
+CAR 
+42 
+0.0013 
+ 
+0.15 
+0.884 
+ 
+[1,2] 
+AVOL (RS) 
+42 
+0.61 
+11.74 
+2.75 
+0.009 
+** 
+[1,2] 
+AVOL (PK) 
+42 
+0.47 
+9.02 
+2.58 
+0.014 
+* 
+ 
+As presented in Table 7, for FOMC, the two-day pre-event window [-2,-1] shows a 
+significant rise in volatility and no price drift. AVOL is 0.73 p.p. with the Parkinson proxy 
+(p=0.032) and very close with RS 0.73 p.p. (p=0.053, borderline). In the post-event window 
+[1,2] the volatility increase remains and is statistically significant: 0.61 p.p. with RS 
+(p=0.009) and 0.47 p.p. with Parkinson (p=0.014). CARs are small and insignificant in both 
+windows (−0.0064 pre, 0.0013 post).  
+Therefore, according to the results presented in Tables 5-7, inflation and policy rate 
+announcements result in Bitcoin’s positive abnormal volatility within the chosen event 
+window, but are not associated with significant abnormal returns. A possible reason for the 
+absence of significant results for CAR could be that Bitcoin price has opposite reactions to 
+positive and negative announcements. While these reactions could be individually 
+significant, pooling all announcements together might lead to zero average CAR. To 
+investigate whether this is indeed the case, we split all CPI and FOMC announcements into 
+sub-samples by their direction and present the results for each of them in Tables 8 and 9. 
+ 
+ 
+
+25 
+Table 8. CPI event-study results by YoY inflation direction window 
+average 
+Group 
+Window 
+Measure 
+N 
+Mean  
+Mean 
+(ann.) 
+t-test 
+p 
+ 
+CPI YoY ↑ 
+[-2,-1] 
+AVOL (PK) 30 
+0.54  
+10.37 
+2.29 
+0.030 
+* 
+CPI YoY ↑ 
+[-2,-1] 
+AVOL (RS) 
+30 
+0.49 
+9.32 
+1.59 
+0.122 
+ 
+CPI YoY ↑ 
+[-2,-1] 
+CAR 
+30 
+0.0104 
+ 
+0.92 
+0.364 
+ 
+CPI YoY ↑ 
+[1,2] 
+AVOL (PK) 30 
+-0.1 
+-2.52 
+-0.81 
+0.423 
+ 
+CPI YoY ↑ 
+[1,2] 
+AVOL (RS) 
+30 
+-0.05 
+-0.93 
+-0.28 
+0.782 
+ 
+CPI YoY ↑ 
+[1,2] 
+CAR 
+27 -0.0018 
+ 
+-0.35 
+0.731 
+ 
+Unchanged 
+[-2,-1] 
+AVOL (PK) 
+4 
+-0.27 
+-5.20 
+-0.86 
+0.451 
+ 
+Unchanged 
+[-2,-1] 
+AVOL (RS) 
+4 
+-0.43 
+-8.18 
+-1.32 
+0.279 
+ 
+Unchanged 
+[-2,-1] 
+CAR 
+4 
+-0.0306 
+ 
+-2.07 
+0.130 
+ 
+Unchanged 
+[1,2] 
+AVOL (PK) 
+4 
+-0.32 
+-6.02 
+-1.35 
+0.271 
+ 
+Unchanged 
+[1,2] 
+AVOL (RS) 
+4 
+-0.63 
+-11.94 
+-3.14 
+0.052 
+ 
+Unchanged 
+[1,2] 
+CAR 
+4 
+-0.0034 
+ 
+-0.43 
+0.697 
+ 
+CPI YoY ↓ 
+[-2,-1] 
+AVOL (PK) 28 
+0.82 
+15.62 
+2.08 
+0.047 
+* 
+CPI YoY ↓ 
+[-2,-1] 
+AVOL (RS) 
+28 
+0.69 
+13.17 
+2.36 
+0.026 
+* 
+CPI YoY ↓ 
+[-2,-1] 
+CAR 
+28 -0.0081 
+ 
+-0.67 
+0.507 
+ 
+CPI YoY ↓ 
+[1,2] 
+AVOL (PK) 28 
+1.39 
+26.55 
+1.65 
+0.110 
+ 
+CPI YoY ↓ 
+[1,2] 
+AVOL (RS) 
+28 
+1.12 
+21.41 
+1.77 
+0.087 
+ 
+CPI YoY ↓ 
+[1,2] 
+CAR 
+27 -0.0042 
+ 
+-0.29 
+0.774 
+ 
+ 
+As presented in Table 8, for CPI announcements split by the YoY direction, the volatility 
+response is strongest when inflation falls. In the pre-announcement window [-2,-1], AVOL 
+is 0.82 p.p. with the Parkinson proxy (p=0.047) and 0.69 p.p. with the RS proxy (p=0.026) 
+for “CPI YoY ↓”, while post-window [1,2] effects are weaker and only borderline with RS 
+(1.12 p.p., p=0.087). When inflation rises (“CPI YoY ↑”), there is a smaller but significant 
+
+26 
+pre-window increase with the Parkinson proxy (0.54 p.p., p=0.030). RS is not significant 
+and there is no post-window effect. The “unchanged” group has only four events, so 
+estimates are imprecise. The only near-signal is a negative RS effect in [1,2] (-0.63 p.p., 
+p≈0.052). Across all groups and windows, CARs are insignificant. See Appendix Table 11 
+for day-by-day estimates. 
+Table 9. FOMC event-study results by policy-rate move window 
+average 
+ 
+Group 
+Window 
+Measure 
+N 
+Mean 
+Mean 
+(ann.) 
+t-test 
+p 
+ 
+Hike (rate ↑) 
+[-2,-1] 
+AVOL (PK) 
+11 
+0.53 
+10.17 
+0.92 
+0.378 
+ 
+Hike (rate ↑) 
+[-2,-1] 
+AVOL (RS) 
+11 
+0.40 
+7.69 
+0.90 
+0.388 
+ 
+Hike (rate ↑) 
+[-2,-1] 
+CAR 
+11 
+-0.0336 
+ 
+-2.56 
+0.029 
+* 
+Hike (rate ↑) 
+[1,2] 
+AVOL (PK) 
+11 
+0.31 
+5.86 
+0.82 
+0.429 
+ 
+Hike (rate ↑) 
+[1,2] 
+AVOL (RS) 
+11 
+0.26 
+5.05 
+0.92 
+0.378 
+ 
+Hike (rate ↑) 
+[1,2] 
+CAR 
+11 
+-0.0067 
+ 
+-0.47 
+0.645 
+ 
+Unchanged 
+[-2,-1] 
+AVOL (PK) 
+26 
+0.48 
+9.13 
+1.50 
+0.145 
+ 
+Unchanged 
+[-2,-1] 
+AVOL (RS) 
+26 
+0.46 
+8.73 
+1.45 
+0.160 
+ 
+Unchanged 
+[-2,-1] 
+CAR 
+26 
+0.0012 
+ 
+0.10 
+0.922 
+ 
+Unchanged 
+[1,2] 
+AVOL (PK) 
+26 
+0.49 
+9.35 
+2.31 
+0.030 
+* 
+Unchanged 
+[1,2] 
+AVOL (RS) 
+26 
+0.59 
+11.36 
+2.37 
+0.026 
+* 
+Unchanged 
+[1,2] 
+CAR 
+26 
+0.0025 
+ 
+0.21 
+0.835 
+ 
+Cut (rate ↓) 
+[-2,-1] 
+AVOL (PK) 
+5 
+2.50 
+47.79 
+1.36 
+0.247 
+ 
+Cut (rate ↓) 
+[-2,-1] 
+AVOL (RS) 
+5 
+2.89 
+55.30 
+1.18 
+0.303 
+ 
+Cut (rate ↓) 
+[-2,-1] 
+CAR 
+5 
+0.014 
+ 
+1.60 
+0.185 
+ 
+Cut (rate ↓) 
+[1,2] 
+AVOL (PK) 
+5 
+0.75 
+14.29 
+0.94 
+0.400 
+ 
+Cut (rate ↓) 
+[1,2] 
+AVOL (RS) 
+5 
+1.49 
+28.47 
+1.20 
+0.297 
+ 
+Cut (rate ↓) 
+[1,2] 
+CAR 
+5 
+0.0126 
+ 
+0.47 
+0.665 
+ 
+
+27 
+As presented in Table 9, for FOMC announcements split by the rate move, the volatility 
+response is concentrated in “unchanged” meetings. In the post-announcement window 
+[1,2], AVOL is 0.49 p.p. with the Parkinson proxy (p=0.030) and 0.59 p.p. with the RS 
+proxy (p=0.026), while the pre-window [−2, −1] is not significant for either proxy. When 
+the rate is hiked, both proxies are small and insignificant in both windows. The only clear 
+signal is a negative pre-window return drift: CAR in [−2, −1] is −0.0336 in log returns 
+(≈−3.36% simple) (t=−2.56, p=0.029). For rate cuts the sample is very small (N=5), and 
+neither AVOL nor CAR is significant in any window. See Appendix Table 12 for day-by-
+day estimates. 
+5.3 Summary of results 
+Bitcoin’s volatility rises around U.S. macro announcements, while returns show no 
+consistent drift. For CPI, volatility builds up before the release and peaks on the 
+announcement day: about 0.5–0.7 p.p. on 𝜏 = −2 … −1 and about 0.8 p.p. on 𝜏 =  0 
+(Tables 4 and 6). After the release the effect fades and is not different from zero on 𝜏 =
+ +1 … + 2 (Tables 4 and 6). For FOMC, the day-0 spike is 1.0 p.p. and volatility stays 
+elevated on 𝜏 = +1 … + 2 at roughly 0.5–0.6 p.p. (Tables 5 and 7). 
+Cross-section results follow the same pattern. For CPI, the largest response is when YoY 
+inflation falls: the pre-window [−2, −1] is about 0.7–0.8 p.p., while it is smaller (about 0.5 
+p.p.) when inflation rises, the “unchanged” CPI group is too small for precise estimates 
+(Table 8, Appendix Table 11). For FOMC, the post-window effect is mainly in 
+“unchanged” meetings at about 0.5–0.6 p.p. in [1, 2], hikes and cuts show insignificant in 
+the two-day windows (Table 9, Appendix Table 12). Returns are close to zero throughout, 
+the only pattern is a small negative drift before rate hikes in [−2, −1] of about −3.3% in 
+logs (Table 9). 
+Overall, H1 is supported: volatility increases around CPI and FOMC, with a sharp one-day 
+CPI spike and a more persistent FOMC effect. For returns, H2 is generally not supported: 
+
+28 
+across specifications the average CAR does not differ significantly from zero on 
+announcement days, and pre- or post-window CARs are also mostly insignificant. The only 
+noticeable exceptions are a small negative CAR in [−2, −1] before rate hikes and a few 
+significant day-level FOMC results, however, these are based on small subsamples don’t 
+change the overall conclusion 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+29 
+CHAPTER 6  
+CONCLUSIONS AND RECOMMENDATIONS 
+The patterns documented in the thesis point to a simple message for practice: plan in 
+advance for announcement days, manage risk first, and avoid relying on one-way bets. 
+Scheduled news changes market expectations, so positions get rebalanced, day-level ranges 
+tend to widen, and trading can become one-sided for a while. These effects matter even 
+when the final price move is small. Our evidence is based on daily data, not intraday data, 
+so the guidance below focuses on day-level ranges rather than intraday timing. 
+For spot trading, preparation is more useful than prediction. Use an event calendar, expect 
+wider day-level ranges, and tighten risk controls around the release window. Smaller 
+position sizes, more careful execution, and temporary pauses near the announcement time 
+help to avoid forced decisions in fast markets. After the meeting or release, let positions 
+scale back up only when price action and depth look normal again. 
+For options, strategies that profit from bigger ranges are usually safer than one-way bets. 
+Entering before the announcement and exiting in steps can balance gains from the move 
+with the possibility that realized volatility falls after the event. Position sizing should reflect 
+that the main risk depends on the path the price takes: large ranges can occur without a 
+clear direction. This guidance shows a repeated pattern of higher daily ranges around the 
+announcements, not a forecast about the news itself. 
+For market makers, exchanges, and brokers, it is reasonable to widen spreads and raise 
+initial margin and liquidation buffers around scheduled announcements. The goal is to 
+protect inventories and clients against sudden gaps and temporary order-book imbalances. 
+In FOMC weeks, keeping some of these controls until the next day is consistent with the 
+more persistent response in our results. 
+For treasuries, miners, and large corporate conversions, avoid bunching large transfers 
+around the announcement window. Execution risk and slippage rise when spreads widen 
+
+30 
+and depth is thin. Plan outside the immediate window especially when YoY CPI later falls, 
+because the pre-announcement window is more sensitive in that subgroup. 
+For portfolio and risk management, short-horizon limits should reflect the event pattern. 
+Value-at-Risk and Expected Shortfall inputs can be increased on CPI days (𝜏= 0) and 
+through FOMC 𝜏= 0 … + 2, and risk budgets can be shifted away from strategies that are 
+highly sensitive to sudden changes in day-level range. Signals that occasionally appear 
+before specific meeting outcomes are not strong or consistent enough to justify systematic 
+directional exposure. 
+Overall, the practical rule is simple: on announcement days, prioritize risk discipline over 
+forecasts, let position size and leverage do most of the work, and give markets time 
+(especially after FOMC) to absorb the information before returning to normal. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+31 
+REFERENCES 
+Bhargava Vivek, Chaudhry Mukesh, and Konku Daniel. 2025. “An in-depth examination 
+of trading volume and return volatility dynamics”. Managerial Finance (June) 
+https://doi.org/10.1108/MF-02-2025-0057  
+ 
+Cadenas-Morales Eloisa, and Ortiz Edgar. 2022. “Bitcoin Volatility Estimate Applying 
+Rogers and Satchell Range Model”. International Journal of Finance, Insurance and Risk 
+Management Volume 12, Issue 1 (January): 49-79. 
+https://doi.org/10.35808/ijfirm/278  
+ 
+Corbet Shaen, Larkin Charles, Lucey Brian M., Meegan Andrew, and Yarovaya Larisa. 
+2020. “The impact of macroeconomic news on Bitcoin returns”. European Journal of Finance 
+26(5) (March): 1-21. 
+http://dx.doi.org/10.2139/ssrn.3550842  
+ 
+Kim Suk-Joong, McKenzie Michael D., and Faff Robert W. 2004. “Macroeconomic News 
+Announcements and the Role of Expectations: Evidence for US Bond, Stock and Foreign 
+Exchange Markets”. Journal of Multinational Financial Management Volume 14, Issue 3 (July): 
+217-232. 
+https://doi.org/10.1016/j.mulfin.2003.02.001 
+ 
+MacKinlay Craig A. 1997. “Event Studies in Economics and Finance”. Journal of Economic 
+Literature Volume 35: 13-39. 
+ 
+Ma Chaoqun, Tian Yonggang, Hsiao Shisong, and Deng Liurui. 2022. “Monetary Policy 
+Shocks and Bitcoin Prices”. Research in International Business and Finance Volume 62 
+(December): 101711. 
+https://doi.org/10.1016/j.ribaf.2022.101711 
+ 
+Mužić Ivan, and Gržeta Ivan. 2022. “Expectations of macroeconomic news 
+announcements: Bitcoin vs. traditional assets”. MDPI Risks Volume 10(6) (June): 123. 
+https://doi.org/10.3390/risks10060123 
+ 
+Nakamoto Satoshi. 2008. “Bitcoin: A peer-to-peer electronic cash system”. 
+https://bitcoin.org/bitcoin.pdf  
+ 
+Oprisor Tudos, Balint Cristina-Ioana, and Cordos George-Silviu. 2024. “Economic 
+Tremors From a Perfect Storm: The Ukrainian Crisis and Its Impact on Regional Stock 
+Market Volatility”. Studia Universitatis Babeș-Bolyai Negotia Volume 69(4) (December): 53–
+68. 
+https://doi.org/10.24193/subbnegotia.2024.4.03  
+
+32 
+ 
+Parkinson Michael. 1980. “The Extreme Value Method for Estimating the Variance of the 
+Rate of Return”. The Journal of Business Volume 53, No. 1 (January): 61-65. 
+https://doi.org/10.1086/296071  
+ 
+Pyo Sujin, and Lee Jaewook. 2020. “Do FOMC and Macroeconomic Announcements 
+Affect Bitcoin Prices?”. Finance Research Letters Volume 37 (November): 101386. 
+https://doi.org/10.1016/j.frl.2019.101386 
+ 
+Rogers Leonard Christopher Gordon, and Satchell Stephen. 1991. “Estimating Variance 
+From High, Low and Closing Prices”. The Annals of Applied Probability 1(4) (November): 
+504-512. 
+https://doi.org/10.1214/aoap/1177005835 
+ 
+Saggu Aman, Ante Lennart, and Kopiec Kaja. 2025. “Uncertain Regulations, Definite 
+Impacts: The Impact of the U.S. Securities and Exchange Commission’s Regulatory 
+Interventions on Crypto Assets”. Finance Research Letters Volume 72 (February): 106413. 
+https://doi.org/10.1016/j.frl.2024.106413   
+ 
+S&P Global. May 2023. “Are crypto markets correlated with macroeconomic factors?”. 
+https://www.spglobal.com/content/dam/spglobal/corporate/en/images/general/speci
+al-editorial/are-crypto-markets-correlated-with-macroeconomic-factors.pdf 
+ 
+Youssef Layal, and Polyzos Efstathios. 2025. “Investigating the Impact of Global Events 
+on Cryptocurrency Performance: A Big Data Event Study Approach”. Journal of International 
+Money and Finance Volume 157 (August): 103375. 
+https://doi.org/10.1016/j.jimonfin.2025.103375 
+ 
+Yue Wei, Zhang Sijia, and Zhang Qiang. 2021. “Asymmetric News Effects on 
+Cryptocurrency Liquidity: an Event Study Perspective”. Finance Research Letters Volume 41 
+(July): 101799. 
+https://doi.org/10.1016/j.frl.2020.101799  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+33 
+APPENDIX 
+ 
+Table 10. Event count by direction 
+Event 
+-1 (down) 
+0 (unchanged) 
+1 (up) 
+FOMC 
+5 
+26 
+11 
+CPI 
+28 
+4 
+31 
+ 
+Table 11. CPI event-study results by YoY inflation direction for 
+each day of the event window 
+Group 
+Day 
+Measure 
+N 
+Mean 
+Mean 
+(ann.) 
+t-test 
+p 
+ 
+CPI YoY ↑ 
+-2 
+AVOL (PK) 
+30 
+0.79 
+15.11 
+1.90 
+0.068 
+ 
+CPI YoY ↑ 
+-1 
+AVOL (PK) 
+30 
+0.29 
+5.62 
+1.27 
+0.213 
+ 
+CPI YoY ↑ 
+0 
+AVOL (PK) 
+30 
+0.60 
+11.46 
+2.06 
+0.048 
+* 
+CPI YoY ↑ 
+1 
+AVOL (PK) 
+30 
+-0.20 
+-3.78 
+-0.88 
+0.385 
+ 
+CPI YoY ↑ 
+2 
+AVOL (PK) 
+30 
+-0.07 
+-1.26 
+-0.26 
+0.800 
+ 
+CPI YoY ↑ 
+-2 
+AVOL (RS) 
+30 
+0.80 
+15.28 
+1.60 
+0.120 
+ 
+CPI YoY ↑ 
+-1 
+AVOL (RS) 
+30 
+0.18 
+3.36 
+0.77 
+0.449 
+ 
+CPI YoY ↑ 
+0 
+AVOL (RS) 
+30 
+0.53 
+10.26 
+2.15 
+0.040 
+* 
+CPI YoY ↑ 
+1 
+AVOL (RS) 
+30 
+-0.11 
+-2.04 
+-0.46 
+0.650 
+ 
+CPI YoY ↑ 
+2 
+AVOL (RS) 
+30 
+0.010 
+0.17 
+0.04 
+0.971 
+ 
+CPI YoY ↑ 
+-2 
+CAR 
+24 
+0.0107 
+ 
+1.08 
+0.292 
+ 
+CPI YoY ↑ 
+-1 
+CAR 
+30 
+0.0104 
+ 
+0.92 
+0.364 
+ 
+CPI YoY ↑ 
+0 
+CAR 
+30 
+0.0110 
+ 
+0.91 
+0.373 
+ 
+CPI YoY ↑ 
+1 
+CAR 
+27 
+0.0134 
+ 
+0.90 
+0.374 
+ 
+
+34 
+CPI YoY ↑ 
+2 
+CAR 
+21 
+0.0133 
+ 
+0.72 
+0.478 
+ 
+Unchanged 
+-2 
+AVOL (PK) 
+4 
+0.05 
+1.04 
+0.11 
+0.916 
+ 
+Unchanged 
+-1 
+AVOL (PK) 
+4 
+-0.60 
+-11.44 
+-1.26 
+0.297 
+ 
+Unchanged 
+0 
+AVOL (PK) 
+4 
+-0.40 
+-7.61 
+-0.53 
+0.633 
+ 
+Unchanged 
+1 
+AVOL (PK) 
+4 
+-0.29 
+-5.55 
+-0.98 
+0.399 
+ 
+Unchanged 
+2 
+AVOL (PK) 
+4 
+-0.34 
+-6.49 
+-0.65 
+0.563 
+ 
+Unchanged 
+-2 
+AVOL (RS) 
+4 
+-0.43 
+-8.16 
+-1.13 
+0.340 
+ 
+Unchanged 
+-1 
+AVOL (RS) 
+4 
+-0.43 
+-8.20 
+-0.87 
+0.449 
+ 
+Unchanged 
+0 
+AVOL (RS) 
+4 
+0.23 
+4.47 
+0.25 
+0.821 
+ 
+Unchanged 
+1 
+AVOL (RS) 
+4 
+0.11 
+2.02 
+0.35 
+0.751 
+ 
+Unchanged 
+2 
+AVOL (RS) 
+4 
+-1.37 
+-26.08 
+-6.28 
+0.008 
+** 
+Unchanged 
+-2 
+CAR 
+4 
+-0.0108 
+ 
+-0.64 
+0.566 
+ 
+Unchanged 
+-1 
+CAR 
+4 
+-0.0306 
+ 
+-2.07 
+0.130 
+ 
+Unchanged 
+0 
+CAR 
+4 
+-0.0481 
+ 
+-2.59 
+0.081 
+ 
+Unchanged 
+1 
+CAR 
+4 
+-0.0637 
+ 
+-2.42 
+0.094 
+ 
+Unchanged 
+2 
+CAR 
+1 
+-0.0347 
+ 
+NA 
+NA 
+ 
+CPI YoY ↓ 
+-2 
+AVOL (PK) 
+28 
+0.68 
+13.07 
+1.60 
+0.121 
+ 
+CPI YoY ↓ 
+-1 
+AVOL (PK) 
+28 
+0.95 
+18.18 
+2.25 
+0.033 
+* 
+CPI YoY ↓ 
+0 
+AVOL (PK) 
+28 
+1.21 
+23.17 
+3.47 
+0.002 
+** 
+CPI YoY ↓ 
+1 
+AVOL (PK) 
+28 
+1.77 
+33.75 
+1.77 
+0.088 
+ 
+CPI YoY ↓ 
+2 
+AVOL (PK) 
+28 
+1.01 
+19.36 
+1.46 
+0.156 
+ 
+CPI YoY ↓ 
+-2 
+AVOL (RS) 
+28 
+0.54 
+10.31 
+1.43 
+0.164 
+ 
+CPI YoY ↓ 
+-1 
+AVOL (RS) 
+28 
+0.84 
+16.03 
+2.80 
+0.009 
+** 
+CPI YoY ↓ 
+0 
+AVOL (RS) 
+28 
+1.19 
+22.68 
+3.55 
+0.001 
+*** 
+CPI YoY ↓ 
+1 
+AVOL (RS) 
+28 
+1.01 
+19.24 
+2.20 
+0.037 
+* 
+CPI YoY ↓ 
+2 
+AVOL (RS) 
+28 
+1.23 
+23.59 
+1.40 
+0.174 
+ 
+CPI YoY ↓ 
+-2 
+CAR 
+17 
+-0.0049 
+ 
+-0.49 
+0.629 
+ 
+CPI YoY ↓ 
+-1 
+CAR 
+28 
+-0.0081 
+ 
+-0.67 
+0.507 
+ 
+CPI YoY ↓ 
+0 
+CAR 
+27 
+0.0016 
+ 
+0.13 
+0.900 
+ 
+
+35 
+CPI YoY ↓ 
+1 
+CAR 
+27 
+-0.0067 
+ 
+-0.30 
+0.769 
+ 
+CPI YoY ↓ 
+2 
+CAR 
+21 
+-0.0024 
+ 
+-0.10 
+0.920 
+ 
+ 
+ 
+Table 12. FOMC event-study results by policy-rate move for each 
+day of the event window 
+ 
+Group 
+Day 
+Measure 
+N 
+Mean 
+Mean 
+(ann.) 
+t-test 
+p 
+ 
+Hike (rate ↑) 
+-2 
+AVOL (PK) 
+11 
+1.18 
+22.61 
+1.47 
+0.172 
+ 
+Hike (rate ↑) 
+-1 
+AVOL (PK) 
+11 
+-0.12 
+-2.28 
+-0.29 
+0.779 
+ 
+Hike (rate ↑) 
+0 
+AVOL (PK) 
+11 
+1.17 
+22.33 
+2.88 
+0.016 
+* 
+Hike (rate ↑) 
+1 
+AVOL (PK) 
+11 
+0.61 
+11.65 
+0.95 
+0.363 
+ 
+Hike (rate ↑) 
+2 
+AVOL (PK) 
+11 
+0.00 
+0.06 
+0.01 
+0.992 
+ 
+Hike (rate ↑) 
+-2 
+AVOL (RS) 
+11 
+0.61 
+11.65 
+1.16 
+0.272 
+ 
+Hike (rate ↑) 
+-1 
+AVOL (RS) 
+11 
+0.20 
+3.73 
+0.39 
+0.702 
+ 
+Hike (rate ↑) 
+0 
+AVOL (RS) 
+11 
+1.50 
+28.62 
+2.00 
+0.074 
+ 
+Hike (rate ↑) 
+1 
+AVOL (RS) 
+11 
+0.28 
+5.36 
+0.72 
+0.487 
+ 
+Hike (rate ↑) 
+2 
+AVOL (RS) 
+11 
+0.25 
+4.74 
+0.82 
+0.430 
+ 
+Hike (rate ↑) 
+-2 
+CAR 
+11 -0.0289 
+ 
+-2.06 
+0.066 
+ 
+Hike (rate ↑) 
+-1 
+CAR 
+11 -0.0336 
+ 
+-2.56 
+0.029 
+* 
+Hike (rate ↑) 
+0 
+CAR 
+11 -0.0254 
+ 
+-2.09 
+0.063 
+ 
+Hike (rate ↑) 
+1 
+CAR 
+11 -0.0317 
+ 
+-1.50 
+0.165 
+ 
+Hike (rate ↑) 
+2 
+CAR 
+11 -0.0322 
+ 
+-1.42 
+0.185 
+ 
+Unchanged 
+-2 
+AVOL (PK) 
+26 
+0.85 
+16.32 
+1.86 
+0.075 
+ 
+Unchanged 
+-1 
+AVOL (PK) 
+26 
+0.10 
+1.94 
+0.36 
+0.725 
+ 
+Unchanged 
+0 
+AVOL (PK) 
+26 
+0.99 
+18.95 
+2.84 
+0.009 ** 
+Unchanged 
+1 
+AVOL (PK) 
+26 
+0.48 
+9.08 
+1.76 
+0.090 
+ 
+Unchanged 
+2 
+AVOL (PK) 
+26 
+0.50 
+9.62 
+1.55 
+0.134 
+ 
+
+36 
+Unchanged 
+-2 
+AVOL (RS) 
+26 
+0.78 
+14.82 
+1.59 
+0.124 
+ 
+Unchanged 
+-1 
+AVOL (RS) 
+26 
+0.14 
+2.63 
+0.59 
+0.561 
+ 
+Unchanged 
+0 
+AVOL (RS) 
+26 
+0.63 
+11.97 
+2.20 
+0.037 
+* 
+Unchanged 
+1 
+AVOL (RS) 
+26 
+0.61 
+11.15 
+1.71 
+0.099 
+ 
+Unchanged 
+2 
+AVOL (RS) 
+26 
+0.58 
+11.14 
+1.57 
+0.129 
+ 
+Unchanged 
+-2 
+CAR 
+26 -0.0032 
+ 
+-0.36 
+0.722 
+ 
+Unchanged 
+-1 
+CAR 
+25 
+0.0034 
+ 
+0.26 
+0.795 
+ 
+Unchanged 
+0 
+CAR 
+25 
+0.0218 
+ 
+1.56 
+0.131 
+ 
+Unchanged 
+1 
+CAR 
+26 
+0.0197 
+ 
+1.13 
+0.270 
+ 
+Unchanged 
+2 
+CAR 
+25 
+0.0196 
+ 
+0.84 
+0.408 
+ 
+Cut (rate ↓) 
+-2 
+AVOL (PK) 
+5 
+3.53 
+67.49 
+1.02 
+0.367 
+ 
+Cut (rate ↓) 
+-1 
+AVOL (PK) 
+5 
+1.47 
+28.09 
+1.86 
+0.136 
+ 
+Cut (rate ↓) 
+0 
+AVOL (PK) 
+5 
+0.91 
+17.41 
+1.22 
+0.290 
+ 
+Cut (rate ↓) 
+1 
+AVOL (PK) 
+5 
+1.25 
+23.86 
+0.95 
+0.396 
+ 
+Cut (rate ↓) 
+2 
+AVOL (PK) 
+5 
+0.24 
+4.66 
+0.57 
+0.597 
+ 
+Cut (rate ↓) 
+-2 
+AVOL (RS) 
+5 
+4.92 
+93.93 
+1.06 
+0.350 
+ 
+Cut (rate ↓) 
+-1 
+AVOL (RS) 
+5 
+0.87 
+16.67 
+2.06 
+0.108 
+ 
+Cut (rate ↓) 
+0 
+AVOL (RS) 
+5 
+1.30 
+24.74 
+0.88 
+0.430 
+ 
+Cut (rate ↓) 
+1 
+AVOL (RS) 
+5 
+2.13 
+40.74 
+1.10 
+0.335 
+ 
+Cut (rate ↓) 
+2 
+AVOL (RS) 
+5 
+0.85 
+16.19 
+1.12 
+0.327 
+ 
+Cut (rate ↓) 
+-2 
+CAR 
+4 
+-0.0115 
+ 
+-2.61 
+0.080 
+ 
+Cut (rate ↓) 
+-1 
+CAR 
+4 
+0.0222 
+ 
+6.16 
+0.009 ** 
+Cut (rate ↓) 
+0 
+CAR 
+4 
+0.0465 
+ 
+2.57 
+0.082 
+ 
+Cut (rate ↓) 
+1 
+CAR 
+5 
+0.0521 
+ 
+2.75 
+0.051 
+ 
+Cut (rate ↓) 
+2 
+CAR 
+4 
+0.0558 
+ 
+4.19 
+0.025 
+* 
+ 
+ 
+ 
+ 
+ 
+ 
+
+37 
+Table 13. CPI daily volatility 
+Metric 
+Count Min 
+Max 
+Mean 
+Median 
+Mean(ann.) 
+σ_pre (PK) 
+62 
+0.62 
+5.89 
+2.47 
+2.33 
+47.26 
+σ_pre (RS) 
+62 
+0.67 
+6.31 
+2.45 
+2.29 
+46.90 
+ 
+Table 14. FOMC daily volatility 
+Metric 
+Count 
+Min 
+Max 
+Mean 
+Median Mean(ann.) 
+σ_pre (PK) 
+42 
+0.95 
+6.25 
+2.55 
+2.29 
+48.69 
+σ_pre (RS) 
+42 
+0.97 
+6.79 
+2.50 
+2.26 
+47.73 
+ 

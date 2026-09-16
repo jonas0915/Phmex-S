@@ -1,0 +1,54 @@
+=== Volume Profile Mean Reversion Strategy with Tape Speed Confirmation for Cryptocurrency Futures Markets
+2026 | SSRN Electronic Journal | Volume Profile Mean Reversion Strategy with Tape Speed Confirmation for Cryptocurrency Futures Markets A 5-Year Backtest Study on SOL/USDT Perpetual Contracts
+https://doi.org/10.2139/ssrn.6932998
+NO ABSTRACT
+
+=== Returns from liquidity provision in cryptocurrency markets
+2025 | Journal of Banking & Finance | Returns from liquidity provision in cryptocurrency markets
+https://doi.org/10.1016/j.jbankfin.2025.107411
+We examine the liquidity provision premium in cryptocurrency markets using the returns from the short reversal strategy. We show that returns from liquidity provision can be predicted using the volatility index, realized variance, risk aversion, crash risk, tail risk, and innovations of Tether liquidity. We also find that an increase in the liquidity provision premium is associated with a decline in liquidity, trading volume, and transaction count, as well as more withdrawals, higher fees, and greater impermanent loss on Uniswap. This suggests potential competition between centralized and decentralized exchanges. Further, the liquidity provision premium of stock markets in China and Japan positively predicts the premium of cryptocurrency markets (effect of a common shock), meanwhile that of stock markets in the US and Canada negatively predicts the premium of cryptocurrency markets (substitution effect).
+
+=== Returns from liquidity provision in cryptocurrency markets
+2022 | SSRN Electronic Journal | Returns from Liquidity Provision in Cryptocurrency Markets
+https://doi.org/10.2139/ssrn.4057510
+NO ABSTRACT
+
+=== Predictability of Funding Rates
+1997 | The Journal of Finance | On Persistence in Mutual Fund Performance
+https://doi.org/10.1111/j.1540-6261.1997.tb03808.x
+ABSTRACT Using a sample free of survivor bias, I demonstrate that common factors in stock returns and investment expenses almost completely explain persistence in equity mutual funds' mean and risk‐adjusted returns. Hendricks, Patel and Zeckhauser's (1993) “hot hands” result is mostly driven by the one‐year momentum effect of Jegadeesh and Titman (1993) , but individual funds do not earn higher returns from following the momentum strategy in stocks. The only significant persistence not explained is concentrated in strong underperformance by the worst‐return mutual funds. The results do not support the existence of skilled or informed mutual fund portfolio managers.
+
+=== Predictability of Funding Rates
+2011 | New England Journal of Medicine | Rivaroxaban versus Warfarin in Nonvalvular Atrial Fibrillation
+https://doi.org/10.1056/nejmoa1009638
+BACKGROUND: The use of warfarin reduces the rate of ischemic stroke in patients with atrial fibrillation but requires frequent monitoring and dose adjustment. Rivaroxaban, an oral factor Xa inhibitor, may provide more consistent and predictable anticoagulation than warfarin. METHODS: In a double-blind trial, we randomly assigned 14,264 patients with nonvalvular atrial fibrillation who were at increased risk for stroke to receive either rivaroxaban (at a daily dose of 20 mg) or dose-adjusted warfarin. The per-protocol, as-treated primary analysis was designed to determine whether rivaroxaban was noninferior to warfarin for the primary end point of stroke or systemic embolism. RESULTS: In the primary analysis, the primary end point occurred in 188 patients in the rivaroxaban group (1.7% per year) and in 241 in the warfarin group (2.2% per year) (hazard ratio in the rivaroxaban group, 0.79; 95% confidence interval [CI], 0.66 to 0.96; P<0.001 for noninferiority). In the intention-to-treat analysis, the primary end point occurred in 269 patients in the rivaroxaban group (2.1% per year) and in 306 patients in the warfarin group (2.4% per year) (hazard ratio, 0.88; 95% CI, 0.74 to 1.03; P<0.001 for noninferiority; P=0.12 for superiority). Major and nonmajor clinically relevant bleeding occurred in 1475 patients in the rivaroxaban group (14.9% per year) and in 1449 in the warfarin group (14.5% per year) (hazard ratio, 1.03; 95% CI, 0.96 to 1.11; P=0.44), with significant reductions in intracranial hemorrhage (0.5% vs. 0.7%, P=0.02) and fatal bleeding (0.2% vs. 0.5%, P=0.003) in the rivaroxaban group. CONCLUSIONS: In patients with atrial fibrillation, rivaroxaban was noninferior to warfarin for the prevention of stroke or systemic embolism. There was no significant between-group difference in the risk of major bleeding, although intracranial and fatal bleeding occurred less frequently in the rivaroxaban group. (Funded by Johnson & Johnson and Bayer; ROCKET AF ClinicalTrials.gov number, NCT00403767.).
+
+=== On the Performance of Lagged Momentum and Reversal Strategies Across Daytime and Overnight Sessions in Bitcoin and Ethereum Cryptocurrencies
+2026 | Journal of risk and financial management | On the Performance of Lagged Momentum and Reversal Strategies Across Daytime and Overnight Sessions in Bitcoin and Ethereum Cryptocurrencies
+https://doi.org/10.3390/jrfm19090692
+Cryptocurrency markets trade continuously, but their return dynamics need not be uniform over the 24 h cycle. Using hourly Kraken prices from 2016 to 2025, we divide each day into complementary 12 h sessions and evaluate 25 ordered combinations of cash, long, short, momentum, and reversal positions across all 12 non-redundant hourly boundaries. The full-sample selection identifies Reversal/Reversal at an 08:00 UTC daytime start for Bitcoin (BTC) and Long/Reversal at a 05:00 UTC start for Ethereum (ETH). The return mechanisms differ: BTC is associated with conditional reversal in both sessions, whereas ETH combines positive overnight drift with daytime reversal. The selected rules generate higher realized terminal wealth and more favorable drawdown and Sharpe-ratio outcomes than buy-and-hold along the observed full-sample path. These realized differences, however, are not statistically significant in paired bootstrap tests, and Hansen’s Superior Predictive Ability test does not reject the null after accounting for the search over 300 cutoff–strategy combinations. A chronological holdout exercise, in which selection uses only 2016–2020 and evaluation uses 2021–2025, further shows that the ETH rule persists, but the BTC training-selected rule underperforms buy-and-hold. The findings should therefore be interpreted as evidence of asset-specific historical return structure, not as proof of a stable or readily implementable abnormal-profit opportunity. The 0–2 basis-point cost scenarios are illustrative and exclude slippage, market impact, borrowing, and funding costs.
+
+=== On the Performance of Lagged Momentum and Reversal Strategies Across Daytime and Overnight Sessions in Bitcoin and Ethereum Cryptocurrencies
+2026 | ScholarSpace (University of Hawaii at Manoa) | Max effect in crypto market: Evidence from intraday and overnight trading
+https://hdl.handle.net/10125/113470
+Ph.D.
+
+=== Predicting Ethereum price with perpetual futures contract funding rates
+2020 | International Review of Financial Analysis | Price discovery and microstructure in ether spot and derivative markets
+https://doi.org/10.1016/j.irfa.2020.101506
+NO ABSTRACT
+
+=== Predicting Ethereum price with perpetual futures contract funding rates
+2023 | Applied Sciences | The Potential of Blockchain Technology and Smart Contracts in the Energy Sector: A Review
+https://doi.org/10.3390/app14010253
+The energy sector is undergoing a period of technological transformation, driven by the emergence of blockchain and smart contracts. These technologies have the potential to revolutionize energy markets and significantly reduce transaction costs, improve efficiency, and increase transparency. The rising energy prices in recent years have been a cause for global concern. As the EU recorded historically high energy prices in 2022, according to the EU Council, this price rise is linked to increased energy demand following the COVID-19 pandemic, the war in Ukraine, and the acceleration of climate change. This paper aims to critically examine the current state of blockchain and smart contracts technology in the energy sector, focusing on use cases, key challenges, and potential solutions. It further explores the impact of these technologies on energy markets and their potential to contribute to a sustainable, low-carbon energy future. Finally, it examines the prospects of blockchain and smart contract technologies to transform the energy industry and the policy implications for governments and regulators.
+
+=== Bitcoin intraday time series momentum
+2021 | Financial Review | Bitcoin intraday time series momentum
+https://doi.org/10.1111/fire.12290
+Abstract This study examines intraday time series momentum in Bitcoin. Unlike stock markets, Bitcoin trades 24 h a day and therefore has not got a clear opening and closing period. Therefore, we use trading volume as a proxy for the market trading time and show that the first half‐hour positively predicts the last half‐hour return. We find that the first trading sessions with the highest volume or volatility are associated with the greatest predictability for intraday time series momentum. We also show that intraday momentum‐based trading yields substantial economic gains in terms of market timing and asset allocation, especially in periods of a market downturn in Bitcoin. Consistent with the finding in foreign exchange markets, our results also show that the Bitcoin intraday momentum is driven by liquidity provision rather than late‐informed trading.
+
+=== Bitcoin intraday time series momentum
+2019 | The British Accounting Review | Should investors include Bitcoin in their portfolios? A portfolio theory approach
+https://doi.org/10.1016/j.bar.2019.100837
+NO ABSTRACT

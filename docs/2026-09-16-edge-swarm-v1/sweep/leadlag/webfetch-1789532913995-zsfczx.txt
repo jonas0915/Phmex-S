@@ -1,0 +1,603 @@
+ 
+10th Istanbul Finance Congress (IFC - 2021), Vol.14, p.10-13                                                                                                     Ozaydin 
+ 
+ 
+ 
+_____________________________________________________________________________________________________ 
+ DOI: 10.17261/Pressacademia.2021.1477                                           10                                                       PressAcademia Procedia 
+ 
+ 
+ 
+ 
+ 
+ 
+BITCOIN'S LAGGED EFFECT ON ALTCOINS: A SHORT-TERM RESEARCH 
+ 
+DOI: 10.17261/Pressacademia.2021.1477 
+PAP- V.14-2021(3)-p.10-13 
+ 
+Orhan Ozaydin 
+Istanbul Gelisim University, International Trade and Business, Istanbul, Turkiye. 
+oozaydin@gelisim.edu.tr , ORCID: 0000-0003-2585-1437 
+ 
+ 
+ 
+To cite this document 
+Ozaydin, O. (2021). Bitcoin's Lagged Effect on Altcoins: A short-term research. PressAcademia Procedia (PAP), 14, 10-13. 
+Permeanent link to this document: http://doi.org/10.17261/Pressacademia.2021.1477 
+Copyright: Published by PressAcademia and limited licensed re-use rights only. 
+ 
+ 
+ABSTRACT  
+Purpose- As of October 2021, more than 13,000 cryptocurrencies are traded on 424 exchanges in the crypto money market, which exceeds 
+2.5 trillion dollars. Cryptocurrency initially emerged as a value exchange tool and to develop projects that make life easier. It is now also used 
+by individuals as a benefit for speculation. Cryptocurrencies are influenced by many economic indicators, as well as interacting with each 
+other. Recently, there is a belief in the crypto money market that Bitcoin is the pioneer of altcoins, supported some literatures. In this study, 
+I investigated how bitcoin, the first and largest of the crypto money market, affects other leading altcoins (alternative cryptocurrencies) (ETH, 
+BNB, ADA, XRP) in the short term as a lag period and interaction direction. Also, I examined the effect of DXY on Bitcoin. 
+Methodology- In February 2018, the cryptocurrency market exceeded $1 trillion. As of October 2021, it was $2.6 trillion. During this time, I 
+calculated the returns on the daily high price data. With the help of VAR models, I researched the impact of short-term lags of BTC on ETH, 
+BNB, ADA, XRP. Also, I've looked at Granger causality relationships. 
+Findings- The daily lagged values of BTC have a positive significant interaction with ETH, ADA and BNB, but there is no such relationship in 
+XRP. I found that DXY's lags have significant positive and negative effects on BTC. In the causality analysis, I saw that BTC has bidirectional 
+Granger causality with DXY and other altcoins except XRP. 
+Conclusion- It is seen that BTC, which dominates 45 percent of the market as of October 2021, is decisive for its movement for many altcoins. 
+The shocks to BTC are then reflected similarly to altcoins. I understood from both the literature and the results that DXY has no reasonable 
+effect on BTC. In future studies, the volatility and return contagion effect of BTC on other altcoins can be examined. 
+ 
+Keywords: Bitcoin, altcoin, vector autoregressive, DXY, causality. 
+JEL Codes: G00, G10, G11 
+ 
+ 
+1.INTRODUCTION  
+ryptocurrencies emerged as a replacement for traditional money, claiming to be an exchange of value, as well as a tool for speculation, 
+portfolio diversification and passive investment. The development of the cryptocurrency market in its recent past is dazzling, and it is obvious 
+that it has attracted intense interest from investors and speculators. While 50 cryptocurrencies were on the market in August 2013, it 
+increased to 500 in October 2014, 1500 in February 2018, and 2670 in June 2020 (Ballis and Drakos, 2021). As of October 2021, more than 
+13,000 cryptocurrencies are traded on 424 exchanges in the crypto money market, which exceeds 2.5 trillion dollars (CoinMarketCap). In the 
+digital currency market, they are risky investment instruments (Mariana et al., 2021), (Conlon and McGee, 2020) because their price 
+fluctuations are very high, but they are the focus of attention of investors due to their advantages such as high earnings. For this reason, 
+those who invest in the digital market follow not only Bitcoin, but also altcoins (alternative coins). In addition, speculators closely follow the 
+relations between Bitcoin and leading Altcoins. Pirgaip et al. (2019) stated that there is a causality relationship between BTC and Gold, ETH, 
+XRP and LTC in the short run; Adedokun (2019) stated that there is a causal relationship between BTC and almost all altcoins in 2017 and 
+2018; Demir et al. (2021) found the existence of an asymmetrical relationship between BTC and altcoins. Bouri et al. (2018) mentioned a 
+significant positive relationship between DXY and BTC. 
+In this study, I investigated how bitcoin, the first and largest of the crypto money market, affects other leading altcoins (alternative 
+cryptocurrencies) (ETH, BNB, ADA, XRP) in the short term as a lag period and interaction direction. Also, I examined the effect of DXY on 
+Bitcoin. The results of the study were in parallel with the literature. In the findings, the number of delays in the returns of the Bitcoin affects 
+the altcoins. BTC, which dominates 45 percent of the market as of October 2021, is an pre-indicator for the movement of leading altcoins. It 
+is understood that DXY does not have much effect on BTC. 
+
+ 
+10th Istanbul Finance Congress (IFC - 2021), Vol.14, p.10-13                                                                                                     Ozaydin 
+ 
+ 
+ 
+_____________________________________________________________________________________________________ 
+ DOI: 10.17261/Pressacademia.2021.1477                                           11                                                       PressAcademia Procedia 
+ 
+ 
+ 
+2.LITERATURE REVIEW 
+Nakamato (2008) explained the mechanics of bitcoin in his study in which he introduced the decentralized money system. Essentially, this 
+revolutionary software is a system that solves the double-spending problem without being connected to a central authority, mediates the 
+exchange of values, keeps the recorded transactions encrypted on many computers and shows the clients as witnesses. There is studies that 
+investigates short-term and long-term relationship between bitcoin and altcoins.g(Aysan, 2021) (Adedokun, 2019) (Pirgaip et al., 2019) 
+(Aysan et.al 2021)(Ciaian,2018). In long term, conflicted results were occurred amoung different periods. This may be explained that 
+cryptocurreny's market is young and hot. 
+Pirgaip et al. (2019) carried out a study with Bitcoin in the center with daily data covering 2010 and the end of 2018 that includes BTC and 
+other country currencies, stock markets, gold and altcoins. BTC has not a long-term cointegration relationship with all assets, however, it can 
+be mentioned a short-term mutual causality relationship with Gold, ETH, XRP and LTC. Adedokun (2019) studied Bitcoin and leading altcoins, 
+2015 and 2018 separately. He could not see a cointegration relationship and a causal relationship in 2015 and in 2016, however he mentioned 
+the existence of both relationships in 2017 and 2018. In recent years, he claimed that BTC has a causal relationship with almost all altcoins 
+and especially BTC, ETH and XRP are the granger cause.  Demir et al. (2021) examined the asymmetric interaction of BTC, ETH, XRP and LTC 
+between 2015 and 2019 using the NARDL model. They have seen that BTC has an impact on altcoins in the short and long term. Falls in BTC 
+affect altcoins more than its rise. In fact, this asymmetry is seen more frequently after 2017. Kubar and Toprak (2021) examined the causal 
+relationships between bitcoin and altcoins between 21.08.2020 and 07.01.2021. They stated that BTC is the Granger cause of ETH, however, 
+ADA, ETH and XRP are also the Granger cause of BTC. 
+ Haslak (2018), in his research between 2010 and 2018, says that when there is a positive shock in DXY, there is a short-term shot in BTC and 
+it goes out after 5 periods. However, he could not find a causal relationship between DXY and BTC. Bouri et al. (2018), in their study between 
+2010 and 2017, mention that there is a significant positive relationship between the USD index DXY and Bitcoin prices. 
+3. DATA AND METHODOLOGY 
+Cryptocurrencies with the highest market value in October 2021 were used in the study (Figure 1). These are Bitcoin, Etherium, Binance, 
+Cordano, Ripple. Since the Solana data started from March 2020, it was not included in the study due to lack of its data. In addition, the 
+relationship between USD index (DXY) and Bitcoin was also examined in the study. The total market value of cryptocurrencies exceeded 1 
+trillion USD at the beginning of 2018. February 2018 is taken as the starting date of the data, and the end of the data is October 2021. Return 
+data generated from daily high price data were used in the study (Formula 1). 
+In order to see the relationship between the variables, Vector autoregressive (VAR) models were established (Formula 2). The appropriate 
+lagged values of BTC are independent variables and other altcoins are dependent. Altcoins' delays is not added to the model. There may be 
+autocorrelation in the models, but models reveal the relationship between the lagged values of bitcoin, which is the main purpose of the 
+study, and altcoins. The relationship between Bitcoin and DXY was also examined with the VAR model (Formula 3). At the end of the study, 
+Granger causality between all variables was tested. 
+R(t)=P(t)/P(t-1) – 1    
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+(1) 
+Altcoin(t) = c + BTC(t-1)+BTC(t-2)+ … + Є  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+(2) 
+BTC(t) = c + DXY(t-1)+DXY(t-2)+ … + Є   
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+(3) 
+ 
+Figure 1: 2021, 29th October: Bitcoin and Market Leading Altcoins     
+ 
+ 
+ 
+Coin
+Price
+Market Value
+Bitcoin
+$60,902.35
+$1,166,465,950,106
+BTC
+Ethereum
+$4,227.15
+$504,325,316,918
+ETH
+Binance Coin
+$487.59
+$82,326,579,103
+BNB
+Cardano
+$1.99
+$67,271,843,611
+ADA
+Solana
+$196.72
+$59,933,246,779
+SOL
+Ripple
+$1.06
+$50,332,406,549
+XRP
+Total Market Value
+$2,610,379,126,471
+
+ 
+10th Istanbul Finance Congress (IFC - 2021), Vol.14, p.10-13                                                                                                     Ozaydin 
+ 
+ 
+ 
+_____________________________________________________________________________________________________ 
+ DOI: 10.17261/Pressacademia.2021.1477                                           12                                                       PressAcademia Procedia 
+ 
+ 
+ 
+4. FINDINGS AND DISCUSSION 
+Unit root tests of the return data results showed that there was no unit root in the series (Figure 2) Descriptive statistics of the data show 
+that cryptocurrencies have positive average returns and has higher kurtosis. A spiked distribution is generally encountered in financial time 
+series (Figure 3). The correlation matrix shows that bitcoin and altcoins are positively correlated. A weak negative correlation was seen 
+between Bitcoin and DXY (Figure 4). 
+Figure 2: ADF Unit Root Test 
+t-stat 
+BTC_DH 
+ETH_DH 
+BNB_DH 
+ADA_DH 
+XRP_DH 
+DXY_D 
+C 
+-33.4016 
+-36.8055 
+-30.5443 
+-31.503 
+-33.1775 
+-34.8372 
+Trend 
+-33.4679 
+-36.9855 
+-30.5859 
+-31.697 
+-33.2185 
+-34.8568 
+*All of them significant at 0.01 prob. 
+ 
+Figure 3: Descriptive Statistics 
+ 
+ 
+ 
+ 
+ 
+  
+BTC_DH 
+ETH_DH 
+BNB_DH 
+ADA_DH 
+XRP_DH 
+DXY_D 
+ Mean 
+0.001956 
+0.002163 
+0.004054 
+0.002463 
+0.001725 
+0.000045 
+ Median 
+-0.000377 
+-0.000994 
+-0.000617 
+-0.003058 
+-0.003453 
+0.000000 
+ Maximum 
+0.203951 
+0.796285 
+0.687700 
+0.333895 
+0.631161 
+0.016019 
+ Minimum 
+-0.254496 
+-0.442665 
+-0.315663 
+-0.263819 
+-0.347581 
+-0.016823 
+ Std. Dev. 
+0.035304 
+0.050561 
+0.052103 
+0.053767 
+0.061508 
+0.003014 
+ Skewness 
+0.654800 
+2.508838 
+2.518768 
+1.066416 
+2.800272 
+0.322189 
+ Kurtosis 
+9.755580 
+53.732270 
+31.303020 
+8.128043 
+25.358130 
+6.641720 
+ 
+Figure 4: Correlation Matrices 
+ 
+ 
+ 
+ 
+ 
+  
+BTC_DH 
+ETH_DH 
+BNB_DH 
+ADA_DH 
+XRP_DH 
+DXY_D 
+BTC_DH 
+1.000000 
+0.630439 
+0.493807 
+0.554383 
+0.437977 
+-0.092524 
+ETH_DH 
+0.630439 
+1.000000 
+0.452698 
+0.561811 
+0.450782 
+-0.069464 
+BNB_DH 
+0.493807 
+0.452698 
+1.000000 
+0.450425 
+0.376610 
+-0.088319 
+ADA_DH 
+0.554383 
+0.561811 
+0.450425 
+1.000000 
+0.511438 
+-0.085226 
+XRP_DH 
+0.437977 
+0.450782 
+0.376610 
+0.511438 
+1.000000 
+-0.054108 
+DXY_D 
+-0.092524 
+-0.069464 
+-0.088319 
+-0.085226 
+-0.054108 
+1.000000 
+ 
+Similar to most literature, the relationship between bitcoin and altcoins was resulted in this study on more recent data. When the VAR 
+Models are examined (figure 5), a positive impact in the first, third and fourth lag of Bitcoin positively affects Etherium. Again, Bitcoin's first 
+and second lags affect Binance, and Bitcoin's first, second and fourth lags affect Cordano in the same direction. However, Bitcoin's lag do not 
+have a significant effect on Ripple. The lag of DXY have positive and negative effects on Bitcoin's returns. It can be said that Bitcoin is the 
+leading indicator for the altcoins. When the Granger causality relationships between the data are examined, it is stated that the Granger 
+causality relationship between Bitcoin and all other altcoins exist, except between Bitcoin and Ripple (Figure 6). 
+ 
+Figure 5: VAR Models Coefficients and t-stats 
+ 
+ 
+ 
+ 
+ 
+  
+ETH_DH 
+BNB_DH 
+ADA_DH 
+XRP_DH 
+  
+  
+BTC_DH 
+BTC_DH(-1) 
+0.183039 
+0.090105 
+0.067452 
+0.069578 
+  
+DXY_D(-1) 
+-0.443512 
+  
+[ 5.62926]*** 
+[ 2.50887]** 
+[ 1.87617]* 
+[ 1.59603] 
+  
+  
+[-1.40137] 
+BTC_DH(-2) 
+-0.010885 
+0.110008 
+0.07261 
+0.03339 
+  
+DXY_D(-2) 
+0.40252 
+  
+[-0.33252] 
+[ 3.05161]*** 
+[ 2.01040]** 
+[ 0.76201] 
+  
+  
+[ 1.27597] 
+BTC_DH(-3) 
+0.086978 
+0.050153 
+0.019426 
+0.064932 
+  
+DXY_D(-3) 
+-0.684955 
+  
+[ 2.65819]*** 
+[ 1.38987] 
+[ 0.53790] 
+[ 1.48212] 
+  
+  
+[-2.16963]** 
+BTC_DH(-4) 
+0.089242 
+0.006779 
+0.083899 
+-0.036971 
+  
+DXY_D(-4) 
+0.244218 
+  
+[ 2.74145]*** 
+[ 0.18796] 
+[ 2.34054]** 
+[-0.85086] 
+  
+  
+[ 0.77667] 
+BTC_DH(-5) 
+-- 
+-0.060074 
+-- 
+-- 
+  
+DXY_D(-5) 
+0.401819 
+  
+  
+[-1.66204]* 
+  
+  
+  
+  
+[ 1.27784] 
+BTC_DH(-6) 
+-- 
+-0.068117 
+-- 
+-- 
+  
+DXY_D(-6) 
+0.545036 
+  
+  
+[-1.88594]* 
+  
+  
+  
+  
+[ 1.73425]* 
+BTC_DH(-7) 
+-- 
+0.002595 
+-- 
+-- 
+  
+DXY_D(-7) 
+0.548892 
+  
+  
+[ 0.07235] 
+  
+  
+  
+  
+[ 1.74297]* 
+BTC_DH(-8) 
+-- 
+0.006496 
+-- 
+-- 
+  
+DXY_D(-8) 
+0.244291 
+  
+  
+[ 0.18075] 
+  
+  
+  
+  
+[ 0.77633] 
+BTC_DH(-9) 
+-- 
+-0.043053 
+-- 
+-- 
+  
+DXY_D(-9) 
+-0.61698 
+  
+  
+[-1.19919] 
+  
+  
+  
+  
+[-1.95668]* 
+
+ 
+10th Istanbul Finance Congress (IFC - 2021), Vol.14, p.10-13                                                                                                     Ozaydin 
+ 
+ 
+ 
+_____________________________________________________________________________________________________ 
+ DOI: 10.17261/Pressacademia.2021.1477                                           13                                                       PressAcademia Procedia 
+ 
+ 
+ 
+BTC_DH(-10) 
+-- 
+0.014598 
+-- 
+-- 
+  
+ 
+ 
+  
+  
+[ 0.40946] 
+  
+  
+  
+ 
+ 
+Significance probabilities, *** 0.01, ** 0.05, *0.1. 
+Figure 6: Granger Causality Relationships  
+ 
+ 
+ 
+ 
+BTC_DH 
+ETH_DH 
+*** 
+ 
+ETH_DH 
+BTC_DH 
+*** 
+BTC_DH 
+BNB_DH 
+*** 
+ 
+BNB_DH 
+BTC_DH 
+* 
+BTC_DH 
+ADA_DH 
+*** 
+ 
+ADA_DH 
+BTC_DH 
+** 
+BTC_DH 
+XRP_DH 
+  
+ 
+XRP_DH 
+BTC_DH 
+  
+BTC_DH 
+DXY_D 
+** 
+ 
+DXY_D 
+BTC_DH 
+** 
+Significance probabilities, *** 0.01, ** 0.05, *0.1. 
+5.CONCLUSIONS 
+Investors include not only Bitcoin but also altcoins in their portfolios as an investment assets. Altcoins are gaining weight in the 
+cryptocurrency market. In this study I examined the relationship between Bitcoin and altcoins, I saw that the lagged values of bitcoin affected 
+other altcoins. BTC, which dominates 45% of the market as of October 2021, is the leading indicator for the altcoins. It is understood that 
+DXY does not have much effect on BTC from this research. In future studies, the impact of BTC on total altcoins can be investigated by creating 
+an altcoin index. 
+REFERENCES 
+Adedoku, A.(2019). Bitcoin-Altcoin price synchronization hypothesis: evidence from recent data. Journal of Finance and Economics, 7(4), 137-
+147 
+Aysan, A.F., Khan, A.I. and Topuz, H (2021). Bitcoin and altcoins price dependency: resilience and portfolio allocation in COVID-19 outbreak. 
+Risks, 9(4), 74. 
+Ballis, A. and Drakos, K. (2021). The explosion in cryptocurrencies: a black hole analogy. Financial Innovation, 7(8), 
+https://doi.org/10.1186/s40854-020-00222-0 
+Bouri, E., Gupta, R., Lahiani, A., Shahbaz, M., (2018). Testing for asymmetric nonlinear short-and long-run relationships between bitcoin, 
+aggregate commodity and gold prices. Resource Policy, 57, 224–235. 
+Ciaian, P. and Rajcaniova, M. (2018). Virtual relationships: short-and long-run evidence from BitCoin and altcoin markets. Journal of 
+International Financial Markets, Institutions and Money, 52, 173–195. 
+Conlon, Thomas ve McGee, Richard (2020). Safe haven or risky hazard? Bitcoin during the Covid-19 bear. Market Finance Research Letters, 
+35, doi.org/10.1016/j.frl.2020.101607 
+Demir, E., Simonyan, S., Garcia-Gomez C. and Lau, C.K.M. (2021). The asymmetric effect of bitcoin on altcoins: evidence from the nonlinear 
+autoregressive distributed lag (NARDL) model. Finance Research Letters (40), https://doi.org/10.1016/j.frl.2020.101754 
+Haslak, S. (2018). Analysis of Bitcoin market volatility. Cankaya Unıversity, Department Of Economıcs, Master Thesis. 
+Katsiampa, P., (2019a). Volatility co-movement between Bitcoin and Ether. Finance Research Letter, 30, 221–227. 
+Katsiampa, P., (2019b). An empirical investigation of volatility dynamics in the cryptocurrency market. Research in International Business and 
+Finance, 50, 322–335. 
+Kubar, Y. And Toprak, Y. (2021). Bitcoin ve altcoin’ler arasındaki ilişkinin Granger Nedensellik testi ile analizi. Journal of Emerging Economies 
+And Policy, 6(1), 233-247. 
+Mariana C.D., Ekaputra, I.A., ve Husodo, Z.A.,(2021). Are Bitcoin and Ethereum safe-havens for stocks during the COVID-19 pandemic? 
+Finance Research Letters ,V.38, 101798, https://doi.org/10.1016/j.frl.2020.101798 
+Nakamoto S., 2008, Bitcoin: a peer-to-peer electronic cash system Available at:https://bitcoin.org/bitcoin.pdf. 
+Pirgaip, B., Dinçergök,B. and Haslak, S. (2019). Bitcoin market price analysis and an empirical comparison with main currencies, commodities, 
+securities and altcoins. Blockchain Economics and Financial Market Innovation, Springer, 141-166. https://doi.org/10.1007/978-3-030-
+25275-5Sifat, I.M., Mohamad, A., Shariff, M.S.B.M., (2019). Lead-Lag relationship between Bitcoin and Ethereum: evidence from hourly and 
+daily data. Research in International Business and Finance, 50, 306–321. 

@@ -1,0 +1,511 @@
+Data Focus
+Whale Alerts: Are They Tradable?
+Jan 10, 2025
+Peter Chung l Head of Research
+peterchung@prestolabs.io
+Jaehyun Ha l Research Analyst
+jaehyunha@prestolabs.io
+Contents
+Summary
+1.
+Introduction
+2.
+Whale Alerts Overview
+2.1.
+History
+2.2.
+Underlying Assumption
+3.
+Evaluating Signal’s Efficacy
+3.1.
+Assets, Exchanges, Period, & Deposit Size
+3.2.
+Types of Entities
+3.3.
+Measuring Market Impacts
+3.4.
+Results
+4.
+Takeaways
+5.
+Conclusion
+Source: Whale Alert
+
+Summary
+●
+Whale alerts are popular because large on-chain transactions are often viewed as
+precursors to imminent selling activity and as sell signals. To evaluate these claims, we
+analyzed the relationship between large BTC, ETH, and SOL deposits into Binance and their
+price actions.
+●
+Our regression analysis showed low R-squared values (0.0017 to 0.0537) between large
+exchange deposits and subsequent price actions. Narrowing the data to deposits from VCs
+and MMs slightly improved the R-squared values, but their practical utility as trade signals
+remains limited. The findings strongly suggest that whale exchange deposits lack the
+predictive power to serve as reliable trade signals.
+●
+On-chain metrics are effective for other purposes, such as analyzing blockchain
+fundamentals, tracking illicit fund flows, or explaining price movements ex post. They will
+better serve the industry when investors adopt realistic expectations about their
+capabilities and limitations.
+1. Introduction
+One of the key features that distinguish crypto assets from others is the public availability of their
+transaction records, stored on a distributed ledger. This transparency has enabled the
+development of various tools that leverage this unique attribute, collectively known as "on-chain
+data." One such tool is “whale alerts,” automated services that notify large on-chain crypto
+transactions. They are popular because large transactions are often interpreted as a precursor to
+imminent selling activity and thus regarded as "sell signals" by traders.
+This report evaluates the validity of these commonly held assumptions. After providing a brief
+overview of the popular whale alert services available in the market, we explain how we analyze
+the relationship between large exchange deposits and the prices of BTC, ETH, and SOL. We then
+present the results of the analysis, followed by key takeaways and conclusions.
+2
+
+2. Whale Alerts Overview
+Whale alert refers to a service that tracks and reports large crypto transactions. These services
+emerged with the growth of the crypto ecosystem, highlighting market participants' appreciation
+for the transparency enabled by blockchain's permissionless nature.
+2.1. History
+The term "whale" gained prominence as early Bitcoin adopters, miners, and investors (e.g., Satoshi
+Nakamoto, the Winklevoss Twins, F2Pool, Mt. Gox) amassed large holdings. Initially, enthusiasts
+monitoring blockchain explorers like Blockchain.info noticed large transactions and often shared
+them on forums like Bitcointalk or Reddit. These data were often weaved into narratives explaining
+significant BTC price moves.
+The increasing number of transactions and whales during the 2017 bull market necessitated
+automated solutions for monitoring. In 2018, a European development team launched a tool called
+Whale Alert (capitalized to distinguish it from the generic term for similar services), which provides
+real-time tracking of large crypto transactions across multiple blockchains and sends alerts via X,
+Telegram, and web platforms. It quickly became popular among market participants seeking
+actionable trade signals.
+Figure 1: Looking Out For Big Moves
+Source: Whale Alert
+3
+
+2.2. Underlying Assumption
+Following Whale Alert’s success, numerous platforms have emerged over the years offering similar
+services, as summarized in Figure 2. While many newer platforms have added features to
+contextualize the alerts, the original Whale Alert remains focused on simple, real-time notifications
+and continues to be the most popular service, as evidenced by its large following on X. A common
+feature among all these services is their reliance on the assumption that large on-chain
+transactions—especially exchange deposits—signal imminent selling activity.
+Figure 2: Popular Whale Alert Services
+Platform
+Real-time Alerts?
+Focus
+X Followers
+Whale Alert
+Yes
+Simple, real-time tracking of large transactions
+2.6M
+Lookonchain
+Yes
+Real-time whale tracking with contextual analysis.
+511K
+Glassnode
+Limited
+Data-driven metrics with customizable alerts.
+553K
+Santiment
+Yes
+(configurable)
+Whale activity + sentiment and market analysis.
+199K
+Source: Whale Alert, Lookonchain, Glassnode, Santiment, X, Presto Research
+4
+
+3. Evaluating Signal’s Efficacy
+Advocates of whale alert services argue that on-chain asset transfers into exchanges often
+precede liquidation, making them a valid sell signal. To verify this claim, we analyzed how crypto
+asset prices behaved immediately after large deposits were made into a major exchange. The key
+parameters of the analysis are summarized in Figure 3. Our hypothesis is that, for large exchange
+deposits to serve as a reliable trading signal, meaningful relationships should be observed with the
+corresponding asset prices.
+Figure 3: Key Parameters For Analysis
+Asset
+Exchange
+Period
+Deposit
+Threshold
+Interval
+Sender
+BTC
+ETH
+SOL
+Binance
+1/1/2021 -
+12/27/2024
+BTC: above $20M
+ETH: above $20M
+SOL: above $8M
+1 hr & 6 hr after the
+deposit is made
+All & known entities
+(see Figure 4)
+Source: Presto Research
+3.1. Assets, Exchanges, Period, & Deposit Threshold
+Our analysis focused on three major crypto assets—BTC, ETH, and SOL—and their USDT prices on
+Binance during the period from January 1st 2021 to December 27th 2024. This timeframe was
+chosen to align with the operational duration of Binance’s current wallet addresses used for
+aggregating deposits.
+Deposit threshold is set to reflect the fact that the analysis is, for practical reasons, based on one
+exchange data. Specifically, using Whale Alert's $50M/$50M/$20M limit values for BTC/ETH/SOL
+whales as a benchmark, we adjusted down the deposit thresholds to $20M/$20M/$8M, applying
+Binance's 40% share in the global spot trading volume.
+3.2. Types of Entities
+We also isolated deposits made by known entities and ran the same analysis for the narrower data
+sample to examine whether deposits from specific types of entities exhibit a stronger relationship
+with price movements. The entities were identified through Arkham Intelligence and supplemented
+by our own investigation (Figure 4).
+5
+
+Figure 4: Entities With Known Addresses
+Market Makers (MM)
+Venture Capitals (VC)
+Projects
+Jump Trading
+Wintermute
+GSR
+Amber Group
+Jane Street
+Alameda Research
+Auros Global
+Bastion Trading
+QCP Capital
+B2C2 Group
+Cumberland DRW
+VolleyFire
+Galaxy Digital
+Three Arrows Capital
+Symbolic Capital Partners
+Abraxas Capital Management
+Fenbushi Capital
+Metalpha
+Kenetic Capital
+IOSG Ventures
+Mirana Ventures
+Longling Capital
+Altonomy
+Terraform Labs
+Source: Arkham Intelligence, Presto Research
+3.3. Measuring Market Impacts
+To assess potential selling pressure from whale deposits, we made the following assumptions:
+●
+Selling pressure manifests within a specific time frame after a deposit greater than the
+threshold is confirmed on-chain. We analyzed two time frames: one hour and six hours.
+●
+The Maximum Drawdown (MDD) during the designated interval serves as the metric to
+capture the deposit's price impact, if any, effectively filtering out noise during that period.
+3.4. Results
+The results of the analysis are shown from Figure 5 through 10.
+6
+
+Figure 5: BTC Whale Deposit Impact (All)
+No. of Deposits
+:
+641
+Median MDD
+:
+0.48%
+Average MDD
+:
+0.70%
+R^2
+:
+0.0017
+Source: Binance, Dune Analytics, Presto Research
+No. of Deposits
+:
+641
+Median MDD
+:
+1.49%
+Average MDD
+:
+1.99%
+R^2
+:
+0.0023
+7
+
+Figure 6: BTC Whale Deposit Impact (VCs & MMs Only)
+No. of Deposits
+:
+85
+Median MDD
+:
+0.51%
+Average MDD
+:
+0.86%
+R^2
+:
+0.0089
+Source: Binance, Dune Analytics, Presto Research
+No. of Deposits
+:
+85
+Median MDD
+:
+1.69%
+Average MDD
+:
+2.25%
+R^2
+:
+0.0537
+8
+
+Figure 7: ETH Whale Deposit Impact (All)
+No. of Deposits
+:
+879
+Median MDD
+:
+0.70%
+Average MDD
+:
+0.93%
+R^2
+:
+0.0024
+No. of Deposits
+:
+879
+Median MDD
+:
+1.81%
+Average MDD
+:
+2.40%
+R^2
+:
+0.0012
+Source: Binance, Dune Analytics, Presto Research
+9
+
+Figure 8: ETH Whale Deposit Impact (VCs & MMs Only)
+No. of Deposits
+:
+538
+Median MDD
+:
+0.67%
+Average MDD
+:
+0.90%
+R^2
+:
+0.0137
+Source: Binance, Dune Analytics, Presto Research
+No. of Deposits
+:
+538
+Median MDD
+:
+1.80%
+Average MDD
+:
+2.33%
+R^2
+:
+0.0067
+10
+
+Figure 9: SOL Whale Deposit Impact (All)
+No. of Deposits
+:
+833
+Median MDD
+:
+1.08%
+Average MDD
+:
+1.39%
+R^2
+:
+0.0122
+Source: Binance, Dune Analytics, Presto Research
+No. of Deposits
+:
+833
+Median MDD
+:
+2.71%
+Average MDD
+:
+3.52%
+R^2
+:
+0.0117
+11
+
+Figure 10: SOL Whale Deposit Impact (VCs & MMs Only)
+No. of Deposits
+:
+264
+Median MDD
+:
+0.97%
+Average MDD
+:
+1.34%
+R^2
+:
+0.0041
+Source: Binance, Dune Analytics, Presto Research
+No. of Deposits
+:
+264
+Median MDD
+:
+2.45%
+Average MDD
+:
+3.29%
+R^2
+:
+0.0361
+12
+
+4. Takeaways
+The results, summarized in Figure 11, yield three key takeaways.
+First and foremost, large exchange deposits are weak predictors for price declines. None of the 12
+scenarios analyzed showed a meaningful R-squared value, which ranged from 0.0017 to 0.0537.
+Second, deposits by VCs and MMs may be slightly better predictors, as evidenced by improvement
+in the R-squared for this sub-group. That said, the improvement may simply reflect reduced
+sample-specific noise rather than a stronger relationship with the dependent variable. Moreover,
+the absolute values are still low, suggesting its practical utility as trade signals is limited.
+Third, VCs and MMs dominated ETH whale deposits. They accounted for 61% of ETH deposits
+(538 out of 879), compared to 13% for BTC and 32% for SOL. This likely reflects the differing
+characteristics of the assets: ETH, with its versatile Web3 utility (e.g., gas fees, staking, DeFi
+collateral, and medium of exchange), is a high-turnover asset, while BTC, as a store of value, is
+more static.
+Figure 11: Results Summary
+Deposits By
+No. of
+Transactions
+Interval
+Median MDD
+Average MDD
+R^2
+BTC
+All
+641
+1hr
+0.48%
+0.70%
+0.0017
+6hr
+1.49%
+1.99%
+0.0023
+VCs & MMs
+85
+1hr
+0.51%
+0.86%
+0.0189
+6hr
+1.69%
+2.25%
+0.0537
+ETH
+All
+879
+1hr
+0.70%
+0.93%
+0.0024
+6hr
+1.81%
+2.40%
+0.0012
+VCs & MMs
+538
+1hr
+0.67%
+0.90%
+0.0137
+6hr
+1.80%
+2.33%
+0.0067
+SOL
+All
+833
+1hr
+1.08%
+1.39%
+0.0122
+6hr
+2.71%
+3.52%
+0.0117
+VCs & MMs
+264
+1hr
+0.97%
+1.34%
+0.0041
+6hr
+2.45%
+3.29%
+0.0361
+Source: Binance, Dune Analytics, Presto Research
+13
+
+5. Conclusion
+Admittedly, our analysis is not without caveats. While we selected parameters we believe best
+reflect reality, they may still appear arbitrary. Regression analysis has inherent constraints, and
+relying solely on R-squared values to draw firm conclusions can sometimes be misleading.
+That said, the analysis, supported by context and anecdotal observations, strongly indicates that
+whale exchange deposits lack sufficient predictive power to be a reliable trade signal. And there
+lies an important insight into the broader use of on-chain metrics.
+On-chain metrics are undeniably valuable tools, especially for analyzing blockchain fundamentals
+or tracking illicit fund flows. They could also be useful when explaining price moves ex-post.
+However, using them to predict short-term price changes ex-ante is a different matter entirely.
+Price is a function of both supply and demand, whereas exchange deposits represent just one of
+many factors influencing the supply side only, if at all. Price discovery is a complex process
+shaped by fundamentals, market structure, behavioral factors (e.g., sentiment, expectations), and
+random noise.
+In volatile crypto markets, where participants constantly seek elusive “fail-proof” trading
+strategies, there will always be an audience captivated by the perceived “magic” of on-chain
+metrics. When coupled with a few overzealous data vendors eager to oversell the promise of their
+platforms, the efficacy of on-chain metrics as a trading signal often becomes overstated. On-chain
+metrics will serve the industry far better when investors form realistic expectations about their
+capabilities and limitations.
+Figure 12: Understand Its Capability And Limitations
+Source: New England Inns & Resorts
+14
+
+About Presto
+Presto is an algorithmic trading firm where researchers and engineers solve challenging problems
+in global financial markets. Our core strength lies in combining engineering, mathematics, and
+science to navigate both digital asset and traditional finance markets with precision. Presto
+Research, our research unit, provides expert-driven insights to help navigate these markets
+effectively.
+Find out more at https://www.prestolabs.io.
+Follow Presto for more content: X, LinkedIn
+Follow Presto Research for latest research : X, Telegram
+Authors
+Peter Chung, Head of Research X, Telegram, LinkedIn
+Jaehyun Ha, Research Analyst X, Telegram, LinkedIn
+Required Disclosures
+Any expression of opinion (which may be subject to change without notice) is personal to the author and the author makes
+no guarantee of any sort regarding accuracy or completeness of any information or analysis supplied. The views and
+opinions expressed herein are those of the author(s) and do not necessarily reflect the views of Presto or its affiliates. This
+material by itself, is not and should not be construed as an offer or a solicitation to deal in any investment product or to
+enter into any legal relations. This material is for informational purposes only and is only intended for sophisticated
+investors, and is not intended to provide accounting, legal, or tax advice, or investment recommendations, or an official
+statement of Presto or its affiliates. Presto, its affiliates and its employees make no representation and assume no liability
+to the accuracy or completeness of the information provided. Presto, its affiliates and its employees also do not warrant
+that such information and publications are accurate, up to date or applicable to the circumstances of any particular case.
+Certain statements in this document provide predictions and there is no guarantee that such predictions are currently
+accurate or will ultimately be realized. Prior results that are presented here are not guaranteed and prior results do not
+guarantee future performance. Recipients should consult their advisors before making any investment decision. Presto or
+its affiliates may have financial interests in, or relationships with, some of the assets, entities and/or publications discussed
+or otherwise referenced in the materials. Certain links that may be provided in the materials are provided for convenience
+and do not imply Presto’s endorsement, or approval of any third-party websites or their content. Any use, review,
+retransmission, distribution, or reproduction of these materials, in whole or in part, is strictly prohibited in any form without
+the express written approval of Presto. Presto Research and related logos are trademarks of Presto, or its affiliates.
+15

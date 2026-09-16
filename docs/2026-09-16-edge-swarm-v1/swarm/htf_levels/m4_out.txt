@@ -1,0 +1,15 @@
+M4_week_sweep_reclaim TRAIN: n=1032 net/t=$-0.3484 CI95=[-0.5233,-0.1711] total=$-359.59 WR=0.369 gross_bps=-41.5 exits={'SL': 622, 'TP': 328, 'TIME': 82} med_hold_h=21.3 med_RR=1.76
+M4_week_sweep_reclaim OOS_tail: n=83 net/t=$-0.5046 CI95=[-0.9723,-0.0037] total=$-41.88 WR=0.301 gross_bps=-67.4 exits={'SL': 50, 'TP': 19, 'TIME': 14} med_hold_h=20.7 med_RR=1.83
+   per-symbol (n,total$): {'ETH': (120, np.float64(-35.03)), 'SOL': (125, np.float64(-21.37)), 'XRP': (116, np.float64(-39.11)), 'DOGE': (116, np.float64(-41.07)), 'LINK': (127, np.float64(-48.14)), 'SUI': (128, np.float64(-83.77)), 'ADA': (132, np.float64(-58.37)), '1000PEPE': (130, np.float64(-44.86)), '1000SHIB': (121, np.float64(-29.74))}
+   TRAIN long: n=563 net/t=$-0.7080 WR=0.316
+   TRAIN short: n=469 net/t=$0.0832 WR=0.433
+M4_var_tp_quarter TRAIN: n=1007 net/t=$-0.2479 CI95=[-0.3710,-0.1339] total=$-249.67 WR=0.505 gross_bps=-27.5 exits={'TP': 532, 'SL': 468, 'TIME': 7} med_hold_h=8.5 med_RR=0.82
+M4_var_tp_quarter OOS_tail: n=81 net/t=$-0.4467 CI95=[-0.8200,-0.0795] total=$-36.18 WR=0.457 gross_bps=-60.6 exits={'SL': 41, 'TP': 36, 'TIME': 4} med_hold_h=7.3 med_RR=0.83
+   per-symbol (n,total$): {'ETH': (121, np.float64(-49.23)), 'SOL': (120, np.float64(-16.68)), 'XRP': (122, np.float64(-24.85)), 'DOGE': (114, np.float64(-27.59)), 'LINK': (125, np.float64(-11.35)), 'SUI': (116, np.float64(-60.98)), 'ADA': (129, np.float64(-60.65)), '1000PEPE': (130, np.float64(-39.43)), '1000SHIB': (111, np.float64(4.91))}
+   TRAIN long: n=554 net/t=$-0.3014 WR=0.493
+   TRAIN short: n=453 net/t=$-0.1825 WR=0.521
+M4_var_lookback14 TRAIN: n=664 net/t=$-0.2794 CI95=[-0.5286,-0.0194] total=$-185.52 WR=0.363 gross_bps=-28.0 exits={'SL': 394, 'TP': 140, 'TIME': 130} med_hold_h=36.7 med_RR=2.29
+M4_var_lookback14 OOS_tail: n=51 net/t=$-0.5259 CI95=[-1.2373,0.2233] total=$-26.82 WR=0.294 gross_bps=-70.1 exits={'SL': 32, 'TIME': 11, 'TP': 8} med_hold_h=16.5 med_RR=2.37
+   per-symbol (n,total$): {'ETH': (86, np.float64(-22.49)), 'SOL': (80, np.float64(-11.53)), 'XRP': (72, np.float64(-16.64)), 'DOGE': (72, np.float64(-5.75)), 'LINK': (82, np.float64(-36.23)), 'SUI': (95, np.float64(-66.25)), 'ADA': (74, np.float64(-29.15)), '1000PEPE': (79, np.float64(-19.26)), '1000SHIB': (75, np.float64(-5.05))}
+   TRAIN long: n=379 net/t=$-0.6836 WR=0.311
+   TRAIN short: n=285 net/t=$0.2581 WR=0.432

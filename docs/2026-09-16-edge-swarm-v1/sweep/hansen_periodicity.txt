@@ -1,0 +1,1356 @@
+                                                       Periodicity in Cryptocurrency Volatility and Liquidity∗†
+
+
+                                                          Peter Reinhard Hansena,b‡ Chan Kima                       Wade Kimbroughc
+
+
+
+
+arXiv:2109.12142v2 [q-fin.TR] 3 Nov 2021
+                                                                          a
+                                                                              University of North Carolina, Chapel Hill
+                                                                                   b Copenhagen Business School
+
+
+                                                                                       c Volatility Group, Inc.
+
+
+
+                                                                                         November 5, 2021
+
+
+
+                                                                                               Abstract
+
+                                                 We study recurrent patterns in volatility and volume for major cryptocurrencies, Bitcoin and Ether,
+                                                 using data from two centralized exchanges (Coinbase Pro and Binance) and a decentralized exchange
+                                                 (Uniswap V2). We find systematic patterns in both volatility and volume across day-of-the-week,
+                                                 hour-of-the-day, and within the hour. These patterns have grown stronger over the years and are
+                                                 presumably related to algorithmic trading and funding times in futures markets. We also document
+                                                 that price formation mainly takes place on the centralized exchanges while price adjustments on the
+                                                 decentralized exchanges can be sluggish.
+
+
+
+                                           Keywords: Cryptocurrency, High Frequency data, Market Microstructure, Realized Volatility, Bitcoin,
+                                           Ether, Ethereum
+                                           JEL Classification: C58, G12
+
+
+
+
+                                             ∗
+                                                We are grateful to Tim Bollerslev, Chris Cashwell, and Mark Ettinger for many useful and constructive comments
+                                           and to Emily Dyckman for proofreading the article.
+                                              †
+                                                Disclosure: The first and second authors have served as compensated consultants for Volatility Group Inc.
+                                              ‡
+                                                Corresponding author. Address: University of North Carolina, Department of Economics, 107 Gardner Hall Chapel
+                                           Hill, NC 27599-3305
+
+
+                                                                                                   1
+1        Introduction
+
+We study empirical patterns in volatility in cryptocurrency markets. Intraday patterns in volatility
+are well-documented in stock prices and in foreign exchange rates, see Andersen and Bollerslev (1997),
+Andersen and Bollerslev (1998), Andersen et al. (2019), and references therein. The average time-
+of-the-day volatility for US stock returns is typically found to have a U-shape over the period from
+9:30 AM to 4:00 PM. It is also well documented that volatility tends to be higher in the hours during
+which main exchanges are open. For instance, Hansen et al. (2012) found that roughly 75% of daily
+volatility in the S&P 500 index occurs during the 6.5 hours where US stocks are actively traded on
+major exchanges.
+        Cryptocurrencies differ from most other markets by being open for trading 24 hours a day, seven
+days a week. Trading activity is continuously high, and therefore, high-frequency data is available
+at any time of the day for all major cryptocurrencies. This availability of data facilitates studies of
+periodicity in volatility and market liquidity measures beyond what is possible in other markets.
+        In this paper, we investigate periodicity in volatility and liquidity in two leading cryptocurrencies,
+Bitcoin and Ether, using data from three exchanges, Binance, Coinbase Pro, and Uniswap V2. Peri-
+odicity refers to a recurrent pattern within some period, such as a week, a day, or an hour.1 We find
+strong evidence of periodicity in volatility and liquidity for day-of-the-week, hour-of-the-day, as well as
+within the hour. The first two findings are not new, but the distinct patterns we document within the
+hour are new. We conjecture that many of these patterns are driven by algorithmic trading while some
+are likely related to funding rates for perpetual futures.
+        The recurrent patterns have important implications for volatility measurement, modeling and fore-
+casting. First, in measuring volatility it is valuable to know if a sudden change in volatility merely
+follows the expected pattern or if it reflects an unanticipated change. This importance is analogous
+to the way macroeconomic time series are adjusted for seasonality. For example, to understand a
+measurement of volatility prior to the release of an unemployment report, one would need to know the
+difference between the current measurement and the pattern of high volatility that has been established
+during the lead up to previous reports being released. Similarly, knowledge about the typical variation
+in trading volume makes it possible to discriminate between usual variation and unanticipated changes.
+Second, in time series forecasting we can account for periodicity, analogous to the way seasonality
+is built into models. In our empirical analysis we find that GARCH models benefit substantially by
+    1
+    Parts of the literature refer to such patterns as seasonality even though the patterns are unrelated to seasons, and the
+periods are shorter than a year.
+
+
+
+                                                             2
+accounting for periodicity. The estimated models with periodicity have substantially better in-sample
+and out-of-sample performance than standard models without periodicity. Third, some of the recurrent
+patterns we identify may also have important implications for some realized measures of volatility as
+we discuss in the conclusion.
+      Recurrent patterns in cryptocurrency markets have previously been documented in Dimpfl (2017)
+who found that trading volume was closely related to the trading times of the US and European stock
+markets. Similarly, Dyhrberg et al. (2018) found that the highest trading activity, highest volatility,
+and lowest spread in three US based crypto-exchanges coincide with US market trading hours. Catania
+and Sandholdt (2019) documented that the intraday volatility and volume patterns were different for
+a Europe-based exchange (Bitstamp) and a US-based exchange (Coinbase), and that the patterns
+followed the time-of-the-day in their respective locations. In terms of the intra-week patterns, both
+exchanges show increasing volatility during weekdays which then decreases on weekends. Aleti and
+Mizrach (2021) conclude that crypto-liquidity generally peaks when the US and London stock markets
+are both open whereas the periods of lower crypto-volume and wider spreads coincide with the hours
+where the CME Bitcoin futures market is closed. Wang et al. (2020) relate patterns in volatility
+and volume to stock market openings in Asia, Europe, and US. Patterns in US stock markets have
+been related to algorithmic trading activities at an ultra high time-scale. For instance, Hasbrouck
+and Saar (2013) documented patterns within the second, with higher trading activity during the early
+milliseconds of the second with a peak around the 30th millisecond and another smaller spike around
+the 150th millisecond. These patterns were attributed to algorithmic trading, latency, and geographical
+clustering of algorithmic traders, as further documented by Dobrev and Schaumburg (2018).
+      Our investigation of periodicity of volatility and liquidity of cryptocurrencies is laid out in seven
+sections. In Section 2, we provide a brief introduction to cryptocurrencies and cryptocurrency markets,
+and we highlight the key characteristics of the decentralized exchange used in our analysis. Decen-
+tralized exchanges are a relatively new concept. While they have many potential applications, their
+key use is the trading of cryptocurrencies.2 We describe our data in Section 3 along with descriptive
+statistics and some preliminary results. In Section 4, we compute cross correlations between exchanges
+and currencies that strongly indicate that price formation takes place on centralized exchanges. We
+establish the "seasonal” patterns in volatility, volume, and illiquidity in Section 5. In Section 6, we show
+that accounting for periodicity in daily returns improves the empirical fit of volatility modeling and
+forecasting, and our concluding remarks are presented in Section 7. Two Appendices include additional
+  2
+      At the time of writing we are only aware of a handful of betting platforms that operate as decentralized exchanges.
+
+
+
+                                                             3
+empirical results and theoretical justification of the confidence intervals we present.
+
+
+
+2        Cryptocurrency and Exchanges
+
+Cryptocurrency is digital money, sometimes considered more generally as a digital asset. The core idea
+behind cryptocurrency is that the creation, distribution, and transfer of a cryptocurrency is decentral-
+ized, i.e. not controlled by a centralized authority such as a central bank. This feat is accomplished
+using an innovative database called a blockchain and transactions secured by computationally strong
+public-key cryptography. See Narayanan et al. (2016) for an introduction and overview of cryptocur-
+rency technology.
+        Though there are thousands of cryptocurrencies, this paper focuses on five: Bitcoin (symbol BTC),
+Ether (symbol ETH), Wrapped Ether (symbol WETH), USD Coin (symbol USDC), and USD Tether
+(symbol USDT). Using these five cryptocurrencies allows us to investigate the periodicity of volatility
+of BTC and ETH from realized prices (in U.S. Dollars) across our chosen centralized and decentralized
+exchanges. We selected these tokens because BTC and ETH are the most traded, have the largest
+market caps, and are the best known cryptocurrencies. We paired each of these with a USD counterpart
+to investigate their volatility in relationship to the US Dollar and measure their trading volume in USD.
+        Bitcoin was the first and, at the time of writing, the largest cryptocurrency by market capitalization,
+accounting for 45% of the cryptocurrency market. The utility of Bitcoin is primarily as a form of digital
+money (though “money” in this context is not without controversy, see Taleb (2021)) due to the fact
+that the underlying blockchain database is in essence only a financial ledger. Albeit, this is a slight
+oversimplification, see Narayanan et al. (2016).
+        At the time of writing, Ether is the second largest by market capitalization making up 18% of the
+market. Ether is the currency underlying Ethereum, a decentralized virtual computer. On Ethereum, as
+with Bitcoin, transactions are added to the blockchain when confirmed through a consensus mechanism.
+Miners compete to solve a difficult algorithm to add the next block to the current chain, where the
+block consists of a batch of transactions. On average, a block is added every 13 seconds. In order to
+get a transaction into a block, a user must bid on gas (a fee) denominated in Ether.3 Transactions
+are typically ordered in the block by how much a user pays in gas (e.g. the more someone pays in
+gas the higher it is in the order). The Ethereum blockchain does not just store financial balances, but
+rather the state of the Ethereum Virtual Machine (EVM), a virtual computer which “runs” on physical
+    3
+    Ethereum executes programs, called smart contracts, consuming gas. Gas is the fee, denominated in Ether, which is
+required to transact on Ethereum.
+
+
+
+                                                         4
+computers all over the world. For more detail, refer to Intro to Ethereum (n.d.).
+      WETH is a proxy cryptocurrency representing Ether in the form of an ERC-20 token,4 the Ethereum
+standard for fungible tokens. WETH is created by swapping ETH into a smart contract at a 1:1 ratio.
+Because WETH trades on Uniswap V2 and ETH does not, WETH is the source of decentralized prices
+in this paper.
+      Cryptocurrencies pegged to fiat currencies are typically referred to as stablecoins. Stablecoins may
+be either centralized or decentralized. Centralized stablecoins are issued by a regulated entity which
+backs the stablecoin with fiat currency either partially or fully. Decentralized stable coins are issued
+algorithmically on blockchain and are collateralized with a variety of assets.
+      Two centralized stablecoins representing the US Dollar are USDC and USDT. USDC is a stablecoin
+issued by Circle Internet Financial LLC. It is regulated and backed 1:1 with assets that total in USD
+value the amount of USDC in circulation. USDC is a trusted, centralized stable coin because its
+reserves are independently audited. USDT is a digital asset issued by Tether Operations Limited.
+There is controversy surrounding the adequacy of USDT reserves because, at the time of writing, USDT
+reserves have not been independently audited. However, independent accountants have examined USDT
+reserves.
+      As is the case for stock and foreign exchange markets, trading of cryptocurrencies is fragmented
+across multiple exchanges. In this paper, we use data from three exchanges: Binance, Coinbase Pro,
+and Uniswap V2. Binance and Coinbase Pro are centralized exchanges (CEX), while Uniswap V2
+is a decentralized exchange (DEX). We will describe each in turn while putting an emphasis on the
+decentralized exchange because it uses mechanics that are quite different from traditional financial
+exchanges.
+      Centralized exchanges are platforms owned and operated by a legally regulated entity. They facili-
+tate the exchange of cryptocurrencies for fiat currencies or other cryptocurrencies. They act as financial
+custodians where users deposit their assets. Mechanically, they are very similar to traditional financial
+exchanges. Bid and ask prices are matched in an order book. Arbitrageurs and market makers play a
+central role in keeping price parity between exchanges. Centralized exchanges fall under the purview
+of financial regulators from where they are incorporated and from the territories in which their cus-
+tomers reside. Therefore, centralized exchanges often ban users from regions where they cannot, or are
+unwilling to, comply to certain regulations. The geographic location of traders may affect how volume
+and volatility is distributed over the day, which is one of several patterns we study in this paper.
+  4
+    For detailed descriptions of WETH and ERC-20, we refer to https://weth.io/ and https://eips.ethereum.org/
+EIPS/eip-20, respectively.
+
+
+                                                     5
+      Binance launched in June 2017 and is the largest centralized exchange in the world by daily volume
+at the time of this writing.5 The currency pairs BTC/USDT and ETH/USDT had the highest trading
+volume on Binance during the first half of 2021. Web-traffic to Binance is widely distributed across
+the world and, as of May 2021, Turkey had the largest share (7.6%) followed by the UK (4.66%).6 For
+regulatory reasons, Binance has not served US residents since September 2019 and has not served UK
+residents since June of 2021. A separate exchange, Binance US, serves US residents.
+      Coinbase Pro is ranked 15th by volume ($3.62 Billion USD according to Nomics on May 31, 2021)
+among centralized exchanges and is the largest cryptocurrency exchange in the US. Their BTC/USD
+and ETH/USD markets both have the largest trading volume across all BTC and ETH markets with
+U.S. Dollars. Unlike Binance, the web-traffic to Coinbase Pro is very concentrated in the US (56.64%)
+followed by the UK (7.33%), as of May, 2021.7
+      In contrast to centralized exchanges, decentralized exchanges (DEXs) are not owned or operated
+by any entity. Decentralized exchanges are sets of smart contracts, i.e. computer code, that implement
+financial protocols. Users can create markets or trade cryptocurrencies using these smart contracts.
+Most of the protocols for DEXs are known as Automated Market Makers (AMMs). There are several
+different AMM protocols on Ethereum and they each employ different mechanics. For example, one
+might use a constant sum formula to determine price, while another might use a constant product
+formula to determine price. For a more thorough overview of AMM protocols, see Xu et al. (2021).
+      Uniswap V2 is a general protocol implemented in smart contracts to facilitate trading one ERC-
+20 token for another (e.g. USDC/WETH). Uniswap employs a constant product formula to govern
+the dynamics of liquidity provision and currency trading. A constant product formula has the form
+K = X × Y , where X and Y are the reserves of each cryptocurrency and K is a constant which remains
+invariant during operation of the AMM (with the exception of accumulated trading fees). Any user
+can create a market by initially depositing both cryptocurrencies into a pool that is governed by the
+Uniswap smart contract. The ratio of the assets determines the spot price. Because of this, these
+exchanges are more commonly referred to as pools. The amount of each token in the pool is referred to
+as liquidity. Any user can add liquidity to a pool by depositing the two cryptocurrencies according to
+the current reserve ratio. For example, if a pool contains 20,000 USDC and 10 ETH, liquidity providers
+add additional liquidity at the same ratio (2,000 USDC and 1 ETH or 200 USDC and 0.1 ETH, etc.).
+Liquidity providers can add and remove liquidity without paying a transaction fee but must pay the
+  5
+    $55 Billion USD on May 31, 2021 according to crypto-data provider Nomics ( https://nomics.com/)
+  6
+    https://www.similarweb.com/website/binance.com/
+  7
+    https://www.similarweb.com/website/pro.coinbase.com/
+
+
+
+                                                       6
+cost of gas. A 0.3% fee is charged for swapping one cryptocurrency for another. This fee is added to
+the currency reserves in the pool, thus providing an incentive to liquidity providers.
+        On Uniswap V2, anyone can interact with a smart contract to swap one cryptocurrency for an-
+other. The net exchange rate is determined by the constant product formula defining that xin of one
+cryptocurrency can be swapped for yout of another currency according to the formula:
+
+                                              K                 1         Y
+                          yout = Y −                      = 1      x    ×   × xin ,
+                                       X + (1 − 0.003)xin  0.997 + X
+                                                                     in   X
+
+and it follows that the average price for this transaction is
+
+                                         xin            1     xin           X
+                                                                   
+                                              =             +           ×
+                                         yout         0.997   X             Y
+
+This clarifies the transaction cost because, in the absence of transaction costs, the price of one currency
+denominated in the other currency would simply be the ratio X/Y . Unlike an order book, the spot
+price, X/Y , plus the fee only holds "infinitesimally" on Uniswap V2 because any finite trade involves a
+continuous movement of the reserves along the constant function curve (from 0 to xin ). Therefore, the
+greater the quantity of currency exchanged, the more the realized price deviates from the initial spot
+price before the trade. This deviation in price is called slippage, and is directly related to the amount
+exchanged and the total liquidity in the pool, as captured by the term xXin . The concept of slippage
+is important in our investigations because it affects the dynamics of trading volume and volatility on
+Uniswap V2 with respect to Binance and Coinbase Pro.
+
+
+
+3        Data and Preliminary Results
+
+We include data for five markets: BTC/USD (Coinbase Pro), ETH/USD (Coinbase Pro), BTC/USDT
+(Binance), ETH/USDT(Binance), and WETH/USDC (Uniswap V2).
+        We downloaded 1-minute OHLCV data8 and trade data for the two centralized exchanges, Binance
+and Coinbase Pro, through nomics.com using their API (for a fee).9 OHLCVs per Ethereum block for
+Uniswap V2 are collected through a freely available API at graphql.bitquery.io. The block-by-block
+OHLC prices of Uniswap V2 are different from those of the orderbooks. Each block takes 13 seconds
+on average with less than 1% of the blocks spanning more than 1 minute. Each block consists of many
+    8
+    OHLCV = Open, High, Low, Close prices and traded Volume.
+    9
+    We also obtained the same OHLCV data using the Python package CCXT by Kroitor et al. (2021) and verified that
+the data is identical.
+
+
+
+                                                          7
+ordered transactions, and we define our price to be the ratio of the final balances at the end of the
+block of the two cryptocurrencies within the liquidity pool. This choice circumvents the impact that
+fees and slippage have on transaction prices, see Section 2, and mitigates the impact that manipulative
+attacks can have on our price series. It is possible to carry out several types of attacks to manipulate
+prices on decentralized exchanges, especially within the block. Pools with high slippage are especially
+vulnerable to price manipulation. Specifically, we calculate 1 minute returns of the WETH/USDC
+market on Uniswap V2 by the log difference of the last marginal price of the last block for each minute.
+We do not use Uniswap V2 prices for BTC because the volume is insufficient for a detailed analysis
+based on high frequency data.
+   We present detailed results for the sample period from October 1, 2020 at 00:00 UTC to June 1,
+2021 at 00:00 UTC, a period where high-frequency data is continuously available for all exchanges.
+We present additional results for the centralized exchanges based on an extended sample period from
+January 1st, 2019 at 00:00 UTC to June 1st, 2021 at 00:00 UTC. Although the WETH/USDC market
+launched on Uniswap V2 in May of 2020 we focus on a shorter sample period for two reasons. First, there
+was insufficient trading activities during the initial months after Uniswap V2 was launched. Second, in
+late August of 2020 a protocol called Sushiswap launched. Sushiswap forked much of Uniswap’s code
+and incentivized users to transfer their liquidity to the new protocol. This caused a large disruption in
+the depth of liquidity on Uniswap V2 with roughly 55% of total liquidity being transferred to Sushiswap
+for several weeks. By October 1, 2020 liquidity of Uniswap V2 had returned to earlier levels. We did
+not include data for the centralized exchanges before 2019 for two reasons. First, there were credibility
+issues associated with USDT that caused USDT to deviate from the value of the US Dollar. Second,
+Binance had a small market share before 2019.
+
+
+3.1   Realized Volatility Measures
+
+We compute the daily realized variance with five-minute returns,
+
+                                                288
+                                                X
+                                        RVt =         (Yt,5j − Yt,5j−5 )2 ,                              (1)
+                                                j=1
+
+
+where Yt,i is the logarithmic price of a cryptocurrency at the i-th minute on day t, i = 0, . . . , 1440. The
+annualized volatility time series are defined by:
+
+                                           p
+                                               365 × RVt × 100%.
+
+
+
+                                                         8
+To calculate the realized variance, we use five-minute returns rather than one-minute returns because
+sparse sampling offers greater robustness to market microstructure noise. Market microstructure noise
+will reveal itself as autocorrelation in high-frequency returns, which we estimate below.
+   Table 1 presents summary statistics about daily annualized volatility based on 5-min returns and
+daily volumes. Binance and Coinbase Pro show similar price movement for both BTC and ETH, as can
+be seen from the sample correlation matrix below. For this reason, their average annualized volatilities
+are nearly identical for both BTC (∼88%) and ETH (∼111%). The corresponding volatility measure
+for ETH using Uniswap V2 data is substantially smaller at just 90.66%. This is caused by a higher level
+of noise in the prices obtained from Uniswap V2 as we discuss below. The average daily volume is also
+substantially smaller for Uniswap V2 than the two centralized exchanges. This bolsters the argument
+that the realized variances from the centralized exchanges are more reliable than realized variances
+from Uniswap V2 data.
+
+
+                                            RV (Annualized)
+                                Average       min          q25         q50          q75         max
+BTC/USDT (Binance)               88.33        17.90       54.88       76.33       102.67       507.05
+BTC/USD (Coinbase Pro)           88.79        19.01       54.94       76.03       106.44       487.14
+ETH/USDT (Binance)               110.91       28.76       65.76       92.66       129.41       773.62
+ETH/USD (Coinbase Pro)           111.21       27.82       65.67       92.36       131.32       753.03
+WETH/USDC (Uniswap                90.66       17.22       55.95       78.01       102.94       400.14
+V2)
+
+                                                Volume
+                                Average       min          q25         q50          q75         max
+BTC/USDT (Binance)               3,034M       235M        1,513M     2,951M       4,133M      13,482M
+BTC/USD (Coinbase Pro)             829M        34M          333M       726M       1,182M       4,177M
+ETH/USDT (Binance)               1,735M       105M          539M     1,386M       2,278M      11,645M
+ETH/USD (Coinbase Pro)             539M        14M          102M       361M         712M       4,510M
+WETH/USDC (Uniswap                 205M        18M           51M       127M         188M       3,337M
+V2)
+
+
+        Table 1: Summary Statistics for the sample period October 1, 2020 to May 31, 2021.
+
+
+   Next, we turn to the one-minute intraday returns, yt,i = Yt,i − Yt,i−1 , for i = 1, . . . , 1440. The
+empirical correlation matrix for the five time series of contemporaneous one-minute returns, for the
+sample period October 1, 2020 to May 31, 2021, is given by:
+
+
+
+
+                                                      9
+                                                          
+                      1    0.823 0.969 0.802 0.322            (BTC/USDT Binance)
+                                                  
+                     0.823   1   0.836 0.968 0.385            (ETH/USDT Binance)
+                                                  
+                                                   
+                                                   
+                Ĉ = 
+                     0.969 0.803   1   0.800 0.328 
+                                                               (BTC/USD Coinbase Pro)
+                                                   
+                     0.802 0.968 0.800   1   0.388            (ETH/USD Coinbase Pro)
+                                                   
+                                                   
+                       0.322 0.385 0.328 0.388         1        (WETH/USDC Uniswap V2)
+
+
+
+As expected, BTC/USD and BTC/USDT are highly correlated, with a sample correlation of 0.969,
+and similarly for ETH/USD and ETH/USDT with a sample correlation of 0.968. We also observe
+that Bitcoin and Ether returns are very correlated, both within and across centralized exchanges, with
+correlations varying between 0.802 and 0.823. The instantaneous correlations between Ether returns on
+centralized exchanges and Ether returns on the decentralized exchange are remarkably smaller at about
+0.328. Perfect competition would dictate the correlations to be near one for the same cryptocurrency.
+However, sluggish price adjustments can cause the correlations to be smaller. We do find evidence
+that prices on the decentralized exchanges can be stale. Price changes on the centralized exchanges
+are positively correlated with subsequent price changes on the decentralized exchanges. This implies
+sluggish price revisions on Uniswap V2. Competitive market forces will only ensure that prices stay
+within a band, where the width of the band is defined by the cost of transacting. Price staleness is
+therefore a natural consequence of relatively high transaction costs. On Uniswap V2, the arbitrage
+must exceed the cost of the 0.3% transaction fee plus the cost of gas. The latter increases when many
+users compete to get their transaction into a block. The cost of gas is influenced by the amount of all
+Ethereum blockchain transactions not just Uniswap V2 transactions. Slippage determines if the cost
+of transacting will exceed the amount of arbitrage. We should acknowledge that some cross correlation
+can be explained by asynchronicity in the prices series. While the prices on the centralized exchanges
+come with microsecond precision, the duration between Ethereum blocks will induce some staleness in
+our Uniswap V2 prices. This can explain part of the cross-correlation between returns on the centralized
+exchanges and returns on Uniswap V2 the following couple of minutes, but the duration cannot explain
+the cross-correlations we observed 3 (and more) minutes later because block durations lasting more
+than 2 minutes are extremely rare, see Figure A.5 in the appendix.
+
+
+
+
+                                                  10
+ Figure 1: Daily realized variance based on five-minute returns for Bitcoin (red) and Ether (blue).
+
+
+   The time series for each of the five realized variances, in units of annualized volatility, are presented
+in Figure 1. The two volatility series for Bitcoin (solid blue line and dashed blue line) are virtually
+identical as one would expect if the underlying prices series were in agreement. The same is true for the
+volatility measures of Ether when computed from high-frequency prices from the centralized exchange
+(solid red line and dashed red line). The volatility series for Ether is quite different when computed
+from one-minute prices on the decentralized exchange, Uniswap V2. This is not surprising because the
+correlation between returns on the centralized exchanges and Uniswap V2 was only about 68% whereas
+the correlation between returns on the two centralized exchanges was 99%. The volatility series for
+BTC and ETH vary similarly over time. This co-movement manifests a common risk component for
+the two cryptocurrencies as measured in relation to USD.
+
+
+
+
+                                                    11
+4    Autocorrelations and Price Discovery
+
+The observed price process does not fully conform with properties of a semi-martingale for a variety of
+reasons broadly known as market microstructure effects. The literature on measuring volatility from
+high-frequency data defines the discrepancy between the observed price and the theoretical efficient
+price as market microstructure noise, see Hansen and Lunde (2006). The noise arises from bid-ask
+bounces, staleness, rounding errors, plain data errors, and many other reasons. This type of noise
+reveals itself as autocorrelations in high-frequency returns. Transaction costs can cause observed prices
+to be stale, and differences in staleness across exchanges will materialize as cross-correlation between
+intraday returns.
+    We present the autocorrelations and cross-correlations for the five currency pairs in Figure 2 that are
+                                      (k)   (l)
+sample estimates of ρk,l (h) = corr(yt,i , yt,i+h ), where k (and l) refer to a particular currency/exchange,
+such as BTC/USDT on Binance.
+    The panels along the diagonal of Figure 2 present the typical autocorrelation functions for a univari-
+ate time-series. These show price changes correlate with future price changes of the same price series.
+For the centralized exchanges, the first two autocorrelations are statistically significant in all cases,
+whereas the decentralized exchange has substantially more positive autocorrelations. These empirical
+observations strongly suggest that liquidity pool prices are sometimes sluggish and that price change
+can take several minutes to be absorbed on the decentralized exchange, Uniswap V2.
+    The cross correlations further support this view. For instance, the far right panels, second and
+                                                                                          (c)
+third from below, show that ETH intraday returns on Binance and Coinbase Pro, yt,i , are positively
+                                                                         (d)
+correlated with subsequent ETH intraday returns on Uniswap V2, yt,i+h , for h = 1 to about h = 12.
+In fact, BTC price changes on the centralized exchanges predict future ETH price changes on Uniswap
+V2, as can be seen from the two top panels in the far right column of Figure 2. The reason for this
+is the high correlation between BTC and ETH returns on the centralized exchanges. Some of the
+cross-correlations, especially for h = 1, may be explained by the so-called Epp’s effect which implies a
+downwards bias in contemporaneous correlations and an upwards bias in cross-correlations of the same
+magnitude. The staleness in prices on Uniswap V2 also induces this Epp’s effect. Note the different
+y-scale that is used for cross-correlations in the far-right panels. These cross-correlations are much
+larger than those in the other panels, which reflects that future Uniswap V2 prices (ETH/USDC) are
+predictable, seemingly by as much as 12 minutes ahead. This shows that price discovery mainly takes
+place on the centralized exchanges, whereas price changes on the decentralized exchange tend to trail
+those on the centralized exchanges.
+
+                                                     12
+Figure 2: Autocorrelations and cross-correlations of one-minute returns for the five currency pairs for
+h = 1, . . . , 20. Shaded areas are 95% confidence bands. The first and second autocorrelations and cross-
+correlations tend to be significant for the centralized exchanges. Price changes on Uniswap tend to lag
+price changes on the centralized exchanges as evident from the many significant cross-correlations.
+
+
+
+5    How Volatility, Volume, and Liquidity is Distributed over Time
+
+To codify our notation we denote the one-minute intraday returns and volume by quadruple subscripts,
+yw,d,h,m , to identify the week, day, hour, and minute from which the intraday returns are sampled.
+Week numbers are simply w = 1, . . . , W where W is the number of weeks in our sample period. Day-
+
+                                                   13
+of-the-week is labelled with d = 1, . . . , 7 with d = 1 corresponding to Mondays and d = 2 to Tuesdays,
+etc. and hours and minutes are labelled, h = 00, . . . , 23 and m = 00, . . . , 59, respectively.
+       To measure patterns in volatility and volume, we introduce relative measures of volatility and
+volume across days, hours, and minutes. We measure volatility using absolute returns rather than
+squared returns. The reason being that absolute returns are less sensitive to "outliers” and suffice
+for measuring relative volatility. Absolute returns and the closely related range-based measures are
+commonly used to measure and model volatility, see e.g. Alizadeh et al. (2002). Another advantage to
+using absolute returns is that they, in conjunction with volume, can be used to compute some illiquidity
+measures we present below. The corresponding results, based on squared returns, are very similar and,
+as expected, are a bit more noisy. The relative measures gain additional robustness by being averages
+of variables that are bounded between zero and one. The day-of-the-week measures of volatility and
+volume measured relative to that over the preceding week is defined by:10
+
+                                     P                                                           P
+                        1 X    7 h,m |yτ (w,d,h,m) |                                1 X    7 h,m Vτ (w,d,h,m)
+           λday
+            σ (d) ≡          P6 P                             and     λday
+                                                                       V (d) ≡
+                                                                                         P6 P                   ,
+                        Nd w  i=0
+                                       |y
+                                  h,m τ (w,d−i,h,m)
+                                                     |                              Nd w  i=0
+                                                                                                  V
+                                                                                              h,m τ (w,d−i,h,m)
+
+
+
+respectively, for d = 1, . . . , 7. Here, Nd ≃ W is the number of observations for day d in our sample
+(either Nd = W or Nd = W − 1). If we take the example with d = 1 (Mondays), then λday
+                                                                                  σ (1) and
+
+λday
+ V (1) measures the amount of volatility and volume, respectively, that occur on Mondays relative
+
+to other days of the week, where λ = 1 corresponds to the average level of volatility and volume,
+respectively.
+       Similarly, the relative measures of volatility and volume for hour-of-the-day are defined by:
+
+                         1 X 24 m |yτ (w,d,h,m) |                                   1 X 24 m Vτ (w,d,h,m)
+                                       P                                                           P
+           λhour
+            σ    (h) ≡         P23 P                          and     λhour
+                                                                       V    (h) ≡         P23 P                 ,
+                         Nh w,d j=0 m |yτ (w,d,h−j,m) |                             Nh w,d j=0 m Vτ (w,d−i,h,m)
+
+
+respectively, for h = 0, . . . , 23, where, Nh ≃ 7 × W is the number of observations for hour h.
+       Finally, for minute-of the hour we define volatility and volume relative to the previous hour by
+
+                            1 X 60×|yτ (w,d,h,m) |                                       1 X 60×Vτ (w,d,h,m)
+           λminute
+            σ      (m) ≡           P59                        and λminute
+                                                                   V      (m) ≡                 P59                 ,
+                           Nm w,d,h k=0 |yτ (w,d,h−j,m) |                               Nm w,d,h k=0 Vτ (w,d−i,h,m)
+
+
+respectively for m = 0, . . . , 59, where Nm ≃ 7 × 24 × W is the number of observations for minute m.
+  10
+       To simplify our notation, we use the following equivalence class notation,
+
+                            (w, d, h, m) = (w − i, d + 7i − j, h + 24j − k, m + 60k),     ∀i, j, k ∈ Z.
+
+This simplifies the expressions for denominators in the relative quantities.
+
+
+
+                                                               14
+                                                                                          day
+Figure 3: Day-of-the-week relative volatility, λday
+                                                 σ (d), (blue line) and relative volume, λV (d), (red
+bars). The shaded areas are 95% confidence bands for the relative volatility. Results for Bitcoin are
+shown in upper panels, Ethereum in lower panels, and results for Binance, Coinbase Pro, and Uniswap
+V2 are shown in left, middle, and right panels, respectively.
+
+
+   Notice that the ratios in each of the definitions measure the local volatility or volume, relative to a
+preceding period of time, to account for the persistent variation in volatility over time.
+
+
+5.1   Day-of-Week Patterns
+
+We present the daily relative measures of volatility (solid blue line) and volume (red bars) in Figure 3
+for each of the five currency pairs. The shaded blue regions display the 95% confidence intervals for the
+measure of volatility, and these are relatively large because the number of weeks in the sample period
+(Nd ≃ 35) is relatively small. If volatility and/or volume was evenly distributed over the week, we
+would expect all measures to be about one. However, both volatility and volume tend to be smaller on
+weekends, which is most pronounced on Saturdays. Note that the relative volume varies more than the
+relative volatility on the centralized exchanges, which suggests that volume is more concentrated than
+volatility. The uneven distribution of volume and volatility is documented further in the Appendix, see
+Figure A.1. The same patterns are observed in the extended sample period and are found to be stable
+over time.
+
+
+
+
+                                                   15
+Figure 4: Hour-of-the-day Nightingale plots showing hourly volatility (blue line) and volume (red bars)
+relative to their average levels (normalized to one). The shaded areas are 95% confidence bands for the
+relative hourly volatility. Results for Bitcoin are shown in the upper panels, Ether in the lower panels,
+and results for Binance, Coinbase Pro, and Uniswap V2 are shown in left, middle, and right panels,
+respectively.
+
+
+5.2    Hours-of-Day Patterns
+
+For hours-of-the-day we present our results in Figure 4. We illustrate the patterns in volatility and
+volume, using radial line graphs that we refer to as Nightingale plots. A Nightingale volatility plot
+presents the distribution of volatility over a certain period (such as a day or an hour) using a circular plot
+with polar coordinates.11 Due to arbitrageurs, price and volatility show high levels of agreement between
+Binance and Coinbase Pro. For hour-of-the-day, WETH/USDC on Uniswap V2 also demonstrates
+similar intraday volatility patterns as the centralized exchanges, volatility tends to be high around
+16 UTC and hit bottom near 5 UTC. Andersen and Bollerslev (1998) also find intraday periodicity
+in the DM-$ market, which they attribute to the combined effect of u-shape activities in markets in
+  11
+     These polar plots are similar to circular histograms, and are sometimes called radar plots, spider plots, circular
+histograms, and rose diagrams. This form of plot was popularized by Florence Nightingale in 1881.
+
+
+
+
+                                                          16
+different time zones. Unlike volatility, we observe some differences in the patterns of hour-of-the-day
+volume. These patterns are consistent with the geographical distribution of users. Coinbase Pro has
+substantially less volume in the hours from 5 UTC to 12 UTC, which coincides with night time in North
+America. This finding is intuitive because the majority of web-traffic to Coinbase Pro is from the US.
+The web-traffic to Binance is less concentrated on time-zones, which is consistent with a relatively more
+even distribution of volume. Notice that relative volatility and volume have very similar patterns for
+Uniswap V2. This is a natural consequence of AMM protocols where a price change is directly tied to
+trading volume (i.e. the amount of a trade determines the price movement along the constant function
+curve). This is in contrast to order book based markets where prices can change without trading volume
+and large price changes can in principle take place with little trading volume.
+   Notice the spikes in volume and volatility at 0h and 16h, and less noticeable spikes at 8h. These
+are observed across all exchanges and for both BTC and ETH. These coincide with funding times in
+future markets, as we discuss further below.
+
+
+5.2.1     Relative Illiquidity Measure for Hour-of-the-Day
+
+We can combine our measurements of volatility and volume into a relative measure of illiquidity based
+on Amihud (2002). First, we compute the illiquidity measure for each hour, and then we compare the
+hourly measure to the average of the preceding 24 hours. Our relative illiquidity measure is defined by:
+
+                                                                                      m |yτ (w,d,h,m) |
+                                                                                      P
+                          1 X        Illiq(w, d, h)
+        λhour
+         Illiquid (h) ≡          1 P23
+                                                             where Illiq(w, d, h) ≡                       .
+                          Nh w,d 24 j=0 Illiq(w, d, h − j)                                Vτ (w,d,h)
+
+
+The distribution of illiquidity over the hours of the day is show in Figure 5. For Binance, the relative
+illiquidity is largest during night time in East-Asia where it is about 30% larger for both Bitcoin and
+Ether. For Coinbase Pro, we see the opposite distribution with illiquidity peaking at 10:00 UTC, which
+is early in the morning in the US. The variation in the liquidity measure is a bit larger for Coinbase,
+ranging from about 80% to nearly 150%. We also observe that the illiquidity patterns for a given
+exchange, Binance and Coinbase Pro, are nearly identical for the two cryptocurrencies. For Uniswap
+V2, the liquidity is quite evenly distribution over the 24 hours of the day and never deviates more
+than 5 percent from the average. This is largely a feature of the design of the decentralized exchanges
+where changes in prices are directly linked to trading. Aggregating the data for the three exchanges
+creates a combined measure of illiquidity similar to that of Binance alone because volume on Binance
+is many times larger, even during the hours where Coinbase Pro has the most trading activity (around
+
+
+
+                                                        17
+16 UTC).
+
+
+
+
+Figure 5: Nightingale plots for hourly illiquidity relative to the average level of illiquidity. The shaded
+areas are 95% confidence bands for the relative hourly illiquidity. Results for Bitcoin are shown in the
+upper panels, Ether in the lower panels, and results for Binance, Coinbase Pro, and Uniswap V2 are
+shown in left, middle, and right panels, respectively.
+
+
+   The relative illiquidity measures from centralized exchanges are mainly driven by variation in relative
+volume. The numerators, in their illiquidity measures, are nearly identical because their prices are
+highly correlated. Therefore, a large value of the relative illiquidity (e.g. the value at 10 UTC for
+Coinbase Pro) does not imply that trading on Coinbase Pro at this hour is likely to have a larger price
+impact than other times of the day.
+
+
+
+
+                                                    18
+Figure 6: BTC/USDT (Binance) Hour-of-the-Day patterns for each day of the week. Sample period is
+from Jan 1, 2019 to May 31, 2021.
+
+
+5.2.2   Hour-of-the-Day by Weekday
+
+We have seen evidence of strong patterns in volatility and volume across weekdays and hours of the
+day. Some of these patterns could, in principle, be driven by particular weekdays or hours of the day.
+For this reason we proceed to investigate if the hour-of-the-day effect varies by weekday. To this end
+we define the following quantities of relative volatility,
+
+                                     P60
+                                     m=1 |yτ (w,d,h,m) |
+                            X
+             Rd (h) = N1h       1 P23 P60         2
+                                                                ,   for h = 0, . . . , 23, d = 1, . . . , 7.
+                            w,d 24 j=0   m=1   |y τ (w,d,j,m) |
+
+
+This measure is similar to λhour
+                            σ    (h) but is now computed separately for each of the seven weekdays and
+the ratio of volatility for the h-th hour is now measured relative to the 24 hours within the same day
+of the week. It is similar to a statistic used in Wang et al. (2020), albeit they used squared returns and
+did not separate the hourly share of volatility by day of the week.
+   Figure 6 shows that the distribution of volatility over the hours of the day are fairly similar across
+weekdays. The 1st hour and the hour after 16:00 UTC tend to have the highest level of volatility. The
+ratio of volatility during the first hour of the day is particularly large on Mondays, while the 13th and
+15th hours tend to be relatively calmer on Fridays, Saturdays, and Sundays than on other weekdays.
+
+                                                          19
+Figure 7: Patterns in volatility (blue) and volume (red) by the minute-of-the-hour. Results for Bitcoin
+are shown in the upper panels, Ether in the lower panels. The data sources are: Binance (left panels),
+Coinbase Pro (middle panels), and Uniswap V2 (right panels).
+
+
+5.3   Periodicity within the Hour
+
+Next we turn to the minute-of-the-hour analysis. The Nightingale plots are shown in Figure 7. These
+plots show very strong minute-of-the-hour patterns on the centralized exchanges. These patterns are
+most pronounced in volatility. There is a large burst in volatility during the first minute of the hour
+and medium bursts immediately after minutes 15, 30, and 45, and smaller bursts every five minutes.
+The most likely explanation for these patterns is algorithmic trading, possibly magnified by individual
+traders who rely on chart signals.
+
+
+
+
+                                                  20
+Figure 8: BTC/USDT (Binance) Minute-of-hour patterns in volatility, Rh (m), for each of the 24 hours
+of the day. Sample period is from Oct 1, 2020 to May 31, 2021.
+
+
+   We proceed to see if the minute-of-the-hour volatility is similar across hours of the day or more
+pronounced on certain hours of the day. We define the relative minute-of-the-hour volatility for each
+of the 24 hours of the day:
+                                               X        |yτ (w,d,h,m) |
+                                Rh (m) = N1m         1 P59
+                                                                              .
+                                               w,d,h 60   i=0 |yτ (w,d,h,i) |
+
+
+This quantity is similar to λminute
+                             σ      (m).   The difference is that Rh (m) measures volatility for the
+m-th minute relative to other minutes within the same hour-of-the-day, whereas λminute
+                                                                                σ      (m) mea-
+sures it relatively to the 60 minutes period that just ended. This ensures that the average is one,
+1 P60
+60 m=1 Rh (m) = 1, for all h.
+
+
+                                                    21
+   Figure 8 presents the distribution of volatility over the minutes of the hour, for each of the 24 hours
+of the day. The patterns we observe in Figure 7 are also observed for each of the 24 hours. The first
+minute of the hour tends to have the most volatility with peaks every 15 minutes, and smaller peaks
+every 5 minutes across most hours. The minute-of-the-hour effect tends to be most pronounced every
+fourth hour, 00h,. . .,20h, with the exception of 08h. We conjecture that these patterns are related to
+the funding of perpetual futures. On Binance, the funding takes occur at 00h, 08h, and 16h, on FTX
+at every hour, and on Bitmex at 04h, 12h, 20h in UTC.
+   In Appendix A, we present additional empirical results that show that the patterns are not specific
+to our sample period. Nearly identical patterns are observed in different calendar years.
+   Finally, we push the limits of the time-scale by using second-by-second level data for the centralized
+exchanges. Market microstructure noise will influence the returns at this frequency. However, if this
+noise is fairly evenly distributed over time, it need not influence our relative measures of volatility and
+volume. Thus, we compute the distribution of volatility using
+
+                                                  X          |yτ (w,d,h,s) |
+                              λsecond
+                               σ      (s) ≡ N1s           1 P3599
+                                                  w,d,h 3600 i=0 |yτ (w,d,h,s−i) |
+
+
+where the last argument in yτ (w,d,h,s) now represents the second within an hour, s = 0, . . . , 3599 (as
+opposed to the minute-of-the-hour) and where Ns ≃ 7 × 24 × W is the number of observations for
+second s. The corresponding measure for volume is computed similarly using second-by-second volume
+data.
+   We present results for the distribution of volatility and volume over the hour for Bitcoin and Ether
+using second-by-second data from Binance and Coinbase Pro. These results are calculated from an
+extended sample period of Jan 1, 2019 to May 31, 2021 and separate plots are presented for each
+calendar year. The results are presented in Figure 9. The results for Binance, BTC/USDT (upper left
+6 panels) are also shown in the appendix with a higher resolution, see Figure A.4.
+   The patterns in both volatility and volume are also very clear in the second-by-second data, and
+some new details emerge at this granularity. For volume, there is a large spike at the beginning of the
+hour that gradually fades away over several minutes. Only BTC/USD on Coinbase Pro in 2019 does
+not appear to have a spike in the first second. On Binance, there is another spike of similar magnitude
+halfway through the hour in 2020 and 2021. On Coinbase Pro, we observe, the puzzling result that
+the largest spike occurs at the 1200th second, which is 20 minutes into the hour. Albeit, this spike in
+volume is shorter lived than that at the beginning of the hour. We also notice a smaller burst in volume
+
+
+
+                                                       22
+every minute of the hour. These patterns are consistent with algorithmic trading, which is designed
+to have intermittent trading activity. Moreover, the patterns in relative volatility and relative volume
+appear to have grown stronger over time on both exchanges.
+
+               Binance (BTC/USDT)                               Coinbase Pro (BTC/USD)
+
+
+
+2019
+
+
+
+
+2020
+
+
+
+
+2021
+
+
+
+
+               Binance (ETH/USDT)                               Coinbase Pro (ETH/USD)
+
+
+
+2019
+
+
+
+
+2020
+
+
+
+
+2021
+
+
+
+
+Figure 9: Relative volatility and volume by second-of-the-hour for Bitcoin and Ether traded on Binance
+and Coinbase Pro. The first column of panels present the results for relative volatility on Binance,
+followed by relative volume on Binance, and the corresponding results for Coinbase Pro. The upper
+half present the results for Bitcoin and the lower half the results for Ether.
+
+
+                                                  23
+    As we discussed in the introduction, periodicity is well documented in exchange rates and stock
+returns. However this literature has focused on the distribution over the trading day with a continuous
+distribution (typically U-shaped), as opposed to the within-the-hour periodicity we have documented for
+cryptocurrencies in this paper. In unreported results, we found very similar and significant within-hour
+patterns in volatility for the S&P500 index, so the within-hour patterns do not appear to be specific to
+cryptocurrencies. In terms of US stock markets, Broussard and Nikiforov (2014) documented similar
+patterns within the hour for traded volume and the number of transactions. The authors did not
+comment on patterns in volatility, but such can be inferred indirectly from their reported absence of
+patterns in illiquidity measures.
+
+
+
+6    Periodicity in Volatility Modeling and Forecasting
+
+In this section, we show that it is beneficial to account for periodicity in volatility modeling and volatility
+forecasting. We estimate five GARCH models and compare the empirical fit across models with and
+without day-of-the-week periodicity. Conventional GARCH models typically need several years of daily
+returns to produce reliable estimates and, because we divide our sample into an in-sample and an
+out-of-sample period, we use an extended sample period from January 1, 2017 to July 31, 2021. This
+data is solely from Coinbase Pro because data from Binance and Uniswap V2 are not available for the
+entirety of this sample period.
+    Let rt = 100(log Pt − log Pt−1 ) denote a time series of daily returns in percent (BTC/USD or
+ETH/USD). A day spans the 24 hour period starting at 0:00h UTC, and we denote the conditional
+variance by, ht = var(rt |Ft−1 ) where rt is adapted to the filtration, Ft .
+    We estimate the GARCH model by Bollerslev (1986) and the EGARCH model by Nelson (1991).
+These are two of many GARCH models, see Hansen and Lunde (2005) and Bollerslev (2010), and the
+variation across models is primarily in their specification for the GARCH equation that prescribes how
+ht evolves over time. The GARCH model has a linear expression for ht , whereas the EGARCH has a
+linear expression for log ht . The EGARCH can also accommodate an asymmetric relationship between
+return shocks and volatility shocks. We also estimate an EGARCH-X model that includes the realized
+variance as a predictor of future conditional variance, see Engle (2002).
+    A GARCH(1,1) model has
+                                       ht+1 = ω + βht + α(rt − µ)2 ,
+
+
+
+
+                                                      24
+where µ = E(rt |Ft−1 ). The EGARCH model has the GARCH equation:12
+
+
+                                        log ht+1 = ω + β log ht + α|zt | + τ zt ,
+
+                    √
+where zt = (rt − µ)/ ht is the standardized return that has zero conditional mean and conditional
+variance var(zt |Ft−1 ) = 1. The EGARCH-X includes the realized variance in the GARCH equation,
+
+
+                                log ht+1 = ω + β log ht + γ log RV
+                                                                 ht + α|zt | + τ zt ,
+                                                                   t
+
+
+
+
+where the realized variance, RVt , is computed with five-minute returns we defined in (1).
+    We generalize the two EGARCH models to incorporate day-of-the-week periodicity.13 The periodic
+models have a single latent volatility variable, h∗t , and the conditional variance for each of the weekdays
+are simply scaled versions of h∗t to adjust for the variation of relative volatility over day-of-the-week.
+Specifically,
+                                                                        7
+                             log ht = λd(t) + log h∗t ,
+                                                                        Y
+                                                             with             exp(λd ) = 1,
+                                                                        d=1
+
+where d(t) is the mapping from t to the corresponding weekday, d ∈ {1, . . . , 7}. Hence, if t = 1 is a
+Sunday, then d(1) = 7 and d(2) = 1 etc. If there is no periodicity, then we have λd = 0 for all d, whereas
+λd < 0 if weekday d tends to have below average level volatility (as one might expect for Saturdays and
+Sundays) and λd > 0 if weekday d has above average volatility.
+    When estimating the periodic EGARCH and EGARCH-X models, we reparametrize the model to
+simplify the estimation problem. Specifically, we estimate a model with, log h?t+1 = β log h?t + log RV
+                                                                                                      ht +
+                                                                                                        t
+
+
+
+α|zt |+τ zt and log ht = log h?t +κd(t) where κd , d = 1, . . . , 7, are unrestricted parameters to be estimated.
+Since log h∗t = log h?t + ω/(1 − β), we can recover the original parameters using ω = 1−β
+                                                                                                        P7
+                                                                                       7                  d=1 κd and
+           ω
+λd = κd − 1−β , for d = 1, . . . , 7.
+    The estimated models are presented in Table 2. The models are estimated by maximizing the
+in-sample log-likelihood that spans the first three years of data, January 1, 2017 to December 31,
+2019. The remaining period, January 1, 2020 to July 31, 2021, is used as an out-of-sample evaluation
+period. We use a Gaussian specification, zt ∼ iidN (0, 1) for which the log-likelihood for day t is
+`t = − 21 (log ht +zt2 +log(2π)). The maximized log-likelihood using the specification is denoted `is =
+                                                                                                                 P
+                                                                                                                     `t ,
+where the sum is taken over days in the in-sample period and the corresponding out-of-sample log-
+ 12
+    We have simplified the original expression, which included α(|zt | − E|zt |), by letting ω absorb the constant term
+−αE|zt |.
+ 13
+    Our structure is related to the Component GARCH by Engle and Lee (1999) and the periodic GARCH model by
+Bollerslev and Ghysels (1996)
+
+
+                                                           25
+                               BTC/USD                                                 ETH/USD
+
+       GARCH           EGARCH                EGARCH-X            GARCH         EGARCH                EGARCH-X
+ µ        0.181      0.187       0.170      0.174      0.190      0.144      0.187       0.236      0.164      0.223
+          (0.112)    (0.161)     (0.005)    (0.113)    (0.006)    (0.082)    (0.161)     (0.149)    (0.016)    (0.150)
+ β        0.795      0.871       0.896      0.864      0.869      0.674      0.872       0.894      0.849      0.878
+          (0.050)    (0.050)     (0.031)    (0.041)    (0.038)    (0.100)    (0.050)     (0.038)    (0.060)    (0.048)
+ ω        1.448      0.124       0.092      0.334      0.306      5.198      0.243       0.167      0.396      0.285
+          (0.618)    (0.107)     (0.092)    (0.143)    (0.133)    (2.212)    (0.145)     (0.107)    (0.206)    (0.173)
+ α        0.131      0.263       0.279      0.120      0.129      0.171      0.272       0.265      0.199      0.202
+          (0.037)    (0.059)     (0.053)    (0.110)    (0.098)    (0.054)    (0.069)     (0.058)    (0.087)    (0.078)
+ τ                  −0.025      −0.025     −0.033     −0.034                             0.022      0.019      0.026
+                     (0.033)     (0.031)    (0.036)    (0.034)                           (0.027)     (0.03)    (0.028)
+ γ                                          0.080      0.085                                        0.056      0.048
+                                            (0.047)    (0.038)                                      (0.049)    (0.048)
+ λMo                             0.077                 0.059                             0.024                 0.016
+                                 (0.145)               (0.158)                           (0.135)               (0.138)
+ λTu                             0.263                 0.220                             0.240                 0.224
+                                 (0.205)               (0.233)                           (0.147)               (0.151)
+ λWe                             0.130                 0.160                             0.080                 0.098
+                                 (0.176)               (0.177)                           (0.171)               (0.172)
+ λTh                             0.317                 0.313                             0.243                 0.241
+                                 (0.141)               (0.144)                           (0.160)               (0.162)
+ λFr                            −0.041                 0.008                             0.101                 0.110
+                                 (0.144)               (0.150)                           (0.157)               (0.158)
+ λSa                            −0.319                −0.311                            −0.471                −0.461
+                                 (0.160)               (0.161)                           (0.153)               (0.153)
+ λSu                            −0.426                −0.461                            −0.218                −0.227
+                                 (0.160)               (0.167)                           (0.140)               (0.146)
+
+
+
+ `is     -3090.6    -3090.4     -3071.6    -3085.8    -3066.6    -3407.3    -3407.9     -3392.5    -3405.9    -3390.9
+ `os     -1666.1    -1668.1     -1625.7    -1649.5    -1615.8    -1817.2    -1817.9     -1805.7    -1810.6    -1800.9
+
+
+Table 2: Estimated parameters and the corresponding robust standard errors in parentheses for each of
+the GARCH models. Parameters are estimated with the in-sample period, January 1, 2017 to December
+31, 2019, where `is is the maximized log-likelihood. The log-likelihoods are also evaluated out-of-sample
+(January 1, 2020 to July 31, 2021) using the in-sample estimates resulting in the out-of-sample log-
+likelihood denoted `os .
+
+                                 P
+likelihood is denoted `os =          `t , where the sum is taken over the out-of-sample period. The standard
+GARCH and EGARCH model have very similar log-likelihoods for both cryptocurrencies both in-sample
+and out-of-sample. Adding the realized variance to the GARCH equation improves the empirical fit
+both in-sample and out-of-sample. This is particularly the case for BTC/USD returns where the in-
+sample log-likelihood improves by about 5 units and the out-of-sample log-likelihood by as much as 18
+units. However, even larger gains in the empirical fit are achieved by accounting for periodicity in the
+model. For BTC/USD, the periodic model improves the log-likelihood by about 19 units in-sample and
+about 34 units out-of-sample. For ETH/USD, the improvements are roughly 15 units and 11 units,
+respectively.
+
+
+
+
+                                                            26
+Figure 10: The upper panel displays the conditional variances, ĥt , over the entire out-of-sample period,
+January 1, 2020 to July 31, 2021 for three models, GARCH, EGARCH, and pEGARCH-X, estimated
+with daily BTC/USD returns. The lower panel shows ĥt for the EGARCH-X model with and without
+periodicity over the first six months of 2021 (a subset of the out-of-sample period) and the variation in
+RVt over the same period. All measured in annualized volatility.
+
+
+   There are several interesting observations to be made from Table 2. First, the asymmetry parameter,
+τ , is insignificant in all models. This parameter is typically found to be negative and significant when
+
+
+
+                                                   27
+EGARCH models are estimated with stock returns, see Hansen and Lunde (2005) and Hansen et al.
+(2012). For exchange rate data, the GARCH performs on par with the EGARCH, see Hansen and Lunde
+(2005), and a similar situation emerges here with cryptocurrencies because the asymmetry parameter,
+τ , is insignificant. Second, the models with periodicity show that volatility is below average during
+the weekend and above average during most weekdays. This variation over the weekdays is similar to
+that reported in Figure 3, which is estimated for a different sample period. There are some noticeable
+differences such as Wednesday and Fridays, which have a larger share of volatility in Figure 3 than
+suggested by the estimates in Table 2. This could suggest that the distribution of volatility across
+weekdays has shifted over time. For this reason, it might be possible to develop even better volatility
+models for cryptocurrencies in which the share of volatility for different weekdays is time varying similar
+to the time variation in the level of volatility. We shall not pursue this task here because our objective
+is merely to demonstrate that volatility modeling and forecasting can be improved by taking periodicity
+into account.
+    The out-of-sample volatility paths produced by three estimated GARCH models are shown in the
+                                                                                                      q
+upper panel of Figure 10. The volatility displayed is in units of annualized volatility, defined by   365ĥt ,
+for each of the three models. The two models without periodicity, GARCH (green line) and EGARCH
+(red line), produce very similar volatility paths, whereas the EGARCH-X with periodicity has a clear
+weekly pattern in the volatility series. The lower panel has the annualized volatility for the two variants
+of the EGARCH-X model for the first six months of 2021 as well as the daily realized variance computed
+with 5-minute returns. The panel shows that the model with periodicity is in better agreement with
+the realized variance than the EGARCH-X model without periodicity, which is unable to generate the
+sort of weekly variation seen in the realized variance. The estimated series for ĥt for additional models
+and for both cryptocurrencies, BTC/USD and ETH/USD, are presented in Figure A.6 in the appendix.
+
+
+
+7    Concluding Remarks
+
+We have documented intra-week, intra-day, and intra-hour patterns in volatility and volume for two
+leading cryptocurrencies and for three exchanges. We believe we are the first to document the patterns
+within the hour, which appear to have grown stronger in recent years. Interestingly, the within the hour
+periodicity does not appear to be specific to cryptocurrencies because we have found the same patterns
+in volatility for the S&P 500 index in unreported results. In future research, it will be interesting to
+determine if these patterns are primarily driven by algorithmic trading or have other explanations.
+
+
+
+                                                    28
+   We have also noted some important differences between centralized and decentralized exchanges.
+The relatively high cost of transacting on Uniswap V2 causes prices to be sluggish. This cost entails the
+protocol fee and the network’s cost of gas, which, when paired with slippage, often negates or greatly
+reduces arbitrage opportunities. This is evident from the cross-correlations in returns from different
+exchanges and explains that the within the hour patterns are much less pronounced on Uniswap V2. An
+implication of these empirical findings is that price discovery takes place on the centralized exchanges,
+and the higher levels of autocorrelation in returns from the decentralized exchange makes them less
+suitable for measuring volatility.
+   Our empirical findings are important for volatility modeling, volatility measurement, volatility fore-
+casting, and the interpretations of realized measures of volatility. For instance, the equation that
+specifies the dynamic properties of volatility in GARCH models and stochastic volatility models should
+reflect the fully anticipated variation in relative volatility over the week. We have shown that GARCH
+models with day of the week periodicity can lead to better forecasting performance. Since we found the
+periodicity within the day and within the hour to be even stronger than the variation across weekdays,
+it is reasonable to expect that models of volatility at higher frequencies than daily returns would benefit
+from incorporating periodicity.
+   The intra-hour periodicity could also have important implications for some realized measures of
+volatility, such as the bipower variation estimator by Barndorff-Nielsen and Shephard (2004) and the
+nearest neighbor truncation estimator by Andersen et al. (2012). These estimators rely on adjacent
+intraday returns being approximately homogeneous. However, the first 1-second intraday return of
+each hour and the preceding 1-second return have very different properties. Similar discontinuities
+are observed every 15th minute, every 5th minute, and (to a lesser extend) every one minute. This
+inhomogeneity carries over to intraday returns with lower sampling frequencies in calendar time, such
+as 1-minute returns. It is likely possible to lessen the inhomogeneity by sampling more frequently when
+volatility is expected to be high, and less frequently when it is expected to be low. The type of sampling
+was coined business time sampling by Oomen (2006).
+   Periodicity is important for the interpretation of changes in real-time measures of volatility and
+volume. For instance, an observed change in volatility may signal an unanticipated change in the level
+of volatility, and this may be important new information. However, if the change is fully anticipated
+because it follows the pattern of volatility that is typically seen at this time, then the change in volatility
+does not reflect new information. Therefore, the usefulness of information contained in a measurement
+is not the measurement itself, but is the difference between the actual measurement and the expected
+
+
+                                                      29
+measurement, and periodicity is an important component of the latter.
+
+
+References
+Aleti, S. and Mizrach, B. (2021), ‘Bitcoin spot and future market microstructure’, Journal of Futures Markets 41, 194–255.
+
+Alizadeh, S., Brandt, M. and Diebold, F. X. (2002), ‘Range-based estimation of stochastic volatility models’, Journal of
+  Finance 57, 1047–1092.
+
+Amihud, Y. (2002), ‘Illiquidity and stock returns: cross-section and time-series effects’, Journal of Financial Markets
+  5, 31–56.
+
+Andersen, T., Dobrev, D. and Schaumburg, E. (2012), ‘Jump-robust volatility estimation using nearest neighbor trunca-
+  tion’, Journal of Econometrics 169, 75–93.
+
+Andersen, T. G. and Bollerslev, T. (1997), ‘Intraday periodicity and volatility persistence in financial markets’, Journal
+  of Empirical Finance 4(2-3), 115–158.
+  URL: https://ideas.repec.org/a/eee/empfin/v4y1997i2-3p115-158.html
+
+Andersen, T. G. and Bollerslev, T. (1998), ‘Deutsche Mark-Dollar Volatility: Intraday Activity Patterns, Macroeconomic
+  Announcements, and Longer Run Dependencies’, Journal of Finance 53(1), 219–265.
+  URL: https://ideas.repec.org/a/bla/jfinan/v53y1998i1p219-265.html
+
+Andersen, T. G., Thyrsgaard, M. and Todorov, V. (2019), ‘Time-varying periodicity in intraday volatility’, Journal of the
+  American Statistical Association 114, 1695–1707.
+
+Barndorff-Nielsen, O. E. and Shephard, N. (2004), ‘Power and bipower variation with stochastic volatility and jumps’,
+  Journal of Financial Econometrics 2, 1–48.
+
+Bollerslev, T. (1986), ‘Generalized autoregressive heteroskedasticity’, Journal of Econometrics 31, 307–327.
+
+Bollerslev, T. (2010), Glossary to ARCH (GARCH), in T. Bollerslev, J. R. Russell and M. Watson, eds, ‘Volatility and
+  Time Series Econometrics: Essays in Honour of Robert F. Engle’, Oxford University Press, Oxford, UK, pp. 137–164.
+
+Bollerslev, T. and Ghysels, E. (1996), ‘Periodic autoregressive conditional heteroskedasticity’, Journal of Business and
+  Economic Statistics 14, 139–151.
+
+Broussard, J. P. and Nikiforov, A. (2014), ‘Intraday periodicity in algorithmic trading’, Journal of International Financial
+  Markets, Institutions & Money 30, 196–204.
+
+Catania, L. and Sandholdt, M. (2019), ‘Bitcoin at high frequency’, Journal of Risk and Financial Management 12, 36.
+
+Dimpfl, T. (2017), ‘Bitcoin market microstructure’, Available at SSRN p. http://dx.doi.org/10.2139/ssrn.2949807.
+
+Dobrev, D. and Schaumburg, E. (2018), ‘High-frequency cross-market trading: Model free measurement and applications’,
+  Working Paper .
+
+
+
+                                                            30
+Dyhrberg, A. H., Foley, S. and Svec, J. (2018), ‘How investible is bitcoin? analyzing the liquidity and transaction costs of
+  bitcoin markets’, Economics Letters 171, 140–143.
+
+Engle, R. F. (2002), ‘New frontiers for ARCH models’, Journal of Applied Econometrics 17, 425–446.
+
+Engle, R. F. and Lee, G. G. J. (1999), A permanent and transitory component model of stock return volatility, in R. F.
+  Engle and H. White, eds, ‘Cointegration, Causality, and Forecasting: A Festschrift in Honour of Clive W. J. Granger’,
+  Oxford University Press, Oxford.
+
+Hansen, P. R., Huang, Z. and Shek, H. (2012), ‘Realized GARCH: A joint model of returns and realized measures of
+  volatility’, Journal of Applied Econometrics 27, 877–906.
+
+Hansen, P. R. and Lunde, A. (2005), ‘A forecast comparison of volatility models: Does anything beat a GARCH(1,1)?’,
+  Journal of Applied Econometrics 20, 873–889.
+
+Hansen, P. R. and Lunde, A. (2006), ‘Realized variance and market microstructure noise’, Journal of Business and
+  Economic Statistics 24, 127–218. The 2005 Invited Address with Comments and Rejoinder.
+
+Hasbrouck, J. and Saar, G. (2013), ‘Low-latency trading’, Journal of Financial Markets 16, 646–679.
+
+Intro to Ethereum (n.d.), https://ethereum.org/en/developers/docs/intro-to-ethereum/. Accessed: 2021-08-27.
+
+Kroitor, I., Revelli, C., Gordon, V. and Voropaev, D. (2021), ‘CCXT’.
+  URL: https://github.com/ccxt/ccxt
+
+Narayanan, A., Bonneau, J., Felten, E., Miller, A. and Goldfeder, S. (2016), Bitcoin and cryptocurrency technologies: a
+  comprehensive introduction, Princeton University Press, New Jersey.
+
+Nelson, D. B. (1991), ‘Conditional heteroskedasticity in asset returns: A new approach’, Econometrica 59, 347–370.
+
+Oomen, R. C. (2006), ‘Properties of Realized Variance Under Alternative Sampling Schemes’, Journal of Business &
+  Economic Statistics 24, 219–237.
+
+Taleb, N. (2021), ‘Bitcoin, currencies and fragility’, Quantitative Finance forthcoming.
+
+Wang, J.-N., Liu, H.-C. and Hsu, Y.-T. (2020), ‘Time-of-day periodicities of trading volume and volatility in bitcoin
+  exchange: Does the stock market matter?’, Finance Research Letters 34, 101243.
+
+Xu, J., Vavryk, N., Paruch, K. and Cousaert, S. (2021), ‘SoK: Decentralized exchanges (DEX) with automated market
+  maker (AMM) protocols’, arXiv:2103.12732v3 .
+
+
+
+
+                                                            31
+A    Supplementary Empirical Results
+
+We present summary statistics for the sample period, October 1, 2020 to May 31, 2021, in Table 1. The
+corresponding summary statistics for the extended sample period, January 1, 2019 to May 31, 2021 are
+presented in Table A.1. The Table does not include statistics for Uniswap V2, because it only launched
+in May 2020.
+
+
+                                    Volatility RV (5-minute returns)
+                                Average        min         q25         q50       q75          max
+BTC/USDT (Binance)                67.72       14.96        38.83       54.57    80.01        635.23
+BTC/USD (Coinbase Pro)            69.05       11.25        38.43       55.48    82.45        628.57
+ETH/USDT (Binance)                86.29       22.52        53.10       71.59    100.78       773.62
+ETH/USD (Coinbase Pro)            87.81       22.64        54.04       72.77    101.63       753.04
+
+
+                                                Volume
+                                Average        min         q25         q50       q75          max
+BTC/USDT (Binance)               1,162M        55M        282M         512M     1,099M       13,481M
+BTC/USD (Coinbase Pro)             312M        10M         63M         118M       307M        4,177M
+ETH/USDT (Binance)                 573M        16M         60M         138M       408M       11,645M
+ETH/USD (Coinbase Pro)             172M         3M         15M          32M        88M        4,510M
+
+
+
+      Table A.1: Summary Statistics for the sample period January 01, 2019 to May 31, 2021.
+
+
+
+
+                                                  32
+Figure A.1: Day-of-the-Week relative volatility (left panels) and relative volume (right panels) by
+calendar year. The sample period for Binance and Coinbase Pro is January 1, 2019 to May 31, 2021
+and the sample period for Uniswap V2 is October 1, 2020 to May 31, 2021.
+
+
+
+
+                                                33
+Figure A.2: Hour-of-the-Day relative volatility (left panels) and relative volume (right panels) by
+calendar year. The sample period for Binance and Coinbase Pro is January 1, 2019 to May 31, 2021
+and the sample period for Uniswap V2 is October 1, 2020 to May 31, 2021.
+
+                                                34
+Figure A.3: Minute-of-the-Hour relative volatility (left panels) and relative volume (right panels) by
+calendar year. The sample period for Binance and Coinbase Pro is January 1, 2019 to May 31, 2021
+and the sample period for Uniswap V2 is October 1, 2020 to May 31, 2021.
+
+                                                 35
+             Volatility (BTC/USDT, Binance)                   Volume (BTC/USDT, Binance)
+
+
+
+
+2019
+
+
+
+
+2020
+
+
+
+
+2021
+
+
+
+
+Figure A.4: Distribution of volatility and volume over the seconds-of-the-hour for BTC/USDT traded
+on Binance (by calendar year). The left panels show the distribution of volatility and the right panels
+are the corresponding results for volume.
+
+
+       Figure A.5 shows the distribution of Ethereum block time over the sample period from October 1,
+2020 to May 31, 2021. A block time is a duration, defined by the time it takes to add a new block to
+the blockchain. The average block time is 13.3 seconds in this sample period.
+
+
+
+
+                                                   36
+Figure A.5: Distribution of the time it takes to produce a new block on the Ethereum blockchain.
+
+
+
+
+                                               37
+Figure A.6: Out-of-sample conditional annualized volatility for each of the five estimated GARCH
+models. Left panels are for BTC/USD and right panels are for ETH/USD. The upper panels are for
+the three models that do not utilize the realized variance and the lower panels are for GARCHX models.
+                                                                                                q
+    The panels in Figure A.6 show the conditional variances in units of annualized volatility       365 · ĥt
+for the out-of-sample period. The left two panels are the results for BTC/USD and the right two panels
+are for ETH/USD. The upper panels are the models that do not utilize RVt in the modeling and the
+lower panels are the two variants of the EGARCHX model which include the realized variance in the
+GARCH equation.
+
+
+
+B     Computation of Confidence Intervals
+
+In Figures 3, 4 and 7 we present the relative shares of volatility, λσ , for day-of-the-week, hour-of-the-
+day, and minute-of-the-hour, along with confidence bands (shaded regions). Similarly, in Figure 5 we
+include confidence bands for the relative illiquidity measure. Here, we detail how the confidence bands
+are computed and present the justification for the expressions from which these are computed. The
+
+
+
+
+                                                   38
+relative volatility measures, presented in Figure 3 can be written, λday
+                                                                     σ (d) = 7 × θ̂d where
+
+
+                                                           d      N
+                                                      1 X      Xw,d
+                                                θ̂d =
+                                                      Nd w=1 Xw,d +Yw,d
+
+                                                    P6
+                h,m |yτ (w,d,h,m) | and Yw,d =                    h,m |yτ (w,d−i,h,m) |
+              P                                               P
+with Xw,d =                                             i=1
+                                         X
+     We define θd = EZd,w where Zd,w = Xw,dw,d
+                                           +Yw,d and, provided that Zw,d satisfies the conditions of a
+
+central limit theorem, it follows that
+
+                                              √                        d
+                                                  W (θ̂d − θd ) → N (0, ω 2 ).
+
+
+where the variance, ω 2 , can be estimated by
+
+                                                              N
+                                                            d 
+                                                       1 X                2
+                                              ω̂d2 =            Zd,w − θ̂d .
+                                                       Nd w=1
+
+The parameter θd as well as the variables Zw,d are bounded between zero and one as is the case for a
+parameter that represents a probability. For parameters of this type, it is often possible to construct
+confidence intervals with better finite sample properties by applying the logistic transformation, so
+                                                                    x
+define ϑd = logit(θd ) and ϑ̂d = logit(θ̂d ), where logit(x) = log 1−x . Then, by the delta-method, we have
+
+                                          d
+                        Nd (ϑ̂d − ϑd ) → N (0, σ 2 ),                  with σ 2 = ω 2 /[θd (1 − θd )]2 .
+                      p
+
+
+
+Confidence intervals for ϑd are now obtained with ϑ̂d ± 1.96σ̂ϑ , where σ̂ϑ = √1N ω̂/θ̂d (1 − θ̂d ). These are
+                                                                                                   d
+
+translated to to confidence intervals for θd by applying the inverse mapping, tigol(y) = 1/(1 + e−y ), to
+the endpoints of the confidence interval for ϑd . Finally, the confidence interval for λday
+                                                                                        σ (d) is now given
+
+by
+                             h                                                                i
+                                 7 × tigol(ϑ̂d − 1.96σ̂ϑ ), 7 × tigol(ϑ̂d + 1.96σ̂ϑ ) .
+
+The confidence intervals for λhour
+                              σ    (h), λminute
+                                         σ      (m), and λhour
+                                                          Illiquid (h) are constructed similarly.
+
+
+
+
+                                                                  39
+

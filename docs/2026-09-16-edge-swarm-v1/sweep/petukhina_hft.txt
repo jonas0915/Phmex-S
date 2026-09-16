@@ -1,0 +1,1974 @@
+                                                                       Rise of the Machines?
+                                                            Intraday High-Frequency Trading Patterns of Cryptocurrencies
+
+
+
+                                                                              Alla A. Petukhina
+                                                                           Humboldt-Universität zu Berlin.
+                                                                               Firamis GmbH, Germany.
+                                                                          alla.petukhina[at]wiwi.hu-berlin.de
+
+
+                                                                            Raphael C. G. Reule
+
+
+
+
+arXiv:2009.04200v1 [q-fin.TR] 9 Sep 2020
+                                                                           Humboldt-Universität zu Berlin.
+                                                                          irtg1792.wiwi[at]wiwi.hu-berlin.de
+
+                                                                            Wolfgang Karl Härdle
+                                             Humboldt-Universität zu Berlin, IRTG 1792, Dorotheenstr. 1, 10117 Berlin, Germany School of
+                                              Business, Singapore Management University, 50 Stamford Road, Singapore 178899 Faculty of
+                                               Mathematics and Physics, Charles University, Ke Karlovu 3, 121 16 Prague, Czech Republic
+                                           Department of Information Management and Finance, National Chiao Tung University, Taiwan, ROC
+                                                                               haerdle[at]wiwi.hu-berlin.de
+
+
+
+                                                                             September 10, 2020
+
+                                                                                     Abstract
+
+                                                This research analyses high-frequency data of the cryptocurrency market in re-
+                                                gards to intraday trading patterns related to algorithmic trading and its impact
+                                                on the European cryptocurrency market. We study trading quantitatives such as
+                                                returns, traded volumes, volatility periodicity, and provide summary statistics of
+                                                return correlations to CRIX (CRyptocurrency IndeX), as well as respective over-
+                                                all high-frequency based market statistics with respect to temporal aspects. Our
+                                                results provide mandatory insight into a market, where the grand scale employ-
+                                                ment of automated trading algorithms and the extremely rapid execution of trades
+                                                might seem to be a standard based on media reports. Our findings on intraday
+                                                momentum of trading patterns lead to a new quantitative view on approaching the
+                                                predictability of economic value in this new digital market.
+
+                                                JEL Classification: G02, G11, G12, G14, G15, G23.
+                                                Keywords: Cryptocurrency, High-Frequency Trading, Algorithmic Trading, Liquidity,
+                                                Volatility, Price Impact, FinTech, CRIX.
+                                                The financial support of the Czech Science Foundation under grant no. 19-28231X, the
+                                                Firamis GmbH, Robert-Kempner-Ring 27, 61440 Oberursel (Taunus), the Yushan Scholar
+
+
+                                                                                          1
+Program, and European Unions Horizon 2020 FIN-TECH Project, under the grant no.
+825215 (Topic ICT-35-2018, Type of actions: CSA), as well as data support by dyos
+solutions GmbH, Oberwallstr. 8, 10117 Berlin, are greatly acknowledged.
+
+This is a post-peer-review, pre-copyedit version of an article published in The European
+Journal of Finance. The final authenticated version is available online at:
+https://doi.org/10.1080/1351847X.2020.1789684
+
+
+
+
+                                            2
+1    Motivation
+High-frequency trading takes advantage of the incredible rise of computing power pro-
+vided by the steady development of ever more capable structures. Algorithms are already
+major players in a variety of financial applications, and have proven to be more efficient
+than their human counterparts. By employing these so-called “algos”, positive effects can
+be exploited to their maximum and market inefficiencies can potentially be eliminated
+(Hrdle et al., 2020). However, just like for every coin, there is a flipside, such as the
+negative impact on capital markets caused by technological inefficiencies (Emem, 2018).
+One of the most noted events of an early point of attack for these algorithms was the
+Flash Crash of 2010.
+
+     No matter what, the machines are here to stay and their influence, possibly powered
+by “learning” algorithms, will certainly increase even more with time - especially in
+regards to new emerging markets such as cryptocurrencies. The rising popularity and
+acceptance of this alternative asset, as it has yet to be understood as an alternative
+to fiat currency, requires for specialised strategies to maximise the potential return of
+investments (Akhtaruzzaman et al., 2019; Platanakis and Urquhart, 2019; Trimborn et
+al., 2018; Petukhina et al., 2020, 2019).
+
+
+
+
+                             Figure 1: CRIX Time Series.
+
+
+
+
+                                            3
+   Yet, did the quantlets or algorithms really venture in the realm of autonomous ma-
+chines, the digital world, or are they still with the world of the humans, the world of
+manual labour oil and baby nutrition companies?
+
+    This is especially of interest since the cryptocurrency market has significantly matured
+in recent years and has attracted enormous investments, not only by major players but
+especially by individuals. Especially F inT ech Startups are of high interest, as absurd
+amounts of financial backing was (and is still to some extent) being generated by just
+presenting a briefly written W hitepaper-PDF marketing outlet (Zetzsche et al., 2019).
+The early cryptocurrency market kick-off starting in late 2017 is evidently presenting
+such happenings. The discrepancy between sentiment and tone generated by marketing
+versus the delivered performance is fascinating (with further references Hrdle et al., 2020;
+Chen et al., 2019a; Qian et al., 2019).
+
+    In this research, we are analysing high-frequency data (5-minute intervals) gained
+from the cryptocurrency market and see, if there is really 24/7 algorithmic trading, or
+if there are still people sitting behind their computers creating and executing orders by
+hand after they have returned from their daily jobs.
+
+    Previous research outputs on this theme, such as Zhang et al. (2019), have used time
+spans ranging from 1 hour to 12 hours. Their methods yielded results, which lead to
+different conclusions, yet opened up further thoughts towards factors such as trading
+patterns, variations in returns, volatility and trading volume. Zhang et al. (2018) are
+also looking at the same aspects as the previous research, with the additional finding
+of a power-law correlation between price and volume. Rschli et al. (2017) respectively
+build a uni- and multivariate analysis of quantitative facts to show off stylized facts of
+cryptocurrencies. Schnaubelt et al. (2019) analyzed limit order data from cryptocurrency
+exchanges. Besides their recovery of common qualitative facts, they find that these data
+exhibit many of the properties found for classic limit order exchanges, such as a symmet-
+ric average limit order book, the autocorrelation of returns only at the tick level and the
+timing of large trades. Yet they find that cryptocurrency exchanges exhibit a relatively
+shallow limit order book with quickly rising liquidity costs for larger volumes, many small
+trades and an extended distribution of limit order volume far beyond the current mid-
+price.
+
+   Given the search for the most efficient trading strategies, Caporale and Plastun (2019)
+provide a range of historic scientific works on the time of day effects to reap abnormal
+profits. In contrast to their work, we aim at identifying the market drivers, which are
+responsible for how this new emerging market, which is still full of conundrums for many,
+
+                                             4
+behaves - i.e. do market movements fit into human activity patterns or are these inde-
+pendent from time.
+
+   Preliminary research has therefore not touched the highly topical question of human
+impact in the wake of digital systems. There are many papers with interesting approaches
+and solutions, but only for problems that are already known and have been rebrewn for
+some time now. Yet, with the advent and popular discussion of the employment of Long
+Short Term Memory Neural Networks (LSTM) and hence deep learning for finance, AI
+advisory, essentially based on the human factor of sentiment in the realm of cryptocur-
+rencies (Chen et al., 2019a), will play a major role in especially this completely digital
+market. This, as a circular argument, brings us once again to the fundamental idea of
+enforcing the understanding of market behaviour based on the time of the day and the
+agents acting in these markets that are predestined to be ruled by the machines.
+
+   As a polemic term, we are using P roof − Of − Human (P oH; derived from P roof −
+Of − W ork, P roof − Of − Stake et cetera consensus algorithms) to underline the hy-
+potheses that not algorithms are the major players in this market, but humans. Humans
+don’t act as programmed like algorithms - they act based on biological and psychological
+input, such as hunger or fatigue. The majority of humans will have certain times at which
+they are active, and at which they rest and are therefore inactive. Alternatively spoken,
+algorithms need humans to start and then exacerbate a price trend - the question is,
+therefore if the cryptocurrency market is dominated by human or algorithmic behaviour.
+Eventually, we can differentiate algorithmic and human trading patterns expressed within
+the market (with further references Caporale et al., 2016).
+
+   The paper is structured by giving a brief general introduction and data source disclo-
+sure and methodology section, followed by a respective intraday data analysis, which is
+concluded by a section on Time-Of-Day effects and the Proof-Of-Human.
+
+   All presented graphical and numerical examples shown are reproducible and can be
+found on    www.quantlet.de (Borke and Härdle, 2018) and are indicated as CCID.
+
+
+2    High-Frequency Cryptocurrency Data
+To understand the dynamics of this new high-frequency market, it is mandatory to in-
+vestigate the statistical properties of various high-frequency variables, for example, trad-
+ing volume or volatility, to find respective answers to questions like option pricing and
+forecasting. Preliminary research to visualize the cryptocurrency market was done by
+Trimborn and Hrdle (2018) with the CRyptocurrency IndeX,             CRIX (crix.berlin), in
+
+                                             5
+order to represent the performance of the cryptocurrency market with the help of the
+most mature and accepted cryptocurrencies, such as Bitcoin (BTC), Ethereum (ETH),
+or Ripple (XRP) - see appendix section 5.1 for further used abbreviations. As the CRIX
+index family covers a range of cryptocurrencies based on different liquidity rules and
+various model selection criteria, we have chosen this as the main data source. CRIX
+represents the cryptocurrency market, but by its very nature is dominated by a few main
+players with BTC being the absolute market driver over time.
+
+    Furthermore, we used data provided by dyos solutions GmbH (dyos.io) compiled from
+various exchanges’ data, to ensure that our findings are coherent with other data avail-
+able. It is important to keep in mind, that the 5-minute data analysed in this research
+is gained from sources located in the European markets (+1h GMT) and therefore the
+time-of-day effects may look different for markets from the Americas or Asia. We will
+make an exegesis on this important point in subsection 3.3.
+
+    In addition, the analysed data sample belongs to the time period after the cryptocur-
+rency market heated up immensely around the end of 2017, followed by a sharp cooldown
+at the beginning of 2018. By that time a plethora of euphoric media outlets was praising
+the endless possibilities which the blockchain technology may provide - and what eventu-
+ally also lead to quite a lot of ICO scams (Zetzsche et al., 2019). At that time, algorithmic
+trading in cryptocurrency markets was not seen as being a mere idea, but reality by more
+or less promising FinTech startups. These emerging enterprises are offering a wide variety
+of blockchain-related services, such as trading, asset management, or technical support.
+Especially FinTech startups related to the financial sector, in contrast to for example
+supply chain oriented ventures, are heavily interested in ArtificialIntelligence (learning
+algorithms) and are marketing their individual related products as groundbreaking and
+ready-to-use. Given the chosen typical vacation period, July and August, one should
+hence expect a less pronounced human, but algorithmic driven market behavior to con-
+tradict the hypotheses of the PoH concept - more on that as well in subsection 3.3.
+
+    Regarding data handling, we are coherent with previous research on high-frequency
+data based on traditional data sources, such as the NYSE, which has underlined data
+preparation issues and the specific statistical properties of various high-frequency vari-
+ables (Hautsch, 2011). As we are dealing with a subject, where individuals can act
+directly with the market without involving a middle-man, the characteristics of our data
+observed on transaction level, therefore, are especially irregularly spaced in time and
+without interruption - see section 3.
+
+
+
+
+                                             6
+3     Intraday Data Analysis
+In the following chapter, we provide an overview of the methods employed to analyze
+our high-frequency data at hand with further statistical intraday cryptocurrency market
+observations.
+
+
+3.1    Methodology
+This paper undertakes a fresh empirical investigation of key financial variables of cryp-
+tocurrency market, such as volatility, returns and trading volume. Following, for example,
+Hussein (2011), intraday return volatility is calculated as absolute log-returns as defined
+in (2). As we are looking at high-frequency data, there is no need to use measures like,
+for example, the compounded annual growth rate (CAGR) instead of absolute returns,
+which is used to get the per-annum returns and does not support the analysis in this case.
+
+    The simple return Rett is defined as
+
+                                              Pt − Pt−1
+                                     Rett =             ,                              (1)
+                                                 Pt−1
+
+where Pt und Pt−1 are prices of coins at time points t and t − 1 respectively. The log
+return rett is defined as
+
+                                           Pt
+                             rett = log        = log(1 + Rett ).                       (2)
+                                          Pt−1
+
+    In order to expressively visualize some features of our high dimensional and nonsta-
+tionary time series gained from our large high-frequency dataset of the specifically chosen
+period of time, a Generalized Additive M odel (GAM) is best suited. A GAM is a gen-
+eralized linear model (GLM), where the nonlinear predictor is given by a specified sum
+of smooth functions of the covariates, as well as a conventional parametric component
+of the linear predictor (Hrdle, 1990). The basic advantage of GAM is the possibility to
+model highly complex nonlinear relationships given a large number of potential predic-
+tors. In particular, recent computational developments in GAM fitting methods, such as
+Wood et al. (2015), Wand (2017), and Wood (2017), have made it possible to use these
+models to explore very large datasets. Moreover, in the last two decades, GAM methods
+have intensively developed in terms of the range of models that can be fitted. All these
+advantages make GAMs a feasible tool to investigate intraday seasonality patterns with
+high-frequency trading data. In general, the model has a structure something like:
+
+                        g {E (yi )} = β0 + f1 (xi1 ) + · · · + fp (xip )               (3)
+
+
+
+                                               7
+    where y = (y1 , . . . , yn )> observation of a response variable Y , g is a link function
+(identical, logarithmic or inverse, etc.), x1 . . . xp are independent variables, β0 is an inter-
+cept, f1 (xi1 ) . . . fp (xip ) are unknown nonparametric smooth functions, and εi is an i.i.d.
+random error. In our application we use the identity link function, since the LHS of our
+equations are features/variables observed or measured on a continuous scale, to fit the
+following statistical model:
+
+                        yi = f1 (x1,i ) + f2 (x2,i ) + . . . + fp (xp,i ) + εi                      (4)
+
+   Here yi will be a trading volume, volatility, or returns as defined in (2), xq,i will be
+the daily and weekly effects. The nonlinear function fq is a smooth function, composed
+by sum of basis functions bqj (for example B-splines, P-splines or cubic splines) and their
+corresponding regression coefficients βq,j . Thus, each function fq is expressed as:
+
+                                                      kq
+                                                      X
+                                          fq (x) =          βq,j bqj (x)                            (5)
+                                                      j=1
+
+  where kq is the dimension of the spline basis.
+The smooth function m(x1 , ..., xp ) = pq=1 fq (xq ) is estimated by penalized regression:
+                                      P
+
+                       n            p
+                                                      !2       p          Z
+                                                                                           2
+                       X            X                          X
+                             yi −          fq (xi )        +         λq         fq00 (x)       dx   (6)
+                       i=1          q=1                        q=1
+
+   where the penalty parameter Λ = (λ1 , . . . , λp ) is a smoothing parameter controlling
+the fitsmoothness tradeoff for fq and can be selected by minimization of the Generalized
+Cross Validation (GCV) score, see (Wood, 2004) and (Wood, 2011). Denoting B the
+matrix formed by concatenation of the bqj , one has to solve the following problem:
+
+                                                                     p
+                                           (                                               )
+                                                                     X
+                                                               2                  >
+                         βb = arg min kY − Bβk +                              λq̇ β Sq β            (7)
+                                    λ,β
+                                                                     q=1
+
+   where β = (β1 , . . . , βp )> is the vector of the unknown regression parameters, Sq is a
+matrix of known coefficients (a smoothing matrix) and depends on the spline basis. Thus,
+given λ, expression (7) may readily be minimized to yield the coefficient estimates βˆλ .
+The method of obtaining the estimate of the β is called Penalized Iteratively Re-weighted
+Least Squares (P-IRLS) which is implemented in the mgcv R package, see (Wood, 2019).
+
+
+3.2    Summary Statistics
+As an introduction to the data analyzed in this brief research, we are providing sum-
+mary statistics regarding its statistical properties to form a basic understanding of the
+market at hand. Firstly, the trading data density of cryptocurrencies against the normal
+
+
+                                                       8
+distribution of BTC is far from normally distributed, see figure 2. Hence the behaviour
+of agents in this market is far from what we would see in classic markets. This implies,
+that new rules are being employed, and therefore we have to rethink our common way
+on how to approach the quantitative analysis of markets in general. We will start our
+discussion on the specific research question by first providing a general overview of the
+cryptocurrency market with increasingly narrowed focus and attention to detail regarding
+specific timeframes and parameters for individual crypto-assets.
+
+
+                              Density of cryptos against normal distribution
+
+
+
+
+                       1200
+
+
+
+                       1000
+
+
+
+                       800
+
+
+             Density
+                       600
+
+
+
+                       400
+
+
+
+                       200
+
+
+
+                       0
+
+
+                                  −0.005           0.000            0.005
+
+
+
+
+Figure 2: Density of intraday CCs returns. 01. July 2018 - 31. August 2018. The
+probability density functions of the distributions of daily returns for the analized cryp-
+tocurrencies with the following colour code: BCH, BTC, DASH, ETC, ETH, LTC, REP,
+STR, XMR, XRP, ZEC. A normal distribution with the same mean and standard devi-
+ation as the returns on BTC is displayed as a histogram in the background
+
+
+    Secondly, using GAM, we gain interesting insights into the trading activities in this
+24/7 market. Cryptocurrencies are being traded without any forced break, as we know it
+from classic markets, for example, if the stock exchange closes for the night or especially
+for weekends. In addition to this fact, we have to consider, that there is no centralized
+trading in the act, but a plethora of service providers, so-called cryptocurrency exchanges.
+As we disclose the origin of our data, we underline, that caused by this very decentralized
+nature of cryptocurrency genesis and their respective trading, partially greatly diverging
+price data is available for each individual cryptocurrency. Again, this is caused by the de-
+
+
+                                                   9
+centralized root of individual, unsupervised and unregulated, places for exchange. There
+is no fixed price for BTC contrary to, for example, for exchange rates of USD-EUR.
+
+
+                                26000
+                                24000
+                                22000
+
+            Price               20000
+                                18000
+                                16000
+                                14000
+                                                                                     2018-09-29
+                                                                                     2018-09-24
+                                                                                     2018-09-19
+                                                                                     2018-09-14
+                                                                                     2018-09-09
+                                                                                     2018-09-04
+                                                                                     2018-08-30
+                                                                                     2018-08-25
+                                                                                     2018-08-20
+                                                                                     2018-08-15
+                                                                                     2018-08-10
+                                                                                     2018-08-05
+                                                                                     2018-07-31
+                                                                                     2018-07-26
+                                                                                     2018-07-21
+                                                                                     2018-07-16
+                                                                                     2018-07-11
+                                                                                     2018-07-06
+                                                                                     2018-07-01
+                                                                                     2018-06-26
+                                                                                     2018-06-21
+                                                                                     2018-06-16
+                                                                                     2018-06-11
+                                                                                                                                                                                                                               Date
+                                                                                     2018-06-06
+                                                                                     2018-06-01
+
+
+
+                                Figure 3: Candlestick chart of CRIX. 01. July 2018 - 29. September 2018.
+
+
+            8500
+                                                                                                                                                     500                                                                                                                                      0.50
+            8000
+                                                                                                                                                     450                                                                                                                                      0.45
+            7500
+
+BTC Price                                                                                                                                ETH Price                                                                                                                                XRP Price
+                                                                                                                                                     400                                                                                                                                      0.40
+            7000
+                                                                                                                                                     350                                                                                                                                      0.35
+            6500
+                                                                                                                                                     300                                                                                                                                      0.30
+            6000
+                                                                                                                                                     250                                                                                                                                      0.25
+
+                   2018-07-01   2018-07-08   2018-07-15    2018-07-22   2018-07-29   2018-08-05   2018-08-12   2018-08-19   2018-08-26                     2018-07-01   2018-07-08   2018-07-15    2018-07-22   2018-07-29    2018-08-05   2018-08-12   2018-08-19   2018-08-26                      2018-07-01   2018-07-08   2018-07-15    2018-07-22   2018-07-29    2018-08-05   2018-08-12   2018-08-19   2018-08-26
+                                                                              Date                                                                                                                                     Date                                                                                                                                      Date
+
+
+
+                                                          (a) BTC                                                                                                                                 (b) ETH                                                                                                                                   (c) XRP
+
+Figure 4: Chandlestick charts for individual price movements. 01. July 2018 - 31.
+August 2018.
+
+    In contrast to the CRIX candlestick chart presented in figure 3, where five minute
+high-frequency data is aggregated to 60 minutes, we present respective individual plots
+for each examined cryptocurrency, as shown in figure 4 to give an easier entry to under-
+stand this volatile market. Consistency between Figure 1, 3, and 4 can be seen in the
+context of the findings in Chen et al. (2019a), where the impact of sentiment on cryp-
+tocurrency prices is evident (with further references Chen et al., 2019c; Qian et al., 2019).
+Furthermore, when recurring to the observable price structure of the Flash Crash of 2010
+as well, we can see quite many jumps in these figures - a phenomenon also described in
+
+                                                                                                                                                                                                                      10
+Chen et al. (2019b) and Qian et al. (2019).
+
+    Figure 5, shows the intraday 5-minutes returns for the period from the 01. July 2018
+to the 31. August 2018. As indicated, overall returns across the board are very extreme
+- a phenomenon generally unknown to classic financial markets. In addition, we can
+observe an extreme activity cluster around the second half of August. We can link this
+activity to increased media outlets regarding cryptocurrencies: the more investors flooded
+into this market, the higher the trading activity, fueled by sentiment, became - leading
+to partially absurd returns; positive as well as negative.
+
+
+                                                                                      0.04
+      0.04
+
+                                                 0.03
+
+
+
+                                                 0.02                                 0.02
+      0.02
+
+
+                                                 0.01
+
+BTC                                        ETH                                  XRP   0.00
+      0.00                                       0.00
+
+
+
+                                                 −0.01
+                                                                                      −0.02
+
+      −0.02
+                                                 −0.02
+
+
+                                                                                      −0.04
+                                                 −0.03
+              Jul          Aug       Sep                 Jul      Aug     Sep                 Jul      Aug     Sep
+
+                           Index                                  Index                                Index
+
+
+
+
+                       (a) BTC                                 (b) ETH                              (c) XRP
+
+                    Figure 5: Intraday Returns (5 minutes). 01. July 2018 - 31. August 2018.
+
+
+                                                                                      0.04
+      0.04                                       0.035
+
+
+
+                                                 0.030
+
+                                                                                      0.03
+      0.03
+                                                 0.025
+
+
+
+                                                 0.020
+BTC                                        ETH                                  XRP   0.02
+      0.02
+                                                 0.015
+
+
+
+                                                 0.010
+      0.01                                                                            0.01
+
+
+                                                 0.005
+
+
+      0.00                                       0.000                                0.00
+
+              Jul          Aug       Sep                 Jul      Aug     Sep                 Jul      Aug     Sep
+
+                           Index                                  Index                                Index
+
+
+
+
+                       (a) BTC                                 (b) ETH                              (c) XRP
+
+                         Figure 6: Intraday Volatility. 01. July 2018 - 31. August 2018.
+
+
+    Figure 6 adds to this finding, presenting the overall volatility from the beforehand
+stated period. As we can see, the return activity cluster in August from figure 5 is mir-
+rored in the volatility activity cluster in figure 4. Hence, we proof the beforehand stated
+claim of cryptocurrency activity being fueled by media outlets as well as sentiment, as
+being attested.
+
+
+                                                                   11
+    Table 1 displays the estimated values of selected parameters for the cryptocurrency
+intraday trading for the given period of the 01. July 2018 to the 31. August 2018. The
+largest autocorrelation is for DASH (0.01), the smallest autocorrelation is for STR (-0.09).
+
+Table 1: Estimated first-order autocorrelation of the returns, ρb1 (rett ), the squared
+returns, ρb1 (ret2t ), and the absolute returns, ρb1 (|rett |), as well as the estimated skewness,
+S,
+b the estimated excess kurtosis, e.Kurt,
+                                      \ and the Jarque-Bera test statistic, JB, with the
+respective, obviously very small, p-value for the overall summed intraday high-frequency
+data from the 01. July 2018 to the 31. August 2018.
+
+
+
+              ρb1 (rett ) ρb1 (ret2t ) ρb1 (|rett |)        Sb \
+                                                               e.Kurt        JB    JB p-value
+
+    BCH          -0.01         0.12           0.20      0.49    13.69 140148.24          0.00
+    BTC          -0.05         0.13           0.24      1.30    49.44 1823779.80         0.00
+    DASH          0.01         0.17           0.20      0.73    28.98 626596.64          0.00
+    ETC          -0.06         0.26           0.26      0.70    26.07 507374.39          0.00
+    ETH          -0.01         0.18           0.27      0.17    16.34 198777.58          0.00
+    LTC          -0.01         0.11           0.19      0.44    14.91 166121.81          0.00
+    REP          -0.08         0.22           0.19      0.35    21.89 356937.91          0.00
+    STR          -0.09         0.12           0.18      0.28     8.12   49354.96         0.00
+    XMR          -0.07         0.13           0.14      0.03    10.51   82241.48         0.00
+    XRP          -0.05         0.17           0.25      0.11    11.44   97390.58         0.00
+    ZEC          -0.07         0.25           0.22      1.30    26.66 534032.89          0.00
+
+
+
+
+    While the first-order autocorrelation of the returns of all cryptocurrencies is all close
+to zero and mostly negative, the autocorrelations of the squared and absolute returns of
+all cryptocurrencies are positive and significantly larger than zero. Obviously, there is a
+linear relationship in the absolute and squared values of the chronologically sequential
+returns. Since the autocorrelation is positive, it can be concluded, that small absolute
+returns are followed sequentially by small absolute returns and large absolute returns are
+followed by large ones again. This means, that there are quiet periods with small price
+changes and dynamic periods with large oscillations.
+
+    Furthermore, whereas the estimate for skewness is mostly close to zero, except for
+BTC and ZEC, the estimate for excess kurtosis is in every case significantly larger than
+3. The smallest estimated excess kurtosis is by STR (yet with an expressive e.Kurt
+                                                                                 \ of
+8.12), and the largest by BTC (e.Kurt
+                                 \ = 49.44). These values show, that the tested con-
+stituents are far from normally distributed. Negative skewness signals about increasing
+the downside risk and is a consequence of asymmetric volatility models. Positively skewed
+
+                                                       12
+distributions have a longer right tail, meaning for investors a greater chance of extremely
+positive outcomes. A well-known stylized fact about returns distributions highlights their
+leptokurtic nature: they have more mass around the centre and in the tails than a nor-
+mal distribution. For example, Hussein (2011) reports relatively high levels of kurtosis in
+stock data from the United States of America. This phenomenon is known as kurtosis risk.
+
+    The combined test of the normal distribution from Jarque and Bera (JB) can be de-
+rived as asymptotically χ2 distribution with two degrees of freedom. The last column in
+table 1 shows, that in all cases the normal distribution hypothesis is clearly rejected. This
+is above all caused by the value of kurtosis, which is significantly larger than 3, caused by
+a very frequent appearance of outliers in this new market. The higher kurtosis, compared
+to a normal distribution, proves that these extreme points result in leptokurtic distribu-
+tions and are evidence of fat tails relative to the normal distribution’s tail. However, as
+this asymmetry is common to financial markets, it is especially strong in the cryptocur-
+rency markets with potentially extreme returns and a very pronounced volatility.
+
+   The following tables respectively show the individual correlation to CRIX, if the mar-
+ket is acting positively, table 2, or negatively, table 3. Extensive care should be put on
+our main actors - BTC, ETH and XRP - when studying these. As these enjoy a large
+market acceptance and hence are long-term drivers of the cryptocurrency market, we can
+once again, underline our findings given beforehand.
+
+   On a side note, tables 2 and 3 show that among the top 11 cryptocurrencies, most pairs
+exhibit low return correlations, what suggest strong diversification benefits in a portfolio,
+especially outside the major cryptocurrencies presented, see also (Petukhina et al., 2020).
+
+    We can observe, that the correlation to CRIX in both tables presents itself as clustered
+around well-known cryptocurrencies, namely BTC, ETH, XRP, as well as BCH, and ETC.
+Therefore, this activity can be interpreted in a way, which indicates these constituents
+as the market drivers. This finding also correlates with the long term trading activity
+registered on many online sources for these coins. We should note, without going into
+detail, that LTC and BCH are closely related to BTC, and that ETC is closely tied to
+the history of ETH. XRP itself was able to carve out its very specific niche early enough
+for certain applications, especially in the banking sector - in contrast, BTC can be seen
+as the genesis of digital currency without any intrinsic value, whereas the ETH system
+enables many different applications, majorly through so-called “smart contracts”.
+
+
+
+
+                                             13
+Table 2: Pairwise crypto-currency correlations of returns for positive market-movement
+days, as defined by returns on CRIX. 01. July 2018 - 31. August 2018.
+
+
+ UP      BCH       BTC      DASH      ETC      ETH      LTC      REP      STR      XMR      XRP      ZEC
+ BCH               0.50      0.23     0.33     0.47     0.46     0.13     0.29     0.25     0.37     0.23
+ BTC      0.50               0.27     0.36     0.55     0.49     0.18     0.34     0.30     0.40     0.27
+ DASH     0.23     0.27               0.17     0.22     0.22     0.10     0.17     0.17     0.22     0.14
+ ETC      0.33     0.36      0.17              0.37     0.31     0.11     0.21     0.17     0.28     0.14
+ ETH      0.47     0.55      0.22     0.37              0.47     0.16     0.30     0.27     0.42     0.22
+ LTC      0.46     0.49      0.22     0.31     0.47              0.17     0.26     0.25     0.39     0.23
+ REP      0.13     0.18      0.10     0.11     0.16     0.17              0.12     0.11     0.11     0.11
+ STR      0.29     0.34      0.17     0.21     0.30     0.26     0.12              0.18     0.27     0.19
+ XMR      0.25     0.30      0.17     0.17     0.27     0.25     0.11     0.18              0.20     0.15
+ XRP      0.37     0.40      0.22     0.28     0.42     0.39     0.11     0.27     0.20              0.19
+ ZEC      0.23     0.27      0.14     0.14     0.22     0.23     0.11     0.19     0.15     0.19
+
+
+
+Table 3: Pairwise crypto-currency correlations of returns for negative market-movement
+days, as defined by returns on CRIX. 01. July 2018 - 31. August 2018.
+
+
+ DOWN BCH           BTC      DASH      ETC      ETH      LTC      REP      STR      XMR      XRP      ZEC
+ BCH                 0.48      0.21     0.32     0.47     0.43     0.15     0.27     0.23     0.37     0.22
+ BTC        0.48               0.26     0.36     0.52     0.45     0.19     0.33     0.30     0.41     0.24
+ DASH       0.21     0.26               0.15     0.22     0.21     0.11     0.16     0.18     0.18     0.14
+ ETC        0.32     0.36      0.15              0.36     0.30     0.14     0.21     0.18     0.30     0.16
+ ETH        0.47     0.52      0.22     0.36              0.42     0.16     0.29     0.23     0.40     0.21
+ LTC        0.43     0.45      0.21     0.30     0.42              0.16     0.26     0.24     0.35     0.19
+ REP        0.15     0.19      0.11     0.14     0.16     0.16              0.11     0.12     0.13     0.08
+ STR        0.27     0.33      0.16     0.21     0.29     0.26     0.11              0.16     0.26     0.16
+ XMR        0.23     0.30      0.18     0.18     0.23     0.24     0.12     0.16              0.20     0.15
+ XRP        0.37     0.41      0.18     0.30     0.40     0.35     0.13     0.26     0.20              0.17
+ ZEC        0.22     0.24      0.14     0.16     0.21     0.19     0.08     0.16     0.15     0.17
+
+
+
+
+                                                14
+3.3    Time-Of-Day Effects and Proof-Of-Human
+To support our hypothesis of mostly dealing with human agent initiated trades, which
+we coin as PoH, we present our findings regarding the time-of-day trading in this section.
+Additional material on information arrival, news sentiment, volatilities and jumps of in-
+traday returns can also be taken from Qian et al. (2019).
+
+    Cryptocurrency exchanges, as introduced in section 2, are often designed to serve
+a certain target group, for example by emphasizing compliance with national regula-
+tory frameworks. By plotting the trade volume against the timestamps, we can also
+observe certain properties of market activity and draw coherent conclusions to the ori-
+gin of the market participants: are these mostly human, who are doing trades by hand,
+or are we looking at a well oiled automatic machinery full of algorithms - just as com-
+monly portrayed. Keep in mind, as mentioned in section 2, that our data is gained from
+Europe-based sources, and taken from periods that are overwhelmingly identifiable by
+corporate staff vacations. One should hence expect a less pronounced human, but algo-
+rithmic driven market behaviour to contradict our hypotheses.
+
+   To underline this argument, it is useful to imagine a transitional system, whereas
+human interference is completely removed or not relevant to a market system (e.g. Ca-
+porale et al., 2016), and where the trading pattern will, therefore, be independent of the
+time-of-day effects:
+
+human + human + human b   = human driven network
+human + algorithm + human =  b predominantly human driven network
+human + algorithm + algorithm b = predominantly machine driven network
+algorithm + algorithm + algorithm =b algorithmic driven network
+
+   With increasing market participation of algorithms, we expect, for example, nighttime
+to have a negligible impact on the market activity. In contrast, we expect nighttime to
+have an impact on market activity if the market is dominated by human interaction.
+
+    The following figures employ GAM to observe daily and weekly patterns for intraday
+volatility and trading volume. For daily seasonality cubic regression splines, for weekly
+seasonality P -splines are used, and a number of knots are logically set to the number of
+unique values, i.e 62 for daily patterns and 7 for weekly. The summary statistics of GAM
+for all cryptocurrencies demonstrate a high significance of smooth terms combined with a
+quite low explanatory power (coefficients of determination are around 1%). Nevertheless,
+we can observe distinct intraday seasonality patterns.
+
+
+
+                                           15
+                                                                        BTC                                                                                                                          ETH                                                                                                                          XRP
+
+
+               4e−04                                                                                                                        6e−04                                                                                                                        6e−04
+
+
+               3e−04
+                                                                                                                                            4e−04
+                                                                                                                                                                                                                                                                         4e−04
+               2e−04
+
+
+                                                                                                                                            2e−04
+               1e−04                                                                                                                                                                                                                                                     2e−04
+
+Abs. returns                                                                                                                 Abs. returns                                                                                                                 Abs. returns
+               0e+00
+                                                                                                                                            0e+00
+                                                                                                                                                                                                                                                                         0e+00
+
+               −1e−04
+
+                                                                                                                                            −2e−04
+                                                                                                                                                                                                                                                                         −2e−04
+
+
+
+               −3e−04                                                                                                                       −4e−04
+
+                        00:05   02:05   04:05   06:05   08:05   10:05    12:05   14:05   16:05   18:05   20:05   22:05                               00:05   02:05   04:05   06:05   08:05   10:05    12:05   14:05   16:05   18:05   20:05   22:05                               00:05   02:05   04:05   06:05   08:05   10:05    12:05   14:05   16:05   18:05   20:05   22:05
+                                                                        Time                                                                                                                         Time                                                                                                                         Time
+
+
+
+
+                                                        (a) BTC                                                                                                                      (b) ETH                                                                                                                      (c) XRP
+
+Figure 7: Daily seasonality: fit of Generalized Additive Model (5 min nodes) with
+cubic regression splines for absolute returns of cryptocurrencies (shaded regions represent
+confidence bands for smooths), 01. July 2018 - 31. August 2018.
+
+
+
+                                                                                                                                            4e−04                                                                                                                        6e−04
+
+
+
+               2e−04                                                                                                                                                                                                                                                     4e−04
+
+                                                                                                                                            2e−04
+
+                                                                                                                                                                                                                                                                         2e−04
+
+
+
+Abs. returns                                                                                                                 Abs. returns                                                                                                                 Abs. returns
+               0e+00
+                                                                                                                                            0e+00                                                                                                                        0e+00
+
+
+
+                                                                                                                                                                                                                                                                         −2e−04
+               −2e−04                                                                                                                       −2e−04
+
+                                                                                                                                                                                                                                                                         −4e−04
+
+
+                                                                                                                                            −4e−04
+                                                                                                                                                                                                                                                                         −6e−04
+               −4e−04
+                        1               2               3                4               5               6               7                           1               2               3                4               5               6               7                           1               2               3                4               5               6               7
+
+                                                                        Time                                                                                                                         Time                                                                                                                         Time
+
+
+
+
+                                                        (a) BTC                                                                                                                      (b) ETH                                                                                                                      (c) XRP
+
+Figure 8: Weekly seasonality: fit of Generalized Additive Model with p-splines for abso-
+lute returns of cryptocurrencies (shaded regions represent confidence bands for smooths),
+01. July 2018 - 31. August 2018.
+
+
+    Assuming that the majority of employed persons do work from 09:00 to 17:00 o’clock
+in Europe, figures 7 and 8 (data time is +1 GMT) present us with a very clear picture
+of returns and volume. Characteristic human activity curves are presented by figure
+7 showing the daily seasonality - a curve driven by algorithms as the main actor, or
+Artif icial Intelligence in a FinTech startup buzzword context, should not present such
+a comparatively extreme low around a typical time for the majority of humans to be
+asleep. Following that point, the curves expresse a significant growth, only to flat out
+again around lunch break time. Most figures present a peak between 17:00 and 20:00
+o’clock, just when most people finish their daily routine jobs, followed by an expressive
+decline of the curves. This is surprising, as media outlets and startup marketing generally
+praise the non-stop availability and easy access to cryptocurrency exchanges, and hence
+we would presume to see a curve different to that of a “routine”-job. Further adding
+
+
+                                                                                                                                                                                                     16
+to this argument of trading being mostly done by humans organized in cooperations
+(regarding figure 8 with the seven numbers indicating the days of the week), is research
+on anomalies such as the “Monday Effect” applied to our findings (e.g. Cross, 1973;
+Basher and Sadorsky, 2006). By applying both parametric and nonparametric methods,
+Caporale and Plastun (2019) find abnormal returns for no other cryptocurrency than
+BTC, and that only on Mondays - yet, in figure 8 we can observe that weekly absolute
+returns across cryptocurrencies reach their peak only in the period from Tuesdays to
+around Thursdays, with a steep decline in activity during the weekends.
+
+                                Trading Volume                                                           Trading Volume                                                         Trading Volume
+
+
+
+
+   50000                                                                    12000
+                                                                                                                                                     6000
+
+                                                                             10000
+     40000                                                                                                                                            5000
+
+                                                                                8000
+       30000                                                                                                                                            4000
+
+                                                                                    6000                                                                    3000
+           20000
+                                                                                     4000                                                                    2000
+                                                                        7                                                                        7                                                                      7
+             10000
+                                                                    6                  2000                                                  6                1000                                                  6
+                                                              5                                                                        5                                                                      5
+                     50                                                                       50                                                                     50
+                                                          4   kly                                                                  4   kly                                                                4   kly
+                          100                             We                                       100                             We                                     100                             We
+                                                      3      e                                                                 3      e                                                               3      e
+                            Da150                                                                    Da150                                                                  Da150
+                              ily                                                                      ily                                                                    ily
+                                  200             2                                                        200             2                                                      200             2
+                                        250                                                                      250                                                                    250
+                                              1                                                                        1                                                                      1
+
+
+
+
+                           (a) BTC                                                                  (b) ETH                                                                (c) XRP
+
+Figure 9: Daily and weekly seasonality: fit of Generalized Additive Model with cubic
+and p-splines for trading volume of cryptocurrencies (5 min nodes), 01. July 2018 - 31.
+August 2018. 01. July 2018 - 31. August 2018.
+
+    Figure 9 presents us a respective lower trading volume during the weekends, compared
+to for example Thursdays or especially Fridays. Similar results can be seen in figure 10,
+presenting us with low volatility on the cryptocurrency market at said times - one as-
+sumption from this could be taken from the immense influx of financially potent startups
+organized as cooperations in this emerging market (c.f. Benedetti and Kostovetsky, 2018).
+Yet, we can see that human interaction is shaping how the market behaves during the
+given time frames. Trade limited to regular working hours and days in Europe leads to
+the conclusion, that the majority of trades are not done by algorithms, which are active
+24/7, but by human agents themselves making transactions and orders individually and
+by hand. This is especially obvious through figure 8, which is presenting a much lower
+activity pattern observable during the weekends. Should algorithms really be the drivers
+in this, technically predestined, fully digitized market, then this curve should not drop
+off as observable on Saturdays and Sundays. These findings are similar across the board
+(see appendix sections 5.2 - 5.4). While there is a plethora of well working, open-source
+trading bots available for these markets, for example via Github (Nevskii, 2019), as well
+as an abundance of commercially available trading bots (Norry, 2020), the trust in these
+- or the knowledge of how to employ them in this emerging market - is certainly low.
+
+                                                                                                                 17
+This is especially surprising, as the possibility for arbitrage or mean reversion is obvious
+with multiple exchanges trading the same assets each with individually different prices,
+see section 3. The inherent possibility to take advantage of this inefficiency of the dis-
+tributed trading, with near-simultaneous transactions, leads to great opportunities for
+traders unseen in most traditional markets for most assets. Hence we can assume, as
+algorithms need humans to get deployed and take action, like reacting to price changes,
+that the overall impact of these is not significant, if not negligible at all.
+
+                                   Volatility                                                             Volatility                                                             Volatility
+
+
+
+
+   0.0016
+                                                                                                                                                     0.0025
+                                                                              0.0020
+     0.0014
+
+                                                                                                                                                        0.0020
+      0.0012
+                                                                                 0.0015
+        0.0010
+                                                                                                                                                          0.0015
+            0.0008                                                        7                                                                      7                                                                      7
+                                                                                   0.0010
+                                                                      6                                                                      6                                                                      6
+                                                                5                                                                      5                                                                      5
+                     50                                                                     50                                                                     50
+                                                            4   kly                                                                4   kly                                                                4   kly
+                          100                               We                                   100                               We                                   100                               We
+                                                        3      e                                                               3      e                                                               3      e
+                            Da150                                                                  Da150                                                                  Da150
+                              ily                                                                    ily                                                                    ily
+                                  200               2                                                    200               2                                                    200               2
+                                        250                                                                    250                                                                    250
+                                                1                                                                      1                                                                      1
+
+
+
+
+                           (a) BTC                                                                (b) ETH                                                                (c) XRP
+
+Figure 10: Daily and weekly seasonality: fit of Generalized Additive Model with cubic
+and p-splines for volatility of cryptocurrencies (5 min nodes), 01. July 2018 - 31. August
+2018. 01. July 2018 - 31. August 2018.
+
+    In total we can observe, that the activity patterns displayed in this market not only
+tend to express human interaction but also corporate structures as well, as most trad-
+ing is done Mondays to Fridays, with the weekends expressing a low intensity of trades
+taking place. The previously mentioned immense increase of financially potent FinTech
+entities have attracted absurd amounts of financial backing compared to the output de-
+livered via initial coin offerings, ICOs for short (c.f. Benedetti and Kostovetsky, 2018;
+Zetzsche et al., 2019). To enable new industries using the blockchain technology, star-
+tups and commercial companies have been launching ICOs, similar to the initial public
+offerings (IPOs) of companies, to sell tokens in a transparent and decentralized manner
+and therefore creating a new method of raising funds without intermediaries, like tradi-
+tional financial institutes. Some of these tokens are pegged to other (monetary) systems
+or even cryptocurrency constructions directly, as these have already gained a high market
+acceptance - especially the Ethereum ecosystem is facilitating this by providing excessive
+tools and documentaries, paired with a focused and growing community of developers, to
+create what they coined as “coloured coins” in order to expand the utility of the existing
+blockchain (Walters, 2018). Besides the fact, that the legality of ICOs is disputed and
+potential responses from regulatory agencies are growing to be imminent, ICOs enable
+anyone within the community to participate in the investment, providing opportunities
+
+                                                                                                               18
+for small-scale investors. Hence the assumption would be, that especially these special-
+ized corporate startups are working on their backend and maintain their ecosystem, whilst
+being active drivers of trading in this market - yet predominantly human ones.
+
+     Coming back to the 2010 Flash Crash mentioned in the introduction of this paper,
+one could argue, that such a flash crash is not possible due to the delay that is inherent
+to blockchains - the so-called blocktime (Hrdle et al., 2020). However, as research has
+shown, it is easily possible to derive sentiment and therefore market reactions from Twit-
+ter, Facebook, Stocktwits, or similar public forums. As most activity can be seen on the
+respective cryptocurrency exchanges, where the order books are not handled on-chain,
+but necessarily off-chain to quickly process the exchange users trading requests (Chen et
+al., 2019c,a; Qian et al., 2019). Therefore a crash related to certain cryptocurrency prices
+may be seen only after the respective information has been seeded into the network and
+accepted as new information to the individual blockchain. This is creating an inherent
+risk, as market behaviour can not be seen by only relying on on-chain data to predict cer-
+tain price movements. The previously mentioned “‘learning” algorithms could therefore
+be, if they are employed in this manner, be dangerous if a “false-postive” is identified
+and results in a respective process leading to dumping a certain asset, which in turn
+could then generate a waterfall when other algorithms, that respond to blockchain price
+data, reply to this movement (Zinovyeva et al., 2019). Hence, a grand scale application
+of algorithms needs to be finely tuned in order to avoid any humanely unforeseeable, but
+technically feasible, consequences.
+
+    With the cryptocurrency market being easy to join and to actively participate in,
+financial traders are becoming redundant - unless they provide specialized services. Mak-
+ing many transactions doesn’t cost time to interact with a trader and money to pay this
+person, as one can do that by hand at home with very low transaction costs. This said,
+there is a big competition going on between the exchanges, who themselves may act as
+traders or brokers. The future has to tell if through this competition the rise of the ma-
+chines and the respective mass employment of algorithmic trading in this digital realm
+will become reality.
+
+
+4    Closing remarks
+We have shown, that meanwhile there are certainly grand-scale employers of algorith-
+mic trading around in this new emerging market of cryptocurrencies, yet, based on the
+time-of-day effects and the evidence gained, we can conclude, that the impact of 24/7
+algorithmic trading is rather negligible given the empirical facts we have at hand. This
+leads us to the conclusion, that even though this new digital market appears predestined
+
+                                            19
+to be ruled by algorithms and specialised AI advisors, the digital realm of cryptocurren-
+cies has yet to be conquered by the machines and is still firmly in the hands of humans
+or generally driven by respective startup’s.
+
+    Further research should certainly step into this breach, that we have proven to be
+existent, and create means on how to best exploit this open ground on a market-oriented
+basis, as well as on an individual level, say in regards to the exchanges. Necessarily, such
+research not only needs to be of quantitative or technical origin, but also needs to include
+a regulatory point of view, as especially this field on blockchain research is more and
+more characterized by its evident interdisciplinary nature.
+
+
+References
+ Akhtaruzzaman, M., A. Sensoy, and S. Corbet, “The influence of Bitcoin on portfolio diversifi-
+ cation and design,” Finance Research Letters, 2019, p. 101344.
+
+ Basher, S.A. and P. Sadorsky, “Day-of-the-week effects in emerging stock markets,” Applied Eco-
+ nomics Letters, 2006, 13 (10), 621–628.
+
+ Benedetti, H. and L. Kostovetsky, “Digital Tulips? Returns to Investors in Initial Coin Offer-
+ ings,” 2018. SSRN. Retrieved on the 12.02.2020 from https://papers.ssrn.com/sol3/papers.cfm?
+ abstract_id=3182169.
+
+ Borke, L. and W. Härdle, “Q3-D3-LSA: D3.js and Generalized Vector Space Models for Statistical
+ Computing,” in Lu H. Shen X. Härdle, W., ed., Handbook of Big Data Analytics, Springer-Verlag Berlin
+ Heidelberg, ISBN 978-3-319-18284-1, DOI: 10.1007/978-3-319-18284-1, 2018, pp. 377–424.
+
+ Caporale, G.M. and A. Plastun, “The day of the week effect in the cryptocurrency market,”
+ Finance Research Letters, 2019, 31.
+
+  , L. Gil-Alana, A. Plastun, and I. Makarenko, “Intraday Anomalies and Market Efficiency: A
+ Trading Robot Analysis,” Computational Economics, 2016, 47, 275295.
+
+ Chen, C. YH., R. Despres, L. Guo, and T. Renault, “What makes cryptocurrencies spe-
+ cial? Investor sentiment and return predictability during the bubble,” 2019. IRTG 1792 Discus-
+ sion Paper. ISSN: 2568-5619. Forthcoming. https://www.wiwi.hu-berlin.de/de/forschung/irtg/
+ results/discussion-papers/discussion-papers-2017-1/irtg1792dp2019-016.pdf.
+
+  , W. Kuo, L. Guo, and W.K. Hrdle, “Risk of Bitcoin Market: Volatility, Jumps, and
+ Forecasts,”  2019.   IRTG 1792 Discussion Paper. ISSN: 2568-5619. Forthcoming. https:
+ //www.wiwi.hu-berlin.de/de/forschung/irtg/results/discussion-papers/discussion-
+ papers-2017-1/irtg1792dp2019-024.pdf.
+
+  , W.K. Hrdle, and Y. Klochkov, “SONIC: SOcial Network with Influencers and Communities,”
+  2019.   IRTG 1792 Discussion Paper. ISSN: 2568-5619. Forthcoming. https://www.wiwi.hu-
+ berlin.de/de/forschung/irtg/results/discussion-papers/discussion-papers-2017-
+ 1/irtg1792dp2019-025.pdf.
+
+ Cross, F., “The Behavior of Stock Prices on Fridays and Mondays,” Financial Analysts Journal, 1973,
+ 29 (6).
+
+
+                                                 20
+Emem, M., “Wall Street Shenanigans: Rampant Trading Bots are Exploiting Crypto Exchanges,”
+ 2018. CNN. Retrieved on the 28.06.2019 from https://www.ccn.com/trading-bots-exploit-
+crypto-exchanges-dex/.
+
+Hautsch, N., Econometrics of financial high-frequency data, ISBN 978-3642219245.: Springer Science
+& Business Media, 2011.
+
+Hussein, S., “The Intraday Behaviour of Bid-Ask Spreads, Trading Volume and Return Volatility:
+Evidence from DAX30,” International Journal of Economics and Finance, 2011, 3 (1, February).
+
+Hrdle, W., Applied Nonparametric Regression, Cambridge, New York, Melbourne: Cambridge Uni-
+versity Press, 1990.
+
+Hrdle, W.K., C.R. Harvey, and R.C.G. Reule, “Understanding Cryptocurrencies,” Journal of
+Financial Econometrics, 2020.
+
+Nevskii, “Crypto trading bots review 2019,” 2019. Medium. Retrieved on the 25.06.2019 from https:
+//medium.com/@vladnevskii/crypto-trading-bots-review-2018-312cf3e8145c.
+
+Norry, A., “Beginners Guide to Bitcoin & Crypto Trading Bots,” 2020. Blockonomi. Retrieved on
+the 12.02.2020 from https://blockonomi.com/bitcoin-trading-bots/.
+
+Petukhina, A., S. Trimborn, W. Hrdle, and H. Elendner, “Investing With Cryptocurrencies
+Evaluating the Potential of Portfolio Allocation Strategies,” 2020. Quantitative Finance, submitted,
+RR 20200320.
+
+Platanakis, E. and A. Urquhart, “Should investors include bitcoin in their portfolios? a portfolio
+theory approach,” The British Accounting Review, 2019, p. 100837.
+
+Qian, Y., J. Tu, and W. Hrdle, “Information Arrival, News Sentiment, Volatili-
+ties and Jumps of Intraday Returns,”   2019.   IRTG 1792 Discussion Paper. ISSN: 2568-
+5619. Forthcoming. https://www.wiwi.hu-berlin.de/de/forschung/irtg/results/discussion-
+papers/discussion-papers-2017-1/irtg1792dp2019-002.pdf.
+
+Rschli, K., L. Vetter, W. Breymann, J. Osterrieder, J. Chu, S. Nadarajah, and S. Chan,
+“Stylized Facts of Cryptourrencies,” Technical Report, Zurich University of Applied Sciences/ZHAW
+2017.
+
+Schnaubelt, M., J. Rende, and C. Krauss, “Testing Stylized Facts of Bitcoin Limit Order Books,”
+Journal of Risk and Financial Management, 2019, 12 (25, doi:10.3390/jrfm12010025).
+
+Trimborn, S. and W. Hrdle, “CRIX an Index for cryptocurrencies,” Journal of Empirical Finance,
+2018, 49, December, 107–122, https://doi.org/10.1016/j.jempfin.2018.08.004.
+
+  , M. Li, and W.K Hrdle, “Investing with cryptocurrencies-A liquidity constrained investment
+approach,” Published version: Trimborn, S., Li, M. and WK Hrdle (2019)” Investing with Cryp-
+tocurrenciesa Liquidity Constrained Investment Approach” Journal of Financial Econometrics, doi.
+org/10.1093/jjfinec/nbz016, 2018.
+
+Walters, S., “What are Colored Coins? The Ultimate Guide,” 2018. unblock. Retrieved on the
+13.02.2020 from https://unblock.net/what-are-colored-coins/.
+
+Wand, Matt P, “Fast approximate inference for arbitrarily large semiparametric regression models
+via message passing,” Journal of the American Statistical Association, 2017, 112 (517), 137–168.
+
+Wood, S., “Stable and efficient multiple smoothing parameter estimation for generalized additive
+models,” Journal of the American Statistical Association, 2004, 99 (467), 673–686.
+
+
+                                                21
+ , “Fast stable restricted maximum likelihood and marginal likelihood estimation of semiparametric
+generalized linear models,” Journal of the Royal Statistical Society: Series B (Statistical Methodology),
+2011, 73 (1), 3–36.
+
+ , “gam.models,” 2019.   RDocumentation. Retrieved on the 17.02.2020 from https://www.
+rdocumentation.org/packages/mgcv/versions/1.8-31/topics/gam.models.
+
+Wood, Simon N, Generalized additive models: an introduction with R, CRC press, 2017.
+
+ , Yannig Goude, and Simon Shaw, “Generalized additive models for large data sets,” Journal of
+the Royal Statistical Society: Series C (Applied Statistics), 2015, 64 (1), 139–155.
+
+Zetzsche, D.A., R.P. Buckley, D. Arner, and L. Föhr, “The ICO Gold Rush: It’s a Scam, It’s
+a Bubble, It’s a Super Challenge for Regulators,” Harvard International Law Journal, 2019, 63 (2),
+275295.
+
+Zhang, W., P. Wang, X. Li, and D. Shen, “Some stylized facts of the cryptocurrency market,”
+Applied Economics, 2018, 50 (55), 5950–5965.
+
+Zhang, Y., S. Chan, J. Chu, and S. Nadarajah, “Stylised facts for high frequency cryptocurrency
+data,” Physica A, 2019, 513(C), 598–612.
+
+Zinovyeva, E., W.K. Hrdle, and S. Lessmann, “Antisocial Online Behavior De-
+tection Using Deep Learning,”      2019.    IRTG 1792 Discussion Paper. ISSN: 2568-
+5619. Forthcoming. https://www.wiwi.hu-berlin.de/de/forschung/irtg/results/discussion-
+papers/discussion-papers-2017-1/irtg1792dp2019-029.pdf.
+
+
+
+
+                                                  22
+5                              Appendix
+
+
+5.1                                   List of cryptocurrencies in this research
+
+                                                         Abbrev.                                                                         CC                                                                                                Website
+                                                         BCH                                                                             Bitcoin Cash                                                                                      bitcoincash.org
+                                                         BTC (XBT)                                                                       Bitcoin                                                                                           bitcoin.com, bitcoin.org
+                                                         DASH                                                                            Dash                                                                                              dash.org
+                                                         ETC                                                                             Ethereum Classic                                                                                  ethereumclassic.github.io
+                                                         ETH                                                                             Ethereum                                                                                          ethereum.org
+                                                         LTC                                                                             Litecoin                                                                                          litecoin.com, litecoin.org
+                                                         REP                                                                             Augur                                                                                             augur.net
+                                                         STR                                                                             Stalker                                                                                           staker.network
+                                                         XMR                                                                             Monero                                                                                            getmonero.org
+                                                         XRP                                                                             Ripple                                                                                            ripple.com
+                                                         ZEC                                                                             Zcash                                                                                             z.cash
+
+
+
+
+5.2                                   Appendix-Statistics for BCH, ETC and LTC
+
+            900
+                                                                                                                                                       20                                                                                                                                      90
+            800                                                                                                                                        18
+                                                                                                                                                                                                                                                                                               80
+
+BCH Price                                                                                                                                  ETC Price                                                                                                                               LTC Price
+            700                                                                                                                                        16
+                                                                                                                                                                                                                                                                                               70
+                                                                                                                                                       14
+            600
+                                                                                                                                                                                                                                                                                               60
+                                                                                                                                                       12
+            500
+                                                                                                                                                       10                                                                                                                                      50
+
+                  2018-07-01   2018-07-08   2018-07-15    2018-07-22   2018-07-29    2018-08-05   2018-08-12   2018-08-19   2018-08-26                      2018-07-01   2018-07-08   2018-07-15   2018-07-22   2018-07-29    2018-08-05    2018-08-12   2018-08-19   2018-08-26                    2018-07-01   2018-07-08   2018-07-15   2018-07-22   2018-07-29    2018-08-05   2018-08-12   2018-08-19   2018-08-26
+                                                                              Date                                                                                                                                     Date                                                                                                                                    Date
+
+
+
+                                                         (a) BCH                                                                                                                                   (b) ETC                                                                                                                                 (c) LTC
+
+Figure 11: Candlestick charts for individual price movements. 01. July 2018 - 31.
+August 2018.
+
+
+
+
+                                                                                                                                                                                                                         23
+                                                                                                                                                 Abs. returns                                                                                                                                                                             BCH                                                                                                                                                                      BCH
+
+                                                                                                                         −4e−04     −2e−04    0e+00    2e−04      4e−04    6e−04      8e−04                                                                                                                             0.00    0.01      0.02               0.03            0.04                                                                                                         −0.02     −0.01   0.00     0.01    0.02    0.03      0.04
+
+
+                                                                                                              00:05                                                                                                                                                                                               Jul                                                                                                                                                               Jul
+
+                                                                                                              02:05
+
+                                                                                                              04:05
+
+                                                                                                              06:05
+
+                                                                                                              08:05
+
+                                                                                                              10:05
+
+                                                                                                       Time   12:05                                                                           BCH                                                                                                         Index   Aug                                                                                                                                                       Index   Aug
+
+                                                                                                              14:05
+                                                                                             (a) BCH                                                                                                                                                                                            (a) BCH                                                                                                                                                           (a) BCH
+                                                                                                              16:05
+
+                                                                                                              18:05
+
+                                                                                                              20:05
+
+                                                                                                              22:05
+
+                                                                                                                                                                                                                                                                                                                  Sep                                                                                                                                                               Sep
+
+
+
+
+                                                                                                                                                 Abs. returns                                                                                                                                                                             ETC                                                                                                                                                                      ETC
+
+                                                                                                                      −5e−04          0e+00            5e−04              1e−03                                                                                                                                         0.00     0.02          0.04            0.06                                                                                                                       −0.04     −0.02   0.00     0.02     0.04    0.06         0.08
+
+
+                                                                                                              00:05                                                                                                                                                                                               Jul                                                                                                                                                               Jul
+
+                                                                                                              02:05
+
+                                                                                                              04:05
+                                                                                                                                                                                                    Figure 13: Intraday volatility (absolute values of 5-minutes log-returns) . 01. July 2018
+
+
+                                                                                                              06:05
+
+                                                                                                              08:05
+
+                                                                                                              10:05
+
+                                                                                                       Time   12:05                                                                           ETC                                                                                                         Index   Aug                                                                                                                                                       Index   Aug
+24                                                                                           (b) ETC          14:05
+                                                                                                                                                                                                                                                                                                (b) ETC                                                                                                                                                           (b) ETC
+                                                                                                              16:05
+
+                                                                                                              18:05
+
+                                                                                                              20:05
+
+                                                                                                              22:05
+
+                                                                                                                                                                                                                                                                                                                  Sep                                                                                                                                                               Sep
+
+
+
+
+                                                                                                                                                 Abs. returns                                                                                                                                                                              LTC                                                                                                                                                                     LTC
+
+                                                                                                                           −5e−04             0e+00             5e−04             1e−03                                                                                                                                 0.00   0.01     0.02          0.03            0.04                                                                                                                  −0.02           0.00            0.02            0.04
+
+
+                                                                                                              00:05                                                                                                                                                                                               Jul                                                                                                                                                               Jul
+
+                                                                                                              02:05
+
+                                                                                                              04:05
+
+                                                                                                              06:05
+
+                                                                                                              08:05
+
+                                                                                                              10:05
+
+                                                                                                       Time   12:05                                                                           LTC                                                                                                         Index   Aug                                                                                                                                                       Index   Aug
+
+                                                                                                              14:05
+                                                                                             (c) LTC                                                                                                                                                                                            (c) LTC                                                                                                                                                           (c) LTC
+                                                                                                              16:05
+
+                                                                                                              18:05
+
+                                                                                                              20:05
+
+                                                                                                              22:05
+                                                                                                                                                                                                                                                                                                                                                                                    Figure 12: Intraday 5-minutes log-returns. 01. July 2018 - 31. August 2018.
+
+
+
+
+                                                                                                                                                                                                                                                                                                                  Sep                                                                                                                                                               Sep
+     Figure 14: Generalized additive model of volatility. 01. July 2018 - 31. August 2018.
+
+
+
+                                                                                                                                                                                                    - 31. August 2018.
+                                                                                   BCH                                                                                                                                              ETC                                                                                                                                                LTC
+
+
+                 3000                                                                                                                                                                                                                                                                                             1500
+
+                                                                                                                                                                 4000
+
+                 2000
+                                                                                                                                                                                                                                                                                                                  1000
+                                                                                                                                                                 3000
+
+
+                 1000                                                                                                                                            2000
+
+
+
+Trading volume                                                                                                                                  Trading volume                                                                                                                                   Trading volume
+                                                                                                                                                                                                                                                                                                                  500
+
+
+                 0                                                                                                                                               1000
+
+                                                                                                                                                                                                                                                                                                                  0
+                                                                                                                                                                 0
+
+                 −1000
+
+                                                                                                                                                                 −1000                                                                                                                                            −500
+
+                 −2000
+                                                                                                                                                                 −2000
+
+
+
+                         00:00     02:00   04:00        06:00    08:00     10:00    12:00   14:00       16:00   18:00       20:00       22:00                            00:00      02:00   04:00        06:00    08:00     10:00    12:00   14:00       16:00   18:00       20:00       22:00                            00:00      02:00     04:00        06:00    08:00     10:00    12:00   14:00       16:00   18:00       20:00       22:00
+                                                                                   Time                                                                                                                                             Time                                                                                                                                               Time
+
+
+
+
+                                                                (a) BCH                                                                                                                                          (b) ETC                                                                                                                                            (c) LTC
+
+Figure 15: Generalized Additive Model of trading volume of cryptocurrencies. 01. July
+2018 - 31. August 2018.
+
+
+
+                                                                         Trading Volume                                                                                                                                   Trading Volume                                                                                                                                     Trading Volume
+
+
+
+
+                                                                                                                                                                                                                                                                                                                         3000
+
+                         8000
+                                                                                                                                                                         8000
+                                                                                                                                                                                                                                                                                                                          2500
+
+
+                                 6000                                                                                                                                            6000                                                                                                                                             2000
+
+                                                                                                                                                                                                                                                                                                                                   1500
+                                                                                                                                                                                  4000
+                                   4000
+                                                                                                                                                                                                                                                                                                                                    1000
+                                                                                                                                                                                    2000
+                                                                                                                                    7                                                                                                                                                7                                                                                                                                                  7
+                                      2000                                                                                                                                                                                                                                                                                               500
+                                                                                                                              6                                                                                                                                                6                                                                                                                                                  6
+                                                                                                                        5                                                                                                                                                5                                                                                                                                                  5
+                                                   50                                                                                                                                               50                                                                                                                                                 50
+                                                                                                                    4   kly                                                                                                                                          4   kly                                                                                                                                            4   kly
+                                                          100                                                       We                                                                                     100                                                       We                                                                                       100                                                       We
+                                                                                                                3      e                                                                                                                                         3      e                                                                                                                                           3      e
+                                                                Da150                                                                                                                                            Da150                                                                                                                                              Da150
+                                                                  ily                                                                                                                                              ily                                                                                                                                                ily
+                                                                      200                                   2                                                                                                          200                                   2                                                                                                            200                                   2
+                                                                                    250                                                                                                                                              250                                                                                                                                                250
+                                                                                                    1                                                                                                                                                1                                                                                                                                                  1
+
+
+
+
+                                                                (a) BCH                                                                                                                                          (b) ETC                                                                                                                                            (c) LTC
+
+Figure 16: Daily and weekly seasonality: fit of Generalized Additive Model with cubic
+and p-splines for trading volume of cryptocurrencies (5 min nodes), 01. July 2018 - 31.
+August 2018. 01. July 2018 - 31. August 2018.
+
+
+
+
+                                                                                                                                                                                                                                    25
+                                                                                   Volatility                                                                                                                                                                        Volatility                                                                                                                                                                                   Volatility
+
+
+
+
+                     0.0025                                                                                                                                                                           0.0035
+                                                                                                                                                                                                                                                                                                                                                                                           0.0025
+
+
+                                                                                                                                                                                                        0.0030
+                        0.0020                                                                                                                                                                                                                                                                                                                                                               0.0020
+
+                                                                                                                                                                                                                    0.0025
+                                                                                                                                                                                                                                                                                                                                                                                                   0.0015
+                                     0.0015                                                                                                                                                                          0.0020
+                                                                                                                                                                                                                                                                                                                                                                                                               0.0010
+                                                                                                                                                           7                                                           0.0015                                                                                                                   7                                                                                                                                                                                7
+                                       0.0010                                                                                                          6                                                                                                                                                                                    6                                                                                                                                                                              6
+                                                                                                                                              5                                                                                                                                                                                  5                                                                                                                                                                                  5
+                                                      50                                                                                                                                                                             50                                                                                                                                                                                         50
+                                                                                                                                          4   ly                                                                                                                                                                           4   ly                                                                                                                                                                               4   ly
+                                                               100                                                                        We                                                                                                      100                                                                      We                                                                                                         100                                                                       We
+                                                                                                                                            ek                                                                                                                                                                               ek                                                                                                                                                                                   ek
+                                                                                                                                      3                                                                                                                                                                                3                                                                                                                                                                                    3
+                                                                    Da150                                                                                                                                                                           Da150                                                                                                                                                                                         Da150
+                                                                      ily                                                                                                                                                                             ily                                                                                                                                                                                           ily
+                                                                          200                                            2                                                                                                                                200                                              2                                                                                                                                            200                                        2
+                                                                                                  250                                                                                                                                                                              250                                                                                                                                                                                    250
+                                                                                                                     1                                                                                                                                                                                1                                                                                                                                                                                        1
+
+
+
+
+                                                                    (a) BCH                                                                                                                                                                        (b) ETC                                                                                                                                                                                        (c) LTC
+
+Figure 17: Daily and weekly seasonality: fit of Generalized Additive Model with cubic
+and p-splines for volatility of cryptocurrencies (5 min nodes), 01. July 2018 - 31. August
+2018. 01. July 2018 - 31. August 2018.
+
+
+5.3                                             Appendix-Statistics for DASH, REP and STR
+
+             280                                                                                                                                                                                                                                                                                                                                                                   0.350
+                                                                                                                                                                                              40
+             260                                                                                                                                                                                                                                                                                                                                                                   0.325
+             240                                                                                                                                                                              35                                                                                                                                                                                   0.300
+
+
+DASH Price
+             220
+                                                                                                                                                                                  REP Price                                                                                                                                                                            STR Price
+                                                                                                                                                                                              30                                                                                                                                                                                   0.275
+             200                                                                                                                                                                                                                                                                                                                                                                   0.250
+                                                                                                                                                                                              25
+             180
+                                                                                                                                                                                                                                                                                                                                                                                   0.225
+             160                                                                                                                                                                              20
+                                                                                                                                                                                                                                                                                                                                                                                   0.200
+             140
+                                                                                                                                                                                              15                                                                                                                                                                                   0.175
+
+                        2018-07-01       2018-07-08    2018-07-15     2018-07-22     2018-07-29         2018-08-05       2018-08-12           2018-08-19       2018-08-26                              2018-07-01       2018-07-08   2018-07-15         2018-07-22    2018-07-29         2018-08-05       2018-08-12           2018-08-19           2018-08-26                                    2018-07-01       2018-07-08        2018-07-15      2018-07-22      2018-07-29   2018-08-05       2018-08-12       2018-08-19       2018-08-26
+                                                                                            Date                                                                                                                                                                             Date                                                                                                                                                                                          Date
+
+
+
+                                                               (a) DASH                                                                                                                                                                            (b) REP                                                                                                                                                                                        (c) STR
+
+Figure 18: Candlestick charts for individual price movements (60-minutes intervals).
+01. July 2018 - 31. August 2018.
+
+
+
+                                                                                                                                                                                                                                                                                                                                                                                   0.06
+                                                                                                                                                                                              0.10
+
+             0.06
+
+                                                                                                                                                                                                                                                                                                                                                                                   0.04
+             0.04
+
+                                                                                                                                                                                              0.05
+                                                                                                                                                                                                                                                                                                                                                                                   0.02
+             0.02
+
+
+DASH                                                                                                                                                                              REP                                                                                                                                                                                  STR
+             0.00                                                                                                                                                                                                                                                                                                                                                                  0.00
+
+                                                                                                                                                                                              0.00
+             −0.02
+                                                                                                                                                                                                                                                                                                                                                                                   −0.02
+
+             −0.04
+
+                                                                                                                                                                                                                                                                                                                                                                                   −0.04
+                                                                                                                                                                                              −0.05
+             −0.06
+
+                      Jul                                                                Aug                                                                                Sep                        Jul                                                                   Aug                                                                                 Sep                        Jul                                                                      Aug                                                                          Sep
+
+                                                                                      Index                                                                                                                                                                               Index                                                                                                                                                                                     Index
+
+
+
+
+                                                               (a) DASH                                                                                                                                                                            (b) REP                                                                                                                                                                                        (c) STR
+
+                        Figure 19: Intraday log-returns (5-minutes). 01. July 2018 - 31. August 2018.
+
+
+
+                                                                                                                                                                                                                                                                               26
+                                                                                                                                                    Trading volume                                                                                                                                                                           Abs. returns                                                                                                                                                                            DASH
+
+                                                                                                                               −400      −200        0       200           400   600    800                                                                                                                                      −2e−04      0e+00          2e−04    4e−04                                                                                                                            0.00   0.01      0.02      0.03     0.04        0.05      0.06       0.07
+
+
+                                                                                                               00:00                                                                                                                                                                                            00:05                                                                                                                                                                           Jul
+
+                                                                                                               02:00                                                                                                                                                                                            02:05
+
+                                                                                                               04:00                                                                                                                                                                                            04:05
+
+                                                                                                               06:00                                                                                                                                                                                            06:05
+
+                                                                                                               08:00                                                                                                                                                                                            08:05
+
+                                                                                                               10:00                                                                                                                                                                                            10:05
+
+                                                                                                        Time   12:00                                                                          DASH                                                                                                       Time   12:05                                                          DASH                                                                                                     Index   Aug
+
+                                                                                                               14:00                                                                                                                                                                                            14:05
+                                                                                             (a) DASH                                                                                                                                                                                         (a) DASH                                                                                                                                                                       (a) DASH
+                                                                                                               16:00                                                                                                                                                                                            16:05
+
+                                                                                                               18:00                                                                                                                                                                                            18:05
+
+                                                                                                               20:00                                                                                                                                                                                            20:05
+
+                                                                                                               22:00                                                                                                                                                                                            22:05
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                Sep
+
+
+
+
+                                                                                                                                                    Trading volume                                                                                                                                                                           Abs. returns                                                                                                                                                                               REP
+
+                                                                                                                       −400           −200            0              200         400                                                                                                                                    −5e−04            0e+00             5e−04      1e−03                                                                                                                          0.00      0.02          0.04             0.06          0.08          0.10
+
+
+                                                                                                               00:00                                                                                                                                                                                            00:05                                                                                                                                                                           Jul
+
+                                                                                                               02:00                                                                                                                                                                                            02:05
+
+                                                                                                               04:00                                                                                                                                                                                            04:05
+     Figure 22: Generalized Additive Model of intraday trading volume of cryptocurrencies.                                                                                                           Figure 21: Generalized Additive Model of volatility of cryptocurrencies. 01. July 2018                                                                                           Figure 20: Intraday volatility (absolute 5-minutes log-returns). 01. July 2018 - 31.
+
+
+                                                                                                               06:00                                                                                                                                                                                            06:05
+
+                                                                                                               08:00                                                                                                                                                                                            08:05
+
+                                                                                                               10:00                                                                                                                                                                                            10:05
+
+                                                                                                        Time   12:00                                                                          REP                                                                                                        Time   12:05                                                          REP                                                                                                      Index   Aug
+27                                                                                           (b) REP           14:00
+                                                                                                                                                                                                                                                                                              (b) REP           14:05
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                             (b) REP
+                                                                                                               16:00                                                                                                                                                                                            16:05
+
+                                                                                                               18:00                                                                                                                                                                                            18:05
+
+                                                                                                               20:00                                                                                                                                                                                            20:05
+
+                                                                                                               22:00                                                                                                                                                                                            22:05
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                Sep
+
+
+
+
+                                                                                                                                                    Trading volume                                                                                                                                                                           Abs. returns                                                                                                                                                                               STR
+
+                                                                                                                              −2000             0               2000             4000                                                                                                                                   −5e−04            0e+00              5e−04                                                                                                                                    0.00    0.01        0.02          0.03          0.04          0.05     0.06
+
+
+                                                                                                               00:00                                                                                                                                                                                            00:05                                                                                                                                                                           Jul
+
+                                                                                                               02:00                                                                                                                                                                                            02:05
+
+                                                                                                               04:00                                                                                                                                                                                            04:05
+
+                                                                                                               06:00                                                                                                                                                                                            06:05
+
+                                                                                                               08:00                                                                                                                                                                                            08:05
+
+                                                                                                               10:00                                                                                                                                                                                            10:05
+
+                                                                                                        Time   12:00                                                                          STR                                                                                                        Time   12:05                                                          STR                                                                                                      Index   Aug
+
+                                                                                                               14:00                                                                                                                                                                                            14:05
+                                                                                             (c) STR                                                                                                                                                                                          (c) STR                                                                                                                                                                        (c) STR
+                                                                                                               16:00                                                                                                                                                                                            16:05
+
+                                                                                                               18:00                                                                                                                                                                                            18:05
+
+                                                                                                               20:00                                                                                                                                                                                            20:05
+
+                                                                                                               22:00                                                                                                                                                                                            22:05
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                Sep
+     01. July 2018 - 31. August 2018.                                                                                                                                                                - 31. August 2018.                                                                                                                                                               August 2018.
+                                       Trading Volume                                                                                                                                                               Trading Volume                                                                                                                                            Trading Volume
+
+
+
+
+                                                                                                                                                                                 1200                                                                                                                                      10000
+    1500
+
+                                                                                                                                                                                   1000                                                                                                                                      8000
+
+
+        1000                                                                                                                                                                               800                                                                                                                                      6000
+
+                                                                                                                                                                                                600                                                                                                                                       4000
+            500
+                                                                                                                       7                                                                         400                                                              7                                                                        2000                                                                                  7
+                                                                                                                   6                                                                                                                                          6                                                                                                                                                              6
+                                                                                                        5                                                                                                                                               5                                                                                                                                                              5
+                     50                                                                                                                                                                                  50                                                                                                                                               50
+                                                                                                  4    ly                                                                                                                                          4    ly                                                                                                                                                         4   ly
+                          100                                                                     We                                                                                                          100                                We                                                                                                              100                                               We
+                                                                                                    ek                                                                                                                                             ek                                                                                                                                                                ek
+                                                                                              3                                                                                                                                              3                                                                                                                                                                 3
+                               Da150                                                                                                                                                                            Da150                                                                                                                                                   Da150
+                                 ily                                                                                                                                                                              ily                                                                                                                                                     ily
+                                     200                                          2                                                                                                                                   200               2                                                                                                                                     200                          2
+                                                          250                                                                                                                                                               250                                                                                                                                                                 250
+                                                                             1                                                                                                                                                      1                                                                                                                                                                  1
+
+
+
+
+                          (a) DASH                                                                                                                                                                             (b) REP                                                                                                                                                  (c) STR
+
+Figure 23: Daily and weekly seasonality: fit of Generalized Additive Model with cubic
+and p-splines for trading volume of cryptocurrencies (5 min nodes), 01. July 2018 - 31.
+August 2018. 01. July 2018 - 31. August 2018.
+
+
+                                            Volatility                                                                                                                                                                 Volatility                                                                                                                                                      Volatility
+
+
+
+
+   0.0025                                                                                                                                                                       0.0030
+                                                                                                                                                                                                                                                                                                                           0.0035
+
+
+      0.0020                                                                                                                                                                       0.0025                                                                                                                                    0.0030
+
+
+        0.0015                                                                                                                                                                                                                                                                                                                       0.0025
+                                                                                                                                                                                           0.0020
+
+            0.0010                                                                                                                                                                                                                                                                                                                        0.0020
+                                                                                                                       7                                                                        0.0015                                                            7                                                                                                                                                              7
+                                                                                                                   6                                                                                                                                          6                                                                                                                                                              6
+                                                                                                        5                                                                                                                                               5                                                                                                                                                              5
+                     50                                                                                                                                                                                  50                                                                                                                                               50
+                                                                                                  4   kly                                                                                                                                          4    kly                                                                                                                                                        4   kly
+                          100                                                                     We                                                                                                          100                                We                                                                                                              100                                               We
+                                                                                              3      e                                                                                                                                       3      e                                                                                                                                                          3      e
+                               Da150                                                                                                                                                                            Da150                                                                                                                                                   Da150
+                                 ily                                                                                                                                                                              ily                                                                                                                                                     ily
+                                     200                                          2                                                                                                                                   200               2                                                                                                                                     200                          2
+                                                          250                                                                                                                                                               250                                                                                                                                                                  250
+                                                                             1                                                                                                                                                      1                                                                                                                                                                  1
+
+
+
+
+                          (a) DASH                                                                                                                                                                             (b) REP                                                                                                                                                  (c) STR
+
+Figure 24: Daily and weekly seasonality: fit of Generalized Additive Model with cubic
+and p-splines for volatility of cryptocurrencies (5 min nodes), 01. July 2018 - 31. August
+2018. 01. July 2018 - 31. August 2018.
+
+
+5.4               Appendix-Statistics for XMR and ZEC
+
+                                      150
+                                      140                                                                                                                                                                                                               220
+                                      130                                                                                                                                                                                                               200
+                                      120
+                          XMR Price                                                                                                                                                                                                         ZEC Price
+                                                                                                                                                                                                                                                        180
+                                      110
+                                      100                                                                                                                                                                                                               160
+                                      90                                                                                                                                                                                                                140
+                                      80
+                                                                                                                                                                                                                                                        120
+
+                                             2018-07-01         2018-07-08       2018-07-15           2018-07-22           2018-07-29    2018-08-05   2018-08-12   2018-08-19      2018-08-26                                                                         2018-07-01   2018-07-08   2018-07-15    2018-07-22     2018-07-29      2018-08-05    2018-08-12     2018-08-19     2018-08-26
+                                                                                                                                  Date                                                                                                                                                                                              Date
+
+
+
+                                                                                              (a) XMR                                                                                                                                                                                                        (b) ZEC
+
+Figure 25: Chandlestick charts for individual price movements. 01. July 2018 - 31.
+August 2018.
+
+                                                                                                                                                                                                                            28
+                        0.04                                                                                                                                0.10
+
+
+
+                                                                                                                                                            0.08
+
+                        0.02
+                                                                                                                                                            0.06
+
+
+
+                                                                                                                                                            0.04
+         XMR            0.00                                                                                                                 ZEC
+
+                                                                                                                                                            0.02
+
+
+                        −0.02                                                                                                                               0.00
+
+
+
+                                                                                                                                                            −0.02
+
+                        −0.04
+                                                                                                                                                            −0.04
+
+                                 Jul                                             Aug                                              Sep                                Jul                                             Aug                                              Sep
+
+                                                                                 Index                                                                                                                               Index
+
+
+
+
+                                                                 (a) XMR                                                                                                                             (b) ZEC
+
+    Figure 26: Intraday 5-minutes log-returns. 01. July 2018 - 31. August 2018.
+
+
+
+
+                                                                                                                                                            0.10
+                        0.04
+
+
+
+                                                                                                                                                            0.08
+
+                        0.03
+
+
+                                                                                                                                                            0.06
+
+         XMR                                                                                                                                 ZEC
+                        0.02
+
+                                                                                                                                                            0.04
+
+
+
+                        0.01
+                                                                                                                                                            0.02
+
+
+
+
+                        0.00                                                                                                                                0.00
+
+                                 Jul                                             Aug                                              Sep                                Jul                                             Aug                                              Sep
+
+                                                                                 Index                                                                                                                               Index
+
+
+
+
+                                                                 (a) XMR                                                                                                                             (b) ZEC
+
+                        Figure 27: Intraday Volatility. 01. July 2018 - 31. August 2018.
+
+
+
+                                                                                 XMR                                                                                                                                 ZEC
+
+
+
+
+                        6e−04
+                                                                                                                                                            4e−04
+
+
+                        4e−04
+                                                                                                                                                            2e−04
+
+                        2e−04
+
+
+         Abs. returns                                                                                                                        Abs. returns   0e+00
+                        0e+00
+
+
+
+                                                                                                                                                            −2e−04
+                        −2e−04
+
+
+
+                        −4e−04                                                                                                                              −4e−04
+
+
+
+
+                                 00:05   02:05   04:05   06:05   08:05   10:05    12:05   14:05   16:05   18:05   20:05   22:05                                      00:05   02:05   04:05   06:05   08:05   10:05    12:05   14:05   16:05   18:05   20:05   22:05
+                                                                                 Time                                                                                                                                Time
+
+
+
+
+                                                                 (a) XMR                                                                                                                             (b) ZEC
+
+Figure 28: Generalized Additive Model of volatility of cryptocurrencies. 01. July 2018
+- 31. August 2018.
+
+
+
+
+                                                                                                                                        29
+                                                                                              XMR                                                                                                                                                     ZEC
+
+
+
+                          1000
+                                                                                                                                                                                 400
+
+
+
+
+                          500                                                                                                                                                    200
+
+
+
+
+         Trading volume                                                                                                                                         Trading volume
+                                                                                                                                                                                 0
+                          0
+
+
+
+
+                                                                                                                                                                                 −200
+                          −500
+
+
+
+
+                                 00:00    02:00       04:00        06:00    08:00     10:00    12:00   14:00       16:00   18:00       20:00       22:00                                00:00     02:00       04:00        06:00    08:00     10:00    12:00   14:00       16:00   18:00       20:00       22:00
+                                                                                              Time                                                                                                                                                    Time
+
+
+
+
+                                                                           (a) XMR                                                                                                                                                 (b) ZEC
+
+Figure 29: Generalized Additive Model of the 62 intraday trading volume of cryptocur-
+rencies. 01. July 2018 - 31. August 2018.
+
+
+
+                                                                                    Trading Volume                                                                                                                                          Trading Volume
+
+
+
+
+                                 2000                                                                                                                                                   1500
+
+
+                                    1500
+                                                                                                                                                                                                1000
+
+                                         1000
+                                                                                                                                                                                                  500
+                                           500
+                                                                                                                                               7                                                                                                                                                       7
+                                                                                                                                                                                                          0
+                                                  0                                                                                      6                                                                                                                                                       6
+                                                                                                                                   5                                                                                                                                                       5
+                                                              50                                                                                                                                                      50
+                                                                                                                               4   kly                                                                                                                                                 4   kly
+                                                                     100                                                       We                                                                                            100                                                       We
+                                                                                                                           3      e                                                                                                                                                3      e
+                                                                           Da150                                                                                                                                                   Da150
+                                                                             ily                                                                                                                                                     ily
+                                                                                 200                                   2                                                                                                                 200                                   2
+                                                                                               250                                                                                                                                                     250
+                                                                                                               1                                                                                                                                                       1
+
+
+
+
+                                                                           (a) XMR                                                                                                                                                 (b) ZEC
+
+Figure 30: Daily and weekly seasonality: fit of Generalized Additive Model with cubic
+and p-splines for trading volume of cryptocurrencies (5 min nodes), 01. July 2018 - 31.
+August 2018. 01. July 2018 - 31. August 2018.
+
+
+
+
+                                                                                                                                                           30
+                                             Volatility                                                                     Volatility
+
+
+
+
+                                                                                            0.0030
+             0.0025
+
+                                                                                             0.0025
+               0.0020
+                                                                                               0.0020
+
+
+                  0.0015                                                                         0.0015
+
+                                                                                   7                 0.0010                                                       7
+                      0.0010                                                   6                                                                              6
+                                                                          5                                                                              5
+                               50                                                                             50
+                                                                      4   ly                                                                         4   ly
+                                    100                               We                                           100                               We
+                                                                        ek                                                                             ek
+                                                                  3                                                                              3
+                                      Da150                                                                          Da150
+                                        ily                                                                            ily
+                                            200               2                                                            200               2
+                                                  250                                                                            250
+                                                          1                                                                              1
+
+
+
+
+                                     (a) XMR                                                                        (b) ZEC
+
+Figure 31: Daily and weekly seasonality: fit of Generalized Additive Model with cubic
+and p-splines for volatility of cryptocurrencies (5 min nodes), 01. July 2018 - 31. August
+2018. 01. July 2018 - 31. August 2018.
+
+
+
+
+                                                                                       31
+

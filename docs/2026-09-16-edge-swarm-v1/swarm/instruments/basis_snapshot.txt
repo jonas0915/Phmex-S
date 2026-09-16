@@ -1,0 +1,14 @@
+<stdin>:17: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+inverse markets in ccxt: [('BTC/USD:BTC', 'BTCUSD', True), ('ETH/USD:ETH', 'cETHUSD', True), ('SOL/USD:SOL', 'cSOLUSD', True), ('XRP/USD:XRP', 'cXRPUSD', True), ('ADA/USD:ADA', 'cADAUSD', True), ('SUI/USD:SUI', 'cSUIUSD', True), ('LINK/USD:LINK', 'cLINKUSD', True), ('AVAX/USD:AVAX', 'cAVAXUSD', True)]
+04:31:16 inv bid/ask [75798.9, 170419.0] [75799.0, 60066.0] | lin bid/ask [75852.6, 0.765] [75852.7, 0.816] | basis -7.08 bps inv-spread 0.01 bps
+04:31:27 inv bid/ask [75802.5, 1869.0] [75802.6, 62973.0] | lin bid/ask [75852.6, 0.616] [75852.7, 0.589] | basis -6.60 bps inv-spread 0.01 bps
+04:31:38 inv bid/ask [75802.5, 73371.0] [75802.6, 20.0] | lin bid/ask [75864.8, 0.004] [75864.9, 0.88] | basis -8.21 bps inv-spread 0.01 bps
+04:31:49 inv bid/ask [75807.8, 2239.0] [75807.9, 46583.0] | lin bid/ask [75856.3, 0.761] [75856.4, 0.854] | basis -6.39 bps inv-spread 0.01 bps
+04:32:00 inv bid/ask [75807.8, 1869.0] [75807.9, 62969.0] | lin bid/ask [75856.3, 0.52] [75856.4, 0.858] | basis -6.39 bps inv-spread 0.01 bps
+04:32:11 inv bid/ask [75807.8, 2238.0] [75807.9, 62989.0] | lin bid/ask [75860.8, 0.24] [75860.9, 0.67] | basis -6.99 bps inv-spread 0.01 bps
+04:32:22 inv bid/ask [75808.8, 2238.0] [75808.9, 425.0] | lin bid/ask [75860.9, 0.581] [75861.0, 0.597] | basis -6.87 bps inv-spread 0.01 bps
+04:32:33 inv bid/ask [75808.2, 128.0] [75808.3, 384659.0] | lin bid/ask [75852.3, 1.753] [75852.4, 0.066] | basis -5.81 bps inv-spread 0.01 bps
+BTC/USD:BTC funding 0.0001 interval None next None
+ETH/USD:ETH funding -0.00025979 interval None next None
+BTC/USDT:USDT funding 9.504e-05 interval None next None
+BTC/USD:BTC market: {"id": "BTCUSD", "contractSize": 1.0, "settle": "BTC", "maker": -0.0025, "taker": 0.0075, "limits": {"leverage": {"min": 1.0, "max": 100.0}, "amount": {"min": null, "max": null}, "price": {"min": 10.0, "max": 10000000000.0}, "cost": {"min": null, "max": 1000000.0}}, "precision": {"amount": 1.0, "price": 0.5, "cost": null, "base": null, "quote": null}, "active": true}

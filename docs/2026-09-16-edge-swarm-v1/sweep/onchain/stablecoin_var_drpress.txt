@@ -1,0 +1,495 @@
+ 
+189 
+The Impact of Stablecoins on Bitcoin Returns: An Empirical 
+Analysis Based on VAR Model 
+Huiyi Zhang 
+Bay Area International Business School, Beijng Normal University, Zhuhai, China 
+202311109001@mail.bnu.edu.cn 
+Abstract. Bitcoin’s price dynamics are influenced by both internal factors (e.g., supply shocks, 
+investor sentiment) and external drivers, among which the stability of stablecoins has attracted 
+increasing academic and regulatory attention. This paper investigates the effect of stablecoin peg 
+deviations (USDT and USDC) on Bitcoin returns using daily data from January 2020 to August 2025. 
+Based on a vector autoregression (VAR) framework, we conduct unit root tests, lag order selection, 
+model estimation, Granger causality tests, and impulse response analysis. Results show that both 
+Bitcoin returns and stablecoin deviations exhibit strong short-term inertia. USDT and USDC 
+deviations significantly Granger-cause Bitcoin returns, whereas the reverse causality is weaker. 
+Impulse responses indicate that stablecoin deviations first produce positive shocks to Bitcoin returns, 
+followed by negative corrections that gradually stabilize. The effect of USDT is more pronounced 
+and persistent, underscoring its central role in cryptocurrency markets. These findings highlight the 
+importance of monitoring stablecoin market stability, especially USDT, for investors and regulators 
+seeking to manage systemic risks in crypto markets. 
+Keywords: Bitcoin, Stablecoin, Peg deviation, VAR model. 
+1. Introduction 
+With the rapid development of blockchain technology and the continuous expansion of the 
+cryptocurrency market, Bitcoin has become the most representative cryptocurrency and a central topic 
+in both academic and industry research. However, its price exhibits substantial volatility, making risk 
+management and forecasting challenging [1, 2]. Prior studies show that Bitcoin behaves more like a 
+speculative asset than a medium of exchange, while also displaying partial hedging properties similar 
+to gold [3]. Moreover, Bitcoin has become increasingly integrated with global financial markets, 
+which makes its price dynamics more susceptible to macroeconomic shocks [4]. 
+Among the external factors influencing Bitcoin prices, stablecoins have emerged as a key driver 
+of market liquidity and trading activity. By design, stablecoins maintain a 1:1 peg to fiat currencies 
+such as the U.S. dollar, providing a convenient medium of exchange and facilitating arbitrage across 
+cryptocurrency exchanges [5, 6]. Nevertheless, stablecoins are not perfectly stable: “de-pegging” 
+events occasionally occur, which may trigger liquidity shocks and amplify price fluctuations in the 
+broader crypto market [7]. 
+A growing body of empirical research explores the link between stablecoins and Bitcoin. Griffin 
+and Shams demonstrated that Tether (USDT) issuance is positively associated with Bitcoin price 
+increases, raising concerns about potential price manipulation [8]. Ante et al. and Saggu further found 
+that Tether minting and burning events have statistically significant and asymmetric effects on Bitcoin 
+returns, indicating that stablecoin shocks transmit rapidly to Bitcoin prices [9, 10]. Grobys et al. 
+showed that the volatility of stablecoins is closely connected to Bitcoin volatility, while Wang et al. 
+and Hatem et al. explored whether stablecoins function as diversifiers, hedges, or safe havens and 
+found mixed evidence [11-13]. 
+Beyond USDT, USD Coin (USDC) has gained prominence as a major stablecoin, emphasizing 
+reserve transparency and regulatory compliance. However, the Silicon Valley Bank crisis in March 
+2023 caused USDC to experience a severe de-pegging, revealing vulnerabilities even in relatively 
+well-audited stablecoins [14]. Lyons and Viswanath-Natraj analyzed the arbitrage mechanisms that 
+
+ 
+190 
+normally maintain stablecoin pegs but emphasized that these mechanisms can fail under stressed 
+market conditions [15]. 
+From a methodological perspective, multivariate time-series models such as VAR provide a 
+powerful tool to capture the dynamic and bidirectional relationships among financial variables. 
+Katsiampa used GARCH-type models to examine Bitcoin’s volatility dynamics, while Ji et al. 
+employed VAR and connectedness approaches to analyze spillovers among cryptocurrencies and 
+other asset classes [16, 17]. These approaches motivate the use of a VAR framework in this study to 
+explore the dynamic interactions between Bitcoin returns and stablecoin peg deviations. 
+In sum, while prior research has offered valuable insights into the relationship between 
+stablecoins and Bitcoin, two research gaps remain. First, most studies have focused on USDT, with 
+limited systematic examination of USDC. Second, few studies use VAR models to analyze the 
+dynamic effects of stablecoin de-pegging on Bitcoin returns. This paper addresses these gaps by 
+employing a VAR model with daily data from January 2020 to August 2025, examining the short- 
+and medium-term impact of USDT and USDC peg deviations on Bitcoin returns, and providing new 
+evidence on risk transmission mechanisms in the cryptocurrency market. 
+2. Research Framework 
+To investigate the impact of stablecoin peg deviations on Bitcoin returns, this study selects 
+Bitcoin log returns and stablecoin peg deviations as variables and employs a vector autoregression 
+(VAR) model. VAR models capture dynamic relationships among multiple variables without 
+assuming prior causality, making them suitable for analyzing the interaction between stablecoins and 
+Bitcoin. 
+Daily time-series data from January 2020 to August 2025 are used. The Bitcoin return 𝑏𝑡𝑐_𝑟𝑒𝑡𝑡 
+is calculated as the log difference of Bitcoin prices, as shown in Equation (1): 
+𝑏𝑡𝑐_𝑟𝑒𝑡𝑡  =   ln(𝑃𝑡)   −  ln(𝑃𝑡−1)                              (1) 
+Where 𝑃𝑡 is the closing price of Bitcoin on day 𝑡. 
+The peg deviations of stablecoins are calculated as percentage deviations from the 1:1 peg, as 
+shown in Equations (2) and (3): 
+𝑢𝑠𝑑𝑡_𝑑𝑒𝑣𝑡=
+𝑃𝑡
+𝑈𝑆𝐷𝑇−1
+1
+× 100                                (2) 
+𝑢𝑠𝑑𝑐_𝑑𝑒𝑣𝑡=
+𝑃𝑡
+𝑈𝑆𝐷𝐶−1
+1
+× 100                                (3) 
+Where 𝑃𝑡
+𝑈𝑆𝐷𝑇 is the observed daily market price of USDT, 𝑃𝑡
+𝑈𝑆𝐷𝐶 is the observed daily market 
+price of USDC. 
+After conducting stationarity and unit root tests, these variables are confirmed to be stationary 
+and included in the VAR model. The general VAR model is specified in Equation (4): 
+𝑌𝑡= 𝐴+ 𝐵1𝑌𝑡−1 + 𝐵2𝑌𝑡−2 + ⋯+ 𝐵𝑘𝑌𝑡−𝑘+ 𝑈𝑡,  𝑈𝑡∼𝐼𝐼𝐷(0, Ω)              (4) 
+Where 𝑌𝑡= (𝑏𝑡𝑐_𝑟𝑒𝑡𝑡, 𝑠𝑡𝑎𝑏𝑙𝑒𝑐𝑜𝑖𝑛_𝑑𝑒𝑣𝑡), 𝐴 is the constant term vector, 𝐵j are the parameter 
+matrices, 𝑈𝑡 is the disturbance vector, t denotes time, and k is the lag order determined by 
+information criteria. 
+3. Data and Descriptive Statistics 
+Data are sourced from CoinMarketCap’s official website, covering daily values from January 1, 
+2020 to August 20, 2025. The descriptive statistics for btc_ret, usdt_dev, and usdc_dev are presented 
+in Table 1. 
+ 
+ 
+
+ 
+191 
+Table 1. Descriptive statistics of Bitcoin returns and stablecoin deviations 
+Variable 
+Min 
+Max 
+Mean 
+Std.Dev 
+Skewness 
+Kurtois 
+btc_ret 
+-17.1821 
+46.473 
+-0.1343 
+3.2996 
+1.3613 
+21.8477 
+usdt_dev 
+-2.5752 
+5.3585 
+0.0363 
+0.2006 
+8.9390 
+276.2484 
+usdc_dev 
+-2.9876 
+4.4029 
+0.0376 
+0.3162 
+5.1676 
+74.9076 
+On average, Bitcoin daily returns are slightly negative (mean = −0.13%), reflecting its volatile 
+and risky nature. The standard deviation of 3.30 indicates substantial daily price fluctuations, 
+consistent with Bitcoin being a highly volatile asset. Its skewness is positive (1.36), suggesting that 
+extreme positive returns occur more often than extreme negative ones, while the kurtosis (21.85) 
+shows heavy tails and frequent large shocks. 
+For stablecoins, both USDT and USDC display very small average deviations from their pegs (≈ 
+0.03), confirming that they generally maintain their $1 target. However, their distributions are not 
+perfectly symmetric: USDT has a very high skewness (8.94) and extremely high kurtosis (276.25), 
+implying occasional large positive deviations, while USDC also shows fat tails (kurtosis = 74.91) but 
+with less extreme skewness (5.17). These patterns suggest that, although rare, significant depegging 
+events do occur and may have meaningful impacts on Bitcoin returns—justifying further dynamic 
+analysis. 
+4. Empirical Analysis 
+4.1. Pre-estimation Tests 
+Before constructing the VAR model, it is necessary to test the stationarity of each variable in 
+order to avoid spurious regression problems. This paper applies the Augmented Dickey-Fuller (ADF) 
+unit root test to Bitcoin returns (btc_ret), USDT deviations (usdt_dev), and USDC deviations 
+(usdc_dev) to examine their time-series properties. The results are presented in Table 2. 
+Table 2. Results of Unit Root Tests for Variables 
+Variables 
+T-
+statistic 
+1% Critical 
+Value 
+5% Critical 
+Value 
+10% Critical 
+Value 
+P-
+Value 
+btc_ret 
+–17.571 
+–3.43 
+–2.86 
+–2.57 
+0 
+usdt_dev 
+–17.337 
+–3.43 
+–2.86 
+–2.57 
+0 
+usdc_dev 
+–8.343 
+–3.43 
+–2.86 
+–2.57 
+0 
+As shown in Table 2, the ADF test statistics for the three variables are all significantly smaller 
+than the critical values at the 1%, 5%, and 10% levels, with corresponding p-values close to 0. This 
+indicates that the null hypothesis of a unit root can be rejected, implying that all variables are 
+stationary in their level forms. Therefore, it is appropriate to directly use the raw time series for VAR 
+modeling without the need for further differencing. 
+After confirming the stationarity of the variables, the next step is to determine the optimal lag 
+length for the VAR model. To this end, several commonly used information criteria—including AIC 
+(Akaike Information Criterion), SC (Schwarz Criterion), HQ (Hannan-Quinn Criterion), and FPE 
+(Final Prediction Error)—are employed. These criteria balance model fit and parsimony, ensuring 
+that the chosen lag length avoids both underfitting and overfitting. 
+Table 3. Results of Lag Selection 
+ 
+USDT-BTC model 
+USDC-BTC model 
+AIC(n) 
+5 
+4 
+HQ(n) 
+5 
+4 
+SC(n) 
+4 
+4 
+FPE(n) 
+5 
+4 
+As shown in Table 3, for the USDT–BTC model, the AIC, HQ, and FPE criteria all suggest a lag 
+length of 5, while the SC criterion leans toward a lag length of 4. Considering that most criteria 
+
+ 
+192 
+converge on 5 and that longer lags may better capture dynamic interactions, a lag length of 5 is 
+ultimately selected as the optimal lag for the USDT–BTC system. 
+For the USDC–BTC model, all four information criteria (AIC, SC, HQ, and FPE) consistently 
+recommend a lag length of 4. Given this unanimity, the lag length of 4 is directly adopted as the 
+optimal specification for the USDC–BTC system. 
+In summary, subsequent VAR estimations are conducted with a lag length of 5 for the USDT–
+BTC system and a lag length of 4 for the USDC–BTC system. This selection ensures that the models 
+are both statistically robust and capable of effectively capturing the dynamic relationships between 
+Bitcoin returns and stablecoin deviations. 
+4.2. Model Estimation 
+Based on the time series data of Bitcoin returns and the de-anchoring deviation of stablecoins 
+(USDT, USDC), a VAR model is constructed to estimate the coefficients. The results are shown in 
+Tables 4 and 5. 
+From the USDT–BTC system (Table 4), it can be seen that the VAR model with 5 lags reveals 
+some significant relationships. The coefficient of Bitcoin returns at lag 1 is negative (-0.0472), 
+showing a mean-reversion characteristic. Meanwhile, USDT deviations at lag 1 have a significantly 
+positive impact on BTC returns (2.8603), but turn negative at lag 3 (-0.9258). This indicates that 
+shocks in the USDT market deviations exert a short-term amplifying effect on Bitcoin returns, 
+followed by a medium-term corrective response, showing a dual effect. 
+In the USDT equation, the coefficient of BTC returns at lag 1 is significantly positive (0.0025), 
+suggesting that Bitcoin return fluctuations can partly transmit to the stablecoin market. Furthermore, 
+multiple lag terms of USDT itself are significant, indicating that its de-anchoring deviations exhibit 
+relatively strong self-persistence. 
+Table 4. VAR Model Estimation Results (USDT–BTC system, p=5) 
+Variable(Lag) 
+btc_ret equation 
+usdt_dev equation 
+btc_ret.l1 
+-0.0472* (-2.131) 
+0.0025 (1.908) 
+btc_ret.l2 
+0.0400 (1.801) 
+-0.0026* (-2.001) 
+btc_ret.l3 
+-0.0022 (-0.097) 
+0.0006 (0.489) 
+btc_ret.l4 
+0.0563* (2.540) 
+-0.0023 (-1.786) 
+btc_ret.l5 
+0.0160 (0.729) 
+0.0007 (0.583) 
+usdt_dev.l1 
+2.8603*** (7.543) 
+0.2268*** (10.270) 
+usdt_dev.l2 
+-0.7591 (-1.941) 
+0.0756*** (3.320) 
+usdt_dev.l3 
+-0.9258* (-2.369) 
+0.1000*** (4.395) 
+usdt_dev.l4 
+-0.3408 (-0.868) 
+0.1270*** (5.560) 
+usdt_dev.l5 
+-0.3549 (-0.921) 
+-0.0930*** (-4.145) 
+Constant 
+-0.1460(-1.941) 
+0.0203*** (4.640) 
+Adjusted R-squared 
+0.03349 
+0.1135 
+From the USDC–BTC system (Table 4), it can be observed that in the VAR model with lags 1 to 
+4, several variables show significant effects (P<0.05) on Bitcoin returns or USDC deviations. 
+Specifically, the first lag of Bitcoin returns is significantly negative (–0.0581), indicating a certain 
+mean-reversion effect in BTC returns. At the same time, USDC deviations at lag 1 exert a strong 
+positive impact on BTC returns (2.1828), while lags 3 and 4 show significant negative effects (–
+0.8005, –0.6812), suggesting that deviations in the USDC market relative to Bitcoin prices have both 
+short-term positive shocks and medium-term negative corrections, but with asymmetric effects. 
+On the other hand, fluctuations in BTC returns also feed back into USDC deviations. For instance, 
+btc_ret.l1 in the USDC equation is significantly positive (0.0029), indicating that changes in Bitcoin 
+prices can amplify short-term price deviations of stablecoins. Overall, the results suggest a 
+bidirectional and significant dynamic relationship between USDC and BTC. 
+ 
+
+ 
+193 
+Table 5. VAR Model Estimation Results (USDC–BTC system, p=4) 
+Variable (Lag) 
+btc_ret equation 
+usdc_dev equation 
+btc_ret.l1 
+-0.0581** (-2.635) 
+0.0029* (2.011) 
+btc_ret.l2 
+0.0396 (1.793) 
+-0.0041** (-2.806) 
+btc_ret.l3 
+0.0025 (0.115) 
+-0.0005 (-0.346) 
+btc_ret.l4 
+0.0586** (2.679) 
+-0.0028 (-1.948) 
+usdc_dev.l1 
+2.1828*** (6.514) 
+0.4115*** (18.702) 
+usdc_dev.l2 
+-0.5453 (-1.536) 
+0.0811*** (3.477) 
+usdc_dev.l3 
+-0.8005* (-2.255) 
+0.2626*** (11.264) 
+usdc_dev.l4 
+-0.6812* (-2.011) 
+0.0939*** (4.221) 
+Constant 
+-0.1375 (-1.888) 
+0.0056 (1.154) 
+Adjusted R-squared 
+0.0271 
+0.5434 
+Overall, the VAR estimations empirically demonstrate a significant and bidirectional dynamic 
+relationship between Bitcoin returns and stablecoin peg deviations. The results underscore that 
+stablecoin deviations exert a short-term amplifying effect on Bitcoin returns, which is subsequently 
+followed by a medium-term corrective adjustment, reflecting partial mean reversion. Conversely, 
+fluctuations in Bitcoin returns are found to significantly transmit into the stablecoin market, 
+influencing peg stability. These findings highlight the pivotal role of stablecoin stability in 
+cryptocurrency market dynamics and provide important implications for risk monitoring and price 
+forecasting in digital asset markets. 
+4.3. Granger Causality Test 
+To further investigate the relationship between Bitcoin returns and the deviations of stablecoins 
+(USDT and USDC), this study employs the Granger causality test. The results are presented in Table 
+6. 
+Table 6. Results of Granger Causality Test and Instantaneous Causality Test 
+H0 
+Statistics 
+(F/Chi²) 
+P-value 
+Conclusion 
+btc_ret do not Granger-cause usdt_dev 
+F = 2.5256 
+0.0273 
+Reject H₀, causality 
+exists 
+usdt_dev do not Granger-cause btc_ret 
+F = 12.396 
+5.85E-12 
+Reject H₀, causality 
+exists 
+btc_ret do not Granger-cause usdc_dev 
+F = 4.2133 
+0.0021 
+Reject H₀, causality 
+exists 
+usdc_dev do not Granger-cause btc_ret 
+F = 11.575 
+2.40E-09 
+Reject H₀, causality 
+exists 
+No instantaneous causality between: btc_ret and 
+usdt_dev 
+Chi² = 9.0958 
+0.0026 
+Reject H₀, causality 
+exists 
+No instantaneous causality between: usdc_dev and 
+btc_ret 
+Chi² = 0.3228 
+0.5699 
+Accept H₀ 
+Table 6 reports the results of the Granger causality tests between Bitcoin returns and the peg 
+deviations of USDT and USDC. The null hypotheses that Bitcoin returns do not Granger-cause 
+USDT/USDC deviations are rejected at the 5% significance level, indicating that Bitcoin price 
+fluctuations help predict subsequent changes in stablecoin deviations. Similarly, the null hypotheses 
+that USDT and USDC deviations do not Granger-cause Bitcoin returns are also strongly rejected, 
+suggesting that stablecoin de-anchoring contains predictive power for future Bitcoin returns. 
+In addition, the instantaneous causality test shows a significant contemporaneous relationship 
+between Bitcoin returns and USDT deviations (Chi² = −9.0958, p = 0.0026), implying that shocks in 
+the USDT market and Bitcoin returns respond simultaneously within the same period. However, no 
+instantaneous causality is found between USDC deviations and Bitcoin returns, suggesting that 
+USDC reacts to Bitcoin price movements with a slight lag rather than immediately. 
+
+ 
+194 
+Overall, these results confirm a bidirectional and time-dependent causal linkage between Bitcoin 
+and stablecoin markets, with USDT showing stronger and more immediate interactions compared to 
+USDC. 
+4.4. Impulse Response Analysis 
+To explore the dynamic relationship between Bitcoin returns and the de-pegging premium of 
+stablecoins (USDT and USDC), this study constructs impulse response functions based on the 
+estimated VAR model. 
+For the impact of USDT de-pegging premium shocks on Bitcoin returns, the results shown in 
+Figure 1 indicate that Bitcoin returns experience a significant positive shock in the first period, rising 
+rapidly. By the second period, the effect reaches its peak before beginning to decline, and around the 
+fourth period, the effect turns negative. Subsequently, the fluctuations gradually weaken and approach 
+zero. This suggests that short-term volatility in the USDT market has a notable impact on Bitcoin 
+prices, but the effect is temporary. 
+ 
+Figure 1. Impulse response analysis of btc_ret to usdt_dev 
+In contrast, as shown in Figure 2, the response of USDT de-pegging premium to shocks in Bitcoin 
+returns is not significant. The response amplitude is relatively small, and the fluctuation bands hover 
+closely around zero, indicating that Bitcoin has only a limited feedback effect on USDT deviations. 
+ 
+Figure 2. Impulse response analysis of usdt_dev to btc_ret 
+As shown in Figure 3, the impulse response of Bitcoin returns to a one-standard-deviation shock 
+in USDC de-anchoring exhibits a clear short-run positive effect. The response peaks in period 2, 
+indicating that USDC de-anchoring significantly amplifies Bitcoin returns in the immediate aftermath 
+of the shock. This effect subsequently turns negative around periods 3–4, reflecting a partial mean-
+reversion in Bitcoin prices, and gradually converges toward zero in later periods. However, the overall 
+amplitude of the impact is slightly lower than that of USDT. This indicates that while USDC’s 
+influence on Bitcoin is directionally consistent with USDT, its market transmission effect is weaker. 
+
+ 
+195 
+ 
+Figure 3. Impulse response analysis of btc_ret to usdc_dev 
+As illustrated in Figure 4, the impulse response of USDC deviations to a one-standard-deviation 
+shock in Bitcoin returns remains statistically insignificant across all periods. The response oscillates 
+narrowly around zero, with confidence intervals consistently covering the zero line. This indicates 
+that Bitcoin return shocks exert only a weak and statistically negligible effect on USDC’s peg 
+deviations, suggesting limited feedback from Bitcoin price fluctuations to the USDC market. 
+ 
+Figure 4. Impulse response analysis of usdc_dev to btc_ret 
+Overall, the price deviations of stablecoins—particularly USDT—exert a significant short-term 
+impact on Bitcoin returns, characterized by an initial positive shock followed by a negative effect. In 
+contrast, Bitcoin itself provides only a weak feedback response to stablecoin deviations. This suggests 
+that the stablecoin market plays a certain leading role in Bitcoin’s price formation mechanism, though 
+its influence diminishes rapidly over time. 
+5. Conclusion 
+This paper provides a comprehensive empirical investigation of the dynamic interactions between 
+Bitcoin returns and the de-anchoring premiums of major stablecoins, using daily data from January 
+2020 to August 2025 and a VAR modeling framework. Our results consistently show that both 
+Bitcoin returns and stablecoin deviations exhibit strong short-term persistence, with Bitcoin’s own 
+lagged terms explaining most of its future volatility. More importantly, we find robust evidence that 
+USDT and USDC deviations significantly Granger-cause Bitcoin returns, whereas the reverse causal 
+relationship is weak and statistically insignificant. This asymmetry suggests that stablecoin markets 
+act as a leading indicator rather than a passive follower of Bitcoin price fluctuations. 
+Impulse response analysis further reveals a clear dynamic pattern: de-anchoring shocks initially 
+amplify Bitcoin returns, pushing prices in the same direction as the shock, followed by a negative 
+adjustment that gradually stabilizes. This mean-reverting behavior highlights the transitory nature of 
+stablecoin shocks, but also underscores their potential to exacerbate short-term volatility and create 
+
+ 
+196 
+price overshooting. Moreover, the impact of USDT is found to be considerably stronger and more 
+persistent than that of USDC, reflecting its dominant position in crypto trading volumes and liquidity 
+provision. The stronger transmission from USDT may be linked to its wider adoption across 
+centralized and decentralized exchanges, as well as its critical role in arbitrage and price discovery. 
+From a practical perspective, these findings carry significant implications for market participants 
+and regulators. For investors, monitoring stablecoin market conditions—especially USDT’s peg 
+stability and liquidity dynamics—can improve portfolio allocation decisions and risk management 
+strategies, particularly during periods of heightened volatility. For policymakers and regulators, the 
+results point to the systemic importance of stablecoins, suggesting that enhanced oversight of their 
+issuance, reserve management, and redemption mechanisms could help mitigate spillover risks and 
+promote greater resilience in the cryptocurrency ecosystem. 
+References 
+[1] Baur D G, Hong K, Lee A D. Bitcoin: Medium of exchange or speculative assets?. Journal of International 
+Financial Markets, Institutions and Money, 2018, 54: 177-189. 
+[2] Bullmann D, Klemm J, Pinna A. In search for stability in crypto-assets: are stablecoins the solution?. 
+European Central Bank Occasional Paper Series, 2019, 230. 
+[3] Dyhrberg A H. Hedging capabilities of Bitcoin: Is it the virtual gold?. Finance Research Letters, 2016, 
+16: 139-144. 
+[4] Corbet S, Lucey B, Urquhart A, Yarovaya L. Cryptocurrencies as a financial asset: A systematic analysis. 
+International Review of Financial Analysis, 2018, 62: 182-199. 
+[5] Catalini C, Gans J S. Some simple economics of the blockchain. Communications of the ACM, 2020, 63 
+(7): 80-90. 
+[6] Makarov I, Schoar A. Trading and arbitrage in cryptocurrency markets. Journal of Financial Economics, 
+2020, 135 (2): 293-319. 
+[7] Ahmed R, Aldasoro I, Duley C. Public information and stablecoin runs. Basel: Bank for International 
+Settlements, Monetary and Economic Department, 2024. 
+[8] Griffin J M, Shams A. Is Bitcoin really untethered?. The Journal of Finance, 2020, 75 (4): 1913-1964. 
+[9] Ante L, Fiedler I, Strehle E. The influence of stablecoin issuances on cryptocurrency markets. Finance 
+Research Letters, 2021, 41: 101867. 
+[10] Saggu A. The intraday bitcoin response to tether minting and burning events: Asymmetry, investor 
+sentiment, and “whale alerts” on twitter. Finance Research Letters, 2022, 49: 103096. 
+[11] Grobys K, Junttila J, Kolari J W, et al. On the stability of stablecoins. Journal of Empirical Finance, 2021, 
+64: 207-223. 
+[12] Wang G J, Ma X, Wu H. Are stablecoins truly diversifiers, hedges, or safe havens against traditional 
+cryptocurrencies as their name suggests?. Research in International Business and Finance, 2020, 54: 
+101225. 
+[13] Hatem B, El Ouakdi J, Ftiti Z. Roles of stable versus nonstable cryptocurrencies in Bitcoin market 
+dynamics. Research in International Business and Finance, 2022, 62: 101720. 
+[14] Watsky C, Allen J, Daud H, et al. Primary and Secondary Markets for Stablecoins. FEDS Notes, 2024 
+(2024-02): 23-3. 
+[15] Lyons R K, Viswanath-Natraj G. What keeps stablecoins stable?. Journal of International Money and 
+Finance, 2023, 131: 102777. 
+[16] Katsiampa P. Volatility estimation for Bitcoin: A comparison of GARCH models. Economics Letters, 
+2017, 158: 3-6. 
+[17] Ji Q, Bouri E, Roubaud D, Kristoufek L. Information interdependence among energy, cryptocurrency, 
+and major commodity markets. Energy Economics, 2019, 81: 1042-1055. 

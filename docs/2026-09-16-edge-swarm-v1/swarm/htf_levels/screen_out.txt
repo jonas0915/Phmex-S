@@ -1,0 +1,30 @@
+ETH 2025-06-27 05:25:00+00:00 2026-09-02 23:55:00+00:00 124639
+SOL 2025-06-27 05:25:00+00:00 2026-09-02 23:55:00+00:00 124639
+XRP 2025-06-27 05:35:00+00:00 2026-09-02 23:55:00+00:00 124637
+DOGE 2025-06-27 05:35:00+00:00 2026-09-02 23:55:00+00:00 124637
+LINK 2025-06-27 05:30:00+00:00 2026-09-02 23:55:00+00:00 124638
+SUI 2025-06-27 05:30:00+00:00 2026-09-02 23:55:00+00:00 124638
+ADA 2025-06-27 05:30:00+00:00 2026-09-02 23:55:00+00:00 124638
+1000PEPE 2025-06-27 05:55:00+00:00 2026-09-02 23:55:00+00:00 124633
+1000SHIB 2025-06-27 05:40:00+00:00 2026-09-02 23:55:00+00:00 124636
+M1_sweep_reclaim TRAIN: n=2744 net/t=$-0.0936 CI95=[-0.1339,-0.0519] total=$-256.88 WR=0.330 gross_bps=-2.9 exits={'SL': 1788, 'TP': 823, 'TIME': 133} med_hold_h=2.6 med_RR=2.46
+M1_sweep_reclaim OOS_tail: n=205 net/t=$-0.0840 CI95=[-0.2022,0.0404] total=$-17.23 WR=0.341 gross_bps=-1.4 exits={'SL': 131, 'TP': 63, 'TIME': 11} med_hold_h=2.3 med_RR=2.16
+   per-symbol (n,total$): {'ETH': (323, np.float64(-32.55)), 'SOL': (337, np.float64(-43.75)), 'XRP': (328, np.float64(-32.02)), 'DOGE': (323, np.float64(-33.37)), 'LINK': (338, np.float64(-13.46)), 'SUI': (315, np.float64(-47.31)), 'ADA': (337, np.float64(-8.12)), '1000PEPE': (333, np.float64(-11.74)), '1000SHIB': (315, np.float64(-51.78))}
+M1_var_tp_full TRAIN: n=2573 net/t=$-0.1212 CI95=[-0.1747,-0.0692] total=$-311.89 WR=0.248 gross_bps=-7.2 exits={'SL': 1866, 'TIME': 404, 'TP': 303} med_hold_h=4.3 med_RR=5.07
+M1_var_tp_full OOS_tail: n=192 net/t=$-0.0816 CI95=[-0.2359,0.0764] total=$-15.67 WR=0.255 gross_bps=-0.6 exits={'SL': 137, 'TIME': 33, 'TP': 22} med_hold_h=3.8 med_RR=4.66
+   per-symbol (n,total$): {'ETH': (303, np.float64(-57.95)), 'SOL': (320, np.float64(-37.55)), 'XRP': (313, np.float64(-48.39)), 'DOGE': (300, np.float64(-36.01)), 'LINK': (313, np.float64(-10.69)), 'SUI': (294, np.float64(-59.28)), 'ADA': (322, np.float64(-21.58)), '1000PEPE': (306, np.float64(-20.15)), '1000SHIB': (294, np.float64(-35.97))}
+M1_var_tp_quarter TRAIN: n=2796 net/t=$-0.1065 CI95=[-0.1345,-0.0779] total=$-297.66 WR=0.474 gross_bps=-5.4 exits={'SL': 1427, 'TP': 1345, 'TIME': 24} med_hold_h=1.1 med_RR=1.16
+M1_var_tp_quarter OOS_tail: n=206 net/t=$-0.1403 CI95=[-0.2236,-0.0576] total=$-28.91 WR=0.461 gross_bps=-11.1 exits={'SL': 105, 'TP': 96, 'TIME': 5} med_hold_h=0.9 med_RR=1.03
+   per-symbol (n,total$): {'ETH': (328, np.float64(-37.88)), 'SOL': (343, np.float64(-39.09)), 'XRP': (338, np.float64(-34.96)), 'DOGE': (328, np.float64(-29.97)), 'LINK': (344, np.float64(-34.22)), 'SUI': (326, np.float64(-52.98)), 'ADA': (340, np.float64(-35.21)), '1000PEPE': (338, np.float64(-14.06)), '1000SHIB': (317, np.float64(-48.19))}
+M2_pdr_breakout TRAIN: n=1625 net/t=$-0.0477 CI95=[-0.1321,0.0377] total=$-77.54 WR=0.306 gross_bps=5.7 exits={'SL': 1074, 'TP': 408, 'TIME': 143} med_hold_h=7.0 med_RR=3.11
+M2_pdr_breakout OOS_tail: n=136 net/t=$0.1016 CI95=[-0.2240,0.4369] total=$13.82 WR=0.279 gross_bps=30.5 exits={'SL': 86, 'TP': 35, 'TIME': 15} med_hold_h=6.2 med_RR=2.71
+   per-symbol (n,total$): {'ETH': (234, np.float64(11.81)), 'SOL': (244, np.float64(-9.44)), 'XRP': (228, np.float64(-3.59)), 'DOGE': (196, np.float64(-18.88)), 'LINK': (114, np.float64(-7.92)), 'SUI': (117, np.float64(-17.34)), 'ADA': (232, np.float64(-2.53)), '1000PEPE': (165, np.float64(19.28)), '1000SHIB': (231, np.float64(-35.1))}
+M2_var_novolfilter TRAIN: n=2449 net/t=$-0.0858 CI95=[-0.1423,-0.0263] total=$-210.16 WR=0.233 gross_bps=-1.0 exits={'SL': 1857, 'TP': 476, 'TIME': 116} med_hold_h=4.6 med_RR=4.72
+M2_var_novolfilter OOS_tail: n=185 net/t=$-0.0233 CI95=[-0.2508,0.2407] total=$-4.30 WR=0.232 gross_bps=9.3 exits={'SL': 136, 'TP': 37, 'TIME': 12} med_hold_h=4.0 med_RR=4.33
+   per-symbol (n,total$): {'ETH': (294, np.float64(-6.88)), 'SOL': (297, np.float64(-36.93)), 'XRP': (294, np.float64(-24.29)), 'DOGE': (291, np.float64(-23.03)), 'LINK': (301, np.float64(-29.75)), 'SUI': (285, np.float64(-26.11)), 'ADA': (293, np.float64(-3.61)), '1000PEPE': (293, np.float64(-32.24)), '1000SHIB': (286, np.float64(-31.64))}
+M3_weekVA_reentry TRAIN: n=1924 net/t=$-0.1298 CI95=[-0.1901,-0.0700] total=$-249.70 WR=0.446 gross_bps=-8.2 exits={'TP': 950, 'SL': 917, 'TIME': 57} med_hold_h=5.0 med_RR=1.23
+M3_weekVA_reentry OOS_tail: n=155 net/t=$-0.1531 CI95=[-0.2890,-0.0199] total=$-23.73 WR=0.490 gross_bps=-12.4 exits={'TP': 84, 'SL': 67, 'TIME': 4} med_hold_h=4.1 med_RR=0.96
+   per-symbol (n,total$): {'ETH': (214, np.float64(-27.78)), 'SOL': (219, np.float64(-24.76)), 'XRP': (235, np.float64(-29.92)), 'DOGE': (245, np.float64(-27.07)), 'LINK': (234, np.float64(-27.41)), 'SUI': (256, np.float64(-18.16)), 'ADA': (218, np.float64(-30.39)), '1000PEPE': (218, np.float64(-49.72)), '1000SHIB': (240, np.float64(-38.24))}
+M3_var_dayVA_reentry TRAIN: n=4190 net/t=$-0.1187 CI95=[-0.1420,-0.0951] total=$-497.39 WR=0.508 gross_bps=-7.3 exits={'TP': 2921, 'SL': 1148, 'TIME': 121} med_hold_h=1.2 med_RR=0.33
+M3_var_dayVA_reentry OOS_tail: n=361 net/t=$-0.0993 CI95=[-0.1625,-0.0398] total=$-35.85 WR=0.449 gross_bps=-4.2 exits={'TP': 263, 'SL': 90, 'TIME': 8} med_hold_h=1.0 med_RR=0.31
+   per-symbol (n,total$): {'ETH': (500, np.float64(-56.56)), 'SOL': (498, np.float64(-81.49)), 'XRP': (491, np.float64(-54.69)), 'DOGE': (488, np.float64(-68.17)), 'LINK': (509, np.float64(-33.69)), 'SUI': (520, np.float64(-53.63)), 'ADA': (503, np.float64(-45.8)), '1000PEPE': (517, np.float64(-52.14)), '1000SHIB': (525, np.float64(-87.07))}

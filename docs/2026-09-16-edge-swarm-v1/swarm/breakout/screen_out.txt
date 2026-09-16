@@ -1,0 +1,54 @@
+symbols: 35
+train bars 5m (BTC): 18432 2026-06-01 00:00:00+00:00 2026-08-03 23:55:00+00:00
+
+== M1 5m box-compression breakout: raw signals=2218
+M1 5m box-compression breakout TP=1.0H SL=0.5H hold<=24bars: n=2071 (230.1/wk all syms) TP%=29.4 SL%=69.8 TIME%=0.9 gross=-3.9bps net=-16.0bps [-17.8,-14.2] $/t@150=-0.2405 exBTC net=-15.9bps [-17.8,-14.0] fund=0.09bps medH=52bps
+M1 5m box-compression breakout TP=0.5H SL=0.5H hold<=24bars: n=2106 (234.0/wk all syms) TP%=41.9 SL%=58.1 TIME%=0.0 gross=-5.1bps net=-17.1bps [-18.5,-15.8] $/t@150=-0.2571 exBTC net=-17.1bps [-18.4,-15.7] fund=-0.00bps medH=51bps
+M1 5m box-compression breakout TP=0.5H SL=1.0H hold<=24bars: n=2021 (224.6/wk all syms) TP%=58.4 SL%=40.1 TIME%=1.4 gross=-6.6bps net=-18.6bps [-20.6,-16.6] $/t@150=-0.2797 exBTC net=-18.6bps [-20.7,-16.6] fund=-0.00bps medH=57bps
+M1 5m box-compression breakout TP=1.0H SL=1.0H hold<=24bars: n=1980 (220.0/wk all syms) TP%=42.2 SL%=52.1 TIME%=5.8 gross=-5.9bps net=-17.9bps [-20.6,-15.3] $/t@150=-0.2692 exBTC net=-17.8bps [-20.6,-15.2] fund=0.09bps medH=59bps
+M1 5m box-compression breakout LONG TP=1.0H SL=0.5H: n=972 (108.0/wk all syms) TP%=28.0 SL%=71.1 TIME%=0.9 gross=-6.0bps net=-18.0bps [-20.5,-15.5] $/t@150=-0.2698 exBTC net=-17.9bps [-20.5,-15.4] fund=0.00bps medH=100bps
+M1 5m box-compression breakout SHORT TP=1.0H SL=0.5H: n=1099 (122.1/wk all syms) TP%=30.6 SL%=68.6 TIME%=0.8 gross=-2.1bps net=-14.3bps [-17.0,-11.7] $/t@150=-0.2146 exBTC net=-14.2bps [-16.8,-11.3] fund=0.17bps medH=42bps
+
+== M3 5m wide-range-bar continuation: raw signals=5001
+M3 5m wide-range-bar continuation TP=1.0H SL=0.5H hold<=24bars: n=4451 (494.6/wk all syms) TP%=28.3 SL%=64.2 TIME%=7.5 gross=-8.0bps net=-20.0bps [-23.6,-16.4] $/t@150=-0.3006 exBTC net=-20.2bps [-23.8,-16.4] fund=0.05bps medH=220bps
+M3 5m wide-range-bar continuation TP=0.5H SL=0.5H hold<=24bars: n=4567 (507.4/wk all syms) TP%=45.1 SL%=52.9 TIME%=2.0 gross=-8.0bps net=-20.1bps [-22.6,-17.3] $/t@150=-0.3009 exBTC net=-20.3bps [-23.0,-17.5] fund=0.02bps medH=220bps
+M3 5m wide-range-bar continuation TP=0.5H SL=1.0H hold<=24bars: n=4451 (494.6/wk all syms) TP%=56.1 SL%=32.6 TIME%=11.3 gross=-13.5bps net=-25.6bps [-29.4,-22.1] $/t@150=-0.3844 exBTC net=-26.0bps [-29.9,-22.2] fund=0.10bps medH=220bps
+M3 5m wide-range-bar continuation TP=1.0H SL=1.0H hold<=24bars: n=4316 (479.6/wk all syms) TP%=36.0 SL%=40.6 TIME%=23.4 gross=-14.1bps net=-26.3bps [-30.9,-21.5] $/t@150=-0.3939 exBTC net=-26.7bps [-31.7,-21.9] fund=0.20bps medH=222bps
+M3 5m wide-range-bar continuation LONG TP=1.0H SL=0.5H: n=2379 (264.3/wk all syms) TP%=29.3 SL%=63.4 TIME%=7.3 gross=-4.2bps net=-16.2bps [-20.3,-11.7] $/t@150=-0.2424 exBTC net=-16.3bps [-20.6,-11.9] fund=-0.01bps medH=170bps
+M3 5m wide-range-bar continuation SHORT TP=1.0H SL=0.5H: n=2072 (230.2/wk all syms) TP%=27.1 SL%=65.2 TIME%=7.7 gross=-12.4bps net=-24.5bps [-30.1,-18.8] $/t@150=-0.3675 exBTC net=-24.7bps [-30.6,-18.5] fund=0.11bps medH=300bps
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/pandas/core/indexes/datetimes.py", line 578, in _disallow_mismatched_indexing
+    self._data._assert_tzawareness_compat(key)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/pandas/core/arrays/datetimes.py", line 788, in _assert_tzawareness_compat
+    raise TypeError(
+        "Cannot compare tz-naive and tz-aware datetime-like objects"
+    )
+TypeError: Cannot compare tz-naive and tz-aware datetime-like objects
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/private/tmp/claude-501/-Users-jonaspenaso-Desktop/cada294f-0cc3-4fac-8342-724c46c4fb06/scratchpad/swarm/breakout/screen.py", line 131, in <module>
+    sigs={s:fn(tfd[s]) for s in syms}
+            ~~^^^^^^^^
+  File "/private/tmp/claude-501/-Users-jonaspenaso-Desktop/cada294f-0cc3-4fac-8342-724c46c4fb06/scratchpad/swarm/breakout/screen.py", line 117, in m2_signals
+    d=days[i]; row=daily.loc[d]
+                   ~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/pandas/core/indexing.py", line 1192, in __getitem__
+    return self._getitem_axis(maybe_callable, axis=axis)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/pandas/core/indexing.py", line 1432, in _getitem_axis
+    return self._get_label(key, axis=axis)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/pandas/core/indexing.py", line 1382, in _get_label
+    return self.obj.xs(label, axis=axis)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/pandas/core/generic.py", line 4323, in xs
+    loc = index.get_loc(key)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/pandas/core/indexes/datetimes.py", line 598, in get_loc
+    self._disallow_mismatched_indexing(key)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/pandas/core/indexes/datetimes.py", line 580, in _disallow_mismatched_indexing
+    raise KeyError(key) from err
+KeyError: np.datetime64('2026-06-01T00:00:00.000000000')

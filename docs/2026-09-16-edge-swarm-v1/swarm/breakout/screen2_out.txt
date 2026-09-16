@@ -1,0 +1,32 @@
+
+##### SET-A mr_edge 1h 6/1-8/3: 35 syms, 63 days, bars(first sym)=1536 2026-06-01 00:00:00+00:00..2026-08-03 23:00:00+00:00
+== M2 1h prior-NR-day breakout: raw signals=449
+M2 1h prior-NR-day breakout TP=1.0H SL=0.5H hold<=48h: n=385 (42.8/wk) TP%=30.9 SL%=61.8 TIME%=7.3 gross=3.0bps net=-26.7bps CI[-78.7,17.1] $/t@150=-0.401 fund=17.7bps medH=527bps medbars=9
+M2 1h prior-NR-day breakout TP=0.5H SL=0.5H hold<=48h: n=413 (45.9/wk) TP%=52.5 SL%=46.7 TIME%=0.7 gross=23.4bps net=0.9bps CI[-32.2,33.0] $/t@150=0.014 fund=10.4bps medH=970bps medbars=6
+M2 1h prior-NR-day breakout TP=0.5H SL=1.0H hold<=48h: n=363 (40.3/wk) TP%=66.1 SL%=27.8 TIME%=6.1 gross=23.4bps net=-0.4bps CI[-42.1,40.8] $/t@150=-0.006 fund=11.9bps medH=970bps medbars=10
+M2 1h prior-NR-day breakout TP=1.0H SL=1.0H hold<=48h: n=325 (36.1/wk) TP%=38.5 SL%=40.0 TIME%=21.5 gross=-18.1bps net=-51.0bps CI[-122.1,8.2] $/t@150=-0.765 fund=20.9bps medH=870bps medbars=22
+M2 1h prior-NR-day breakout LONG TP=1.0H SL=0.5H: n=169 (18.8/wk) TP%=30.8 SL%=63.3 TIME%=5.9 gross=-8.2bps net=-21.0bps CI[-59.7,16.9] $/t@150=-0.315 fund=0.8bps medH=427bps medbars=7
+M2 1h prior-NR-day breakout SHORT TP=1.0H SL=0.5H: n=216 (24.0/wk) TP%=31.0 SL%=60.6 TIME%=8.3 gross=11.8bps net=-31.2bps CI[-119.7,38.6] $/t@150=-0.468 fund=31.0bps medH=870bps medbars=13
+== M4 1h box-compression breakout: raw signals=141
+M4 1h box-compression breakout TP=1.0H SL=0.5H hold<=48h: n=113 (12.6/wk) TP%=31.0 SL%=68.1 TIME%=0.9 gross=-64.6bps net=-82.5bps CI[-163.0,-19.4] $/t@150=-1.238 fund=5.9bps medH=420bps medbars=6
+M4 1h box-compression breakout TP=0.5H SL=0.5H hold<=48h: n=121 (13.4/wk) TP%=52.9 SL%=47.1 TIME%=0.0 gross=-35.0bps net=-52.4bps CI[-131.7,3.4] $/t@150=-0.786 fund=5.4bps medH=420bps medbars=3
+M4 1h box-compression breakout TP=0.5H SL=1.0H hold<=48h: n=111 (12.3/wk) TP%=70.3 SL%=25.2 TIME%=4.5 gross=0.8bps net=-17.5bps CI[-73.9,27.5] $/t@150=-0.263 fund=6.3bps medH=420bps medbars=6
+M4 1h box-compression breakout TP=1.0H SL=1.0H hold<=48h: n=103 (11.4/wk) TP%=45.6 SL%=43.7 TIME%=10.7 gross=-39.5bps net=-58.4bps CI[-125.2,3.1] $/t@150=-0.877 fund=6.9bps medH=570bps medbars=10
+M4 1h box-compression breakout LONG TP=1.0H SL=0.5H: n=52 (5.8/wk) TP%=38.5 SL%=61.5 TIME%=0.0 gross=-24.0bps net=-36.6bps CI[-121.2,34.1] $/t@150=-0.549 fund=0.6bps medH=495bps medbars=6
+M4 1h box-compression breakout SHORT TP=1.0H SL=0.5H: n=61 (6.8/wk) TP%=24.6 SL%=73.8 TIME%=1.6 gross=-99.3bps net=-121.7bps CI[-256.6,-23.3] $/t@150=-1.825 fund=10.4bps medH=311bps medbars=5
+
+##### SET-B 400d parquet 1h ->5/31: 19 syms, 338 days, bars(first sym)=8130 2025-06-27 06:00:00+00:00..2026-05-31 23:00:00+00:00
+== M2 1h prior-NR-day breakout: raw signals=1684
+M2 1h prior-NR-day breakout TP=1.0H SL=0.5H hold<=48h: n=1416 (29.3/wk) TP%=32.2 SL%=62.0 TIME%=5.8 gross=-1.3bps net=-13.3bps CI[-26.1,0.4] $/t@150=-0.199 fund=-0.1bps medH=1315bps medbars=9
+M2 1h prior-NR-day breakout TP=0.5H SL=0.5H hold<=48h: n=1499 (31.0/wk) TP%=50.4 SL%=48.6 TIME%=1.0 gross=-2.1bps net=-14.2bps CI[-24.4,-4.2] $/t@150=-0.213 fund=0.1bps medH=1270bps medbars=5
+M2 1h prior-NR-day breakout TP=0.5H SL=1.0H hold<=48h: n=1299 (26.9/wk) TP%=65.5 SL%=28.5 TIME%=6.0 gross=3.9bps net=-8.3bps CI[-22.6,7.1] $/t@150=-0.125 fund=0.2bps medH=1316bps medbars=10
+M2 1h prior-NR-day breakout TP=1.0H SL=1.0H hold<=48h: n=1185 (24.5/wk) TP%=43.0 SL%=38.6 TIME%=18.3 gross=6.5bps net=-5.5bps CI[-24.4,14.2] $/t@150=-0.083 fund=0.1bps medH=1490bps medbars=19
+M2 1h prior-NR-day breakout LONG TP=1.0H SL=0.5H: n=730 (15.1/wk) TP%=31.0 SL%=65.6 TIME%=3.4 gross=-14.8bps net=-28.3bps CI[-47.3,-9.4] $/t@150=-0.425 fund=1.5bps medH=1893bps medbars=8
+M2 1h prior-NR-day breakout SHORT TP=1.0H SL=0.5H: n=686 (14.2/wk) TP%=33.5 SL%=58.2 TIME%=8.3 gross=13.0bps net=2.7bps CI[-17.7,23.2] $/t@150=0.041 fund=-1.8bps medH=995bps medbars=9
+== M4 1h box-compression breakout: raw signals=647
+M4 1h box-compression breakout TP=1.0H SL=0.5H hold<=48h: n=531 (11.0/wk) TP%=38.6 SL%=60.6 TIME%=0.8 gross=15.2bps net=3.2bps CI[-11.9,19.2] $/t@150=0.048 fund=-0.1bps medH=1400bps medbars=4
+M4 1h box-compression breakout TP=0.5H SL=0.5H hold<=48h: n=551 (11.4/wk) TP%=53.4 SL%=46.6 TIME%=0.0 gross=2.9bps net=-9.1bps CI[-18.9,1.7] $/t@150=-0.136 fund=-0.1bps medH=1510bps medbars=2
+M4 1h box-compression breakout TP=0.5H SL=1.0H hold<=48h: n=509 (10.5/wk) TP%=67.6 SL%=31.8 TIME%=0.6 gross=-2.4bps net=-14.3bps CI[-29.8,0.3] $/t@150=-0.215 fund=-0.1bps medH=1400bps medbars=4
+M4 1h box-compression breakout TP=1.0H SL=1.0H hold<=48h: n=477 (9.9/wk) TP%=51.6 SL%=44.2 TIME%=4.2 gross=5.4bps net=-6.5bps CI[-27.9,15.4] $/t@150=-0.098 fund=-0.1bps medH=1180bps medbars=8
+M4 1h box-compression breakout LONG TP=1.0H SL=0.5H: n=234 (4.8/wk) TP%=39.3 SL%=59.4 TIME%=1.3 gross=19.6bps net=6.7bps CI[-15.7,29.7] $/t@150=0.100 fund=1.0bps medH=12250bps medbars=4
+M4 1h box-compression breakout SHORT TP=1.0H SL=0.5H: n=297 (6.2/wk) TP%=38.0 SL%=61.6 TIME%=0.3 gross=11.6bps net=0.5bps CI[-19.6,22.0] $/t@150=0.007 fund=-0.8bps medH=468bps medbars=4

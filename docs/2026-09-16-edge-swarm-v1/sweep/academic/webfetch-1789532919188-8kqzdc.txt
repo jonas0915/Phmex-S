@@ -1,0 +1,3453 @@
+Three Essays on Order Flow and
+Cryptocurrency Returns
+by
+Alexia Anastasopoulos
+A thesis
+presented to
+the University of Guelph
+In partial fulfillment of requirements
+for the degree of
+Doctor of Philosophy
+in
+Economics
+Guelph, Ontario, Canada
+©Alexia Anastasopoulos, December, 2025
+Abstract
+Three Essays on Order Flow and Cryptocurrency Returns
+Alexia Anastasopoulos Advisors:
+University of Guelph, 2025 Nikola Gradojevic
+Fred Liu
+Alex Maynard
+Ilias Tsiakas
+We assess the information content of order flow in the emerging cryptocurrency mar-
+ket. Our analysis is based on a large cross-section of cryptocurrencies and a set of
+international order flows denominated in 11 major currencies that reflect world order
+flow. We find that world order flow has strong explanatory power for contempora-
+neous cryptocurrency returns. Using machine learning techniques for out-of-sample
+prediction, we also find that order flow has high predictive ability for daily cryp-
+tocurrency returns. For example, long-short portfolios sorted on machine learning
+forecasts conditioning on daily order flow exhibit an alpha of up to 0 .79% per day
+with an annualized Sharpe ratio of 3 .63. Order flow tends to dominate economic
+fundamentals for prediction, especially in the context of non-linear machine learning
+models, and its performance cannot be explained by economic restrictions such as
+short-sale constraints, transaction costs or limits to arbitrage. Overall, we provide
+comprehensive evidence indicating order flow has a permanent effect for cryptocur-
+rency returns.
+ii
+Acknowledgments
+First and foremost, I would like to thank my supervisors, Ilias Tsiakas, Alex Maynard,
+Fred Liu and Nikola Gradojevic for their continued support throughout this process.
+This would not have been possible without your careful guidance and encouragement
+every step of the way. I would also like to give special thanks to Hong Li and Ba
+Chu for their valuable feedback as internal and external examiners. Finally, I would
+like to thank the rest of the Economics department at Guelph for their insightful
+comments and suggestions over the past five years which have added to the quality
+of this research.
+iii
+Table of Contents
+Abstract . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . ii
+Acknowledgments . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . iii
+Table of Contents . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . iv
+List of Tables . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . viii
+List of Figures . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . x
+1 In-Sample Analysis of Order Flow and Cryptocurrency Returns 1
+1.1 Introduction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 1
+1.2 Data . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+1.2.1 Cryptocurrency Returns . . . . . . . . . . . . . . . . . . . . . 7
+1.2.2 Order Flow . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+1.2.3 Control Variables . . . . . . . . . . . . . . . . . . . . . . . . . 11
+1.2.4 Summary Statistics . . . . . . . . . . . . . . . . . . . . . . . . 11
+1.3 In-Sample Analysis . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+iv
+1.3.1 Panel Regressions with World Order Flow . . . . . . . . . . . 13
+Contemporaneous Regressions . . . . . . . . . . . . . . . . . . 13
+Predictive Regressions . . . . . . . . . . . . . . . . . . . . . . 15
+1.3.2 Panel Regressions with All International Order Flows . . . . . 17
+Contemporaneous Regressions . . . . . . . . . . . . . . . . . . 18
+Predictive Regressions . . . . . . . . . . . . . . . . . . . . . . 19
+1.3.3 Panel Regression Robustness Using Cryptocompare Returns . 19
+1.4 Conclusion . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21
+2 Predicting the Cryptocurrency Cross-Section with Machine Learn-
+ing 36
+2.1 Introduction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+2.2 Data Overview . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 42
+2.3 Machine Learning Models . . . . . . . . . . . . . . . . . . . . . . . . 43
+2.3.1 Model Descriptions . . . . . . . . . . . . . . . . . . . . . . . . 44
+2.3.2 Linear Regression . . . . . . . . . . . . . . . . . . . . . . . . . 45
+2.3.3 Penalized Linear Regression: Ridge, Lasso and Elastic Net . . 46
+2.3.4 Principal Component Regression . . . . . . . . . . . . . . . . 47
+2.3.5 Random Forest and Gradient Boosted Regression Trees . . . . 48
+2.3.6 Neural Networks . . . . . . . . . . . . . . . . . . . . . . . . . 51
+2.3.7 Forecast Combinations . . . . . . . . . . . . . . . . . . . . . . 54
+v
+2.3.8 Robust Huber Objective Function . . . . . . . . . . . . . . . . 54
+2.4 Hyperparameter Tuning . . . . . . . . . . . . . . . . . . . . . . . . . 55
+2.4.1 Estimation Procedure and Performance Evaluation . . . . . . 57
+2.4.2 Out-of-Sample Performance . . . . . . . . . . . . . . . . . . . 59
+2.5 The Economic Value of Order Flow . . . . . . . . . . . . . . . . . . . 61
+2.5.1 Portfolio Sorts . . . . . . . . . . . . . . . . . . . . . . . . . . . 61
+2.5.2 Portfolio Performance . . . . . . . . . . . . . . . . . . . . . . 63
+Sorting on Order Flow . . . . . . . . . . . . . . . . . . . . . . 63
+Sorting on ML Forecasts . . . . . . . . . . . . . . . . . . . . . 65
+2.6 Conclusion . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 68
+3 Predictability of Order Flow for Cryptocurrency Returns: A Deeper
+Dive 75
+3.1 Introduction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 75
+3.2 Data Overview . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 80
+3.3 Nature of the Relationship Between Order Flow and Returns . . . . . 81
+3.3.1 Non-linear Prediction . . . . . . . . . . . . . . . . . . . . . . . 81
+3.3.2 V AR models . . . . . . . . . . . . . . . . . . . . . . . . . . . . 83
+3.4 Economic Restrictions and Limits to Arbitrage . . . . . . . . . . . . . 86
+3.4.1 Short-sale Constraints, Drawdowns, and Transaction Costs . . 86
+3.4.2 Limits to Arbitrage . . . . . . . . . . . . . . . . . . . . . . . . 89
+vi
+3.4.3 Top 10 Coins . . . . . . . . . . . . . . . . . . . . . . . . . . . 92
+3.5 Conclusion . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 94
+References 105
+vii
+List of Tables
+1.1 List of All Cryptocurrencies . . . . . . . . . . . . . . . . . . . . . . . 23
+1.2 Variance Decomposition of World Order Flow . . . . . . . . . . . . . 24
+1.3 Summary Statistics . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+1.4 Mean Returns Across Time . . . . . . . . . . . . . . . . . . . . . . . 26
+1.5 Contemporaneous Panel Regressions with World Order Flow . . . . . 27
+1.6 Predictive Panel Regressions with World Order Flow . . . . . . . . . 28
+1.7 Contemporaneous Panel Regressions with All International Order Flows 29
+1.8 Predictive Panel Regressions with All International Order Flows . . . 30
+1.9 Predictive Panel Regressions: Cryptocompare.com (CC) Data . . . . 31
+1.10 Predictive Panel Regressions with All International Order Flows: CC
+Data . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 32
+1.11 Contemporaneous Panel Regressions with US Order Flow . . . . . . . 34
+1.12 Predictive Panel Regressions with US Order Flow . . . . . . . . . . . 35
+2.1 Hyperparameters . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 69
+viii
+2.2 Out-of-Sample Statistical Performance . . . . . . . . . . . . . . . . . 70
+2.3 Portfolios Sorted on World Order Flow . . . . . . . . . . . . . . . . . 71
+2.4 Portfolios Sorted on US Order Flow . . . . . . . . . . . . . . . . . . . 72
+2.5 Daily Portfolios Sorted on ML Forecasts . . . . . . . . . . . . . . . . 74
+3.1 Predictive Panel Regressions: Non-linear and Interaction Terms . . . 96
+3.2 Predictive Panel Regressions: Non-linear Terms - Test Sample Period 97
+3.3 V AR Results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 98
+3.4 V AR Results: BTC and XRP . . . . . . . . . . . . . . . . . . . . . . 99
+3.5 The Performance of Long vs Long-Short Portfolios . . . . . . . . . . . 100
+3.6 Double-Sorted Portfolios . . . . . . . . . . . . . . . . . . . . . . . . . 101
+3.7 Double-Sorted Portfolios - Economic Fundamentals . . . . . . . . . . 102
+3.8 Top 10 Coins Only: Out-of-Sample Statistical Performance . . . . . . 103
+3.9 Top 10 Coins Only: Daily Portfolios Sorted on ML Forecasts . . . . . 104
+ix
+List of Figures
+2.1 The Cumulative Return of Long-Short Portfolios . . . . . . . . . . . . 73
+x
+Chapter 1
+In-Sample Analysis of Order Flow
+and Cryptocurrency Returns
+1.1 Introduction
+The emergence of the cryptocurrency market over the past decade has been accompa-
+nied by remarkable growth. Market capitalization has increased from $11 billion US
+dollars (USD) in 2014 to a peak of $2.9 trillion USD in 2021. Similarly, daily trading
+volume has risen from $40 million USD in 2014 to a peak of $308 billion USD in
+2021. Unlike traditional foreign exchange markets, where trading volume is concen-
+trated among a few major dealers (Menkhoff et al., 2016), cryptocurrency markets
+consist of independently owned, non-integrated exchanges that operate in parallel
+across countries and multiple currencies (Makarov and Schoar, 2020). Furthermore,
+1
+cryptocurrency markets are relatively less liquid and face more pervasive asymmetric
+information compared to traditional markets (Bianchi, Babiak and Dickerson, 2022).
+These unique features make cryptocurrency markets a novel setting for studying the
+role of order flow in the price formation process. 1
+In this context, this paper contributes to the emerging cryptocurrency literature by
+assessing the information content of order flow for explaining and predicting cryp-
+tocurrency returns. Specifically, we address three related questions. First, can order
+flow explain the cross-section of cryptocurrency returns? Second, does order flow con-
+vey predictive information for the cross-section of cryptocurrency returns? Lastly,
+is there valuable information contained in international order flows that can not be
+explained by US order flow? Addressing these questions is relevant to the study of
+market microstructure and paves the way for a deeper investigation into the eco-
+nomic mechanisms driving order flow and price discovery in cryptocurrency markets.
+Although for traditional financial markets these questions have been addressed by
+a long line of research, for cryptocurrencies they remain open. Accordingly, by fo-
+cusing on the information conveyed by order flow in the cryptocurrency market, this
+paper bridges a gap in the literature.
+There are several studies related to the theory and empirical evidence on the effect
+of order flow on fiat exchange rates. For example Evans and Lyons (2002, 2005) pro-
+1 According to coinmarketcap.com, the market capitalization of the cryptocurrency market on
+January 1, 2014 was $10.8 billion USD and subsequently peaked on November 8, 2021 at $2.9
+trillion USD. Daily volume was $40.2 million USD on January 1, 2014 and peaked on April
+16, 2021 at $308 billion USD. This trading volume was spread across more than 700 exchanges
+operating in various countries and transacting in over 50 fiat currencies.
+2
+pose a theoretical model relating order flow to exchange rates and provide empirical
+evidence showing order flow plays a significant role in the Deutsche mark/dollar mar-
+ket. They find order flow explains up to 50% of the variation in exchange rates and
+produces out-of-sample forecasts that beat the random walk. Berger et al. (2008) use
+high-frequency intraday data and find a strong positive relationship between order
+flow and returns for time intervals ranging from one minute to one day. However,
+they find no evidence of predictive power for order flow on future exchange rates be-
+yond the one-minute frequency. Menkhoff et al. (2016) focus on a broad range of fiat
+currencies and examine disaggregated segments of foreign exchange end-users. They
+find order flows contain highly significant predictive information, but the degree of
+predictability differs between end-user segments. 2
+Order flow is a measure of the net demand for a particular cryptocurrency defined
+in this study as the log difference between buyer-initiated and seller-initiated trans-
+action volume denominated in a particular fiat currency over a period of time. In
+general, there are three economic views on the extent to which order flow may be
+related to cryptocurrency returns. First, it is possible that order flow is in fact unre-
+lated to cryptocurrency returns. In this case, it is economic fundamentals, not order
+flow, that may explain and predict cryptocurrency returns. We refer to this view
+as the “no-predictability view” and it is essentially the null hypothesis tested in our
+2 For further evidence of the effect of order flows in foreign exchange markets see Evans (2010),
+Rime, Sarno and Sojli (2010) and Evans and Rime (2012). For US treasury markets see Brandt
+and Kavajecz (2004), for the S&P 500 futures market see Deuskar and Johnson (2011), and
+for NYSE stocks see Chordia, Roll and Subrahmanyam (2002), Goyenko, Holden and Trzcinka
+(2009), and Hendershott and Menkveld (2014).
+3
+empirical analysis.
+Second, it is possible that order flow has a transitory effect on cryptocurrency returns.
+In this case, order flow has a temporary but not a permanent effect. The market
+microstructure literature associates transitory effects with changes in liquidity, price
+pressure and temporary preference shocks (see, e.g., Froot and Ramadorai, 2005, and
+Menkhoff et al., 2016). We refer to this view as the “transitory view.”
+Finally, third, it is possible that order flow has a permanent effect on cryptocur-
+rency returns. The market microstructure literature associates permanent effects
+with asymmetric information among market participants so that trades convey in-
+formation with a persistent effect on security prices (see, e.g., Glosten and Milgrom,
+1985, Kyle, 1985, and Hasbrouck, 1988, 1991). According to this view, if trades con-
+vey information about future economic fundamentals that is not currently known by
+all market participants, then order flow acts as the key vehicle that impounds this
+information into cryptocurrency returns through the process of price discovery (see,
+e.g., Evans and Lyons, 2002, 2005, and Menkhoff et al., 2016). We refer to this view
+as the “permanent view.”
+Our empirical analysis employs daily data from a cross-section of 84 cryptocurrencies
+for the sample period of January 1, 2018 to June 30, 2022. We use a rich dataset
+of order flows denominated in 11 fiat currencies, including the G10 currencies plus
+South Korea, which is a prominent center for cryptocurrency trading. We then
+form a measure of world order flow by aggregating the 11 international order flows.
+Accordingly, our analysis assesses the information content of world order flow and
+4
+disaggregated international order flows, including US order flow. In what follows, we
+discuss our empirical approach and main findings step by step.
+We begin by estimating panel regressions to assess whether order flow can explain
+and predict cryptocurrency returns in sample. The aim of this analysis is not to
+prove causality but to examine the explanatory and predictive power of order flow
+for returns. The panel regressions condition on combinations of world order flow and
+the 11 international order flows together with a set of coin-specific control variables
+and economic fundamentals. The economic fundamentals included are based on
+what has been widely used in the literature (see for e.g.Welch and Goyal, 2008). We
+estimate contemporaneous and predictive panel regressions at the daily and weekly
+frequency.
+With respect to the in-sample evidence, our main finding is that world order flow
+has significant explanatory and predictive power for the cross-section of cryptocur-
+rency returns. The contemporaneous relation of world order flow and cryptocurrency
+returns is positive and highly significant. World order flow together with control vari-
+ables can explain about 10% of daily returns and 20% of weekly returns.
+For predictive regressions, it is crucial to separate two opposing components of order
+flow: a transitory component that reverses in the short term and a permanent com-
+ponent that persists over the long term. Following Bianchi, Babiak and Dickerson
+(2022), we use lagged returns as a proxy for short-term reversal. In other words, the
+predictive regressions condition on lagged order flow, while controlling for lagged re-
+turns. We find that the portion of lagged order flow that is uncorrelated with lagged
+5
+returns has a positive and significant predictive relation with future returns. The
+positive coefficient of world order flow for both daily and weekly returns provides
+empirical support for the permanent view.
+In considering all international order flows, world order flow consistently exhibits
+the highest and most significant coefficient compared to all international order flows.
+In contemporaneous regressions, the US order flow is also significant. In predictive
+regressions, however, the significance of the US order flow disappears in the presence
+of world order flow. Overall, these findings indicate that world order flow is a more
+powerful and significant predictor than any of the individual international order flows
+in the context of in-sample panel regressions.
+In summary, our analysis provides compelling empirical evidence to establish that
+order flow has strong explanatory and predictive power in an in-sample setting. Our
+findings indicate that order flow has a permanent effect for cryptocurrency returns
+since this effect is consistently positive and stronger for weekly compared to daily
+returns.
+Our empirical analysis is related to the study of Makarov and Schoar (2020), who
+examine the relation between bitcoin returns and order flow. However, the focus
+of Makarov and Schoar (2020) is on assessing arbitrage opportunities across cryp-
+tocurrency exchanges. Therefore, it substantially differs from our study since it only
+focuses on one coin. In general, our approach is distinct from the existing literature
+as indicated by the use of a large cross-section of coins and a large cross-section of
+order flows denominated in different fiat currencies.
+6
+The remainder of the paper is organized as follows. In the next section, we describe
+the cryptocurrency data and define order flow. In Section 3, we describe the in-sample
+panel regression framework for explaining and predicting cryptocurrency returns.
+Finally, we conclude in Section 4.
+1.2 Data
+1.2.1 Cryptocurrency Returns
+Our empirical analysis employs data from a cross-section of 84 cryptocurrencies for
+the sample period of January 1, 2018 to June 30, 2022. For each cryptocurrency
+(crypto or coin), we collect daily US dollar (USD) prices from coinmarketcap.com
+(henceforth CMC) at 00:00am GMT time. The CMC data aggregates prices from
+over 700 exchanges and is a reliable source of data that is used extensively in the
+cryptocurrency literature (for a detailed description of the CMC data, see, e.g., Liu
+and Tsyvinski, 2021 and Liu, Tsyvinski and Wu, 2022). We exclude weekends and
+US holidays from the daily sample.
+The CMC database contains data on thousands of coins but most have low market
+capitalization and/or limited historical data. To obtain the final cross-section of
+84 coins, we impose three criteria to ensure the liquidity of our sample. First, we
+require that coins must have a market capitalization of greater than 1 million USD on
+the first day of the sample period. Second, coins must be continuously traded with
+7
+a non-zero price and non-zero volume in each time period of our sample. Finally,
+third, we exclude all stable coins from the cross-section. As a result, we are left with
+a balanced panel of 84 coins, which are listed in Table 1.1. 3
+We use daily prices to compute returns:
+ri,t = Pi,t
+Pi,t−1
+− 1, (1.1)
+where Pi,t is the price of coin i at time t. Weekly crypto returns are defined over
+the interval beginning on Saturday at 00:00am GMT time and ending the following
+Friday at 11:59pm GMT for a total of seven days including weekends.
+1.2.2 Order Flow
+Our primary variable of interest is order flow, which is defined as the log differ-
+ence between buyer-initiated and seller-initiated transaction volume denominated in
+a particular fiat currency over a period of time. We compute order flow using data
+on signed volume (buy-volume and sell-volume) obtained from cryptocompare.com
+(henceforth CC). CC is a reliable source for cryptocurrency volume data (see, e.g.,
+3 We set January 2018 as the beginning of the sample to allow for a reasonable number of
+observations across time, while maintaining a reasonably large cross-section of coins. Starting
+earlier than 2018 severely limits the breadth of the balanced cross-section. Notably, the number
+of coins in our sample is similar to other studies that predict crypto returns. For example,
+Filippou, Rapach and Thimsen (2024) includes 41 coins, while the number of coins in Cakici
+et al. (2024) dynamically ranges from approximately 30 to 300.
+8
+Bianchi, Babiak and Dickerson, 2022). CC aggregates information from over 300 ex-
+changes and provides data on signed volume that is not available on CMC. Through-
+out our analysis, we use crypto data from CMC except for signed volume (i.e., order
+flow) that is only available from CC.
+A critical advantage of the CC data is that they provide signed volume data de-
+nominated in several fiat currencies. In our analysis, we compute the order flow
+denominated in each of the G10 currencies plus South Korea. We add South Korea
+to the sample because it is a prominent centre for trading cryptocurrencies outside
+of the G10. We designate this group as the G11 currencies, which include the fol-
+lowing: US dollar (USD), Euro (EUR), British pound (GBP), Japanese yen (JPY),
+Swiss frank (CHF), Canadian dollar (CAD), Australian dollar (AUD), New Zealand
+dollar (NZD), Norwegian krone (NOK), Swedish krona (SEK) and the Korean won
+(KR W).
+We compute a measure of order flow that is comparable across cryptocurrencies.
+Following Menkhoff et al. (2016), we standardize each series as follows:
+OFi,t = ofi,t
+σ(ofi,t−29:t) , (1.2)
+where OFi,t denotes the standardized order flow of coin i at time t, ofi,t is the original
+order flow, and σ(ofi,t−29:t) is the order flow volatility over the last 30 days. Due to
+the standardization, the first day of our sample becomes February 14, 2018. 4
+4 We also computed a truncated version of the standardized order flow to address the potential
+of large spikes in volatility. The regression results did not change significantly when using
+9
+In addition to the 11 international order flows, we also define an aggregate measure
+that we term world order flow (OF W ). World order flow is computed by aggregating
+all 11 buy-volumes and all 11 sell-volumes, taking the log difference, and performing
+the same standardization as applied to the disaggregated order flows.
+To assess the contribution of each cryptocurrency to world order flow, we conduct a
+variance decomposition as follows:
+V CW
+i = β2
+i V ar(OFi)P11
+j=1 β2
+j V ar(OFj)
+, (1.3)
+where V CW
+i is the variance contribution of coin i to world order flow, βi is the
+estimated coefficient of each order flow when regressing world order flow on its 11
+components, and V ar(OFi) is the variance of each order flow.
+The variance decomposition results are reported in Table 1.2. For daily data, US
+order flow has the highest variance contribution at 38%. The second contribution is
+from South Korea at 23%. This motivates our decision to add South Korea to the
+G10 order flows. The euro is third at 11% followed by the British pound at about 6%.
+Overall, world order flow is dominated by few countries since the top two contribute
+61% to the total variance, whereas the top three contribute 72%. The weekly V Cs
+are similar to the daily V Csbut now the top three order flows contribute 79% to
+world order flow.
+truncated vs non-truncated order flow.
+10
+1.2.3 Control Variables
+We use a combination of coin-specific variables and economic fundamentals as con-
+trols in the empirical analysis. The coin-specific variables include market capitaliza-
+tion (henceforth market cap), total volume and volatility. Total volume is the sum
+of a coin’s 24-hour trading volume across all exchanges. Volume and market cap are
+expressed in logs. Volatility is defined as the log difference between a coin’s high
+price and low price on a given day. As mentioned earlier, all coin-specific data other
+than order flow are obtained from CMC.
+The economic fundamentals used in our analysis include the following. The short
+rate is defined as the 3-month US T-bill rate. The term spread is defined as the
+difference between the 10-year and 3-month US treasury rates. The default spread is
+defined as the difference between the BAA- and AAA-rated corporate bond yields.
+All interest rate data are obtained from the Federal Reserve Bank of St. Louis. The
+TED spread is defined as the difference between the 3-month T-Bill rate and the 3-
+month LIBOR rate, which is obtained from the LSEG Eikon database. The S&P 500
+index returns (including dividends) are from the CRSP database. The MSCI global
+index returns are taken from msci.com. The VIX index is obtained from CBOE.com.
+1.2.4 Summary Statistics
+In Tables 1.3 and 1.4 we report summary statistics for all coin-specific variables:
+returns, US and world order flow, market cap, volume and volatility. The tables
+11
+report results for all 84 coins as well as for the top 10 coins by market cap on the
+first day of the sample. In brief, our main findings from table 1.3 are as follows:
+(1) daily cryptocurrency returns are extremely volatile with high positive skewness
+and very high kurtosis; (2) daily standardized order flow is well behaved relative to
+returns since it exhibits low skewness and moderate kurtosis; (3) the coins exhibit
+higher volatility, skewness and kurtosis in the time-series than the cross-section; and
+(4) the average full-sample cryptocurrency return is equal to 0.21% per day or 52.9%
+per year. Table 1.4 further highlights the volatility of returns. The crypto market
+performed worst during 2018 and 2022 with average daily returns of −0.52% and
+−0.62% respectively. The best performing year was 2021 with an average daily
+return of 0 .91%.
+1.3 In-Sample Analysis
+Our empirical approach is based on balanced panel regressions. This section presents
+the in-sample panel regression results on the effect of order flow in explaining and
+predicting cryptocurrency returns. We begin with explanatory and predictive re-
+gressions that include world order flow followed by regressions with all international
+order flows. Finally, we briefly discuss the results of the panel regressions which in-
+clude US order flow. We note that the objective of this study is not to develop fully
+specified explanatory and predictive models of cryptocurrency returns, but rather to
+assess whether order flow exhibits statistically significant explanatory and predictive
+power. Accordingly, while potential endogeneity and dynamic panel bias are ac-
+12
+knowledged, advanced estimators such as GMM or instrumental variable approaches
+are not employed, as the focus lies on inference regarding the marginal effect of or-
+der flow within a consistent fixed-effects framework. To address the possibility of
+reverse causality, a complementary vector autoregression (V AR) framework is later
+employed in chapter 3 to examine the potential bidirectional relationship between
+order flow and returns.
+1.3.1 Panel Regressions with World Order Flow
+Contemporaneous Regressions
+Can world order flow explain cryptocurrency returns? We address this question by
+estimating panel regressions that condition on contemporaneous world order flow
+and the control variables. The panel regressions are estimated using the full sample
+ranging from February 14, 2018 to June 30, 2022, and include coin fixed effects. The
+t-statistics shown in all panel regressions are computed using standard errors which
+are clustered by time and by coin. The results for both daily and weekly data are
+reported in Table 1.5. 5
+Our main empirical finding is that world order flow has a positive contemporaneous
+relation to returns, which is highly significant in all cases. Therefore, world order
+flow does explain cryptocurrency returns. For example, in the presence of control
+variables, a one standard deviation increase in world order flow is associated with a
+5 In the Appendix, we also report detailed results for US order flow.
+13
+2.2% increase in returns at the daily frequency and a 4 .0% increase at the weekly
+frequency. These results are highly significant, as the t-statistic is equal to 10 .44 for
+daily regressions and 8 .29 for weekly regressions. Our results align with Makarov
+and Schoar (2020), who find a positive contemporaneous relation between order flow
+and bitcoin returns in daily regressions. We show that this positive relation holds
+across a broad cross-section of cryptocurrencies and demonstrate that it also persists
+in weekly regressions.
+It is interesting to note that the weekly coefficient is larger than the daily coefficient
+and this is also true for the ¯R2. Specifically, the ¯R2 is equal to 10 .4% for daily
+regressions and 19.6% for weekly regressions. A possible explanation for the stronger
+weekly results is that order flow at the daily horizon may include uninformed traders
+(also referred to as liquidity or noise traders). Since the trades of uninformed traders
+are driven primarily by liquidity preferences than information, the effect of these
+traders on the price tends to be transitory. Aggregating order flow over one week
+mitigates the effect of market microstructure noise. Consequently, order flow may
+explain a greater variation of price movements at the weekly than the daily horizon.
+This is in line with a long literature on market microstructure, which distinguishes
+between informed and uninformed traders and assesses the effect of information-
+based trading on asset prices. See, for example, Glosten and Milgrom (1985), Easley
+and O’Hara (1987), and Easley et al. (1996).
+In addition to order flow, several control variables are also significant. For daily
+regressions, volume and volatility are significant. For weekly regressions, market
+cap, volume, volatility, the S&P 500 return, the MSCI global index return and the
+14
+term spread are all significant. In conclusion, world order flow has strong and highly
+significant explanatory power for the cross-section of cryptocurrency returns in the
+presence of crypto-specific control variables and standard economic fundamentals.
+Predictive Regressions
+Can world order flow predict cryptocurrency returns? We address this question by
+estimating the same panel regressions as previously but with lagged values for all
+independent variables. Specifically, we condition on the same control variables plus
+lagged cryptocurrency returns. Short-term returns exhibit a negative autocorrelation
+due to transitory effects such as price pressure and other short-term liquidity effects,
+resulting in reversal, i.e., a negative relation between lagged and future returns.
+Table 1.5 shows that lagged order flow is positively (contemporaneously) related to
+lagged returns, suggesting that order flow has two opposing components: a transitory
+component that reverses in the short term and a permanent component that persists
+in the long term. Following Bianchi, Babiak and Dickerson (2022), we use lagged
+returns as a proxy for short-term liquidity effects, and assess the predictive relation
+of lagged order flow with future returns, while controlling for lagged returns.
+The results reported in Table 1.6 indicate that world order flow is a highly significant
+predictor of both one-day ahead and one-week ahead cryptocurrency returns. The
+daily predictive regressions exhibit an interesting pattern. Lagged order flow on its
+own is not significant (t-stat=0.62). However, after controlling for lagged returns,
+it is highly significant (t-stat=2.58). In contrast, lagged returns have a negative
+15
+and significant effect (t-stat=-3.25). These findings confirm that lagged order flow
+has two opposing components: the transitory component correlated with lagged
+returns that exhibits short-term reversal, and a permanent component, uncorrelated
+to lagged returns, that is positively related to future returns. By conditioning on
+both lagged order flow and lagged returns, we uncover the positive predictive ability
+of daily world order flow.
+For the weekly predictive regressions, world order flow has a consistent positive
+and significant predictive power for future returns whether we condition on lagged
+returns or not. Weekly lagged returns still exhibit a negative coefficient but it is
+not significant. This aligns with transitory effects exerting a stronger impact on
+prices at the daily horizon, while at the weekly horizon, permanent effects such as
+adverse selection become more dominant. Accordingly, the component of lagged
+weekly order flow that is uncorrelated with lagged weekly returns appears to be
+the dominant component of weekly order flow leading to consistently positive and
+significant predictions.
+The strong positive predictive effect of world order flow on both daily and weekly
+returns is consistent with the permanent view. Our findings provide evidence against
+both the non-predictability and the transitory view. Specifically, in the full speci-
+fication that includes the control variables, an increase in lagged world order flow
+by one standard deviation is associated with a 0.2% increase in daily returns and a
+0.9% increase in weekly returns. The increasing strength of this predictive relation
+for longer horizons provides empirical support for the permanent view of the effect
+of order flow on cryptocurrency returns.
+16
+Relevant to our analysis, Makarov and Schoar (2020) study the relation between
+order flow and future returns specifically for bitcoin. They find a significant negative
+relation between order flow and one-day-ahead returns, and a positive but statisti-
+cally insignificant relation with one-week-ahead returns. In this context, by using
+a broad cross-section of cryptocurrencies, our approach reveals the full predictive
+power of order flow.
+In addition to order flow and lagged returns, several control variables are significant
+in the predictive regressions. For the daily predictive regressions, the market cap,
+volatility and the short rate are significant. For the weekly predictive regressions,
+the market cap, volume, volatility and the MSCI global index return are significant.
+Finally, note that the daily predictive regression delivers an ¯R2 = 1 .2% and the
+weekly predictive regressions an ¯R2 = 3.3%.
+1.3.2 Panel Regressions with All International Order Flows
+In addition to panel regressions conditioning on just world order flow, we also esti-
+mate panel regressions that condition on all 11 international order flows. The panel
+regressions are set up in the same way as previously and condition on the same con-
+trol variables. We estimate two types regressions: one with just the 11 international
+order flows and one with the 11 order flows plus the aggregate world order flow.
+We use daily and weekly data and repeat for both contemporaneous and predictive
+17
+regressions.6
+Contemporaneous Regressions
+The results from contemporaneous regressions are shown in Table 1.7. Our main
+finding is that, for both daily and weekly returns, world order flow has the highest
+and most significant coefficient. Specifically, a one standard deviation increase in
+world order flow is associated with a 1.9% increase in returns at the daily horizon
+(t-stat=11.03) and a 2.9% increase at the weekly horizon (t-stat=7.01). Other than
+world order flow, US and Korean order flows remain significant in all specifications.
+The full set of order flows together with the control variables explain 11.4% of daily
+crypto returns and 20.3% of weekly returns.
+These results justify the use of disaggregated international order flows (including US
+order flow) over and above world order flow. They also motivate the inclusion of
+South Korea to the sample since it is consistently significant. In short, the empirical
+evidence indicates that order flows on a global scale have explanatory power for
+contemporaneous cryptocurrency returns. 7
+6 Note that regressions which condition on the 11 international order flows plus world order flow
+do not suffer from multicollinearity due to the standardization of all order flows. Specifically,
+if we regress the standardized world order flow on its 11 standardized components, the R2 is
+equal to 0.50.
+7 Our analysis disaggregates world order flow by currency. This is similar to the foreign exchange
+literature, where several studies use disaggregated order flows by counterparty type (e.g.,
+customer types). See, for example, Evans and Lyons (2005) and Menkhoff et al. (2016).
+18
+Predictive Regressions
+Turning to the predictive regressions, the results reported in Table 1.8 indicate that
+world order flow still has the highest and most significant coefficient. Now, a one
+standard deviation increase in world order flow is associated with a 0.2% increase
+in future daily returns (t-stat=2.92) and a 0.6% increase in future weekly returns
+(t-stat=2.49). For the predictive regressions, few of the international order flows are
+significant: South Korea, Canada and Sweden for daily returns, and the Euro and
+Sweden for weekly returns. Notably, US order flow is not significant in the presence
+of world order flow, which motivates the focus of our main analysis on world rather
+than US order flow. The ¯R2 is equal to 1.2% for daily predictive regressions and
+3.4% for weekly predictive regressions. This indicates that there is higher predictive
+power associated with weekly than daily returns. In conclusion, our main finding is
+that world order flow is a more powerful and significant predictor than any of the
+individual order flows in the context of in-sample panel regressions. 8
+1.3.3 Panel Regression Robustness Using Cryptocompare
+Returns
+Our main analysis employs USD returns data from coinmarketcap.com (CMC). In
+this section, we assess the predictive power of domestic and world order flow using
+8 For brevity, we do not report the coefficient estimates for the control variables in the panel
+regressions with international order flows. These coefficients are largely the same as with just
+world order flow.
+19
+returns data from cryptocompare.com (CC). An advantage of CC data is that returns
+are available in different fiat currency denominations, which is a proxy for country-
+specific prices. Specifically, we use the CCCAGG prices from the CC database, which
+only take direct trading pairs into consideration. For example the CCCAGG BTC-
+EUR price only reflects trades from exchanges trading BTC-EUR directly. Therefore,
+the CC country-specific prices are meaningfully different from simply using fiat ex-
+change rates to convert USD prices to another fiat currency denomination because
+they reflect different trades.
+In Table 1.9, we report results from predictive panel regressions using daily and
+weekly returns denominated in USD, EUR and KR W. For both daily and weekly
+returns, we estimate two panel regressions: one regression conditions on lagged
+domestic order flow and lagged returns only, and a second regression additionally
+conditions on lagged world order flow. This allows us to directly test whether, for
+example, EUR returns are driven by EUR order flow or world order flow or both.
+For further robustness, in Table 1.10, we use the same data to also condition on all
+international order flows.9
+The results reported in Table 1.9 indicate that world order flow is consistently sig-
+nificant in all regressions but domestic order flow is not. Specifically, domestic order
+flow on its own is significant for Korea and for weekly returns but it is not significant
+for daily USD and EUR returns.10 These results are consistent with our main finding
+9 The CC returns exhibit substantially more outliers than CMC returns. Accordingly, in the
+panel regressions reported in Tables 1.9 and 1.10, we winsorize the CC returns at 1%.
+10 Korean exchanges are known to trade cryptocurrencies at a higher price than US exchanges
+20
+that world order flow has significant predictive power in all cases but domestic and
+international order flows are occasionally significant. We conclude, therefore, that
+whether we use USD data from CMC or country-specific data from CC, global price
+discovery matters more than domestic price discovery for cryptocurrency returns.
+The remainder of our analysis continues to be based on USD CMC returns.
+1.4 Conclusion
+The meteoric rise of cryptocurrencies as a new investment asset class has triggered
+an emerging literature in financial economics. The foreign exchange literature has
+established order flow as a prominent predictor of fiat currency returns representing
+the microstructure approach to exchange rate prediction as an alternative to models
+conditioning on standard economic fundamentals. For cryptocurrencies, however,
+there is a gap in the literature as there is little work on the ability of order flow
+to explain and predict cryptocurrency returns. Our analysis contributes to this
+literature by highlighting the role of order flow for return prediction over and above
+standard economic fundamentals.
+We find that order flow matters both for explaining and for predicting the cross-
+section of cryptocurrency returns. World order flow has a strong contemporaneous
+and predictive relation to cryptocurrency returns in the context of in-sample panel
+regressions. Specifically, the ¯R2 is equal to 10.4% for daily regressions and 19 .6% for
+in what is known as the Kimchi premium (see, e.g., Makarov and Schoar, 2020).
+21
+weekly regressions. A one standard deviation increase in world order flow is associ-
+ated with a 2 .2% increase in returns at the daily frequency and a 4 .0% increase at
+the weekly frequency. Our predictive models show an increase in lagged world order
+flow by one standard deviation is associated with a 0.2% increase in daily returns
+and a 0.9% increase in weekly returns. The strong positive predictive effect of world
+order flow on both daily and weekly returns is consistent with the permanent view.
+In conclusion, our empirical evidence strongly indicates that information conveyed
+by order flow matters for cryptocurrency returns.
+22
+Table 1.1: List of All Cryptocurrencies
+This table lists all 84 cryptocurrencies used in our analysis. The top 10 coins by market capitaliza-
+tion on the first day of the sample (February 14, 2018) are indicated in bold. The CMC full name
+is the name used by coinmarketcap.com.
+Coin CMC Full Name Coin CMC Full Name
+1 ADA Cardano 43 MONA MonaCoin
+2 ADX AdEx 44 MTL Metal DAO
+3 AE Æternity 45 NA V Navcoin
+4 AMB AirDAO 46 NEBL Neblio
+5 ANT Aragon 47 NEO Neo
+6 ARDR Ardor 48 NMR Numeraire
+7 ARK Ark 49 NULS NULS
+8 BAT Basic Attention Token 50 NXS Nexus
+9 BCH Bitcoin Cash 51 NXT Nxt
+10 BNB BNB 52 OAX OAX
+11 BNT Bancor 53 OMG OMG Network
+12 BTC Bitcoin 54 PIVX PIVX
+13 BTG Bitcoin Gold 55 POWR Powerledger
+14 BTM BytomDAO 56 PPC Peercoin
+15 BTS BitShares 57 PPT Populous
+16 CMT CyberMiles 58 PRO Propy
+17 CVC Civic 59 QASH QASH
+18 DASH Dash 60 QSP Quantstamp Token
+19 DATA Streamr 61 QTUM Qtum
+20 DCR Decred 62 REP Augur
+21 DNT district0x 63 RLC iExec RLC
+22 DOGE Dogecoin 64 SAN Santiment Network Token
+23 ENJ Enjin Coin 65 SMART SmartCash
+24 EOS EOS 66 SNC SunContract
+25 ETC Ethereum Classic 67 SNT Status
+26 ETH Ethereum 68 STEEM Steem
+27 ETP Metaverse ETP 69 STORJ Storj
+28 GAS Gas 70 STRAX Stratis [Old]
+29 GNO Gnosis 71 TRX TRON
+30 GRS Groestlcoin 72 VIB Viberate
+31 HC HyperCash 73 VIBE VIBE
+32 ICX ICON 74 VTC Vertcoin
+33 KMD Komodo 75 W ABI Wabi
+34 LBC LBRY Credits 76 W A VES Waves
+35 LINK Chainlink 77 WTC Waltonchain
+36 LRC Loopring 78 XEM NEM
+37 LSK Lisk 79 XLM Stellar
+38 L TC Litecoin 80 XMR Monero
+39 MAID MaidSafeCoin 81 XRP XRP
+40 MANA Decentraland 82 ZEC Zcash
+41 MIOT A IOT A 83 ZEN Horizen
+42 MDA Moeda Loyalty Points 84 ZRX 0x Protocol
+23
+Table 1.2: Variance Decomposition of World Order Flow
+This table reports the variance decomposition of world order flow into its 11 country components.
+The values represent the percent variance contribution of each country to world order flow at the
+daily and weekly frequency. The sample period ranges from February 14, 2018 to June 30, 2022.
+Daily % Weekly %
+OF U SD 38.14 38.26
+OF KRW 23.21 30.48
+OF EU R 10.57 10.09
+OF GBP 5.95 4.98
+OF N ZD 3.87 3.13
+OF CHF 3.85 2.39
+OF AU D 3.57 2.56
+OF CAD 3.44 2.87
+OF N OK 2.94 1.88
+OF SEK 2.66 1.71
+OF JP Y 1.80 1.66
+OF W 100 100
+24
+Table 1.3: Summary Statistics
+This table presents summary statistics for the coin-specific variables used in our analysis: daily
+returns, US and world order flow, market capitalization, volume and volatility. Order flow is
+the standardized log difference of buyer-initiated and seller-initiated transaction volume. Market
+capitalization and volume are measured in the log of billions of USD. Returns and volatility are
+measured in daily percent terms. Statistics across time represent the time-series of cross-sectional
+averages. Statistics across coins represent the cross-section of the time-series averages. Statistics
+across time and coins are computed using the entire panel across both time and coins. The top
+10 coins are selected by market capitalization on the first day of the sample. The sample period
+ranges from February 14, 2018 to June 30, 2022.
+Across Time and Coins Across Time Across Coins
+Mean Median StD Skew Kurt S.D Skew Kurt. StD Skew Kurt
+Top 10
+Coins
+Return 0.21 0.03 7.95 8.88 366.70 7.63 2.26 52.17 3.17 0.53 3.37
+OFU SD 0.03 0.01 1.04 0.04 6.36 1.04 0.04 6.25 0.64 0.15 3.17
+OFW 0.04 0.01 1.04 -0.07 6.91 1.04 -0.07 6.84 0.65 0.17 3.23
+MCAP 22.97 22.72 1.86 0.44 1.12 1.02 0.36 5.10 1.62 0.51 6.56
+Volume 20.88 21.11 1.97 -0.26 1.32 1.23 -0.15 1.53 1.64 0.20 1.77
+Volatility 7.11 5.53 6.18 5.21 64.57 5.92 3.96 33.00 2.69 0.77 3.26
+All
+Coins
+Return 0.18 -0.07 8.96 4.64 117.03 8.75 2.28 37.33 5.93 1.77 14.09
+OFU SD -0.01 0.01 1.05 -0.04 5.33 1.05 -0.04 5.26 1.01 0.04 4.63
+OFW 0.01 0.01 1.05 -0.17 6.50 1.05 -0.16 6.39 0.96 -0.01 5.90
+MCAP 18.75 18.38 2.40 0.80 3.57 0.92 0.39 2.40 2.30 0.86 3.72
+Volume 15.97 15.69 3.16 0.26 3.83 1.39 0.13 3.20 3.06 0.31 2.88
+Volatility 9.65 7.58 8.73 18.30 1641.16 7.96 4.20 44.21 0.06 2.88 16.33
+25
+Table 1.4: Mean Returns Across Time
+This table reports the mean daily returns (Panel A) and mean annualized returns (Panel B) for each
+year of the sample period. These are reported for the following cross-sections: (1) the top 10 coins
+by market capitalization, (2) all 84 coins, and (3) quintile portfolios sorted on contemporaneous
+returns. The sample period ranges from February 14, 2018 to June 30, 2022.
+Panel A: Mean Daily Returns
+2018 2019 2020 2021 2022 2018-2022
+Top 10 -0.41 0.13 0.59 0.97 -0.73 0.21
+All Coins -0.52 0.04 0.61 0.91 -0.62 0.17
+Quintiles
+sorted by
+returns
+1 -0.93 -0.31 0.17 0.33 -1.06 -0.04
+2 -0.73 -0.15 0.44 0.62 -0.84 0.06
+3 -0.57 0.02 0.55 0.82 -0.69 0.11
+4 -0.42 0.18 0.75 1.02 -0.49 0.21
+5 0.06 0.48 1.15 1.74 -0.04 0.50
+Panel B: Mean Annualized Returns
+2018 2019 2020 2021 2022 2018-2022
+Top 10 -103.32 32.76 148.68 244.44 -183.96 52.92
+All Coins -131.04 10.08 153.72 229.32 -156.24 42.84
+Quintiles
+sorted by
+returns
+1 -234.36 -78.12 42.84 83.16 -267.12 -10.08
+2 -183.96 -37.80 110.88 156.24 -211.68 15.12
+3 -143.64 5.04 138.60 206.64 -173.88 27.72
+4 -105.84 45.36 189.00 257.04 -123.48 52.92
+5 15.12 120.96 289.80 438.48 -10.08 126.00
+26
+Table 1.5: Contemporaneous Panel Regressions with World Order Flow
+This table displays panel regression results of cryptocurrency returns on contemporaneous world
+order flow and control variables. Order flow is in logs and standardized as described in the data
+section. Market cap and volume are in logs. Volatility is the log difference between a coin’s high and
+low price. The VIX, S&P 500 and MSCI are log returns. The TED spread is the difference between
+the three-month Treasury bill and the three-month LIBOR. The short rate is the three-month T-bill
+rate. The term spread is the difference between the ten-year and three-month T-bill rates. The
+default spread is the difference between the AAA and BAA corporate bonds. All panel regressions
+use balanced panels with fixed coin effects. Columns (1)-(2) are for daily returns. Columns (3)-(4)
+are for weekly returns. The t-statistics shown in parentheses are computed using standard errors
+which are clustered by time and by coin. The sample period ranges from February 14, 2018 to June
+30, 2022.
+Daily Weekly
+(1) (2) (3) (4)
+constant 0.002
+(1.16)
+0.001
+(0.13)
+0.012
+(1.41)
+0.059
+(1.08)
+OFW
+i,t
+0.022∗∗∗
+(10.52)
+0.022∗∗∗
+(10.44)
+0.044∗∗∗
+(8.10)
+0.040∗∗∗
+(8.29)
+MCAP i,t
+-0.001
+(-0.59)
+0.019∗∗∗
+(3.08)
+Volumei,t
+0.007∗∗∗
+(5.94)
+0.009∗∗∗
+(2.69)
+Volatilityi,t
+0.147∗∗
+(2.52)
+0.253∗∗∗
+(3.31)
+VIXt
+-0.045
+(-1.31)
+-0.093
+(-1.16)
+TED Spread t
+0.000
+(0.67)
+0.001
+(0.77)
+S&P 500 t
+-0.488
+(-1.03)
+-4.065 ∗∗
+(-2.29)
+MSCIGlobal
+t
+0.761
+(1.33)
+5.680∗∗∗
+(2.75)
+Short Rate t
+-0.002
+(-0.84)
+-0.016
+(-1.23)
+Term Spread t
+-0.009
+(-1.61)
+-0.055 ∗∗
+(-1.99)
+Default Spread t
+0.010
+(1.27)
+0.012
+(0.28)
+¯R2 (%) 6.5 10.4 6.1 19.6
+# obs. 92568 92568 17136 17136
+27
+Table 1.6: Predictive Panel Regressions with World Order Flow
+This table displays results of predictive panel regressions of cryptocurrency returns on lagged world
+order flow and lagged control variables. The table contains the same information as Table 1.5 but
+all variables are lagged and ri,t−1 is the lagged return of each cryptocurrency. The t-statistics shown
+in parentheses are computed using standard errors which are clustered by time and by coin. The
+sample period ranges from February 14, 2018 to June 30, 2022.
+Daily Weekly
+(1) (2) (3) (4) (5) (6)
+constant 0.002
+(1.02)
+0.002
+(1.08)
+0.013
+(1.08)
+0.013
+(1.42)
+0.013
+(1.44)
+0.046
+(0.68)
+OFW
+i,t−1
+0.001
+(0.62)
+0.002∗∗∗
+(2.58)
+0.002∗∗∗
+(3.02)
+0.008∗∗
+(2.30)
+0.009∗∗∗
+(3.22)
+0.009∗∗∗
+(3.40)
+ri,t−1
+-0.054∗∗∗
+(-3.25)
+-0.066∗∗∗
+(-3.82)
+-0.019
+(-0.51)
+-0.037
+(-1.01)
+MCAPi,t−1
+-0.006∗∗∗
+(-3.65)
+-0.029∗∗∗
+(-4.00)
+Volumei,t−1
+0.001
+(1.39)
+0.004∗∗
+(1.07)
+Volatilityi,t−1
+0.048∗∗∗
+(2.64)
+0.067∗∗
+(2.08)
+VIXt−1
+-0.012
+(-0.38)
+-0.104
+(-1.27)
+TED Spreadt−1
+-0.000
+(-0.01)
+-0.001
+(-0.38)
+S&P 500t−1
+-0.148
+(-0.25)
+1.573
+(1.58)
+MSCIGlobal
+t−1
+0.496
+(0.86)
+-1.966∗
+(-1.68)
+Short Ratet−1
+-0.005∗
+(-1.81)
+-0.023
+(-1.50)
+Term Spreadt−1
+-0.003
+(-0.49)
+-0.005
+(-0.16)
+Default Spreadt−1
+-0.004
+(-0.46)
+-0.005
+(-0.10)
+¯R2 (%) 0.1 0.3 1.2 0.2 0.2 3.3
+# obs. 92484 92484 92484 17052 17052 17052
+28
+Table 1.7: Contemporaneous Panel Regressions with All International Order Flows
+This table displays panel regression results of contemporaneous cryptocurrency returns on world
+order flow, international order flows and control variables. The table contains the same information
+as Table 1.5 but for all international order flows plus the world order flow. The t-statistics shown
+in parentheses are computed using standard errors which are clustered by time and by coin. The
+sample period ranges from February 14, 2018 to June 30, 2022. The panel regressions also condition
+on the control variables reported in the previous tables but these results are not reported to save
+space.
+Daily Weekly
+(1) (2) (3) (4)
+constant 0.002
+(0.19)
+0.001
+(0.07)
+0.061
+(1.09)
+0.058
+(1.06)
+OFW
+i,t
+0.019∗∗∗
+(11.03)
+0.029∗∗∗
+(7.01)
+OFU SD
+i,t
+0.012∗∗∗
+(7.72)
+0.005∗∗∗
+(4.48)
+0.026∗∗∗
+(6.43)
+0.014∗∗∗
+(4.18)
+OFKRW
+i,t
+0.011∗∗∗
+(7.24)
+0.006∗∗∗
+(6.22)
+0.018∗∗∗
+(5.77)
+0.008∗∗∗
+(3.72)
+OFEU R
+i,t
+0.004∗∗∗
+(5.21)
+0.001
+(0.74)
+0.009∗∗∗
+(3.97)
+0.003∗
+(1.64)
+OFGBP
+i,t
+0.002∗∗∗
+(4.09)
+-0.001∗∗
+(-2.38)
+0.004∗∗∗
+(2.59)
+-0.001
+(-0.49)
+OFJP Y
+i,t
+0.001∗
+(1.81)
+-0.001
+(-0.62)
+0.002
+(0.83)
+-0.001
+(-0.38)
+OFCAD
+i,t
+0.001∗∗∗
+(2.74)
+-0.001∗∗∗
+(-2.63)
+0.005∗∗∗
+(4.13)
+0.002
+(1.19)
+OFAU D
+i,t
+0.001
+(1.38)
+-0.002∗∗∗
+(-3.09)
+0.002∗
+(1.68)
+-0.001
+(-0.46)
+OFCHF
+i,t
+0.000
+(0.72)
+-0.002∗∗∗
+(-5.73)
+0.001
+(0.26)
+-0.003∗
+(-1.74)
+OFN ZD
+i,t
+0.001
+(1.59)
+-0.002∗∗∗
+(-4.63)
+-0.000
+(-0.26)
+-0.004∗∗
+(-2.40)
+OFN OK
+i,t
+0.000
+(0.76)
+-0.002∗∗∗
+(-4.11)
+0.002
+(1.17)
+-0.001
+(-0.35)
+OFSEK
+i,t
+0.000
+(0.64)
+-0.002∗∗∗
+(-5.16)
+0.001
+(0.63)
+-0.002
+(-0.90)
+¯R2 (%) 9.0 11.4 19.0 20.3
+# obs. 92568 92568 17136 17136
+29
+Table 1.8: Predictive Panel Regressions with All International Order Flows
+This table displays results of predictive panel regressions of cryptocurrency returns on lagged world
+order flow, international order flows and control variables. The table contains the same information
+as Table 1.6 but for all international order flows plus the world order flow. The t-statistics shown
+in parentheses are computed using standard errors which are clustered by time and by coin. The
+sample period ranges from February 14, 2018 to June 30, 2022. The panel regressions also condition
+on the control variables reported in the previous tables but these results are not reported to save
+space.
+Daily Weekly
+(1) (2) (3) (4)
+constant 0.014
+(1.08)
+0.013
+(1.07)
+0.047
+(0.68)
+0.046
+(0.68)
+OFW
+i,t−1
+0.002∗∗∗
+(2.92)
+0.006∗∗
+(2.49)
+OFU SD
+i,t−1
+0.001
+(1.44)
+-0.000
+(-0.37)
+0.004∗∗
+(2.12)
+0.001
+(0.68)
+OFKRW
+i,t−1
+0.002∗∗∗
+(3.36)
+0.001∗∗∗
+(2.78)
+0.005∗∗
+(2.24)
+0.003
+(1.57)
+OFEU R
+i,t−1
+0.00
+(0.81)
+-0.000
+(-0.51)
+0.005∗∗∗
+(2.62)
+0.004∗∗
+(2.04)
+OFGBP
+i,t−1
+-0.000
+(-0.13)
+-0.000
+(-0.96)
+0.000
+(0.05)
+-0.001
+(-0.60)
+OFJP Y
+i,t−1
+0.001∗
+(1.76)
+0.000
+(1.19)
+0.001
+(0.64)
+0.000
+(0.23)
+OFCAD
+i,t−1
+-0.001∗
+(-1.91)
+-0.001∗∗∗
+(-2.64)
+0.001
+(0.90)
+0.001
+(0.45)
+OFAU D
+i,t−1
+-0.000
+(-0.83)
+-0.000
+(-1.60)
+-0.001
+(-0.48)
+-0.001
+(-0.97)
+OFCHF
+i,t−1
+0.000
+(0.70)
+-0.000
+(-0.09)
+0.002
+(1.29)
+0.001
+(0.79)
+OFN ZD
+i,t−1
+0.000
+(0.22)
+-0.001
+(-0.64)
+0.003∗
+(1.93)
+0.002
+(1.45)
+OFN OK
+i,t−1
+0.000
+(0.96)
+0.000
+(0.20)
+0.001
+(0.97)
+0.007
+(0.53)
+OFSEK
+i,t−1
+-0.000
+(-0.95)
+-0.001∗
+(-1.82)
+-0.003∗
+(-1.86)
+-0.003∗∗
+(-2.39)
+ri,t−1
+-0.064∗∗∗
+(-3.73)
+-0.067∗∗∗
+(-3.89)
+-0.035
+(-0.94)
+-0.038∗∗∗
+(-1.05)
+¯R2 (%) 1.2 1.2 3.3 3.4
+# obs. 92484 92484 17052 17052
+30
+Table 1.9: Predictive Panel Regressions: Cryptocompare.com (CC) Data
+This table displays results of predictive panel regressions using cryptocurrency returns data from
+cryptocompare.com denominated in US dollars (USD), euros (EUR) and Korean won (KR W). Panel
+A conditions on domestic order flow and lagged returns only, and Panel B additionally conditions
+on world order flow. The returns are winsorized at 1%. The t-statistics shown in parentheses are
+computed using standard errors which are clustered by time and by coin. The sample period ranges
+from February 14, 2018 to June 30, 2022.
+Panel A: Domestic Order Flow Only
+Daily Weekly
+USD EUR KR W USD EUR KR W
+constant 0.001 0.002 0.001 0.011 0.012 0.011
+(0.76) (1.02) (0.69) (1.27) (1.35) (1.31)
+OF U SD
+i,t −1 -0.000 0 .005 ∗∗∗
+(-0.45) (2.65)
+OF EU R
+i,t −1 0.000 0 .005 ∗∗∗
+(0.26) (2.80)
+OF KRW
+i,t −1 0.001 ∗∗∗ 0.007 ∗∗∗
+(2.80) (2.90)
+ri,t −1 -0.099 ∗∗∗ -0.117 ∗∗∗ -0.088 ∗∗∗ -0.042 -0.049 -0.018
+(-4.59) (-5.01) (-4.59) (-0.98) (-1.15) (-0.46)
+¯R 2 (%) 1.00 1.37 0.76 0.21 0.32 0.20
+Panel B: World and Domestic Order Flow
+constant 0.001 0.002 0.001 0.011 0.012 0.011
+(0.77) (1.03) (0.70) (1.28) (1.36) (1.33)
+OF W
+i,t −1 0.002 ∗∗∗ 0.002 ∗∗∗ 0.002 ∗∗∗ 0.008 ∗∗∗ 0.008 ∗∗∗ 0.008 ∗∗∗
+(2.73) (2.89) (3.13) (2.83) (3.07) (3.26)
+OF U SD
+i,t −1 -0.001 ∗∗ 0.001
+(-2.46) (0.60)
+OF EU R
+i,t −1 -0.000 0 .003 ∗
+(-1.53) (1.87)
+OF KRW
+i,t −1 0.001 ∗∗ 0.004 ∗∗
+(2.09) (2.00)
+ri,t −1 -0.104 ∗∗∗ -0.123 ∗∗∗ -0.093 ∗∗∗ -0.049 -0.059 -0.027
+(-4.83) (-5.30) (-4.92) (-1.18) (-1.41) (-0.69)
+¯R 2 (%) 1.04 1.42 0.81 0.39 0.51 0.38
+31
+Table 1.10: Predictive Panel Regressions with All International Order Flows: CC
+Data
+This table displays results of predictive panel regressions using cryptocurrency returns data from
+cryptocompare.com denominated in US dollars (USD), euros (EUR) and Korean won (KR W).
+The panel regressions also condition on the control variables reported in previous tables but these
+results are not reported to save space. The returns are winsorized at 1%. The t-statistics shown
+in parentheses are computed using standard errors which are clustered by time and by coin. The
+sample period ranges from February 14, 2018 to June 30, 2022.
+Daily Weekly
+USD EUR KR W USD EUR KR W
+constant 0.014 0.013 0.013 0.042 0.038 0.047
+(-1.20) (1.16) (1.22) (0.66) (0.59) (0.78)
+OF W
+i,t − 1 0.002 ∗∗∗ 0.002 ∗∗∗ 0.002 ∗∗∗ 0.005 ∗∗ 0.005 ∗∗ 0.006 ∗∗
+(2.57) (3.01) (3.52) (2.33) (2.36) (2.40)
+OF U SD
+i,t − 1 -0 .001 ∗∗ 0.000 0.000 0.002 0.002 0.001
+(-2.50) (0.19) (0.24) (0.96) (1.04) (0.73)
+OF KRW
+i,t − 1 0.001 ∗∗∗ 0.001 ∗∗∗ 0.001 ∗∗ 0.004 ∗∗ 0.004 ∗∗ 0.004 ∗∗
+(3.05) (2.97) (2.06) (2.12) (2.33) (2.22)
+OF EU R
+i,t − 1 0.000 0.000 0.000 0 .004 ∗∗ 0.003 ∗∗ 0.004 ∗∗
+(-0.22) (-1.46) (-1.11) (2.29) (2.02) (2.29)
+OF GBP
+i,t − 1 0.000 0.000 0.000 -0.001 -0.001 -0.001
+(-0.42) (-0.42) (-0.45) (-0.77) (-1.00) (-0.47)
+OF JP Y
+i,t − 1 0.000 0.000 0.000 0.000 0.000 0.000
+(-0.90) (0.16) (-0.65) (0.08) (-0.21) (-0.18)
+OF CAD
+i,t − 1 -0 .000 ∗ -0 .001 ∗∗ 0.000 ∗ 0.000 0.000 0.000
+(-1.95) (-2.36) (-1.67) (0.26) (0.36) (0.07)
+OF AU D
+i,t − 1 0.000 ∗ 0.000 0.000 -0.001 -0.001 -0.001
+(-1.69) (-1.63) (-1.45) (-1.06) (-1.04) (-1.01)
+OF CHF
+i,t − 1 0.000 0.000 0.000 0.001 0.002 0.001
+(-0.33) (-0.05) (-0.40) (1.24) (1.59) (0.62)
+OF N ZD
+i,t − 1 0.000 0.000 0.000 0.002 0 .002 ∗ 0.002
+(-1.57) (-0.77) (-1.21) (1.39) (1.76) (1.32)
+OF N OK
+i,t − 1 0.000 0.000 0.000 0.001 0.001 0.001
+-0.28 0.17 0.37 1.22 1.11 0.94
+OF SEK
+i,t − 1 0.000 0.000 -0 .001 ∗∗ -0 .002 ∗ -0 .002 ∗ -0.002
+(-1.09) (-1.61) (-2.54) (-1.80) (-1.74) (-1.61)
+ri,t − 1 -0 .113 ∗∗∗ -0 .132 ∗∗∗ -0 .102 ∗∗∗ -0.067 -0 .078 ∗ -0.043
+(-5.22) (-5.70) (-5.31) (-1.64) (-1.88) (-1.10)
+¯R 2 1.95 2.30 1.60 3.76 3.83 3.10
+32
+Table 1.11: Contemporaneous Panel Regressions with US Order Flow
+This table displays panel regression results of cryptocurrency returns on contemporaneous US order
+flow and control variables. Order flow is in logs and standardized as described in the data section.
+Market cap and volume are in logs. Volatility is the log difference between a coin’s high and low
+price. The VIX, S&P 500 and MSCI are log returns. The TED spread is the difference between the
+three-month Treasury bill and the three-month LIBOR. The short rate is the three-month T-bill
+rate. The term spread is the difference between the ten-year and three-month T-bill rates. The
+default spread is the difference between the AAA and BAA corporate bonds. All panel regressions
+use balanced panels with fixed coin effects. Columns (1)-(2) are for daily returns. Columns (3)-(4)
+are for weekly returns. The t-statistics shown in parentheses are computed using standard errors
+which are clustered by time and by coin. The sample period ranges from February 14, 2018 to June
+30, 2022.
+Daily Weekly
+(1) (2) (3) (4)
+constant 0.002
+(1.10)
+0.003
+(0.27)
+0.012
+(1.35)
+0.065
+(1.14)
+OFU SD
+i,t
+0.014∗∗∗
+(7.43)
+0.014∗∗∗
+(7.41)
+0.034∗∗∗
+(6.31)
+0.030∗∗∗
+(6.30)
+MCAP i,t
+-0.001
+(-0.57)
+0.021∗∗∗
+(3.24)
+Volumei,t
+0.007∗∗∗
+(5.73)
+0.009∗∗
+(2.51)
+Volatilityi,t
+0.142∗∗
+(2.37)
+0.251∗∗∗
+(3.22)
+VIXt
+-0.045
+(-1.25)
+-0.096
+(-1.17)
+TED Spread t
+0.000
+(0.63)
+0.000
+(0.81)
+S&P 500 t
+-0.512
+(-1.03)
+-4.049 ∗∗
+(-2.23)
+MSCIGlobal
+t
+0.775
+(1.30)
+5.722∗∗∗
+(2.71)
+Short Rate t
+-0.003
+(-0.98)
+-0.018
+(-1.34)
+Term Spread t
+-0.009
+(-1.58)
+-0.057 ∗∗
+(-2.00)
+Default Spread t
+0.009
+(1.10)
+0.009
+(0.20)
+¯R2 (%) 2.9 6.7 3.4 17.4
+# obs. 92568 92568 17136 17136
+34
+Table 1.12: Predictive Panel Regressions with US Order Flow
+This table displays results of predictive panel regressions of cryptocurrency returns on lagged US
+order flow and lagged control variables. The table contains the same information as Table 1.11
+but all variables are lagged and ri,t−1 is the lagged return of each cryptocurrency. The t-statistics
+shown in parentheses are computed using standard errors which are clustered by time and by coin.
+The sample period ranges from February 14, 2018 to June 30, 2022.
+Daily Weekly
+(1) (2) (3) (4) (5) (6)
+constant 0.017
+(1.02)
+0.002
+(1.07)
+0.014
+(1.09)
+0.013
+(1.41)
+0.013
+(1.42)
+0.048 ∗∗∗
+(0.69)
+OFU SD
+i,t−1
+-0.000
+(-0.14)
+0.001
+(1.45)
+0.001 ∗
+(1.78)
+0.004 ∗
+(1.91)
+0.005 ∗∗
+(2.48)
+0.005 ∗∗∗
+(2.62)
+ri,t−1
+-0.051 ∗∗∗
+(-3.01)
+-0.062 ∗∗∗
+(-3.56)
+-0.011
+(-0.30)
+-0.029
+(-0.78)
+MCAP i,t−1
+-0.006 ∗∗∗
+(-3.64)
+-0.028 ∗∗∗
+(-3.96)
+Volumei,t−1
+0.001
+(1.35)
+0.004
+(1.02)
+Volatilityi,t−1
+0.047 ∗∗∗
+(2.59)
+0.064 ∗∗
+(2.02)
+VIX t−1
+-0.012
+(-0.38)
+-0.104
+(-1.26)
+TED Spread t−1
+-0.000
+(-0.01)
+-0.000
+(-0.37)
+S&P 500 t−1
+-0.148
+(-0.25)
+1.607
+(1.61)
+MSCI Global
+t−1
+0.495
+(0.86)
+-1.994 ∗
+(-1.70)
+Short Rate t−1
+-0.005 ∗
+(-1.82)
+-0.023
+(-1.52)
+Term Spread t−1
+-0.003
+(-0.49)
+-0.005
+(-0.16)
+Default Spread t−1
+-0.004
+(-0.48)
+-0.006
+(-0.12)
+¯R2 (%) 0.1 0.3 1.1 0.1 0.1 3.1
+# obs. 92484 92484 92484 17052 17052 17052
+35
+Chapter 2
+Predicting the Cryptocurrency
+Cross-Section with Machine
+Learning
+2.1 Introduction
+The rapid expansion of the cryptocurrency market over the past decade has caused
+it to become the newest asset class to emerge onto the global finance stage. Its
+unique characteristics such as being comprised of independently owned decentralized
+exchanges, and greater opportunity for asymmetric information make it an inter-
+esting environment to study the role of order flow in the price formation process
+(Makarov and Schoar, 2020,Bianchi, Babiak and Dickerson, 2022). In the previous
+36
+chapter we established the strong explanatory and predictive significance of world
+order flow on crypto returns in an in-sample setting. We also established that the
+predictive information contained in order flow is permanent rather than transitory
+in nature, as the positive significance of order flow for predicting returns became
+stronger at longer horizons. While the in-sample significance is clear, the question of
+whether this predictive significance holds when we move to an out-of-sample setting
+remains unanswered. In this paper, we aim to address this gap in the literature and
+deepen our understanding of how order flow impacts the price formation process in
+the cryptocurrency market.
+Specifically, we assess the out-of-sample predictive ability of order flow for daily
+cryptocurrency returns using machine learning (ML) techniques. In recent literature,
+machine learning has been used to forecast returns for the cross-section of stocks as
+well as cryptocurrencies. For example, Gu, Kelly and Xiu (2020) employ various
+linear and non-linear ML models to forecast a large cross-section of stocks with more
+than 900 predictors. They find non-linear techniques are the top performing models,
+providing significant gains to investors. Cakici et al. (2024) employ a variety of ML
+models to predict a cross-section of over 500 cryptocurrency returns using a set of 41
+characteristics. They find predictability is largely driven by a few characteristics but
+ML models still provide a profitable strategy for investors. Similarly, Fieberg et al.
+(2024) and Filippou, Rapach and Thimsen (2024) also use ML techniques to predict a
+cross-section of cryptocurrency returns. Fieberg et al. (2024) use predictors derived
+from technical signals and find these models outperform more widely used factor
+models. Filippou, Rapach and Thimsen (2024) find predictors related to momentum,
+37
+size and value are important, and allowing for non-linear functional forms improves
+performance. 1
+ML methods are ideally suited for out-of-sample forecasting because they emphasize
+techniques for variable selection and dimension reduction, which can accommodate
+a large set of predictors as well as a richer specification of functional forms. For our
+study we use the same data set from the in-sample analysis of chapter 1, comprised
+of a cross-section of 84 coins spanning the sample period of January 1, 2018 to June
+30, 2022. We employ a rich dataset of order flows denominated in 11 fiat currencies,
+including the G10 currencies plus South Korea, which is a prominent center for
+cryptocurrency trading. We then form a measure of world order flow by aggregating
+the 11 international order flows. ML forecasting allows us to condition on the 11
+international order flows and additional economic fundamentals for prediction of the
+one-day ahead cryptocurrency returns.
+This paper aims to address two important and related questions. First, do linear and
+non-linear machine learning techniques improve the out-of-sample predictive power
+of order flow relative to standard predictive approaches? And second, do models
+that condition on our set of international order flows and aggregate world order flow
+improve predictability over models that include economic fundamental predictors
+only? We answer these questions in two main ways. First, we evaluate the statistical
+performance of a variety of ML models conditioning on all 11 international order
+1 For related literature published in other disciplinary journals such as applied statistics and
+engineering, see Mallqui and Fernandes (2019), Akyildirim et al. (2021) and Yae and Tian
+(2022)
+38
+flows and world order flow, and compare the performance to models that condition
+on economic fundamentals only. Second, we examine the economic value of ML model
+forecasts in the context of portfolio sorts. We compare the performance of models
+that condition on order flow verses models that condition on economic fundamentals.
+Addressing these questions is relevant to the study of market microstructure and
+deepens our understanding into the economic mechanisms driving order flow and
+price discovery in cryptocurrency markets.
+We estimate a set of linear and non-linear ML models, which include the follow-
+ing specifications: ridge regression (RR), lasso (LAS), elastic net (EN), principal
+component regression (PCR), random forest (RF), stochastic gradient boosted re-
+gression trees (SGB), and neural networks with 1-4 hidden layers (NN1-NN4). In
+addition, we compute forecast combinations across the linear models (L-Mean), and
+the non-linear models (NL-Mean). 2
+In terms of the out-of-sample statistical analysis, we find that non-linear ML forecasts
+which condition on all order flows consistently outperform: (1) linear models that
+condition on all order flows, (2) linear and non-linear models that condition on
+economic fundamentals, and (3) the zero-forecast benchmark. The best performer
+is the SGB model that conditions on all order flows with an out-of-sample R2 of
+0.39%. In short, non-linear ML models conditioning on order flow have significant
+2 Although most of our analysis is performed for both daily and weekly returns, the out-of-
+sample ML forecasting is only performed for daily returns. Due to the short sample period,
+which is specific to the cryptocurrency market, we do not have enough data to perform weekly
+ML forecasting.
+39
+out-of-sample predictive ability for the cross-section of cryptocurrency returns.
+In addition to the statistical analysis, we also assess the out-of-sample economic
+value of conditioning on order flow using portfolio sorts. Our approach is based
+on generating cryptocurrency portfolios sorted on lagged values of either world or-
+der flow or the ML return forecast of models conditioning on order flow. The ML
+approach enables us to exploit the predictive information of all international order
+flows. Specifically, on each day, we allocate the 84 coins into quintile portfolios and
+assess the one-day ahead performance of the five quintile portfolios as well as the
+long-short (top-minus-bottom) portfolio.
+In assessing portfolio performance, we first orthogonalize lagged world order flow
+with respect to lagged returns to remove the short-term reversal component. Then,
+we demonstrate that portfolios sorted on orthogonalized world order flow exhibit
+strong performance, especially at the weekly frequency. For weekly portfolio sorts,
+the long-short mean return spread is equal to 1 .83% per week, it is highly significant
+(t-stat=2.82) and exhibits an annualized Sharpe ratio of 1.93. Furthermore, the
+long-short portfolio delivers a weekly alpha of 1.72% (t-stat=2.71) with respect to the
+cryptocurrency three-factor model (Liu, Tsyvinski and Wu, 2022). For daily portfolio
+sorts, the long-short portfolio delivers an alpha of 0.24% per day (t-stat=1.65) and
+an annualized Sharpe ratio of 1.00.
+Importantly, daily portfolio performance improves substantially when the portfolio
+sorts are based on machine learning models that generate forecasts which condition
+on all order flows. Although all ML models perform well, the non-linear models con-
+40
+ditioning on order flow perform the best. For example, the best model (SGB) that
+conditions on order flow delivers a daily long-short alpha of 0.78% (t-stat=5.85) and
+an annualized Sharpe ratio of 3.68. Moreover, non-linear ML models conditioning
+on order flow consistently outperform ML models conditioning on economic funda-
+mentals. Non-linear ML models conditioning on order flow also outperform leading
+ML-based benchmarks in the literature for forecasting cryptocurrency returns. For
+example, the NL-Mean model in Filippou, Rapach and Thimsen (2024), which con-
+ditions on 54 characteristics but excludes order flow, generates a Sharpe ratio of
+2.57, while the same model conditioning on just order flow in this paper achieves
+a Sharpe ratio of 3.61. Taken together, these findings indicate that there is signif-
+icant economic value in conditioning on all international order flows in the context
+of out-of-sample machine learning forecasts.
+In summary, our analysis provides compelling empirical evidence to establish that
+order flow has strong and economically valuable out-of-sample predictive power for
+cryptocurrency returns. Our findings indicate that order flow has a permanent effect
+for cryptocurrency returns since this effect is consistently positive and stronger for
+weekly compared to daily returns. Non-linear ML models conditioning on order flow
+outperform ML models conditioning on economic fundamentals as well as leading
+ML benchmarks that do not include order flow. Forecast combinations of non-linear
+ML models also exhibit strong performance. In short, order flow provides significant
+predictive information that cannot be explained by economic fundamentals and non-
+linear ML techniques best capture this information.
+The remainder of the paper is organized as follows. In the next section, we review
+41
+the cryptocurrency data. In Section 3, we provide a detailed description of the ML
+models used in our analysis and discuss the objective function. The framework for
+out-of-sample prediction based on machine learning models is examined in Section 4.
+Section 5 discusses the out-of-sample statistical performance. In Section 6, we assess
+the economic value of order flow based on portfolio sorts, and Section 7 concludes.
+2.2 Data Overview
+Our empirical analysis employs data from a cross-section of 84 cryptocurrencies for
+the sample period of January 1, 2018 to June 30, 2022. The CMC database from
+which we obtain the crypto prices contains data on thousands of coins but most
+have low market capitalization and/or limited historical data. To obtain the final
+cross-section of 84 coins, we impose three criteria to ensure the liquidity of our
+sample. First, we require that coins must have a market capitalization of greater
+than 1 million USD on the first day of the sample period. Second, coins must be
+continuously traded with a non-zero price and non-zero volume in each time period
+of our sample. Finally, third, we exclude all stable coins from the cross-section.
+Order flow, is defined as the log difference between buyer-initiated and seller-initiated
+transaction volume denominated in a particular fiat currency over a period of time.
+The fiat currencies we employ include the following: US dollar (USD), Euro (EUR),
+British pound (GBP), Japanese yen (JPY), Swiss frank (CHF), Canadian dollar
+(CAD), Australian dollar (AUD), New Zealand dollar (NZD), Norwegian krone
+(NOK), Swedish krona (SEK) and the Korean won (KR W). Following Menkhoff
+42
+et al. (2016), we standardize each order flow series using a rolling window of 30
+days. Due to the standardization, the first day of our sample becomes February 14,
+2018. World order flow is computed by aggregating all 11 buy-volumes and all 11
+sell-volumes, taking the log difference, and performing the same standardization as
+applied to the disaggregated order flows.
+We use a combination of coin-specific variables and economic fundamentals as con-
+trols in the empirical analysis. The coin-specific variables include market cap, total
+volume, and volatility. The economic fundamentals used in our analysis include the
+short rate, term spread, default spread, TED spread, S&P 500 index returns, MSCI
+global index returns, and the VIX index returns. 3
+2.3 Machine Learning Models
+We perform an out-of-sample analysis of the predictive ability of order flow for cryp-
+tocurrency returns using popular machine learning methods (see, e.g., Gu, Kelly and
+Xiu, 2020). Out-of-sample forecasting of asset returns is notoriously difficult (see,
+e.g., Welch and Goyal, 2008), which is likely exacerbated in the case of cryptos due to
+their high volatility. Traditional prediction methods based on ordinary least squares
+(OLS) regressions are likely to underperform when conditioning on a high number
+of predictors such as the 11 international order flows and the additional control vari-
+ables that we use to forecast one-day ahead cryptocurrency returns. ML methods
+3 See section 1.2 for a detailed explanation of the data and data sources.
+43
+are more suitable for out-of-sample forecasting because they emphasize techniques
+for variable selection and dimension reduction, which can accommodate a large set
+of predictors as well as a richer specification of functional forms.
+We use linear regression estimated with pooled OLS as our benchmark model, which
+is motivated by the predictive panel regression approach in the in-sample analysis of
+the previous chapter. In addition to the OLS benchmark, we consider a variety of
+linear and non-linear models from the rapidly expanding ML literature on forecasting
+asset returns (Gu, Kelly and Xiu, 2020). We include Ridge regression (RR), Lasso
+(LAS) and the Elastic Net (EN) for penalized linear models and principal component
+regression (PCR) as a linear dimension reduction technique. Our non-linear mod-
+els include tree-based models, random forest (RF) and stochastic gradient boosted
+regression trees (SGB), and feed-forward neural networks with 1 to 4 hidden layers
+(NN1-NN4). In what follows, we provide a detailed explanation of each model used
+in our analysis as well as the objective function used in the estimation framework.
+2.3.1 Model Descriptions
+We index coins as i = 1, ..., Nand days by t = 1, ..., T, and describe the return of
+coin i at time t + 1 as:
+ri,t+1 = Et[ri,t+1] + ϵi,t+1, (2.1)
+where
+Et[ri,t+1] = g(zi,t), (2.2)
+44
+is the conditional expected return and g(·) is a flexible function of coin i’s P -
+dimensional vector of characteristics zi,t. Inspired by Gu, Kelly and Xiu (2020), we
+approximate g(·) using a variety of models with increasing complexity, to maximize
+the out-of-sample predictive power for realized ri,t+1.
+2.3.2 Linear Regression
+Our benchmark model is the linear regression model, which does not incorporate non-
+linearities or interactions between predictors. The linear regression model assumes
+that conditional expectation return g(·) can be approximated by a linear function of
+predictors zi,t and parameter vector θ:
+g(zi,t; θ) = z′
+i,tθ. (2.3)
+The pooled ordinary least squares (OLS) estimator is obtained by minimizing the ℓ2
+objective function:
+L(θ) = 1
+N T
+NX
+i=1
+TX
+t=1
+(ri,t+1 − g(zi,t; θ))2. (2.4)
+The OLS estimator is unbiased and efficient if the number of predictors P is small
+relative to the number of observations T . However, when P approaches T , the OLS
+estimator becomes inefficient and begins to overfit. To mitigate this issue, we use a
+variety of ML models that have been recently applied in the asset pricing literature.
+45
+2.3.3 Penalized Linear Regression: Ridge, Lasso and Elastic
+Net
+A popular method for mitigating the overfitting issue of OLS is to shrink the esti-
+mated parameters towards zero by adding a penalty term to the objective function.
+This regularization approach intentionally deteriorates a model’s in-sample fit to im-
+prove its out-of-sample stability. Penalized linear models estimate θ by minimizing:
+L(θ; ·) = L(θ) + ϕ(θ; ·), (2.5)
+where ϕ(θ; ·) is the the widely-used elastic net (EN) penalty on θ defined as:
+ϕ(θ; λ, ρ) = λ(1 − ρ)
+PX
+j=1
+|θj| + 1
+2 λρ
+PX
+j=1
+θ2
+j , (2.6)
+where λ is a nonnegative tuning parameter controlling the degree of shrinkage so
+that higher values of λ lead to greater shrinkage of the estimated parameters. When
+λ = 0, the model reduces to OLS. When λ >0, EN includes two well-known regu-
+larization methods as special cases, determined by the nonnegative hyperparameter
+ρ. When ρ = 0, Equation (2.5) corresponds to the lasso (LAS), which imposes an ℓ1
+parameter penalization. LAS can set a subset of θ to exactly zero, imposing spar-
+sity on the model and thus performing variable selection. When ρ = 1, Equation
+(2.5) corresponds to ridge regression (RR), which imposes an ℓ2 parameter penaliza-
+tion. RR shrinks coefficient estimates toward zero, but keeps all predictors in the
+model. For values of ρ between 0 and 1, the elastic net combines the advantages
+46
+of RR and LAS by performing both shrinkage and variable selection. We optimize
+the hyperparameters, λ and ρ, using the validation sample (see Section 2.4 for more
+details).
+2.3.4 Principal Component Regression
+Principal component regression (PCR) is a dimension reduction technique that in-
+volves a two-step procedure. In the first step, principal component analysis (PCA)
+condenses P predictors into a much smaller number of K linear combinations that
+best capture the common variation among the predictors. Specifically, PCA linearly
+transforms a set of predictors into orthogonal principal components, in which the first
+component has the highest variance, the second component has the second highest
+variance, and so on, up to K < Pprincipal components.
+The jth principal component Zw j solves the optimization problem:
+wj = arg max
+w
+V ar(Zw), s.t. w′w = 1, Cov (Zw, Zwl) = 0, l = 1, 2, ..., j− 1,
+(2.7)
+where Z is the N T×P matrix of standardized predictorszi,t, and wj is the eigenvector
+corresponding to the jth eigenvalue of V ar(Z).
+In the second step, PCR uses the first K leading components as regressors in a
+linear regression estimated with OLS. Thus, PCR acts as a regularization technique
+by zeroing out coefficients associated with low variance components.
+47
+Equation (2.7) demonstrates that the first K principal components are selected to
+explain the variation in the P predictors. However, there is no guarantee that these
+principal components are the most effective for forecasting future returns since ri,t+1
+is not considered in Equation (2.7). Therefore, a potential drawback of PCR is that
+the first K principal components, while exhibiting high variance, may have little
+relation with ri,t+1. Consequently, the number of principal components used, K,
+is an important tuning parameter that is optimized using the validation sample as
+detailed in Section 2.4.
+While penalized linear regression and PCR improve on OLS when the number of
+regressors is large, they do not account for non-linearities or predictor interactions.
+Next, we describe the non-linear ML models employed in our study.
+2.3.5 Random Forest and Gradient Boosted Regression Trees
+Regression trees are fully nonparametric and follow a different logic from linear mod-
+els. A tree is built through a sequence of steps, where at each step, a new “branch”
+separates the remaining data from the previous step based on one of the predictors.
+This sequential process partitions the predictor space into rectangular regions, and
+the final outputs are the average values of ri,t+1 within each region.
+Specifically, the prediction of a tree with K regions and depth L, can be written as:
+g(zi,t; θ, K, L) =
+KX
+k=1
+θk1(zi,t∈Ck(L)), (2.8)
+48
+where Ck(L) represents one of the K regions into which the data is partitioned, 1 (·)
+is an indicator function denoting whether zi,t falls within region Ck(L), and θk is a
+constant.
+We follow the algorithm of Breiman et al. (1984) to estimate θ in Equation (2.8).
+At each new level, we select the predictor and threshold value that minimizes the
+prediction error in the resulting two branches. This procedure, called recursive binary
+splitting, is a greedy algorithm because at each step of the tree-building process the
+best split is selected based on that particular step, without consideration for future
+steps. The prediction error for each branch C is defined as:
+H(θ, C) = 1
+|C|
+X
+zi,t∈C
+(ri,t+1 − θ)2, (2.9)
+where |C| represents the number of observations within branch C. This loss function
+naturally leads to the optimal choice of θ being the sample average of returns within
+each branch, i.e., θ = 1
+|C|
+P
+zi,t∈C ri,t+1. Branching continues until the maximum
+specified depth L is reached or the number of observations in each region is below a
+specified count.
+Trees capture complex non-linearities and multiway interactions among predictors,
+however this flexibility is also a limitation that often leads trees to overfit on the
+training sample. To address this issue, we use two types of ensemble models that
+improve stability by aggregating over many trees.
+The first type of ensemble model is random forest (RF), which is a special case
+49
+of a more general technique known as bagging. The standard bagging procedure
+constructs B regression trees using B new bootstrap samples and averages their
+predictions. These trees are usually deep and complex, hence each tree has low bias
+but high variance. Averaging over all B trees reduces this variance, stabilizing the
+model’s predictive performance.
+RF uses a variation on bagging to further decrease the correlation among trees from
+different bootstrap samples (Breiman, 2001). Unlike standard bagging, where all P
+predictors are considered at each split, RF reduces tree correlation by only allowing
+a random subset of m < Ppredictors to be considered for each split. This procedure
+enhances the variance reduction of the model beyond what is achieved with standard
+bagging, overall improving model stability.
+The second type of ensemble model is stochastic gradient boosted regression trees
+(SGB), which grows regression trees sequentially (Friedman, 2001). These trees are
+typically shallow with few or often one split, hence each tree has low variance but
+high bias. Trees are recursively built using the information from previous trees,
+which reduces this bias by improving the model in areas where it does not perform
+well.
+The SGB algorithm begins by fitting the training data with a single shallow tree.
+Next, a second shallow tree of the same depth is fitted based on the residuals from
+the first tree. The prediction from these two trees are summed together to form
+an ensemble prediction, but the second tree prediction is scaled by a learning rate
+λ ∈ (0, 1) to help the model learn slowly and prevent overfitting. This procedure is
+50
+repeated until there are B trees in the ensemble, and the final prediction is the sum
+of the scaled forecasts from each tree.
+Furthermore, SGB uses a regularization technique where a random subsample of the
+training data is used to fit each tree. This randomness reduces correlations between
+trees, which improves model stability and computation speed.
+For both types of ensemble models, we tune the number of trees,B, and the maximum
+depth, L, using the validation set. For SGB, we also tune the learning rate λ. See
+Section 2.4 for a detailed discussion.
+2.3.6 Neural Networks
+Inspired by the human brain, neural networks are highly flexible and can approximate
+any continuous function (Hornik et al., 1989). We use feed-forward neural networks
+that include three types of layers. First, an input layer takes in raw predictors.
+Second, one or more hidden layers interact and non-linearly transform the predictors.
+Third, an output layer aggregates the hidden layers into a final prediction.
+Mathematically, a feed-forward neural network has the following formula. Let K (l)
+denote the number of hidden units in each layer l = 1, ..., L. The output of unit k in
+layer l is denoted as x(l)
+(k), and x(l) = (1, x(l)
+(1), ..., x(l)
+(K))′ is the vector of outputs for layer
+l, including a constant. The vector x(0) denotes the input layer of raw predictors.
+51
+Each unit in hidden layer 0 < l < Lcan be recursively expressed as:
+x(l)
+(k) = f (x(l−1)′
+θ(l−1)
+k ), (2.10)
+where x(l−1)′
+represents the transposed output vector from the previous layer l − 1,
+and θ(l−1)
+k is the vector of weights connecting this output to unit k in layer l. The
+function f denotes a non-linear activation function that transforms the weighted sum
+of inputs. While there are many different activation functions, we use the Rectified
+Linear Unit (Relu) for our neural networks:
+f (u) =
+
+
+
+0 if u <0
+u otherwise.
+(2.11)
+This activation function is popular for its efficiency and computability.
+The ultimate output for the neural network is given by:
+g(z; θ) = x(L−1)′
+θ(L−1), (2.12)
+which is a linear function of the outputs from the last hidden layer.
+We consider architectures with up to four hidden layers. Our shallowest neural
+network, denoted NN1, has a single hidden layer of 16 units. Next, NN2 has two
+hidden layers with 16 and 8 units, respectively; and NN3 has three hidden layers
+with 16, 8, and 4 units respectively. Our deepest neural network, NN4, has four
+hidden layers with 16, 8, 4, and 2 units, respectively. By comparing the performance
+52
+across neural networks with different depths, we can assess the value of complexity
+for forecasting cryptocurrency returns.
+We estimate the neural network parameters by minimizing the penalized ℓ2 objective
+function, which is nonconvex in the parameters, leading to multiple local minima. We
+train the neural network by using the stochastic gradient descent (SGD) algorithm,
+which jointly updates all parameters at each iteration using the gradient calculated
+from a random subsample of the training data. SGD is somewhat less accurate
+at each step compared to the traditional gradient descent, however it significantly
+improves computation speed. To further enhance computational efficiency, we use the
+Adaptive Moment Estimation (Adam) algorithm to adaptively control the learning
+rate, reducing it when the gradient is close to zero.
+Estimating neural networks necessitates substantial regularization due to their heavy
+parameterization and severe non-linearities, hence we apply several techniques in-
+spired by Gu, Kelly and Xiu (2020). First, we include an ℓ1 penalty into the loss
+function, which functions similarly to the lasso, encouraging a sparse representation
+of the predictors. Second, we use early stopping to mitigate overfitting, by termi-
+nating the estimation procedure when the validation error begins to increase. Early
+stopping acts as a less computationally intensive alternative to ℓ2 penalization, while
+still providing shrinkage. Third, we use batch normalization to control the variability
+of predictors across different regions in the network. Fourth, we adopt an ensemble
+approach by training ten different neural networks initialized with different seeds,
+and averaging their forecasts. Since each seed produces a different forecast, this en-
+semble approach reduces forecast variance. Section 2.4 provides further details on
+53
+the hyperparameters used in these techniques.
+2.3.7 Forecast Combinations
+In addition to the linear and non-linear ML techniques, we form forecast combina-
+tions to aggregate the predictive ability across multiple models (see, e.g., Timmer-
+mann, 2006). Following Rapach, Strauss and Zhou (2010), we compute the equally-
+weighted average of all forecasts across a set of models at each point in time, referred
+to as the mean combination. Formally, if the forecast of a given model j (j = 1, ..., J)
+is denoted by ˆr(j)
+i,t+1, then the forecast combination at t + 1 is:
+ˆrM ean
+i,t+1 = 1
+J
+JX
+j=1
+ˆr(j)
+i,t+1, (2.13)
+where J denotes the number of models combined. We compute and compare forecast
+combinations for two cases: (1) linear models (L-Mean) and (2) non-linear models
+(NL-Mean), which allows us to assess the gains in predictive ability from incorpo-
+rating non-linearities and predictor interactions.
+2.3.8 Robust Huber Objective Function
+Section 1.2.4 shows that cryptocurrency returns exhibit extremely heavy tails, char-
+acterized by high positive skewness and immense kurtosis. The ℓ2 objective function
+in Equation (2.4) emphasizes large outliers, which can destabilize models. To mit-
+54
+igate the impact of heavy-tailed data and improve the stability of our models, we
+adopt the robust Huber objective function advocated by Gu, Kelly and Xiu (2020),
+defined as:
+LH(θ) = 1
+N T
+NX
+i=1
+TX
+t=1
+H(ri,t+1 − g(zi,t; θ), ξ), (2.14)
+where
+H(x; ξ) =
+
+
+
+x2, if |x| ≤ξ;
+2ξ|x| −ξ2, if |x| > ξ.
+(2.15)
+The Huber loss H(·) combines the ℓ2 loss for small errors and ℓ1 loss for large errors.
+The threshold parameter ξ controls the mix between ℓ1 and ℓ2. We set the threshold
+at the 99.9th percentile of returns in the combined training and validation samples
+to more effectively handle extreme values. We estimate all models, except for RF,
+using the Huber objective function. Since RF has inherent robustness to outliers, we
+follow Gu, Kelly and Xiu (2020) and use the default ℓ2 loss function.4
+2.4 Hyperparameter Tuning
+This section describes the hyperparameters that are tuned for each model.
+The hyperparameter λ determines the level of parameter shrinkage for penalized
+linear models, including RR, LAS and EN, controlling the bias-variance trade-off.
+4 In unreported results, we find that models estimated using the Huber objective function gen-
+erally outperform those estimated with the mean squared error (MSE) objective function for
+cryptocurrency data.
+55
+Increasing λ results in more shrinkage, which reduces variance but increases bias.
+However setting λ to be too high may lead to underfitting. The hyperparameter ρ
+controls the proportion of ℓ1 and ℓ2 penalization for EN, with values closer to 0 (1)
+corresponding to relatively more ℓ1 (ℓ2).
+The number of principal components K included in the regression is the main hy-
+perparameter for PCR. Lower values of K reduce variance and mitigate overfitting,
+however setting K too low risks omitting predictive information.
+The number of trees B and maximum depth of each tree L are the main hyper-
+parameters for tree-based models, RF and GBT. Increasing the number of trees B
+improves the predictive accuracy but can overfit. Higher values of L allow trees to
+capture more complex interactions, however deeper trees are also more susceptible
+to overfitting. Additionally, the minimum number of samples in each leaf is another
+hyperparameter for RF: lower values increase complexity but can cause overfitting.
+The learning rate λ controls the speed at which GBT learns, with higher values
+leading to faster learning but at an increased risk of overfitting. 5
+We tune the ℓ1 penalty and initial learning rate for NN1-NN4. The ℓ1 penalty
+functions similarly to the LAS: a higher ℓ1 increases shrinkage, leading to a sparser
+model, however setting the penalty too high can cause the model to underfit. The
+initial learning rate for the Adam SGD optimizer controls the convergence speed: a
+lower learning rate results in slower but more precise convergence, whereas a higher
+5 We use SGB instead of XGBoost because SGB supports the standard Huber objective function
+in Equation (2.14), whereas XGBoost does not.
+56
+learning rate leads to faster training but potentially a suboptimal solution or even
+divergence.
+Table 2.1 lists the hyperparameters tuned for each model considered in this paper.
+To select the optimal hyperparameters at a given time, we partition the sample into
+training, validation and test sets as outlined in Section 2.4.1. For each model, we
+select the hyperparameters that produce the lowest MSE in the validation set. Using
+these chosen hyperparameters, we then re-estimate each model over the combined
+training and validation sets to generate the out-of-sample forecasts for the test set
+in the next month.
+2.4.1 Estimation Procedure and Performance Evaluation
+We recursively generate out-of-sample daily forecasts for each model by dividing
+our sample into three disjoint sets: the training, validation and test sets. First, we
+estimate the model parameters on a training sample T1 spanning one year (February
+14, 2018 to February 14, 2019). Second, we conduct an extensive hyperparameter
+optimization on a one-year validation sample T2 (February 15, 2019 to February 14,
+2020). Third, we evaluate the out-of-sample performance of each model using an
+initial one-month test sample (February 18, 2020 to March 13, 2020). We keep the
+model parameters fixed for one month and repeat this process by rolling forward the
+validation and test sets by one month, while expanding the training sample by one
+month in each iteration. We continue this process to the end of the sample so that
+57
+the total test sample ( T3) ranges from February 18, 2020 to June 30, 2022. 6
+Our primary performance metric is the modified Welch and Goyal (2008) out-of-
+sample R2 (R2
+oos) statistic used by Gu, Kelly and Xiu (2020):
+R2
+oos = 1 −
+P
+(i,t)∈T3(ri,t+1 − ˆri,t+1)2
+P
+(i,t)∈T3(ri,t+1)2 , (2.16)
+where ri,t+1 and ˆri,t+1 denote the realized t+1 return and one-day ahead t+1 forecast
+for coin i, respectively, and T3 indicates that the metric is only assessed on the test
+sample. The R2
+oos statistic pools forecast errors across coins and over time into a
+comprehensive panel-level assessment of each model’s predictive ability. It measures
+the reduction in MSE achieved by each model relative to a naive forecast, which
+predicts zero returns for all coins (i.e., a random walk for prices with no drift). In
+unreported results, we explore several alternative benchmarks, including the use of
+historical mean returns typically employed in equity market forecasts. However, we
+find that the naive forecast of zero returns consistently produces the lowest R2
+oos,
+making it the most conservative benchmark. 7
+Outliers are prevalent in cryptocurrency returns, as evidenced by their very high
+kurtosis. Since the R2
+oos statistic is based on the MSE, which places high emphasis
+6 Note that our out-of-sample analysis focuses on daily forecasts since the short sample period
+prohibits performing weekly ML forecasting.
+7 For the R2
+oos statistic, there is a standard way of assessing statistical significance based on the
+Clark and West (2006, 2007) testing procedure. However, we find that the R2
+oos values are
+significant at the 1% confidence level for nearly every model and specification. Hence, we omit
+these results for presentation purposes, but they are available upon request.
+58
+on large errors, outliers can disproportionately influence the evaluation of a given
+model’s predictive power. To address this issue, we incorporate a second criterion
+for the statistical evaluation of a model: the modified Koenker and Machado (1999)
+robust R1
+oos statistic used by Liu (2023), defined as:
+R1
+oos = 1 −
+P
+(i,t)∈T3 |ri,t+1 − ˆri,t+1|P
+(i,t)∈T3 |ri,t+1| . (2.17)
+The R1
+oos is based on the mean absolute error (MAE), which is less sensitive to
+outliers relative to MSE. Using the MAE adds to robustness by ensuring that the
+ranking of the models is driven by overall performance not by a few outliers.
+2.4.2 Out-of-Sample Performance
+In Table 2.2, we report results on the out-of-sample statistical performance of the
+models. Our analysis compares models conditioning on three distinct information
+sets: (1) ML models that condition on just order flow (OF); (2) ML models that
+condition on just economic fundamentals (EF) (i.e., models that condition on just
+the control variables, not order flow); and (3) ML models that condition on both OF
+and EF. This grouping of models allows us to assess whether order flow is essential in
+generating reliable out-of-sample forecasts for cryptocurrency returns over and above
+economic fundamentals. All models condition on lagged returns to capture short-
+term reversals. Additionally, for the training, validation and test sets, we standardize
+each variable using its mean and variance from the training set as is standard practice
+59
+in the ML literature. Our main findings can be summarized as follows. 8
+First, we find that in terms of statistical performance, the OF models dominate
+both the EF and OF+EF models using either the R1
+oos or the R2
+oos statistic. Specif-
+ically, the OF models deliver a higher R1
+oos value for all 13 linear and non-linear
+ML specifications and forecast combinations. The OF models also deliver a higher
+R2
+oos value for 11 out of the 13 ML specifications. The better performance of OF
+over EF indicates that international order flows convey more predictive information
+than economic fundamentals. Similarly, the better performance of OF over OF+EF
+suggests that economic fundamentals contribute limited additional predictive value
+as their information is largely spanned by order flow. Overall, this is compelling
+evidence that order flow is the best information set in our analysis for predicting
+future crypto returns.
+Next, comparing the linear OF models to the non-linear OF models, we find that
+the non-linear OF models dominate the linear specifications. Notably, all the R2
+oos
+values of the linear models are negative, whereas all the R2
+oos values of the non-linear
+models are positive. For example, the best performing model is SGB with an R2
+oos
+of 0.39%, which reinforces the role of sparsity since SGB is often considered a sparse
+model. NL-Mean also achieves an R2
+oos of 0.39%, indicating that the performance of
+combined forecasts is as good as any of the individual non-linear models. These find-
+ings clearly demonstrate the importance of non-linearities and variable interactions
+8 For standard exchange rates, machine learning techniques have been used by Gradojevic and
+Yang (2006) in assessing the predictive ability of order flow and Li, Tsiakas and Wang (2015)
+in assessing the predictive ability of economic fundamentals.
+60
+in the predictive relation between order flow and future crypto returns.
+Finally, we compare our ML OF models to other studies on crypto return prediction
+using ML techniques, which do not condition on order flow. For example, Cakici et
+al. (2024) predict crypto returns using ML models conditioning on 40 characteristics,
+not including order flow. Their best-performing model (OLS) achieves an R2
+oos value
+of -0.21%, which outperforms our OLS model’s R2
+oos value of -1.20% but substantially
+underperforms all our non-linear ML models conditioning on order flow. 9
+In light of these results, we conclude that: (1) conditioning on order flow provides su-
+perior forecasts relative to conditioning on economic fundamentals, and (2) non-linear
+ML models for cryptocurrency returns consistently outperform both linear models
+and the naive benchmark. In summary, order flow offers significant out-of-sample
+predictive power for cryptocurrency returns beyond that of economic fundamentals.
+2.5 The Economic Value of Order Flow
+2.5.1 Portfolio Sorts
+In this section, we assess the out-of-sample economic value of conditioning on order
+flow. Our approach is based on generating portfolios by sorting the cross-section of
+9 Filippou, Rapach and Thimsen (2024) report R2
+oos values up to 2.08% for SGB, but their R2
+oos
+benchmark is the historical mean rather than zero, making direct comparison with our results
+challenging.
+61
+cryptocurrencies on one of two criteria: (1) the world order flow of each coin; (2)
+the ML return forecast for each coin generated by models conditioning on one of the
+three information sets discussed in Section 2.4.2 (OF, EF, OF+EF). This approach
+provides a comprehensive assessment of the economic gains associated with the out-
+of-sample predictive ability of order flow, and its relative economic gain over other
+information sets.
+The portfolio sorting procedure is implemented as follows. At each time t, we rank
+all coins using one of the two criteria listed above: world order flow or the ML
+forecasts. Based on this ranking, we allocate the 84 coins into five quintile portfolios.
+Allocating assets to quintile portfolios is a standard approach in the asset pricing
+literature and ensures that there is a sufficient number of cryptos in each portfolio.
+Then, we compute the t + 1 equally-weighted portfolio returns and the Newey and
+West (1987) t-statistic.10 When sorting on world order flow, we report results for
+both daily and weekly rebalancing. When sorting on ML forecasts, we only report
+results for daily rebalancing since the short sample period is not well-suited for weekly
+ML forecasting. All portfolio sorts are performed purely out of sample with no look-
+ahead bias. In short, the portfolio sorts allow us to assess whether order flow has
+predictive information for portfolio returns over the next period. 11
+10 In computing the Newey and West (1987) t-statistic, we use the Bartlett kernel with the
+data-driven bandwidth parameter selected by the AR(1) model (see, e.g., Andrews, 1991).
+11 For cryptocurrencies, it is sensible to use equal weights as opposed to value weights because
+value weights would be dominated by the top 5 cryptos, which on a given day comprise ap-
+proximately 90% of the total market cap. Consequently, using equal weights allows us to take
+full advantage of the breadth of information available in our data set.
+62
+We report results on the mean daily (or weekly) percent return for the five quintile
+portfolios (P1 to P5). We primarily focus on the zero-cost investment portfolio that
+goes long on the top portfolio and short on the bottom portfolio ( P5 − P1). For
+this portfolio, we report the mean return, alpha and Sharpe ratio. Following Liu,
+Tsyvinski and Wu (2022), the alpha is estimated by regressing the portfolio return
+on three factors: (1) the market return defined as the value-weighted return of all
+84 coins; (2) the size factor defined as the return difference between the small size
+portfolio (bottom 30% in market cap) and the big size portfolio (top 30% in market
+cap), and (3) the momentum factor based on 2 × 3 sorts on size and past three-
+week returns. To construct these common factors at the daily (weekly) interval,
+we replicate their methodology using our sample of 84 coins and reconstitute the
+portfolios daily (weekly).
+2.5.2 Portfolio Performance
+Sorting on Order Flow
+We begin our discussion of portfolio performance by reporting results in Table 2.3 for
+daily and weekly portfolio sorts on world order flow (OF W ). In addition to sorting
+on OF W , we also sort on an orthogonalized OF W variable (ortho-OF W ), which is
+orthogonalized relative to same-period returns.12 As previously discovered in chapter
+12 Daily (weekly) ortho-OF W is defined as the last residual from a recursive regression of lagged
+order flow on lagged returns, which is estimated using an expanding window that is updated
+daily (weekly). This approach avoids any forward-looking bias as only information available
+63
+1 ( see Table 1.6), lagged order flow is comprised of one component that is correlated
+with lagged returns, reflecting transitory effects, and another component that is
+uncorrelated with returns, reflecting permanent effects. Using an orthogonalized
+OFW ensures that portfolio sorts rely on lagged order flow information exclusive of
+any information in lagged returns. The sample period spans from February 18, 2020,
+to June 30, 2022. 13
+Panel A in Table 2.3 indicates that the performance of the daily long-short portfolio
+(P5 − P1) tends to be better for the orthogonalized OF W compared to the original
+non-orthogonalized OF W . For example, the daily alpha of P5 − P1 when sorting on
+OFW is equal to 0 .02% with a t-stat=0.11, which however rises to 0 .24% with a
+t-stat=1.65 for sorting on ortho-OF W . Furthermore, ortho-OF W exhibits an annu-
+alized Sharpe ratio of 1.00. The better performance of ortho-OF W is not surprising
+since, as we have seen in the daily predictive panel regressions of the first chapter,
+order flow alone is insignificant but when controlling for lagged returns it becomes
+significant. In portfolio sorts, we capture the same effect by orthogonalizing OF W ,
+which is essential in generating strong positive portfolio performance. Importantly,
+the positive relation between ortho-OF W and future coin returns suggests a perma-
+nent effect of order flow on crypto prices. 14
+Panel B in Table 2.3 shows that the weekly results are strong regardless of orthogo-
+up to time t is used to construct ortho-OF W .
+13 The portfolio sorts on world order flow use the same sample period as the sorts on ML forecasts
+so that all portfolio results are comparable.
+14 For the results on portfolio sorts conditioning on just US order flow, please see Table 2.4.
+64
+nalization. For portfolio sorts on the weekly OF W , the mean of P5 − P1 is equal to
+1.93% per week and significant (t-stat=2.99). The alpha is similar (1 .78% per week)
+and also significant (t-stat=2.86), demonstrating that the economic value cannot be
+explained by the crypto market, size or momentum factors. The annualized Sharpe
+ratio is equal to 2 .05. The results for ortho-OF W are similar: the long-short mean
+is equal to 1.83% (t-stat=2.82), the alpha is 1.72% (t-stat=2.71) and a Sharpe ratio
+of 1.93. Therefore, the orthogonalization of world order flow leads to a substantial
+improvement for daily returns but no improvement for weekly returns, which is con-
+sistent with lagged returns having weaker predictive power for future weekly returns
+in the in-sample panel regressions. Taken together, these results indicate that there
+is strong out-of-sample economic value for portfolios sorted on world order flow.
+Sorting on ML Forecasts
+In Table 2.5, we report results on portfolio sorts based on the daily forecasts generated
+by ML models, which condition on the 11 international order flows. This approach
+enables an assessment of whether there are economic gains with conditioning on all
+order flows as opposed to just world order flow as we did previously. Given that
+the training and validation sets require two years of data, the test period begins on
+February 18, 2020, which is the same period as the sorts on world order flow.
+We emphasize three key findings regarding ML model performance. First, most
+non-linear models conditioning on OF achieve higher Sharpe ratios than non-linear
+models conditioning on EF or OF+EF. For example, the NL-Mean model generates
+65
+an annualized Sharpe ratio of 3.61 for OF, compared to 2.10 for EF and 2.53 for
+OF+EF. In other words, the Sharpe ratio for NL-Mean with OF is nearly double
+that with EF. The top-performing model overall is SGB conditioning on OF, with
+a Sharpe ratio of 3.68, aligning with the highest R2
+oos value delivered by the same
+model shown in Table 2.2. RF, NN1 and NN3 also deliver high Sharpe ratios of 2.98,
+2.61 and 2.42, respectively, aligning with their relatively high R2
+oos values.
+Second, while linear models perform similarly across the three information sets, they
+are outperformed by non-linear models conditioning on OF. For example, the best
+linear model, OLS conditioning on OF, delivers a Sharpe ratio of 2.38, which is lower
+than that of RF, SGB, NN1, NN3, and NL-Mean conditioning on OF. These results
+underscore the importance of model complexity in generating economic value with
+ML OF models, aligning with the “virtue of complexity” in return prediction (Kelly,
+Malamud and Zhou, 2024). 15
+Third, our models conditioning on OF outperform leading benchmarks for crypto
+return prediction using ML techniques that do not condition on OF. For example,
+Filippou, Rapach and Thimsen (2024) construct daily equally-weighted long-short
+portfolios using various ML models conditioning on 54 characteristics representing
+network value, activity, momentum, technical signals and online activity, but ex-
+cluding order flow. Their models yield annualized Sharpe ratios of 1.44, 2.68, 1.14,
+and 2.57 for RF, SGB, NN3, and NL-Mean, respectively. In comparison, Table 2.5
+15 OLS is considered to have higher complexity, i.e., more parameterization, than regularized
+linear models such as RR, LAS and EN. Therefore, OLS outperforming these regularized linear
+models further aligns with the “virtue of complexity” (Kelly, Malamud and Zhou, 2024).
+66
+shows that the same models conditioning on OF achieve Sharpe ratios of 2.98, 3.68,
+2.42, and 3.61, respectively, demonstrating the additional economic value of order
+flow. Furthermore, the best-performing model (OLS) in Cakici et al. (2024) achieves
+a weekly three-factor alpha of 1.98%, which is considerably lower than SGB condi-
+tioning on OF, yielding a weekly alpha of 5 × 0.78 = 3.90%.
+To illustrate these results, in Figure 2.1 we report the cumulative return of the long-
+short portfolio of select ML OF models against the return of the market portfolio,
+which is the value-weighted return of all coins in the sample. The figure confirms
+that the non-linear models consistently outperform the linear models throughout the
+sample period. It is also interesting to note that the non-linear models continue to
+perform well even when the market portfolio exhibits a negative return in the last
+year of the sample.
+Overall, we can summarize the main results as follows: (1) the non-linear ML OF
+models perform the best and their performance is excellent by any standard. For
+example, the long-short portfolio for the best model (SGB) delivers a daily mean
+return of 0.76% and an annualized SR = 3.68; (2) the linear ML models consistently
+underperform the non-linear models, demonstrating that model complexity is impor-
+tant for generating economic value; (3) the OLS benchmark performs well relative to
+regularized linear models; (4) the combined forecasts are among the best performers;
+(5) the portfolios sorted on the daily ML models perform substantially better than
+portfolios sorted directly on world order flow; and, finally, (6) ML models condition-
+ing on OF outperform leading benchmarks that use ML models without conditioning
+on OF. In short, there is high economic value in conditioning on all 11 international
+67
+order flows in the context of non-linear ML models.
+2.6 Conclusion
+We provide clear evidence of the value of order flow for predicting cryptocurrency
+returns out-of-sample. By employing various linear and non-linear machine learn-
+ing techniques, we find non-linear models which include the 11 international order
+flows as well as world order flow perform better than (1) linear models condition-
+ing on order flows and (2) linear and non-linear models conditioning on economic
+fundamentals only.
+The combination of non-linear machine learning techniques with international order
+flow information provides an especially powerful predictive toolkit for this market
+and is associated with high economic value. The best performing model is the SGB
+OF with an R2
+OOS of 0 .39% and an annualized Sharpe ratio of 3.68. Similarly, the
+forecast combination of non-linear machine learning models conditioning on daily
+order flow delivers an R2
+OOS of 0 .39% annualized Sharpe ratio of 3.61 for the long-
+short portfolio. In contrast, our benchmark OLS model produces an R2
+OOS of −1.20%
+and an annualized Sharpe ratio of 2.38. In conclusion, our empirical evidence strongly
+indicates that information conveyed by order flow matters for cryptocurrency returns.
+68
+Table 2.1: Hyperparameters
+This table describes the set of hyperparameters, which are tuned for each individual model imple-
+mented in the paper.
+Ridge λ ∈ (10−5, 10−1)
+ρ = 0
+Lasso λ ∈ (10−5, 10−1)
+ρ = 1
+EN λ ∈ (10−5, 10−1)
+ρ = {0.25, 0.5, 0.75}
+PCR K = 1 ∼ P
+RF #Trees = 50 ∼600
+#Features in each split = floor(
+√
+P )
+Tree depth = 5∼30
+Minimum leaf samples = {0.01, 0.05, 0.1 }
+GBT #Trees = 100 ∼600
+Tree depth = 1∼2
+Learning rate = {0.0001, 0.001, 0.01 }
+Sample rate = 0.5
+NN1-NN4 Activation Functions = Relu
+Adam Params. = default
+Learning Rate ∈ {0.0001, 0.001}
+Batch size = 16
+Epochs = 300
+ℓ1 = (10−5, 10−3)
+Patience = 5
+69
+Table 2.2: Out-of-Sample Statistical Performance
+This table reports the out-sample statistical performance of the models using two criteria: the
+R1
+oos statistic in percent based on the Mean Absolute Error (MAE) of the forecasts and the R2
+oos
+statistic in percent based on the Mean Squared Error (MSE) of the forecasts. The MAE and the
+MSE are computed using an expanding window. Daily results are reported for three information
+sets: OF only conditions on order flows; EF only conditions on economic fundamentals; and OF+EF
+conditions on both. All models condition on lagged returns. Bold entries indicate the highest value
+in each row for each statistic. The out-of-sample test period ranges from February 18, 2020 to June
+30, 2022.
+Daily R1
+oos (%) Daily R2
+oos (%)
+OF EF OF+EF OF EF OF+EF
+OLS -1.52 -13.48 -13.65 -1.20 -18.94 -19.23
+RR -1.48 -13.03 -13.22 -1.14 -16.15 -16.43
+LAS -1.02 -1.13 -1.15 -0.53 -0.48 -0.48
+EN -0.85 -1.08 -1.07 -0.36 -0.29 -0.28
+PCR -1.52 -3.25 -3.60 -1.01 -1.36 -1.71
+RF 0.23 -0.98 -0.75 0.29 -0.21 0.02
+SGB 0.42 -0.47 -0.47 0.39 0.13 0.14
+NN1 0.18 -0.42 -0.62 0.10 0.03 -0.60
+NN2 0.10 -0.24 -0.35 0.30 0.17 0.02
+NN3 -0.07 -0.97 -2.39 0.18 -0.93 -2.99
+NN4 -0.08 -0.81 -0.77 0.21 -0.70 -1.29
+L-Mean -1.12 -3.96 -4.01 -0.67 -2.81 -2.91
+NL-Mean 0.23 -0.37 -0.52 0.39 0.02 -0.31
+70
+Table 2.3: Portfolios Sorted on World Order Flow
+This table displays the performance of cryptocurrency portfolios sorted on world order flow (OFW ).
+Ortho-OFW is world order flow orthogonalized relative to same-period returns. P1 represents the
+portfolio with the lowest lagged order flow and P5 the portfolio with the highest lagged order flow.
+The portfolios are equally-weighted and rebalanced daily (Panel A) or weekly (Panel B). The alpha
+is based on a three-factor model, which includes the cryptocurrency market, size and momentum
+factors (Liu, Tsyvinski and Wu, 2022). The returns and alphas are in daily/weekly percent. SR
+is the annualized Sharpe ratio. The Newey and West (1987) t-statistics are shown in parenthesis.
+The out-of-sample test period ranges from February 18, 2020 to June 30, 2022.
+Panel A: Daily Portfolios Sorted on W orld Order Flow
+P1 P2 P3 P4 P5 P5 − P1
+Mean return (% daily) Mean alpha SR
+OFW 0.40 0.38 0.37 0.54 0.42 0.02 0.02 0.11
+(t-stat) (1.64) (1.52) (1.53) (2.13) (1.67) (0.18) (0.11)
+ortho-OFW 0.35 0.39 0.43 0.38 0.57 0.23 0.24 1.00
+(t-stat) (1.38) (1.55) (1.76) (1.58) (2.24) (1.59) (1.65)
+Panel B: W eekly Portfolios Sorted on W orld Order Flow
+P1 P2 P3 P4 P5 P5 − P1
+Mean return (% weekly) Mean alpha SR
+OFW 1.37 1.95 1.91 1.87 3.30 1.93 1.78 2.05
+(t-stat) (1.05) (1.43) (1.43) (1.41) (2.36) (2.99) (2.86)
+ortho-OFW 1.48 1.42 2.20 1.98 3.31 1.83 1.72 1.93
+(t-stat) (1.10) (1.08) (1.59) (1.51) (2.48) (2.82) (2.71)
+71
+Table 2.4: Portfolios Sorted on US Order Flow
+This table displays the performance of cryptocurrency portfolios sorted on US order flow (OF U SD).
+Ortho-OFU SDis US order flow orthogonalized relative to same-period returns. P1 represents the
+portfolio with the lowest lagged order flow and P5 the portfolio with the highest lagged order flow.
+The portfolios are equally-weighted and rebalanced daily (Panel A) or weekly (Panel B). The alpha
+is based on a three-factor model, which includes the cryptocurrency market, size and momentum
+factors (Liu, Tsyvinski and Wu, 2022). The returns and alphas are in daily/weekly percent. SR
+is the annualized Sharpe ratio. The Newey and West (1987) t-statistics are shown in parenthesis.
+The out-of-sample test period ranges from February 18, 2020 to June 30, 2022.
+Panel A: Daily Portfolios Sorted on US Order Flow
+P1 P2 P3 P4 P5 P5 − P1
+Mean return (% daily) Mean alpha SR
+OFU SD 0.47 0.44 0.39 0.42 0.39 -0.08 -0.08 -0.45
+(t-stat) (1.97) (1.74) (1.56) (1.70) (1.57) (-0.74) (-0.69)
+ortho-OFU SD 0.45 0.43 0.30 0.46 0.46 0.01 0.03 0.06
+(t-stat) (1.83) (1.74) (1.23) (1.88) (1.86) (0.09) (0.25)
+Panel B: W eekly Portfolios Sorted on US Order Flow
+P1 P2 P3 P4 P5 P5 − P1
+Mean return (% weekly) Mean alpha SR
+OFU SD 1.08 2.35 1.84 2.30 2.78 1.70 1.64 1.80
+(t-stat) (0.83) (1.68) (1.42) (1.70) (2.11) (2.91) (2.61)
+ortho-OFU SD 0.96 2.07 2.30 2.39 2.61 1.65 1.48 1.82
+(t-stat) (0.71) (1.60) (1.64) (1.81) (1.98) (2.86) (2.50)
+72
+Figure 2.1: The Cumulative Return of Long-Short Portfolios
+The figure plots the cumulative return for the long-short portfolio of select machine learning models
+that condition on the international order flows (ML OF models). The figure also reports the return
+of the market portfolio, which is the value-weighted return of all the coins in the sample. The
+out-of-sample test period ranges from February 18, 2020 to June 30, 2022.
+73
+Table 2.5: Daily Portfolios Sorted on ML Forecasts
+This table displays the performance of cryptocurrency portfolios which are sorted on ML forecasts.
+The portfolios are equally-weighted and rebalanced daily. Results are reported for three ML models:
+OF only conditions on order flows; EF only conditions on economic fundamentals; and OF+EF
+conditions on both. All models condition on lagged returns. The alpha is based on a three-factor
+model, which includes the cryptocurrency market, size and momentum factors (Liu, Tsyvinski and
+Wu, 2022). The returns and alphas are in daily percent. SR is the annualized Sharpe ratio. The
+Newey and West (1987) t-statistics are shown in parenthesis. Bold entries indicate the highest
+Sharpe ratio for each ML model across the three information sets (OF, EF, OF+EF). The out-of-
+sample test period ranges from February 18, 2020 to June 30, 2022.
+OF Model EF Model OF+EF Model
+P5 − P1 P5 − P1 P5 − P1
+Mean alpha SR Mean alpha SR Mean alpha SR
+OLS 0.55 0.53 2.38 0.50 0.53 2.06 0.47 0.48 1.97
+(t-stat) (3.55) (3.58) (3.05) (3.49) (2.92) (3.23)
+RR 0.53 0.51 2.31 0.46 0.49 1.88 0.45 0.46 1.89
+(t-stat) (3.42) (3.47) (2.79) (3.23) (2.81) (3.12)
+LAS 0.34 0.33 1.69 0.17 0.19 0.97 0.17 0.18 0.94
+(t-stat) (2.43) (2.56) (1.53) (1.62) (1.48) (1.59)
+EN 0.26 0.28 1.24 0.32 0.35 1.65 0.32 0.35 1.62
+(t-stat) (1.83) (2.09) (2.47) (2.79) (2.41) (2.74)
+PCR 0.13 0.12 0.59 -0.03 -0.11 -0.13 0.02 -0.06 0.08
+(t-stat) (0.87) (0.81) (-0.20) (-0.77) (0.12) (-0.43)
+RF 0.61 0.66 2.98 0.33 0.29 1.45 0.23 0.20 0.99
+(t-stat) (4.67) (4.95) (2.21) (2.05) (1.51) (1.35)
+SGB 0.76 0.78 3.68 0.47 0.49 2.61 0.48 0.50 2.66
+(t-stat) (5.54) (5.85) (3.87) (4.14) (3.94) (4.23)
+NN1 0.56 0.61 2.61 0.35 0.36 1.43 0.45 0.47 2.08
+(t-stat) (3.89) (4.41) (2.17) (2.36) (3.10) (3.45)
+NN2 0.45 0.50 2.05 0.32 0.34 1.40 0.53 0.53 2.34
+(t-stat) (2.99) (3.55) (2.17) (2.30) (3.59) (3.72)
+NN3 0.52 0.56 2.42 0.24 0.26 1.12 0.51 0.50 2.25
+(t-stat) (3.53) (4.04) (1.70) (1.87) (3.46) (3.44)
+NN4 0.33 0.38 1.55 0.42 0.44 2.07 0.49 0.51 2.25
+(t-stat) (2.33) (2.76) (3.12) (3.40) (3.34) (3.78)
+L-Mean 0.45 0.43 1.95 0.47 0.49 1.90 0.47 0.48 1.98
+(t-stat) (2.87) (2.89) (2.81) (3.21) (2.93) (3.23)
+NL-Mean 0.78 0.81 3.61 0.48 0.50 2.10 0.61 0.60 2.53
+(t-stat) (5.49) (5.83) (3.19) (3.48) (3.71) (4.14)
+74
+Chapter 3
+Predictability of Order Flow for
+Cryptocurrency Returns: A
+Deeper Dive
+3.1 Introduction
+The previous two chapters have established strong evidence of the explanatory and
+predictive power of order flow for the cross-section of cryptocurrency returns. In the
+first chapter we used in-sample panel regressions at the daily and weekly levels and
+establish strong evidence for the significance of world order flow in both explaining
+and predicting returns. Our results show the predictive information contained in or-
+der flow is permanent rather than transitory in nature. Chapter two employed linear
+and non-linear ML models in addition to forecast combinations to predict returns
+in an out-of-sample setting. The out-performance of non-linear ML techniques for
+models conditioning on all international order flows and world order flow suggests
+these variables contain complex and potentially non-linear information about future
+75
+returns.
+In this chapter, we take our analysis one step further to shed light on important
+questions related to the non-linear nature of the information contained in order flow,
+and the profitability of our trading strategy under economic restrictions and limits
+to arbitrage. Addressing these topics will deepen our understanding of the reason
+behind the strong performance of non-linear machine learning models that condition
+on order flow, in addition to building upon the economic insight to our previous
+results from the trading strategies.
+Specifically, we address the following four questions. First, why do non-linear ma-
+chine learning models that condition on order flow improve the predictability of
+returns? Second, is there a bidirectional relationship between order flow and re-
+turns? Third, are the portfolio results robust to short-sale constraints, drawdowns
+and transaction costs? Fourth, can the economic value of order flow be explained by
+limits to arbitrage?
+Our empirical analysis employs the same daily data used in the previous two chap-
+ters. This dataset consists of a cross-section of 84 cryptocurrencies for the sample
+period of January 1, 2018 to June 30, 2022. It includes a rich dataset of order flows
+denominated in 11 fiat currencies, including the G10 currencies plus South Korea in
+addition to an aggregate world order flow. In what follows, we discuss our empirical
+approach and main findings step by step.
+We begin our analysis by identifying the existence of significant non-linear relation-
+ships between order flow and returns. By estimating a panel regression conditioning
+76
+on non-linear transformations of the international and world order flows, we show
+clear evidence of a non-linear relationship between returns and order flow. This
+provides measurable evidence to explain why non-linear ML techniques outperform
+linear ones when it comes to models conditioning on order flow. Next, we test for
+the existence of a bidirectional relationship between order flow and returns. Follow-
+ing Foucault, Pagano and Roell (2013), we estimate a vector autoregression (V AR)
+model with the endogenous variables being returns and order flows. We find mixed
+evidence in support of a bidirectional relationship when we estimate individual V AR
+models for the top 10 coins by market cap. Out of these 10 coins, about half show
+significance of past returns on future order flow suggesting that the existence of
+mechanical price pressure is coin-specific. This relationship becomes stronger when
+estimated over the cross-section of the top-10 coins as well as for all 84 coins.
+Motivated by Avramov, Cheng and Metzker (2023), we conduct an analysis on the
+profitability of our models in the presence of economic restrictions such as short-
+selling constraints, transaction costs, drawdowns and limits to arbitrage. To be
+more specific, in the cryptocurrency market, it may be difficult or even impossible
+to short certain coins. Therefore, to generate a realistic trading strategy that avoids
+shorting, we may focus on the long portfolio rather than the long-short portfolio
+spread. In light of this, we show that compared to the long-short portfolios, the long
+portfolios exhibit a similar risk-adjusted return, lower Sharpe ratio, lower turnover
+and hence a higher break-even transaction cost. For example, the long portfolio of the
+NL-Mean combination exhibits a daily alpha of 0.87% (t-stat=3.18), an annualized
+Sharpe ratio of 1.98 and a break-even transaction cost of 1.07% per day. In contrast,
+77
+the same model for the long-short portfolio delivers an alpha of 0.81% (t-stat=5.83),
+an annualized Sharpe ratio of 3.61 and a break-even transaction cost of 0.50% per
+day. We conclude, therefore, that ML models that condition on order flow generate
+high economic value for long-only investors who pursue a realistic trading strategy
+investing in cryptocurrencies.
+Finally, we study whether the profitability of ML models conditioning on order flow
+can be explained by limits to arbitrage. We address this in two ways. First, we
+restrict our analysis to the top 10 coins by market capitalization which tend to have
+low arbitrage costs. If limits to arbitrage were present, we would expect to see
+the profitability diminish when restricted to the largest of coins in our sample. We
+find the non-linear ML models conditioning on order flow continue to perform well
+and in some cases perform better than models that use the full cross-section. For
+example, the best performing model using the full cross-section is SGB OF with an
+R2
+oos = 0.39% which almost triples to 1.05% with the top 10 coins. Additionally, the
+profitability of the ML models remains strong. For example, the SGB OF remains
+the best performing model with a Sharpe ratio of 2.14.
+Second, following Atilgan et al. (2020) and Liu, Tsyvinski and Wu (2022) we create
+an arbitrage cost index based on multiple indicators known to capture limits to arbi-
+trage. We find that orthogonalized order flow and non-linear ML models conditioning
+on order flow produce significant economic value for coins with low arbitrage costs. In
+contrast, models conditioning on economic fundamentals perform well only for coins
+with higher arbitrage costs, indicating that their economic value can be explained by
+limits to arbitrage. Overall, the inability of limits to arbitrage to explain the positive
+78
+predictive ability of order flow, especially in the context of non-linear ML models,
+further supports the permanent view of the effect of order flow on cryptocurrency
+returns.
+In summary, our analysis provides compelling empirical evidence to establish that
+order flow has strong and economically valuable out-of-sample predictive power for
+cryptocurrency returns. Our empirical findings are robust to economic restrictions,
+such as short-selling constraints and high transaction costs that characterize the
+cryptocurrency market.
+In general, our approach is distinct from the existent literature as indicated by the
+use of a large cross-section of coins, a large cross-section of order flows denominated
+in different fiat currencies, the out-of-sample focus of assessing predictability, the use
+of machine learning methods and the economic evaluation based on portfolio sorts
+with an assessment of the effect of limits to arbitrage.
+The remainder of the paper is organized as follows. In the next section, we review the
+cryptocurrency dataset used in the empirical analysis. In Section 3, we present our
+panel results highlighting the non-linear relationship between order flow and returns
+and discuss the results from the V AR analysis. In Section 4, we assess the economic
+value of order flow based on portfolio sorts in presence of economic restrictions and
+discuss the impact limits to arbitrage have on our overall profitability. Finally, we
+conclude in Section 5.
+79
+3.2 Data Overview
+Our empirical analysis employs data from a cross-section of 84 cryptocurrencies for
+the sample period of January 1, 2018 to June 30, 2022. The CMC database from
+which we obtain the crypto prices contains data on thousands of coins but most
+have low market capitalization and/or limited historical data. To obtain the final
+cross-section of 84 coins, we impose three criteria to ensure the liquidity of our
+sample. First, we require that coins must have a market capitalization of greater
+than 1 million USD on the first day of the sample period. Second, coins must be
+continuously traded with a non-zero price and non-zero volume in each time period
+of our sample. Finally, third, we exclude all stable coins from the cross-section.
+Order flow, is defined as the log difference between buyer-initiated and seller-initiated
+transaction volume denominated in a particular fiat currency over a period of time.
+The fiat currencies we employ include the following: US dollar (USD), Euro (EUR),
+British pound (GBP), Japanese yen (JPY), Swiss frank (CHF), Canadian dollar
+(CAD), Australian dollar (AUD), New Zealand dollar (NZD), Norwegian krone
+(NOK), Swedish krona (SEK) and the Korean won (KR W). Following Menkhoff
+et al. (2016), we standardize each order flow series using a rolling window of 30
+days. Due to the standardization, the first day of our sample becomes February 14,
+2018. World order flow is computed by aggregating all 11 buy-volumes and all 11
+sell-volumes, taking the log difference, and performing the same standardization as
+applied to the disaggregated order flows.
+We use a combination of coin-specific variables and economic fundamentals as con-
+80
+trols in the empirical analysis. The coin-specific variables include market cap, total
+volume, and volatility. The economic fundamentals used in our analysis include the
+short rate, term spread, default spread, TED spread, S&P 500 index returns, MSCI
+global index returns, and the VIX index returns. 1
+3.3 Nature of the Relationship Between Order Flow
+and Returns
+3.3.1 Non-linear Prediction
+Through the work in the first two chapters, we have shown the significance of order
+flow for predicting cryptocurrency returns both in and out of sample. In chapter 2
+we found evidence that order flow has strong out-of-sample predictability as linear
+and non-linear ML models conditioning on order flow perform well, with non-liner
+models performing the best. One of the limitations of ML techniques such as the
+ones used in the previous chapter is the ”black box” nature of the models. It is
+not obvious as to why the non-linear models perform better than the linear order
+flow models. Could it be the case that order flow has a non-linear relationship to
+future returns? We shed light on this question by specifying a single predictive panel
+regression, where world and international order flows enter in a linear, square and
+cubic form together with interaction terms between the world order flow and each
+1 See section 1.2 for a detailed explanation of the data and data sources.
+81
+of the international order flows. The regression also conditions on the same control
+variables as previously used. The results of this predictive regression are reported in
+Table 3.1. 2
+We find that some of the non-linear and interaction terms are individually signifi-
+cant, all non-linear and interaction terms are collectively significant and, importantly,
+their inclusion does not diminish the strong predictive power of the linear world order
+flow. Specifically, Table 3.1 indicates that: (1) among the linear terms, world, Ko-
+rean, British and Australian order flows are significant; (2) among the square terms,
+British, Swiss and Norwegian order flows are significant; (3) among the cubic terms,
+Canadian and Swiss order flows are significant; and finally (4) among the interaction
+terms Korean order flow and lagged returns are significant.
+Additionally, we conduct an F-test for the joint significance of the non-linear effects
+and we find that the p-value is equal to 5.3% for the square terms jointly, 0.4%
+for the cubic terms, 0.5% for the interaction terms, and 0.0% for all non-linear
+and interaction terms together. Furthermore, the adjusted ¯R2 rises from 1.20% for
+conditioning on the linear terms only to 1.28% for both linear and square terms,
+then to 1.31% for linear, square and cubic terms and, finally, to 1.39% for all terms
+together. Based on this evidence, we conclude that the non-linear and interaction
+terms of order flow have significant predictive power for future cryptocurrency returns
+in the context of panel regressions.
+2 In Table 3.2, we report the same results for the test sample period used by the machine learning
+models in out-of-sample forecasting.
+82
+The non-linearities we uncover in the regression are complicated. They involve
+squares, cubics and interactions for some international order flows but not others.
+The order flows for which squares are significant are not always the same as the
+ones for which cubics or interactions are significant. This suggests that the underly-
+ing non-linear model is complex and unlikely to be fully captured by our non-linear
+regression. This finding provides evidence as to why the non-linear machine learn-
+ing models perform better than linear methods since they are able to capture these
+complex relationships in the data. Moreover, as several machine learning models
+perform variable selection, these results can be viewed as a lower bound on the im-
+provements attained by including non-linear and interaction terms. Our finding that
+some non-linear terms are highly significant while others are not, underscores the
+value of machine-learning variable selection, which selects the non-linearities that
+matter most.
+3.3.2 V AR models
+Although we have established order flow has strong predictive power for returns, it
+is well documented in the literature that prices and order flows affect each other in a
+dynamic way (see, e.g., Foucault, Pagano and Roell, 2013). The positive correlation
+between prices and order flows may stem from two factors. First, informed traders
+buy an asset, when they believe that the price will go up. In this case, order flow
+contains predictive information. Second, it is possible that high order flow also
+creates mechanical price pressure, which can be observed in two directions. In the
+presence of momentum, a higher price will attract higher order flow, which in turn
+83
+will push up the price leading to a feedback effect. Alternatively, in the presence
+of contrarian reversal and inventory effects, a lower price may attract buy market
+orders and a higher price may attract sell market orders leading to an effect that is the
+opposite of momentum. The direction of price pressure can be assessed empirically.
+While the correlation between order flow and future returns establishes the predictive
+power of order flow, we gain greater economic insight by evaluating the relative
+role of the two causal effects. To disentangle the two effects, we estimate a vector
+autoregression (V AR) in which the endogenous variables are daily cryptocurrency
+returns and order flows (up to five lags), and the exogenous variables are the same
+control variables that we use in the panel regressions in chapter 1. This is similar
+to testing for Granger causality of returns on order flows and order flows on returns.
+Following Hasbrouck (1991), we include contemporaneous world order flow in the
+V AR regressions. We estimate V AR regressions for each of the top 10 coins by
+market cap as well as for all top-10 coins together and all 84 coins together (i.e., the
+full cross section). In Table 3.3, we report results for select coefficients of all V AR
+regressions.3
+Our main findings are as follows. First, the contemporaneous world order flow is
+highly significant for returns in all coins. For example, the t-statistic on BTC is
+equal to 12.05. Second, in the presence of contemporaneous world order flow, the
+predictive world order flow is significant for the returns of half of the top 10 coins.
+For example, t-statistic for XRP is equal to 2.20. More importantly, third, when
+3 In Table 3.4 we report detailed V AR results for two prominent coins: BTC (bitcoin) and XRP
+(by Ripple).
+84
+considering the top-10 coins together or all 84 coins, the predictive world order flow
+is highly significant with a t-stat=3.49 for the top-10 coins and a t-stat=5.39 for all
+84 coins. Fourth, the lagged return has a predominantly negative relation with future
+order flow suggesting contrarian reversal and inventory effects. Again, this relation
+is significant for half of the top-10 coins individually but is highly significant for the
+top-10 coins together (t-stat=-4.55) and for the 84 coins together (t-stat=-5.85). 4
+Consistent with Hasbrouck (1991), Table 3.3 also reports the cumulative coefficients
+for order flow and returns for up to five lags. We find that the t-statistics on the
+cumulative coefficients are similar to the t-statistics on the first lag. For example,
+for the cumulative predictive effect of world order flow on returns, the t-statistic is
+significant for 6 of the top-10 coins as well as for all top-10 coins together and all 84
+coins.
+Taken together, these results imply that although the contemporaneous effect of order
+flow on returns is universally strong, the two predictive effects of order flow on returns
+and returns on order flow tend to be coin-specific but become substantially stronger
+when considering the cross section of the top-10 coins or all 84 coins. Prediction is
+consistently significant when using a cross-section of cryptocurrency returns. In other
+words, there is predictability in both the time series and in the cross-section so that
+the panel regressions deliver strong results. We conclude that based on the panel
+regression results and the V AR regression results applied to a large cross-section,
+the predictive effect of order flow on future returns is universally strong even after
+4 The results remain qualitatively similar when removing the contemporaneous world order flow
+from the V AR regressions.
+85
+conditioning on lagged returns.
+3.4 Economic Restrictions and Limits to Arbitrage
+3.4.1 Short-sale Constraints, Drawdowns, and Transaction
+Costs
+Our portfolio analysis has so far focused on the long-short portfolio because it is
+well suited for illustrating the economic value of conditioning on order flow. In other
+words, if order flow is a good predictor, it should be able to identify which portfolio
+performs well and which one does not. Then, investors would benefit from a zero-cost
+trading strategy that goes long on the top portfolio and short on the bottom portfolio.
+However, in the cryptocurrency market, it may be difficult, even impossible, to short
+some cryptocurrencies. When possible, additional shorting fees will apply (see, e.g.,
+Liu, Tsyvinski and Wu, 2022). Since the objective of a typical investor is to generate
+a realistic trading strategy that avoids shorting and is subject to lower transaction
+costs, in this section we focus on just the long portfolio. In Table 3.5, we report
+detailed results on the performance of the daily long OF portfolio ( P5) and compare
+them to the corresponding daily long-short OF portfolio ( P5 − P1).
+For a comprehensive assessment of performance of the most realistic trading strate-
+gies, we report the mean return, alpha, beta on the market portfolio, and Sharpe
+ratio. Additionally, in assessing economic restrictions, we report the maximum draw-
+86
+down (MDD), turnover (TO) and break-even transaction cost (BE-TC) as advocated
+by Avramov, Cheng and Metzker (2023). The maximum drawdown is defined as the
+maximum cumulative loss from the portfolio’s price peak to the following trough.
+A reasonably low MDD is indicative of a successful trading strategy because large
+drawdowns often lead to fund redemptions.
+Following Gu, Kelly and Xiu (2020), we define the turnover of the long-short portfolio
+at time t as follows:
+T Ot = 1
+2
+X
+i∈L
+wi,t − wi,t−1(1 + ri,t)P
+k∈L wk,t−1(1 + rk,t)
+ + 1
+2
+X
+j∈S
+wj,t − wj,t−1(1 + rj,t)P
+n∈S wn,t−1(1 + rn,t)
+ ,
+(3.1)
+where i ∈ L (j ∈ S) indicates that coin i (j) belongs to the long (short) portfolio,
+wi,t (wj,t) refers to the weight of coin i (j) at time t, and ri,t (rj,t) refers to the
+return of coin i (j) at time t. By design, the turnover of long and short positions
+ranges between 0 and 1. Accordingly, the turnover of the long-short portfolio ranges
+between 0 and 2.
+Finally, we compute the break-even transaction cost (BE-TC) as the portfolio return
+divided by turnover (see, e.g., Avramov, Cheng and Metzker, 2023). The BE-TC
+is equal to the daily/weekly proportional transaction cost required to eliminate the
+gains from the trading strategy. For example, if the portfolio return is equal to 1%
+per day and the turnover is 0 .8, then the BE-TC is equal to 1% ÷ 0.8 = 1 .25%
+per day, and the proportional transaction cost would have to be 1 .25% per day to
+eliminate all the gains of the portfolio.
+87
+Overall, we find that the performance of the long portfolio is strong. Compared
+to the long-short portfolio, the long portfolio tends to have a higher mean return
+and alpha, lower Sharpe ratio, lower turnover and higher break-even transaction
+cost. The long portfolios also display a strong negative beta to the market, which
+indicates that the order flow ML strategies are on average negatively correlated to
+the overall cryptocurrency market. Hence, order flow information is distinct from
+aggregate market trends.
+Consider, for example, the NL-Mean OF model. The long portfolio delivers a daily
+mean return of 0.84% (t-stat=3.16), an alpha of 0.87% (t-stat=3.18) and SR = 1.98.
+The maximum drawdown is equal to 0.65, the turnover is equal to 0.78 and the
+break-even transaction cost is equal to 1.07%. For reference, the long-short portfolio
+for the same model delivers a similar mean return (0.78%) and alpha (0.81%) but a
+higher Sharpe ratio (3.61) at the expense of much higher turnover (1.56) and much
+lower break-even transaction cost (0.50%).
+In terms of evaluating the level of the break-even transaction cost for the long port-
+folio, it is helpful to note that realistic transaction costs for the cryptocurrency
+market are estimated to be in the range of 0.3%-0.5%. For example, Bianchi, Babiak
+and Dickerson (2022) apply a fixed transaction cost of 0.3% for their long strategy,
+whereas Liu, Tsyvinski and Wu (2022) estimate the effective bid-ask spread to be
+around 0.5% since 2018. In this context, a break-even transaction cost of about
+1% for the NL-Mean (or other non-linear models) comfortably clears the bar, thus
+leading to a profitable strategy net of transaction costs. Based on these results, we
+conclude that conditioning on order flow, especially in the context of non-linear ma-
+88
+chine learning forecasts, generates high economic value for long-only investors who
+pursue a realistic trading strategy investing in cryptocurrencies.
+3.4.2 Limits to Arbitrage
+Our main result is that order flow itself as well as ML models that condition on order
+flow positively predict future crypto returns. It might be expected that arbitragers
+would identify this opportunity and drive prices toward their fundamental values.
+However, Shleifer and Vishny (1997) and Pontiff (2006) argue that there are limits to
+arbitrage, which in our context could potentially explain the strong positive relation
+between order flow and future returns. A testable implication of this argument is
+that the relation between order flow and future returns should be more pronounced
+in coins that are more difficult to arbitrage.
+Rather than relying on a single proxy for arbitrage costs, we follow Atilgan et al.
+(2020) and Liu, Tsyvinski and Wu (2022) in constructing an arbitrage index (AI)
+using a number of indicators known to capture important dimensions of limits to
+arbitrage. First, we build an index at the coin level, for which we include size,
+idiosyncratic volatility (Ang et al., 2006), and illiquidity (Amihud, 2002). 5 To con-
+struct the AI, we sort coins in increasing order based on their idiosyncratic volatility
+and illiquidity, and decreasing order based on their size. Each coin is given the cor-
+5 Idiosyncratic volatility is defined as the volatility of residuals from the three factor model (Liu,
+Tsyvinski and Wu, 2022) over the previous 21 days. Illiquidity is defined as the ratio of the
+absolute value of returns over daily total volume (Amihud, 2002), averaged over the past 21
+days.
+89
+responding score of its quintile rank for each variable. Then, the arbitrage cost index
+is the sum of the three scores, which ranges from 3 to 15. A higher value implies
+greater limits to arbitrage.
+Based on the AI of each coin at time t, we form tercile splits in order to compare
+the predictability of machine learning forecasts with different levels of the arbitrage
+index. In the last column of Table 3.6, we report the R2
+oos values for each AI tercile.
+The results indicate that the L-Mean model exhibits a negative R2
+oos for all three AI
+terciles. In contrast, the NL-Mean model exhibits a positive R2
+oos for all three AI
+terciles with the highest R2
+oos being associated with the low AI tercile. This is strong
+statistical evidence that the NL-Mean model performs best for the crypto portfolio
+that is the easiest to arbitrage.
+We also conduct a bivariate sort analysis. First, at time t, we split the coins in our
+sample into terciles based on the AI. Second, within each tercile, we further sort coins
+into terciles by either the orthogonalized order flow or the ML forecast conditioning
+on order flows. Table 3.6 reports the double sort results for ortho-OFW , L-Mean, and
+NL-Mean. The first panel shows that for the low AI tercile, the long-short portfolio
+based on ortho-OF W achieves an alpha of 0.32% (t-stat=2.85) and a Sharpe ratio of
+1.91. In contrast, for the high AI tercile, the long-short portfolio based on ortho-OFW
+achieves an insignificant alpha of 0.04% (t-stat=0.23) and a Sharpe ratio of only 0.08.
+These results demonstrate that the economic value of order flow cannot be explained
+by limits to arbitrage, as the long-short performance is strongest in coins, which are
+the easiest to arbitrage, i.e., the largest, most liquid, and lowest volatility coins.
+90
+The second panel shows that for the low and medium AI terciles, the long-short
+portfolio based on L-Mean has insignificant alphas. In contrast, for the high AI
+tercile, the portfolio achieves an alpha of 0.69 (t-stat=3.32) and a Sharpe ratio of
+2.16. This indicates that the economic value of linear ML models is concentrated in
+coins with the highest arbitrage costs.
+Importantly, the third panel reveals that for NL-Mean, all AI terciles display sig-
+nificant alphas. Additionally, the Sharpe ratios for the low, medium, and high AI
+terciles are 1.64, 1.90 and 2.93, respectively, suggesting that the performance of non-
+linear ML models is robust across coins with varying arbitrage costs. These findings
+are remarkable considering that the economic value of ML models not conditioning
+on order flow can mostly be explained by limits to arbitrage in stocks (Avramov,
+Cheng and Metzker, 2023), options (Bali et al., 2023), and cryptos (Cakici et al.,
+2024, and Filippou, Rapach and Thimsen, 2024).
+Table 3.7 presents a bivariate sort analysis for L-Mean and NL-Mean conditioning
+purely on economic fundamentals (EF). For both models, the Sharpe ratios are the
+lowest in the bottom AI tercile and increase monotonically as we move to the top
+AI tercile. This clearly indicates that the long-short portfolio returns for models
+conditioning on economic fundamentals have economic value only for small, illiquid,
+and volatile coins.
+Overall, these results show that the economic value of orthogonalized order flow
+and non-linear ML models cannot be explained by limits to arbitrage. In contrast,
+arbitrage costs can explain the economic value of linear ML models conditioning on
+91
+order flow as well as (linear and non-linear) ML models conditioning on economic
+fundamentals. In light of these results, we conclude that the permanent effect of
+order flow on crypto returns is not limited to small, illiquid and volatile coins but
+rather extends to coins which are large, liquid and less volatile.
+3.4.3 Top 10 Coins
+We further restrict our analysis to the easiest to arbitrage coins, represented by the
+top 10 coins by market cap as determined on the first day of the sample period
+(February 14, 2018). These coins are highlighted with bold in Table 1.1. Focusing
+on the top 10 coins mitigates the effect of limits to arbitrage because it avoids small
+coins, which may be less liquid, subject to higher transaction costs and more difficult
+to short.
+To begin with, we report the out-of-sample statistical performance of the ML models
+in Table 3.8. The ML models are trained on the full cross section of the 84 coins
+to ensure that we have enough observations for accurate estimation. We find that,
+for the top 10 coins, the results are essentially the same as for the full cross section.
+Specifically, the OF models consistently generate the highest R1
+oos and R2
+oos values
+across ML specifications. The non-linear models again have superior performance
+compared to the linear models. For example, all non-linear OF models generate
+a positive R2
+oos, whereas all linear OF models generate a negative R2
+oos. The best
+model remains the SGB OF with an R2
+oos = 1 .05% and the NL-Mean delivers an
+R2
+oos = 0.68%. These R2
+oos values for the top 10 coins are substantially higher than
+92
+for the full cross section. This indicates that the ML models conditioning on order
+flow are especially accurate for the largest coins that exhibit low arbitrage costs. In
+short, in terms of statistical performance, the non-linear OF models perform the best
+in the full cross-section as well as for just the top 10 coins.
+Next, we assess the economic value of the ML models. Due to the small cross-section,
+we form tertile portfolios by sorting the top 10 coins on the ML forecasts. The top
+portfolio ( P3) includes the 3 coins with the highest ML forecasts and the bottom
+portfolio ( P1) includes the 3 coins with the lowest ML forecasts. The portfolios are
+equally-weighted and rebalanced daily. The results are reported in Table 3.9. Again,
+we find that the results are qualitatively the same as before. In brief, the OF models
+tend to perform the best, the non-linear ML specifications perform better than the
+linear specifications, SGB OF is still the best individual model ( SR = 2 .14), and
+NL-Mean performs very well ( SR = 1.78). Accordingly, we conclude that our main
+empirical findings are robust to using a smaller cross-section based on only the top
+10 coins by market cap.
+93
+3.5 Conclusion
+The meteoric rise of cryptocurrencies as a new investment asset class has triggered an
+emerging literature in financial economics. A central theme of this literature is the
+out-of-sample prediction of cryptocurrency returns and the design of trading strate-
+gies that demonstrate consistent profitability. Our analysis builds on the results
+established in the second chapter, deepening our understanding of the economic
+value of order flow in predicting cryptocurrency returns over and above economic
+fundamentals. We provide measurable evidence of the existence of a non-linear re-
+lationship between order flow and returns, which explains why the non-linear ML
+models conditioning on order flow out-perform linear ones. We also show that a
+bidirectional relationship between returns and order flow is coin specific and not all
+coins are driven by mechanical price pressure. However, the relationship strengthens
+when estimating over the cross-section of the top-10 and all 84 coins.
+We further expand upon our understanding of the profitability of the trading strate-
+gies developed in the previous chapter. The profitability of the non-linear order flow
+models are robust to economic restrictions such as short selling constraints, trans-
+action costs, and limits to arbitrage, providing compelling empirical support for the
+permanent view of the effect of order flow on returns. Our bivariate sort analysis
+shows that non-linear order flow models produce profitable results that are not re-
+stricted to the small, illiquid, and highly volatile coins. This is further supported
+by the positive economic value seen by restricting our analysis to the top 10 coins
+by market cap. This evidence is remarkable considering that the economic value of
+94
+ML models that do not condition on order flow can largely be explained by lim-
+its to arbitrage in the stock market, options, and crypto literature. In conclusion,
+our empirical evidence strongly indicates that information conveyed by order flow is
+not only important for predicting cryptocurrency returns, but is robust to economic
+restrictions as well.
+95
+Table 3.1: Predictive Panel Regressions: Non-linear and Interaction Terms
+This table displays results of a single predictive panel regression of cryptocurrency returns on linear,
+square, cubic and interaction terms of lagged world order flow and international order flows. The
+panel regressions also condition on the control variables reported in previous tables but these results
+are not reported to save space. The t-statistics shown in parentheses are computed using standard
+errors which are clustered by time and by coin. The adjusted ¯R2 values reported in the bottom
+are for four individual regressions, the first one conditioning only on linear terms, the second one
+also including square terms, the third one further adding cubic terms and the last one including all
+terms. The sample period ranges from February 14, 2018 to June 30, 2022.
+Single Predictive Panel Regression
+Interaction
+Linear Square Cubic with OF W
+i,t−1
+const 0.0122
+(0.97)
+OFW
+i,t−1 0.0028 ∗∗∗ -0.0004 -0.0001
+(3.14) (-1.32) (-1.45)
+OFU SD
+i,t−1 -0.0002 0.0003 0.0000 0.0000
+(-0.58) (1.32) (0.26) (0.06)
+OFKRW
+i,t−1 0.0013 ∗∗∗ 0.0001 0.0001 0 .0013 ∗∗∗
+(2.99) (0.65) (1.32) (3.67)
+OFEU R
+i,t−1 -0.0002 0.0001 0.0001 0.0002
+(-0.56) (0.22) (0.80) (0.38)
+OFGBP
+i,t−1 -0.0008 ∗ -0.0004 ∗∗ -0.0000 -0.0000
+(-1.91) (-2.24) (-0.18) (-0.17)
+OFJP Y
+i,t−1 0.0001 0.0001 -0.0001 -0.0003
+(0.20) (0.26) (-1.32) (-0.85)
+OFCAD
+i,t−1 -0.0001 0.0002 -0 .0002 ∗∗ -0.0002
+(-0.20) (0.94) (-2.07) (-0.61)
+OFAU D
+i,t−1 -0.0008 ∗∗ 0.0003 0.0001 -0.0001
+(-2.11) (1.22) (0.97) (-0.38)
+OFCHF
+i,t−1 -0.0005 -0 .0006 ∗∗∗ 0.0001 ∗ 0.0001
+(-1.40) (-2.64) (1.80) (0.32)
+OFN ZD
+i,t−1 -0.0004 0.0002 0.0000 -0.0001
+(-1.16) (0.79) (0.71) (-0.37)
+OFN OK
+i,t−1 0.0003 0 .0007 ∗∗ -0.0001 -0.0003
+(0.64) (2.56) (-0.67) (-0.81)
+OFSEK
+i,t−1 -0.0002 0.0000 -0.0001 -0.0004
+(-0.42) (0.14) (-0.45) (-1.17)
+ri,t−1 -0.0734 ∗∗∗ 0.0118 -0.0015 0 .0124 ∗∗
+(-3.63) (0.28) (-0.11) (2.06)
+F-test (non-linear) 0.053 0.004 0.005
+F-test (ALL non-linear) 0.000
+¯R2 (%) 1.20 1.28 1.31 1.39
+(separate regressions)
+# obs. 92484
+96
+Table 3.2: Predictive Panel Regressions: Non-linear Terms - Test Sample Period
+This table displays results of a single predictive panel regression of cryptocurrency returns on linear,
+square, cubic and interaction terms of lagged world order flow and international order flows. The
+panel regressions also condition on the control variables reported in previous tables but these results
+are not reported to save space. The t-statistics shown in parentheses are computed using standard
+errors which are clustered by time and by coin. The adjusted ¯R2 values reported in the bottom
+are for four individual regressions, the first one conditioning only on linear terms, the second one
+also including square terms, the third one further adding cubic terms and the last one including all
+terms. The sample period corresponds to the out-of-sample test period ranging from February 18,
+2020 to June 30, 2022.
+Single Predictive Panel Regression
+Interaction
+Linear Square Cubic with OF W
+i,t−1
+const 0.0268
+(1.16)
+OFW
+i,t−1 0.0034 ∗∗ -0.0007 ∗ -0.0002 ∗
+(2.50) (-1.86) (-1.75)
+OFU SD
+i,t−1 -0.0001 0.0002 0.0001 0.0005
+(-0.10) (0.68) (1.08) (1.00)
+OFKRW
+i,t−1 0.0015 ∗∗ 0.0003 0.0001 0 .0014 ∗∗∗
+(2.10) (1.05) (1.30) (2.69)
+OFEU R
+i,t−1 -0.0006 -0.0002 0.0000 -0.0001
+(-1.08) (-0.64) (0.36) (-0.17)
+OFGBP
+i,t−1 -0.0008 -0.0001 0.0001 0.0000
+(-1.27) (-0.43) (0.67) (0.09)
+OFJP Y
+i,t−1 0.0002 -0.0001 -0 .0001 ∗ -0.0000
+(0.39) (-0.24) (-1.83) (0.03)
+OFCAD
+i,t−1 -0.0005 0.0003 -0.0002 -0.0002
+(-0.73) (0.67) (-1.15) (-0.45)
+OFAU D
+i,t−1 -0.0008 0 .0007 ∗∗ 0.0000 -0.0005
+(-1.59) (1.99) (0.42) (-1.06)
+OFCHF
+i,t−1 -0.0003 -0 .0008 ∗∗∗ 0.0001 0.0005
+(-0.50) (-2.93) (1.45) (1.17)
+OFN ZD
+i,t−1 -0.0002 0.0004 0.0000 -0.0002
+(-0.46) (1.12) (0.50) (-0.30)
+OFN OK
+i,t−1 -0.0002 0 .0009 ∗∗ -0.0000 -0.0003
+(-0.22) (2.33) (-0.19) (-0.68)
+OFSEK
+i,t−1 -0.0001 0.0003 -0.0002 -0.0009
+(-0.20) (0.98) (-1.09) (-1.48)
+ri,t−1 -0.0780 ∗∗∗ 0.0412 -0.0089 0.0094
+(-2.77) (0.81) (-0.59) (1.31)
+F-test (non-linear) 0.062 0.000 0.088
+F-test (ALL non-linear) 0.000
+¯R2 (%) 1.82 1.96 2.02 2.10
+(separate regressions)
+# obs. 50232
+97
+Table 3.3: V AR Results
+This table reports results for select coefficients from vector autoregressions (V AR) for cryptocurrency returns and order flow. The
+results are for each of the top-10 coins individually, all top-10 coins together, and all 84 coins together. The V AR specification is
+defined as in Hasbrouck (1991):
+rt = a0 +
+5X
+i=1
+airt−i +
+5X
+i=0
+biOF W
+t−i +
+NX
+i=1
+mifi,t−1 + ε1,t, OF W
+t = c0 +
+5X
+i=1
+cirt−i +
+5X
+i=1
+diOF W
+t−i +
+NX
+i=1
+nifi,t−1 + ε2,t,
+where fi,t−1 are the i ≤ N economic fundamentals used as control variables. For select individual coefficients and for cumulative
+coefficients at 5 lags, we report t-statistics computed using standard errors which are clustered by time and by coin. The sample
+period ranges from February 14, 2018 to June 30, 2022.
+BTC ETH XRP BCH LTC ADA XLM NEO EOS MIOTA Top 10 ALL 84
+Return Equation
+OFW
+i,t 0.023∗∗∗ 0.033∗∗∗ 0.046∗∗∗ 0.030∗∗∗ 0.023∗∗∗ 0.048∗∗∗ 0.043∗∗∗ 0.024∗∗∗ 0.046∗∗∗ 0.046∗∗∗ 0.036∗∗∗ 0.021∗∗∗
+(t-stat) (12.05) (12.88) (12.69) (9.01) (8.38) (20.64) (10.71) (8.01) (14.58) (15.42) (30.26) (28.71)
+OFW
+i,t−1 0.002 0.000 0 .006∗∗ 0.000 0 .005∗∗ 0.006∗∗ 0.006∗ -0.001 0.002 0 .008∗∗∗ 0.003∗∗∗ 0.002∗∗∗
+(t-stat) (1.16) (0.25) (2.20) (0.12) (2.30) (2.18) (1.80) (-0.61) (1.04) (3.18) (3.49) (5.39)
+Pj=5
+j=1 OFW
+i,t−j 0.003 0.002 0 .014∗∗ 0.010∗ 0.014∗∗∗ 0.016∗∗∗ 0.010 0.002 0 .009∗∗ 0.017∗∗∗ 0.007∗∗∗ 0.004∗∗∗
+(t-stat) (0.88) (0.59) (2.13) (1.93) (3.81) (2.94) (1.39) (0.46) (2.12) (3.39) (4.54) (3.04)
+ri,t−1 -0.035 -0.016 -0.028 0.010 −0.066∗∗ -0.046 0.044 0.001 -0.019 -0 .058∗ -0.016 0.000
+(t-stat) (-1.27) (-0.61) (-0.73) (0.22) (-2.47) (-1.29) (0.77) (0.04) (-0.70) (-1.81) (-1.17) (-0.17)
+Pj=5
+j=1 ri,t−j -0.058 0.012 -0.098 0.029 -0 .134∗∗ -0.162∗ -0.024 0.024 -0.050 -0.129 -0 .041∗ -0.055∗
+(t-stat) (-0.82) (0.16) (-0.96) (0.39) (-1.99) (-1.72) (-0.37) (0.34) (-0.74) (-1.29) (-1.68) (-1.75)
+¯R2 (%) 28.3 35.1 43.8 21.1 16.0 47.4 39.1 13.3 43.1 36.8 31.3 7.6
+Order Flow Equation
+OFW
+i,t−1 0.060 -0.055 0.016 -0 .151∗∗ -0.025 -0 .088∗ 0.039 -0.012 -0.025 -0 .095∗∗ -0.034∗∗ -0.011
+(t-stat) (1.52) (-1.11) (0.25) (-2.53) (-0.72) (-1.79) (0.63) (-0.26) (-0.57) (-2.03) (-2.04) (-1.62)
+Pj=5
+j=1 OFW
+i,t−j 0.237∗∗∗ 0.006 0.059 -0 .292∗∗∗ -0.051 0.029 0.019 0.086 -0.039 -0.063 0.020 0 .030∗∗
+(t-stat) (3.02) (0.07) (0.43) (-2.65) (-0.74) (0.23) (0.20) (1.09) (-0.45) (-0.67) (0.67) (2.41)
+ri,t−1 -2.330∗∗∗ -0.002 -1 .185∗ 0.439 -0.393 -0.601 -2 .125∗∗∗ -0.884∗ -1.314∗∗ -0.899 -0 .947∗∗∗ -0.434∗∗∗
+(t-stat) (-2.83) (0.00) (-1.75) (0.69) (-0.61) (-0.83) (-3.40) (-1.74) (-2.08) (-1.38) (-4.55) (-5.85)
+Pj=5
+j=1 ri,t−j -1.160 0.621 0.851 2 .657∗ 0.234 0.013 -1.322 -0.390 0.298 0.005 -0.147 -0 .325∗∗
+(t-stat) (-0.65) (0.39) (0.60) (1.85) (0.15) (0.01) (-1.11) (-0.30) (0.25) (0.01) (-0.35) (-2.07)
+¯R2 (%) 1.7 1.6 2.1 2.6 0.5 2.1 1.2 0.0 0.4 2.5 1.7 0.4
+98
+Table 3.4: V AR Results: BTC and XRP
+This table reports the results from vector autoregressions (V AR) for cryptocurrency returns and
+order flow for two coins: BTC (Bitcoin) and XRP (by Ripple). The V AR specification follows
+Hasbrouck (1991). The t-statistics shown in parentheses are computed using standard errors which
+are clustered by time and by coin. The sample period ranges from February 14, 2018 to June 30,
+2022.
+BTC XRP
+Returns Order Flow Returns Order Flow
+param ( t-stat) param ( t-stat) param ( t-stat) param ( t-stat)
+constant 0.012 (0.91) 0.244 (0.91) -0.009 (-0.66) 0 .493∗ (1.93)
+OFW
+i,t 0.023∗∗∗ (12.05) 0 .046∗∗∗ (12.69)
+OFW
+i,t−1 0.002 (1.16) 0.060 (1.52) 0 .006∗∗ (2.20) 0.016 (0.25)
+OFW
+i,t−2 -0.001 (-0.74) 0 .083∗∗ (2.04) 0 .006∗ (1.91) -0.029 (-0.69)
+OFW
+i,t−3 -0.001 (-0.56) 0.015 (0.35) 0 .004∗ (1.92) 0.053 (1.07)
+OFW
+i,t−4 0.000 (0.05) 0.049 (1.38) -0.003 (-1.48) -0.008 (-0.17)
+OFW
+i,t−5 0.003∗ (1.94) 0.031 (0.87) 0.001 (0.36) 0.025 (0.66)
+ri,t−1 -0.035 (-1.27) -2 .330∗∗∗ (-2.83) -0.028 (-0.73) −1.185∗ (-1.75)
+ri,t−2 0.041 (1.19) 0.295 (0.29) −0.095∗∗ (-2.33) 1 .274∗∗ (2.21)
+ri,t−3 0.023 (0.70) 1 .728∗∗ (2.01) -0.040 (-1.00) -0.038 (-0.07)
+ri,t−4 -0.011 (-0.32) 0.204 (0.31) 0 .073∗ (1.84) 0 .883∗ (1.70)
+ri,t−5 -0.077∗ (-1.84) -1.058 (-1.17) -0.008 (-0.16) -0.083 (-0.16)
+MCAPi,t−1 -0.003 (-0.53) -0.057 (-0.48) −0.018∗∗ (-2.49) -0 .265∗∗∗ (-2.70)
+Volumei,t−1 -0.002 (-0.58) -0.004 (-0.04) 0.002 (0.40) -0.058 (-0.85)
+Volatilityi,t−1 0.085∗∗ (2.20) 0.397 (0.46) 0.040 (0.88) 1 .436∗∗∗ (2.84)
+VIXt−1 0.027 (1.37) -0.480 (-0.96) -0.040 (-1.27) -0.443 (-0.86)
+TED Spreadt−1 0.000 (0.08) -0.001 (-0.65) 0.000 (-0.94) -0.001 (-0.66)
+S&P 500t−1 0.315 (0.76) -11.599 (-1.48) −0.694∗ (-1.83) 3.823 (0.42)
+MSCIGlobal
+t−1 -0.070 (-0.15) 10.852 (1.24) 0 .950∗∗ (2.14) -2.399 (-0.24)
+Short Ratet−1 -0.006∗ (-1.66) -0.071 (-0.91) 0.004 (0.76) -0.081 (-1.00)
+Term Spreadt−1 -0.006 (-1.10) -0.017 (-0.14) 0 .017∗ (1.68) 0.029 (0.20)
+Default Spreadt−1 0.000 (0.03) -0.131 (-0.59) -0.005 (-0.54) -0 .442∗∗∗ (-2.81)
+¯R2 (%) 28.26 1.66 43.76 2.05
+99
+Table 3.5: The Performance of Long vs Long-Short Portfolios
+This table compares the performance of the long to the long-short portfolio for daily returns.
+The portfolios are sorted on the ML forecasts from the OF model that conditions on all lagged
+international order flows and lagged returns. The long portfolio is the top quintile portfolio ( P5)
+and the long-short portfolio is P5-P1. The portfolios are equally-weighted and rebalanced daily.
+The alpha is based on a three-factor model, which includes the cryptocurrency market, size and
+momentum factors (Liu, Tsyvinski and Wu, 2022). The returns and alphas are in daily percent.
+SR is the annualized Sharpe ratio. MDD is the maximum drawdown. TO is the daily turnover.
+BE-TC is the break-even transaction cost in daily percent. The Newey and West (1987) t-statistics
+are shown in parenthesis. The out-of-sample test period ranges from February 18, 2020 to June 30,
+2022.
+Long Portfolio (P5) - OF Model Long-Short Portfolio ( P5 −P1) - OF Model
+Mean alpha βm SR MDD TO BE TC Mean alpha βm SR MDD TO BE TC
+OLS 0.67 0.67 -6.37 1.63 0.71 0.81 0.82 0.55 0.53 -6.80 2.38 0.36 1.60 0.34
+(t-stat) (2.60) (2.50) (-1.20) (3.55) (3.58) (-2.30)
+RR 0.66 0.67 -6.67 1.62 0.70 0.81 0.81 0.53 0.51 -6.55 2.31 0.37 1.60 0.32
+(t-stat) (2.58) (2.51) (-1.26) (3.42) (3.47) (-2.23)
+LAS 0.58 0.58 -4.15 1.45 0.76 0.39 1.50 0.34 0.33 -0.88 1.69 0.36 0.76 0.44
+(t-stat) (2.29) (2.22) (-0.80) (2.43) (2.56) (-0.34)
+EN 0.52 0.52 -7.30 1.32 0.75 0.50 1.05 0.26 0.28 -6.31 1.24 0.41 0.99 0.26
+(t-stat) (2.13) (2.03) (-1.42) (1.83) (2.09) (-2.35)
+PCR 0.46 0.47 -4.98 1.18 0.77 0.81 0.57 0.13 0.12 -3.56 0.59 0.52 1.60 0.08
+(t-stat) (1.88) (1.84) (-0.98) (0.87) (0.81) (-1.25)
+RF 0.75 0.81 -7.20 1.82 0.69 0.77 0.98 0.61 0.66 -5.24 2.98 0.22 1.55 0.40
+(t-stat) (2.91) (3.02) (-1.35) (4.67) (4.95) (-1.98)
+SGB 0.81 0.84 -9.46 1.99 0.63 0.72 1.13 0.76 0.78 -8.38 3.68 0.27 1.42 0.54
+(t-stat) (3.18) (3.18) (-1.79) (5.54) (5.85) (-3.17)
+NN1 0.66 0.69 -11.39 1.64 0.62 0.81 0.81 0.56 0.61 -12.64 2.61 0.48 1.60 0.35
+(t-stat) (2.65) (2.62) (-2.18) (3.89) (4.41) (-4.58)
+NN2 0.64 0.69 -11.18 1.61 0.64 0.80 0.80 0.45 0.50 -11.20 2.05 0.41 1.59 0.29
+(t-stat) (2.59) (2.66) (-2.15) (2.99) (3.55) (-3.99)
+NN3 0.63 0.66 -9.64 1.58 0.62 0.70 0.90 0.52 0.56 -10.10 2.42 0.54 1.47 0.36
+(t-stat) (2.53) (2.53) (-1.87) (3.53) (4.04) (-3.64)
+NN4 0.63 0.67 -6.88 1.59 0.69 0.65 0.98 0.33 0.38 -3.61 1.55 0.56 1.33 0.25
+(t-stat) (2.51) (2.59) (-1.34) (2.33) (2.76) (-1.32)
+L-Mean 0.62 0.62 -6.63 1.52 0.71 0.81 0.76 0.45 0.43 -6.64 1.95 0.40 1.60 0.28
+(t-stat) (2.42) (2.33) (-1.25) (2.87) (2.89) (-2.23)
+NL-Mean0.84 0.87 -9.45 1.98 0.65 0.78 1.07 0.78 0.81 -9.22 3.61 0.24 1.56 0.50
+(t-stat) (3.16) (3.18) (-1.73) (5.49) (5.83) (-3.33)
+100
+Table 3.6: Double-Sorted Portfolios
+This table displays the performance of double-sorted cryptocurrency portfolios. We first sort on the
+arbitrage index, which is an index based on quintiles of size, idiosyncratic volatility and illiquidity.
+Then, we double sort on one of the following: orthogonalized world order flow (ortho-OF W ), the
+linear ML forecast combination (L-Mean) that conditions on all order flows (OF model), and the
+non-linear ML forecast combination (NL-Mean) for the OF model. The portfolios are equally-
+weighted and rebalanced daily. The alpha is based on a three-factor model, which includes the
+cryptocurrency market, size and momentum factors (Liu, Tsyvinski and Wu, 2022). The mean
+returns and alphas are in daily percent. SR is the annualized Sharpe ratio. The Newey and West
+(1987) t-statistics are shown in parenthesis. The table also reports the R2
+oos in percent for the
+two ML models for each level of the arbitrage index. The out-of-sample test period ranges from
+February 18, 2020 to June 30, 2022.
+ortho-OFW
+P1 P2 P3 P3 − P1
+Mean return (% daily) Mean alpha SR
+Arbitrage 1 0.35 0.50 0.67 0.32 0.32 1.91
+Index (1.47) (2.02) (2.78) (2.99) (2.85)
+2 0.37 0.65 0.61 0.25 0.18 0.90
+(1.38) (2.47) (2.35) (1.40) (0.97)
+3 0.56 0.53 0.58 0.02 0.04 0.08
+(2.06) (2.03) (2.26) (0.13) (0.23)
+L-Mean OF
+P1 P2 P3 P3 − P1
+Mean return (% daily) Mean alpha SR R2
+oos
+Arbitrage 1 0.55 0.47 0.48 -0.07 -0.06 -0.40 -0.75
+Index (2.24) (1.95) (2.00) (-0.59) (-0.52)
+2 0.46 0.69 0.47 0.01 0.07 0.06 -0.56
+(1.66) (2.61) (1.89) (0.08) (0.47)
+3 0.18 0.68 0.86 0.68 0.69 2.16 -0.16
+(0.68) (2.75) (3.04) (3.24) (3.32)
+NL-Mean OF
+P1 P2 P3 P3 − P1
+Mean return (% daily) Mean alpha SR R2
+oos
+Arbitrage 1 0.38 0.51 0.63 0.26 0.28 1.64 0.60
+Index (1.58) (2.10) (2.61) (2.52) (2.67)
+2 0.32 0.49 0.82 0.50 0.55 1.90 0.28
+(1.24) (1.99) (2.91) (2.94) (3.18)
+3 0.12 0.64 0.97 0.84 0.87 2.93 0.43
+(0.48) (2.27) (3.54) (4.33) (4.60)
+101
+Table 3.7: Double-Sorted Portfolios - Economic Fundamentals
+This table displays the performance of double-sorted cryptocurrency portfolios for models that
+condition on economic fundamentals (EF). We first sort on the arbitrage index, which is an index
+based on quintiles of size, idiosyncratic volatility and illiquidity. Then, we double sort on one of the
+following: the linear ML forecast combination (L-Mean) that conditions on EF and the non-linear
+ML forecast combination (NL-Mean) for the EF model. The portfolios are equally-weighted and
+rebalanced daily. The alpha is based on a three-factor model, which includes the cryptocurrency
+market, size and momentum factors (Liu, Tsyvinski and Wu, 2022). The mean returns and alphas
+are in daily percent. SR is the annualized Sharpe ratio. The Newey and West (1987) t-statistics
+are shown in parenthesis. The table also reports the R2
+oos in percent for the two ML models for
+each level of the arbitrage index. The out-of-sample test period ranges from February 18, 2020 to
+June 30, 2022.
+L-Mean EF
+P1 P2 P3 P3 − P1
+Mean return (% daily) Mean alpha SR R2
+oos
+Arbitrage 1 0.54 0.54 0.42 -0.12 -0.09 -0.59 -4.20
+Index (2.19) (2.23) (1.75) (-0.89) (-0.72)
+2 0.37 0.79 0.47 0.10 0.20 0.34 -2.12
+(1.37) (3.00) (1.78) (0.51) (1.08)
+3 0.21 0.57 0.94 0.72 0.84 2.32 -1.77
+(0.79) (2.18) (3.46) (0.08) (4.15)
+NL-Mean EF
+P1 P2 P3 P3 − P1
+Mean return (% daily) Mean alpha SR R2
+oos
+Arbitrage 1 0.46 0.56 0.49 0.03 0.06 0.18 0.28
+Index (1.94) (2.32) (1.97) (0.28) (0.44)
+2 0.33 0.58 0.72 0.39 0.45 1.48 0.29
+(1.29) (2.25) (2.62) (2.33) (2.54)
+3 0.17 0.72 0.83 0.66 0.75 2.14 0.11
+(0.69) (2.46) (3.15) (3.16) (3.70)
+102
+Table 3.8: Top 10 Coins Only: Out-of-Sample Statistical Performance
+This table reports the out-sample statistical performance of the models using only the top 10 coins
+in terms of market capitalization on the first day of the sample (February 14, 2018). The ML
+models are trained on the full cross section of the 84 coins. The R1
+oos statistic in percent is based
+on the Mean Absolute Error (MAE) of the forecasts and the R2
+oos statistic in percent is based on
+the Mean Squared Error (MSE) of the forecasts. The MAE and the MSE are computed using an
+expanding window. Daily results are reported for three information sets: OF only conditions on
+order flows; EF only conditions on economic fundamentals; and OF+EF conditions on both. All
+models condition on lagged returns. Bold entries indicate the highest value in each row for each
+statistic. The out-of-sample test period ranges from February 18, 2020 to June 30, 2022.
+Daily R1
+oos (%) Daily R2
+oos (%)
+OF EF OF+EF OF EF OF+EF
+OLS -2.59 -17.70 -18.04 -3.17 -33.65 -34.77
+RR -2.53 -17.34 -17.84 -3.11 -29.93 -31.09
+LAS -1.67 -1.78 -1.85 -1.47 -1.44 -1.43
+EN -1.55 -1.68 -1.70 -1.43 -1.59 -1.56
+PCR -2.38 -4.88 -5.48 -3.05 -3.83 -4.46
+RF 0.18 -1.36 -0.97 0.58 -0.91 -0.37
+SGB 0.33 -0.67 -0.66 1.05 0.14 0.16
+NN1 0.21 -0.38 -0.83 0.44 0.12 -1.26
+NN2 0.02 -0.19 -0.47 0.25 0.30 0.04
+NN3 -0.06 -1.17 -3.15 0.23 -1.59 -5.22
+NN4 -0.09 -1.04 -1.21 0.18 -1.39 -2.51
+L-Mean -1.94 -5.57 -5.72 -2.20 -5.97 -6.31
+NL-Mean 0.21 -0.46 -0.74 0.68 -0.08 -0.69
+103
+Table 3.9: Top 10 Coins Only: Daily Portfolios Sorted on ML Forecasts
+This table displays the performance of cryptocurrency portfolios which are sorted on ML forecasts
+using only the top 10 coins in terms of market capitalization on the first day of the sample (February
+14, 2018). The ML models are trained on the full cross section of the 84 coins. The top portfolio
+(P3) includes the 3 coins with the highest ML forecasts and the bottom portfolio ( P1) includes the
+3 coins with the lowest ML forecasts. The portfolios are equally-weighted and rebalanced daily.
+Results are reported for three ML models: OF only conditions on order flows; EF only conditions on
+economic fundamentals; and OF+EF conditions on both. All models condition on lagged returns.
+The alpha is based on a three-factor model, which includes the cryptocurrency market, size and
+momentum factors (Liu, Tsyvinski and Wu, 2022). The returns and alphas are in daily percent. SR
+is the annualized Sharpe ratio. The Newey and West (1987) t-statistics are shown in parenthesis.
+Bold entries indicate the highest Sharpe ratio for each ML model across the three information sets
+(OF, EF, OF+EF). The out-of-sample test period ranges from February 18, 2020 to June 30, 2022.
+OF Model EF Model OF+EF Model
+P3 − P1 P3 − P1 P3 − P1
+Mean alpha SR Mean alpha SR Mean alpha SR
+OLS -0.16 -0.15 -0.66 -0.02 0.02 -0.07 -0.09 -0.06 -0.34
+(t-stat) (-1.02) (-0.98) (-0.11) (0.09) (-0.54) (-0.39)
+RR -0.13 -0.13 -0.55 -0.07 -0.04 -0.26 -0.11 -0.09 -0.44
+(t-stat) (-0.85) (-0.81) (-0.42) (-0.20) (-0.70) (-0.57)
+LAS -0.18 -0.18 -0.81 0.11 0.11 0.60 0.12 0.13 0.67
+(t-stat) (-1.27) (-1.23) (0.96) (0.93) (1.08) (1.05)
+EN -0.13 -0.11 -0.54 -0.01 0.02 -0.02 0.00 0.02 -0.01
+(t-stat) (-0.86) (-0.70) (-0.04) (0.12) (-0.08) (0.15)
+PCR -0.05 -0.04 -0.20 0.00 -0.04 0.01 -0.02 -0.07 -0.09
+(t-stat) (-0.32) (-0.28) (0.01) (-0.23) (-0.15) (-0.43)
+RF 0.40 0.42 1.72 -0.21 -0.19 -0.91 -0.10 -0.11 -0.43
+(t-stat) (2.57) (2.80) (-1.44) (-1.29) (-0.68) (-0.72)
+SGB 0.53 0.56 2.14 0.22 0.23 1.21 0.18 0.19 1.01
+(t-stat) (3.25) (3.48) (1.90) (1.91) (1.59) (1.61)
+NN1 0.11 0.15 0.43 -0.27 -0.23 -1.02 -0.13 -0.10 -0.51
+(t-stat) (0.69) (0.93) (-1.67) (-1.37) (-0.82) (-0.58)
+NN2 -0.05 0.00 -0.19 -0.02 0.02 -0.06 -0.08 -0.04 -0.37
+(t-stat) (-0.29) (0.01) (-0.10) (0.09) (-0.57) (-0.26)
+NN3 -0.03 -0.02 -0.14 -0.10 -0.09 -0.45 -0.17 -0.13 -0.65
+(t-stat) (-0.22) (-0.10) (-0.69) (-0.61) (-1.03) (-0.80)
+NN4 -0.06 -0.05 -0.25 -0.12 -0.08 -0.52 -0.08 -0.03 -0.34
+(t-stat) (-0.42) (-0.28) (-0.89) (-0.50) (-0.52) (-0.20)
+L-Mean 0.00 0.00 0.00 -0.08 -0.04 -0.29 -0.07 -0.05 -0.28
+(t-stat) (0.00) (0.02) (-0.48) (-0.21) (-0.46) (-0.27)
+NL-Mean 0.42 0.46 1.78 -0.36 -0.32 -1.34 -0.17 -0.13 -0.69
+(t-stat) (2.79) (2.94) (-2.19) (-1.81) (-1.09) (-0.80)
+104
+References
+Akyildirim, E., A. Goncu, and A. Sensoy (2021). Prediction of cryptocurrency returns
+using machine learning. Annals of Operation Research 297, 3-36.
+Amihud, Y. (2002). Illiquidity and stock returns: cross-section and time-series effects.
+Journal of Financial Markets 5, 31-56.
+Andrews, D.W.K. (1991). Heteroskedasticity and autocorrelation consistent covari-
+ance matrix estimation. Econometrica 59, 817-858.
+Ang, A., R.J. Hodrick, Y. Xing, and X. Zhang (2006). The cross-section of volatility
+and expected returns. Journal of Finance 61, 259-299.
+Atilgan, Y., T.G. Bali, K.O. Demirtas, and A.D. Gunaydin (2020). Left-tail momen-
+tum: Underreaction to bad news, costly arbitrage and equity returns. Journal of
+Financial Economics 135, 725-753.
+Avramov, D., S. Cheng, and L. Metzker (2023). Machine learning vs. economic
+restrictions: Evidence from stock return predictability. Management Science 69,
+2587–2619.
+Bali, T.G., H. Beckmeyer, M. Moerke, and F. Weigert (2023). Option return pre-
+dictability with machine learning and big data. Review of Financial Studies 36,
+3548-3602.
+Berger, D., A. Chaboud, S. Chernenko, E. Howorka, and J. Wright (2008). Order
+flow and exchange rate dynamics in electronic brokerage system data. Journal of
+International Economics 75, 93–109.
+105
+Bianchi, D., M. Babiak, and A. Dickerson (2022). Trading volume and liquidity
+provision in cryptocurrency markets. Journal of Banking and Finance 142, 106547.
+Brandt, M.W. and K.A. Kavajecz (2004). Price discovery in the US treasury market:
+The impact of order flow and liquidity on the yield curve. Journal of Finance 59,
+2623-2654.
+Breiman, L., J. Friedman, R. Olshen, and C. Stone (1984). Cart. Classification and
+Regression Trees Wadsworth and Brooks/Cole Monterey, CA, USA.
+Breiman, L. (2001). Random forests. Machine Learning 45, 5-32.
+Cakici, N., S.J.H. Shahzad, B. Bedowska-Sojka, and A. Zaremba (2024). Machine
+learning and the cross-section of cryptocurrency returns. International Review of
+Financial Analysis, 103244.
+Chordia, T., R. Roll, and A. Subrahmanyam (2002). Order imbalance, liquidity, and
+market returns. Journal of Financial Economics 65, 111–130.
+Clark, T.E. and K.D. West (2006). Using out-of-sample mean squared prediction
+errors to test the Martingale difference hypothesis. Journal of Econometrics 135,
+155-186.
+Clark, T.E. and K.D. West (2007). Approximately normal tests for equal predictive
+accuracy. Journal of Econometrics 138, 291-311.
+Deuskar, P. and T.C. Johnson (2011). Market liquidity and flow-driven risk. Review
+of Financial Studies 24, 721–753.
+106
+Easley, D. and M. O’Hara (1987). Price, trade size, and information in securities
+markets. Journal of Financial Economics 19, 69-90.
+Easley, D., N.M. Kiefer, M. O’Hara, and J.B. Paperman (1996). Liquidity, informa-
+tion, and infrequently traded stocks. Journal of Finance 51, 1405-1436.
+Evans, M.D.D. (2010). Order flows and the exchange rate disconnect puzzle. Journal
+of International Economics 80, 58-71.
+Evans, M.D.D. and R. K. Lyons (2002). Order flow and exchange rate dynamics.
+Journal of Political Economy 110, 170-180.
+Evans, M.D.D. and R.K. Lyons (2005). Meese-Rogoff redux: Micro-based exchange-
+rate forecasting. American Economic Review Papers and Proceedings 95, 405-414.
+Evans, M.D.D. and D. Rime (2012). Micro approaches to foreign exchange determi-
+nation, in James, J., L. Sarno and I. W. Marsh (eds.) Handbook of Exchange Rates .
+Hoboken, NJ: Wiley.
+Fieberg, C., G. Liedtke, T. Poddig, T. Walker, and A. Zaremba (2023). A trend factor
+for the cross-section of cryptocurrency returns.Journal of Financial and Quantitative
+Analysis (forthcoming).
+Filippou, I., D. Rapach, and C. Thimsen (2024). Cryptocurrency re-
+turn predictability: A machine-learning analysis. Available at SSRN:
+https://ssrn.com/abstract=3914414.
+Friedman, J.H. (2001). Greedy function approximation: A gradient boosting ma-
+chine. Annals of statistics 29, 1189-1232.
+107
+Foucault, T., M. Pagano, and A. Roell (2013). Market Liquidity . Oxford: Oxford
+University Press.
+Froot, K.A. and T. Ramadorai (2005). Currency returns, intrinsic value, and
+institutional-investor flows. Journal of Finance 60, 1535–1566.
+Glosten, L.R. and P.R. Milgrom (1985). Bid, ask and transaction prices in a market-
+maker market with heterogeneously informed traders. Journal of Financial Eco-
+nomics 14, 71-100.
+Goyenko, R.Y., C.W. Holden, and C.A. Trzcinka (2009). Do liquidity measures mea-
+sure liquidity? Journal of Financial Economics 92, 153–181.
+Gradojevic N. and J. Yang (2006). Non-linear, non-parametric, non-fundamental
+exchange rate forecasting. Journal of Forecasting 25, 227-245.
+Gu, S., B. Kelly, and D. Xiu (2020). Empirical asset pricing via machine learning.
+Review of Financial Studies 33, 2223–2273.
+Hasbrouck, J. (1988). Trades, quotes, inventories, and information. Journal of Fi-
+nancial Economics 22, 229–252.
+Hasbrouck, J. (1991). Measuring the information content of stock trades. Journal of
+Finance 46, 179–207.
+Hendershott, T. and A.J. Menkveld (2014). Price pressures. Journal of Financial
+Economics 114, 405–423.
+Hornik, K., M. Stinchcombe, and H. White (1989). Multilayer feedforward networks
+are universal approximators. Neural networks 2, 359-366.
+108
+Koenker, R. and J.A.F. Machado (1999). Goodness of fit and related inference pro-
+cesses for quantile regression. Journal of the American Statistical Association 94,
+1296-1310.
+Kyle, A.S. (1985). Continuous auctions and insider trading. Econometrica 53,
+1335–1355.
+Kelly, B., S. Malamud, and K. Zhou (2024). The virtue of complexity in return
+prediction. Journal of Finance 79, 459-503.
+Li, J., I. Tsiakas, and W. Wang (2015). Predicting exchange rates out of sample: Can
+economic fundamentals beat the random walk?” Journal of Financial Econometrics
+13, 293-341.
+Liu, F. (2023). Quantile machine learning and the cross-section of stock returns.
+Available at SSRN 4491887.
+Liu, Y., and A. Tsyvinski (2021). Risks and returns of cryptocurrency. Review of
+Financial Studies 34, 2689–2727.
+Liu, Y., A. Tsyvinski, and X. Wu (2022). Common risk factors in cryptocurrency.
+Journal of Finance 77, 1133-1177.
+Makarov, I. and A. Schoar (2020). Trading and arbitrage in cryptocurrency markets.
+Journal of Financial Economics 135, 293–319.
+Mallqui, D.C.A. and R.A.S. Fernandes (2019). Predicting the direction, maximum,
+minimum and closing prices of daily Bitcoin exchange rate using machine learning
+techniques. Applied Soft Learning 75, 596-606.
+109
+Menkhoff, L., L. Sarno, M. Schmeling, and A. Schrimpf (2016). Information flow in
+foreign exchange markets: Dissecting customer currency trades. Journal of Finance
+71, 601–633.
+Newey, W.K. and K.D. West (1987). A simple, positive semi-definite, heteroskedas-
+ticity and autocorrelation consistent covariance matrix. Econometrica 55, 703-708.
+Pontiff, J. (2006). Costly arbitrage and the myth of idiosyncratic risk. Journal of
+Accounting and Economics 42, 35-52.
+Rapach, D.E., J.K. Strauss, and G. Zhou (2010). Out-of-sample equity premium
+prediction: Combination forecasts and links to the real economy. Review of Financial
+Studies 23, 821-862.
+Rime, D., L. Sarno, and E. Sojli (2010). Exchange rate forecasting, order flow and
+macroeconomic information. Journal of International Economics 80, 72-88.
+Shleifer, A., and R. W. Vishny (1997). The limits of arbitrage. Journal of Finance
+52, 35-55.
+Timmermann, A. (2006). Forecast combinations, in Elliott, G., C. W. J. Granger, and
+A. Timmermann (eds.), Handbook of Economic Forecasting, Volume 1, Amsterdam:
+North-Holland.
+Welch, I. and A. Goyal (2008). A comprehensive look at the empirical performance
+of equity premium prediction. Review of Financial Studies 21, 1455-1508.
+110
+Yae, J. and G.Z. Tian (2022). Out-of-sample forecasting of cryptocurrency returns:
+A comprehensive comparison of predictors and algorithms. Physica A: Statistical
+Mechanics and its Applications 598, 127379.
+111

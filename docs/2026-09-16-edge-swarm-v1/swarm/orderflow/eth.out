@@ -1,0 +1,158 @@
+ETH 2026-08-18 A 9 B 14
+ETH 2026-08-20 A 177 B 19
+ETH 2026-08-25 A 91 B 22
+ETH 2026-09-02 A 63 B 24
+ETH 2026-09-04 A 71 B 22
+{
+ "symbol": "ETH",
+ "days": [
+  "2026-08-18",
+  "2026-08-20",
+  "2026-08-25",
+  "2026-09-02",
+  "2026-09-04"
+ ],
+ "sweep_bps": 8.0,
+ "A_all": {
+  "60": {
+   "n": 411,
+   "mean": -0.55,
+   "median": 0.65,
+   "se": 0.81,
+   "hit_gt_cost": 0.146
+  },
+  "300": {
+   "n": 411,
+   "mean": 1.95,
+   "median": 2.46,
+   "se": 1.38,
+   "hit_gt_cost": 0.341
+  },
+  "900": {
+   "n": 407,
+   "mean": 0.96,
+   "median": 4.05,
+   "se": 1.97,
+   "hit_gt_cost": 0.359
+  }
+ },
+ "A_rebuild_ofi": {
+  "60": {
+   "n": 187,
+   "mean": 0.41,
+   "median": 0.71,
+   "se": 0.99,
+   "hit_gt_cost": 0.128
+  },
+  "300": {
+   "n": 187,
+   "mean": 1.88,
+   "median": 3.44,
+   "se": 2.06,
+   "hit_gt_cost": 0.369
+  },
+  "900": {
+   "n": 186,
+   "mean": 0.67,
+   "median": 5.32,
+   "se": 2.93,
+   "hit_gt_cost": 0.36
+  }
+ },
+ "A_norebuild": {
+  "60": {
+   "n": 28,
+   "mean": -1.22,
+   "median": 5.47,
+   "se": 6.17,
+   "hit_gt_cost": 0.393
+  },
+  "300": {
+   "n": 28,
+   "mean": 10.58,
+   "median": 13.73,
+   "se": 6.44,
+   "hit_gt_cost": 0.5
+  },
+  "900": {
+   "n": 27,
+   "mean": 5.46,
+   "median": -1.99,
+   "se": 8.21,
+   "hit_gt_cost": 0.444
+  }
+ },
+ "B_all": {
+  "300": {
+   "n": 101,
+   "mean": -3.2,
+   "median": -3.16,
+   "se": 3.08,
+   "hit_gt_cost": 0.168
+  },
+  "900": {
+   "n": 100,
+   "mean": -3.16,
+   "median": -2.68,
+   "se": 3.83,
+   "hit_gt_cost": 0.25
+  },
+  "1800": {
+   "n": 101,
+   "mean": -6.84,
+   "median": -3.94,
+   "se": 4.48,
+   "hit_gt_cost": 0.277
+  }
+ },
+ "B_thin": {
+  "300": {
+   "n": 36,
+   "mean": 1.41,
+   "median": -0.16,
+   "se": 7.18,
+   "hit_gt_cost": 0.222
+  },
+  "900": {
+   "n": 36,
+   "mean": 0.81,
+   "median": -1.32,
+   "se": 8.46,
+   "hit_gt_cost": 0.306
+  },
+  "1800": {
+   "n": 36,
+   "mean": -2.33,
+   "median": -2.75,
+   "se": 9.06,
+   "hit_gt_cost": 0.278
+  }
+ },
+ "B_notthin": {
+  "300": {
+   "n": 65,
+   "mean": -5.75,
+   "median": -3.81,
+   "se": 2.62,
+   "hit_gt_cost": 0.138
+  },
+  "900": {
+   "n": 64,
+   "mean": -5.4,
+   "median": -3.35,
+   "se": 3.59,
+   "hit_gt_cost": 0.219
+  },
+  "1800": {
+   "n": 65,
+   "mean": -9.33,
+   "median": -5.61,
+   "se": 4.79,
+   "hit_gt_cost": 0.277
+  }
+ },
+ "nA": 411,
+ "nB": 101
+}
+DQ [{"day": "2026-08-18", "book_rows": 468569, "trade_rows": 18619, "secs_with_book": 73390, "max_gap_s": 335.785, "gaps_gt5s": 191, "lat_ms_median": 108}, {"day": "2026-08-20", "book_rows": 982305, "trade_rows": 22076, "secs_with_book": 83917, "max_gap_s": 922.073, "gaps_gt5s": 5, "lat_ms_median": 96.0}, {"day": "2026-08-25", "book_rows": 1208555, "trade_rows": 23213, "secs_with_book": 85304, "max_gap_s": 33.349, "gaps_gt5s": 7, "lat_ms_median": 101}, {"day": "2026-09-02", "book_rows": 1321591, "trade_rows": 22990, "secs_with_book": 83953, "max_gap_s": 714.771, "gaps_gt5s": 12, "lat_ms_median": 96}, {"day": "2026-09-04", "book_rows": 1219070, "trade_rows": 25896, "secs_with_book": 83424, "max_gap_s": 22.028, "gaps_gt5s": 27, "lat_ms_median": 75}]
+RANGE [{"day": "2026-08-18", "range15m_bps_median": 16.660335996962466, "range15m_bps_p75": 22.59845242840829}, {"day": "2026-08-20", "range15m_bps_median": 49.681582649891766, "range15m_bps_p75": 65.38778651129508}, {"day": "2026-08-25", "range15m_bps_median": 35.60174735930273, "range15m_bps_p75": 47.94376520772547}, {"day": "2026-09-02", "range15m_bps_median": 32.03158233598431, "range15m_bps_p75": 44.77326708345976}, {"day": "2026-09-04", "range15m_bps_median": 25.894543281023065, "range15m_bps_p75": 38.9774205954626}]
