@@ -1,0 +1,7 @@
+[
+  {
+    "id": "dryrun_forced_flows_delever_fade",
+    "dead_row": 6,
+    "reason": "relabel of DEAD_LIST row 6 (Liquidation-cascade reversion: vol-fade with extra steps; high-vol bars CONTINUE, don't revert). Mechanism is identical: fade a 5m bar whose range and volume exceed a trailing baseline, expecting reversion of forced-liquidation flow; only the indicator name (z_range>3 & z_volume>3 'deleveraging-exhaustion z-score') changed. Thesis's own nearest_dead_rows[0].why_different states 'NOT different'; row 80 (tape_snapback) is the same bet on tape. Step-1 sanity otherwise passed (id regex OK; BTC/ETH/SOL in mr_edge; 5m exists; signal_py imports only pandas/numpy and defines signals(df); source_urls non-empty). Step 2 not reached; note the thesis's evidence field itself reports no external number was read from https://www.coinglass.com/LiquidationData (client-rendered placeholders)."
+  }
+]

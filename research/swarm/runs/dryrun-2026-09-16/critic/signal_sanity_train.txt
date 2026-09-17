@@ -1,0 +1,4 @@
+# critic re-run of analyst signal sanity check, era=train only, dataset=mr_edge, tf=5m (not a screen)
+BTC bars= 20304 values= [-1, 0, 1] nonzero= 196 range 2026-06-01 00:00:00+00:00 -> 2026-08-10 11:55:00+00:00
+ETH bars= 20304 values= [-1, 0, 1] nonzero= 179 range 2026-06-01 00:00:00+00:00 -> 2026-08-10 11:55:00+00:00
+SOL bars= 20304 values= [-1, 0, 1] nonzero= 253 range 2026-06-01 00:00:00+00:00 -> 2026-08-10 11:55:00+00:00

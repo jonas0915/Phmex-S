@@ -1,0 +1,256 @@
+{
+  "info": {
+    "code": "0",
+    "msg": "",
+    "data": [
+      {
+        "currency": "BTC",
+        "balanceEv": "0",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1754202560298883584",
+        "walletVid": "0"
+      },
+      {
+        "currency": "USD",
+        "balanceEv": "0",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1718960478013930496",
+        "walletVid": "0"
+      },
+      {
+        "currency": "USDT",
+        "balanceEv": "0",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1785175410896120064",
+        "walletVid": "0"
+      },
+      {
+        "currency": "ETH",
+        "balanceEv": "0",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1772777496138631168",
+        "walletVid": "0"
+      },
+      {
+        "currency": "XRP",
+        "balanceEv": "0",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1693277563838797312",
+        "walletVid": "0"
+      },
+      {
+        "currency": "ADA",
+        "balanceEv": "88",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1698895854108046080",
+        "walletVid": "0"
+      },
+      {
+        "currency": "TRX",
+        "balanceEv": "101118600",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1661455704546205696",
+        "walletVid": "0"
+      },
+      {
+        "currency": "SOL",
+        "balanceEv": "61912",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1707352099228470016",
+        "walletVid": "0"
+      },
+      {
+        "currency": "MATIC",
+        "balanceEv": "0",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1726125170974260736",
+        "walletVid": "0"
+      },
+      {
+        "currency": "USDC",
+        "balanceEv": "0",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1677783995631261952",
+        "walletVid": "0"
+      },
+      {
+        "currency": "AVAX",
+        "balanceEv": "0",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1744651980121388032",
+        "walletVid": "0"
+      },
+      {
+        "currency": "XPTOLD",
+        "balanceEv": "0",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1701249586216142080",
+        "walletVid": "0"
+      },
+      {
+        "currency": "PT",
+        "balanceEv": "79902",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1703137315883002880",
+        "walletVid": "0"
+      },
+      {
+        "currency": "PEPE",
+        "balanceEv": "15",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1710385056938852608",
+        "walletVid": "0"
+      },
+      {
+        "currency": "POL",
+        "balanceEv": "898663",
+        "lockedTradingBalanceEv": "0",
+        "lockedWithdrawEv": "0",
+        "lastUpdateTimeNs": "1726125170990260480",
+        "walletVid": "0"
+      }
+    ]
+  },
+  "BTC": {
+    "free": 0.0,
+    "used": 0.0,
+    "total": 0.0
+  },
+  "USD": {
+    "free": 0.0,
+    "used": 0.0,
+    "total": 0.0
+  },
+  "USDT": {
+    "free": 0.0,
+    "used": 0.0,
+    "total": 0.0
+  },
+  "ETH": {
+    "free": 0.0,
+    "used": 0.0,
+    "total": 0.0
+  },
+  "XRP": {
+    "free": 0.0,
+    "used": 0.0,
+    "total": 0.0
+  },
+  "ADA": {
+    "free": 8.8e-07,
+    "used": 0.0,
+    "total": 8.8e-07
+  },
+  "TRX": {
+    "free": 1.011186,
+    "used": 0.0,
+    "total": 1.011186
+  },
+  "SOL": {
+    "free": 0.00061912,
+    "used": 0.0,
+    "total": 0.00061912
+  },
+  "MATIC": {
+    "free": 0.0,
+    "used": 0.0,
+    "total": 0.0
+  },
+  "USDC": {
+    "free": 0.0,
+    "used": 0.0,
+    "total": 0.0
+  },
+  "AVAX": {
+    "free": 0.0,
+    "used": 0.0,
+    "total": 0.0
+  },
+  "XPTOLD": {
+    "free": 0.0,
+    "used": 0.0,
+    "total": 0.0
+  },
+  "PT": {
+    "free": 0.00079902,
+    "used": 0.0,
+    "total": 0.00079902
+  },
+  "PEPE": {
+    "free": 0.15,
+    "used": 0.0,
+    "total": 0.15
+  },
+  "POL": {
+    "free": 0.00898663,
+    "used": 0.0,
+    "total": 0.00898663
+  },
+  "timestamp": 1785175410896,
+  "datetime": "2026-07-27T18:03:30.896Z",
+  "free": {
+    "BTC": 0.0,
+    "USD": 0.0,
+    "USDT": 0.0,
+    "ETH": 0.0,
+    "XRP": 0.0,
+    "ADA": 8.8e-07,
+    "TRX": 1.011186,
+    "SOL": 0.00061912,
+    "MATIC": 0.0,
+    "USDC": 0.0,
+    "AVAX": 0.0,
+    "XPTOLD": 0.0,
+    "PT": 0.00079902,
+    "PEPE": 0.15,
+    "POL": 0.00898663
+  },
+  "used": {
+    "BTC": 0.0,
+    "USD": 0.0,
+    "USDT": 0.0,
+    "ETH": 0.0,
+    "XRP": 0.0,
+    "ADA": 0.0,
+    "TRX": 0.0,
+    "SOL": 0.0,
+    "MATIC": 0.0,
+    "USDC": 0.0,
+    "AVAX": 0.0,
+    "XPTOLD": 0.0,
+    "PT": 0.0,
+    "PEPE": 0.0,
+    "POL": 0.0
+  },
+  "total": {
+    "BTC": 0.0,
+    "USD": 0.0,
+    "USDT": 0.0,
+    "ETH": 0.0,
+    "XRP": 0.0,
+    "ADA": 8.8e-07,
+    "TRX": 1.011186,
+    "SOL": 0.00061912,
+    "MATIC": 0.0,
+    "USDC": 0.0,
+    "AVAX": 0.0,
+    "XPTOLD": 0.0,
+    "PT": 0.00079902,
+    "PEPE": 0.15,
+    "POL": 0.00898663
+  }
+}
