@@ -41,6 +41,17 @@ def _write_state(bot_dir: Path, slot_id: str, nets: list[float], start_ts: float
         (bot_dir / f"trading_state_{slot_id}_mode.json").write_text(json.dumps(mode))
 
 
+def fake_git(branch="main", pull=(0, "Already up to date.")):
+    """git recorder answering rev-parse with `branch`; every other command succeeds."""
+    def _git(args):
+        if args[:2] == ["rev-parse", "--abbrev-ref"]:
+            return 0, branch + "\n"
+        if args[:2] == ["pull", "--ff-only"]:
+            return pull
+        return 0, ""
+    return _git
+
+
 class Recorder:
     def __init__(self, result=None):
         self.calls: list = []
@@ -67,6 +78,7 @@ def ctx(tmp_path, monkeypatch):
         {"closed_trades": [_trade(99.0, NOW_TS - DAY)], "positions": {}}))   # main book: never a slot
     monkeypatch.delenv("SWARM_DESK_MODEL", raising=False)
     monkeypatch.delenv("SWARM_JUDGE_MODEL", raising=False)
+    monkeypatch.delenv("SWARM_BRANCH", raising=False)
     c = sd.Ctx(
         bot_dir=bot_dir,
         log_dir=tmp_path / "logs",
@@ -80,7 +92,7 @@ def ctx(tmp_path, monkeypatch):
         },
         pgrep=Recorder(result=[]),
         bot_alive=Recorder(result=False),
-        git=Recorder(result=(0, "")),
+        git=Recorder(result=fake_git()),
         launcher=Recorder(result=sd.Launch(returncode=0, stdout="", stderr="", timed_out=False)),
         telegram=Recorder(result=True),
         adjudicator_log=tmp_path / "lab_adjudicator.log",
@@ -123,11 +135,47 @@ def test_run_alone_guard_refuses_a_duplicate(ctx, mode):
 
 
 def test_git_pull_failure_is_logged_and_the_run_continues(ctx):
-    ctx.git = Recorder(result=lambda *a, **kw: (1, "fatal: no network") if a[0][:2] == ["pull", "--ff-only"] else (0, ""))
+    ctx.git = Recorder(result=fake_git(pull=(1, "fatal: no network")))
     rc = sd.main(["--mode", "maint"], ctx=ctx)
     assert rc == 0
-    assert ctx.git.calls[0][0][0][:2] == ["pull", "--ff-only"]
+    assert ["pull", "--ff-only"] in [c[0][0] for c in ctx.git.calls]
     assert ctx.paper_status_path.exists()
+
+
+# ── branch awareness ──────────────────────────────────────────────────────────
+def _log_text(ctx):
+    return (ctx.log_dir / "swarm_desk.log").read_text()
+
+
+@pytest.mark.parametrize("mode", ["desk", "test"])
+def test_desk_and_test_refuse_on_the_wrong_branch_before_maint_or_launch(ctx, mode):
+    ctx.git = Recorder(result=fake_git(branch="edge-swarm-v2"))
+    rc = sd.main(["--mode", mode], ctx=ctx)
+    assert rc == 1
+    assert ctx.launcher.calls == []
+    assert not ctx.paper_status_path.exists()                    # maint did not run
+    assert ["pull", "--ff-only"] not in [c[0][0] for c in ctx.git.calls]
+    tg = ctx.telegram.calls[0][0][0]
+    assert "desk refused: on branch edge-swarm-v2, expected main" in tg
+    assert "branch: edge-swarm-v2 (SWARM_BRANCH=main)" in _log_text(ctx)
+
+
+def test_swarm_branch_env_overrides_the_default(ctx, monkeypatch):
+    monkeypatch.setenv("SWARM_BRANCH", "edge-swarm-v2")
+    ctx.git = Recorder(result=fake_git(branch="edge-swarm-v2"))
+    _desk_ok(ctx)
+    assert sd.main(["--mode", "desk"], ctx=ctx) == 0
+    assert len(ctx.launcher.calls) == 1
+
+
+def test_maint_only_logs_the_branch_and_never_refuses(ctx):
+    ctx.git = Recorder(result=fake_git(branch="edge-swarm-v2"))
+    ctx.registered_ids = ["ALPHA"]
+    _write_state(ctx.bot_dir, "ALPHA", [0.5], NOW_TS - 9 * DAY)
+    assert sd.main(["--mode", "maint"], ctx=ctx) == 0
+    assert ctx.paper_status_path.exists()
+    assert "branch: edge-swarm-v2 (SWARM_BRANCH=main)" in _log_text(ctx)
+    assert ctx.telegram.calls == []
 
 
 # ── maint ─────────────────────────────────────────────────────────────────────
@@ -277,6 +325,47 @@ def test_maint_only_writes_paper_status_and_the_state_file(ctx):
     assert ctx.launcher.calls == []
 
 
+def test_maint_commits_paper_status_by_pathspec_without_push_and_only_when_changed(ctx):
+    ctx.registered_ids = ["ALPHA"]
+    _write_state(ctx.bot_dir, "ALPHA", [0.5], NOW_TS - 9 * DAY)
+    sd.main(["--mode", "maint"], ctx=ctx)
+    calls = [c[0][0] for c in ctx.git.calls]
+    assert ["add", "research/swarm/kb/PAPER_STATUS.md"] in calls
+    commit = next(c for c in calls if c[0] == "commit")
+    assert commit[-2:] == ["--", "research/swarm/kb/PAPER_STATUS.md"]
+    assert "Co-Authored-By: Claude" in commit[commit.index("-m") + 1]
+    assert ["push"] not in calls
+    # unchanged content (fixed clock) → no second commit
+    ctx.git.calls.clear()
+    sd.main(["--mode", "maint"], ctx=ctx)
+    assert not any(c[0][0][0] in ("add", "commit") for c in ctx.git.calls)
+    # a crossing → LESSONS.md joins the pathspec, still no push
+    _write_state(ctx.bot_dir, "ALPHA", [0.5, -11.0], NOW_TS - 9 * DAY)
+    ctx.git.calls.clear()
+    sd.main(["--mode", "maint"], ctx=ctx)
+    commit = next(c[0][0] for c in ctx.git.calls if c[0][0][0] == "commit")
+    assert commit[commit.index("--") + 1:] == ["research/swarm/kb/PAPER_STATUS.md", "research/swarm/kb/LESSONS.md"]
+    assert ["push"] not in [c[0][0] for c in ctx.git.calls]
+
+
+def test_git_add_failure_is_reported_and_skips_the_commit(ctx):
+    def git(args):
+        if args[0] == "add":
+            return 128, "fatal: index.lock"
+        return fake_git()(args)
+    ctx.git = Recorder(result=git)
+    ctx.registered_ids = ["ALPHA"]
+    _write_state(ctx.bot_dir, "ALPHA", [0.5], NOW_TS - 9 * DAY)
+    sd.main(["--mode", "maint"], ctx=ctx)
+    assert not any(c[0][0][0] == "commit" for c in ctx.git.calls)
+    assert "git add" in _log_text(ctx) and "failed" in _log_text(ctx)
+
+
+def test_adjudicator_key_map_never_puts_a_live_grade_on_the_paper_mr_row():
+    assert "mr_bundle" not in sd.ADJ_KEY_TO_SLOT
+    assert sd.ADJ_KEY_TO_SLOT["sr_bounce_v2"] == "SR_BOUNCE"
+
+
 def test_legacy_kill_lines_are_registered_for_the_known_slots():
     from lab_adjudicator import adjudicate
     lines = sd.kill_lines(adjudicate.EXPERIMENTS)
@@ -355,16 +444,21 @@ def test_parse_desk_result():
 
 
 # ── desk mode end to end (fake launcher) ──────────────────────────────────────
-def _desk_ok(ctx, result_code="NO_SURVIVORS", report=True, extra=None):
+def _desk_ok(ctx, result_code="NO_SURVIVORS", report=True, critic=True, extra=None, lengths=True):
     def launch(cmd, cwd, timeout):
-        # the "workflow" writes the run's REPORT.md the way desk.js's synthesis seat does
+        # the "workflow" writes REPORT.md / CRITIC.md the way desk.js's closing seats do
         run_id = [t for t in cmd[2].split() if t.startswith("research/swarm/runs/")][0].split("/")[3]
         rd = ctx.runs_dir / run_id
         rd.mkdir(parents=True, exist_ok=True)
         if report:
             (rd / "REPORT.md").write_text(f"# REPORT — run {run_id}\n\nWritten now.\n\n## Verdict\nNothing survived.\n")
+        if critic:
+            (rd / "CRITIC.md").write_text("# CRITIC\n")
+        la = json.loads((rd / "launch_args.json").read_text())
         payload = {"run_id": run_id, "result": result_code, "passed": [], "gate_rejected": [{"id": "a"}],
                    "results": [{"id": "b"}], "lenses": [{"lens": "forced_flows", "theses": 2}]}
+        if lengths:
+            payload.update({"constraints_len": len(la["constraints_md"]), "standards_len": len(la["standards_md"])})
         payload.update(extra or {})
         return sd.Launch(returncode=0, stdout="ok\n" + sd.RESULT_MARKER + " " + json.dumps(payload) + "\n",
                          stderr="", timed_out=False)
@@ -392,13 +486,15 @@ def test_desk_mode_runs_maint_then_launches_commits_pushes_and_telegrams(ctx):
     assert la["dry_run"] is False and la["max_analysts"] == 8 and la["constraints_md"].startswith("# CONSTRAINTS")
     assert "build.js" not in cmd[2]
     calls = _git_calls(ctx)
-    assert calls[0][:2] == ["pull", "--ff-only"]
-    add = next(c for c in calls if c[0] == "add")
+    assert calls[0] == ["rev-parse", "--abbrev-ref", "HEAD"] and calls[1] == ["pull", "--ff-only"]
+    add = next(c for c in calls if c[0] == "add" and "research/swarm/kb" in c)
     assert add[1:] == ["research/swarm/kb", f"research/swarm/runs/{run_id}"]
-    commit = next(c for c in calls if c[0] == "commit")
+    commit = next(c for c in calls if c[0] == "commit" and "desk run" in c[2])
     msg = commit[commit.index("-m") + 1]
     assert run_id in msg and "NO_SURVIVORS" in msg and "Co-Authored-By: Claude" in msg
+    assert commit[commit.index("-m") + 2:] == ["--", "research/swarm/kb", f"research/swarm/runs/{run_id}"]   # pathspec commit
     assert ["push"] in calls
+    assert "pass-through fidelity OK" in _log_text(ctx)
     assert len(ctx.telegram.calls) == 1
     tg = ctx.telegram.calls[0][0][0]
     assert f"# REPORT — run {run_id}" in tg and "Written now." in tg
@@ -426,8 +522,9 @@ def test_desk_mode_survivors_is_gate_a_stop_not_a_build(ctx):
 
 
 def test_desk_mode_web_budget_exhausted_sends_the_manual_one_liner(ctx):
-    _desk_ok(ctx, result_code="WEB_BUDGET_EXHAUSTED", report=False)
-    sd.main(["--mode", "desk"], ctx=ctx)
+    _desk_ok(ctx, result_code="WEB_BUDGET_EXHAUSTED", report=False, critic=False)
+    rc = sd.main(["--mode", "desk"], ctx=ctx)
+    assert rc == 0                      # the pre-gate abort writes no REPORT/CRITIC by design — not NO_ARTIFACTS
     tg = ctx.telegram.calls[0][0][0]
     assert "WEB_BUDGET_EXHAUSTED" in tg and sd.MANUAL_LAUNCH_ONE_LINER in tg
     assert "REPORT.md" in tg          # says the report is missing rather than fabricating lines
@@ -456,6 +553,29 @@ def test_desk_mode_claude_failure_is_reported(ctx):
     assert rc != 0
     tg = ctx.telegram.calls[0][0][0]
     assert "FAILED" in tg and sd.MANUAL_LAUNCH_ONE_LINER in tg
+
+
+@pytest.mark.parametrize("report,critic", [(True, False), (False, True), (False, False)])
+def test_desk_mode_requires_report_and_critic_else_no_artifacts(ctx, report, critic):
+    _desk_ok(ctx, result_code="NO_SURVIVORS", report=report, critic=critic)
+    rc = sd.main(["--mode", "desk"], ctx=ctx)
+    assert rc != 0
+    tg = ctx.telegram.calls[0][0][0]
+    assert "result: NO_ARTIFACTS" in tg and sd.MANUAL_LAUNCH_ONE_LINER in tg
+    assert "NO_ARTIFACTS" in _log_text(ctx)
+
+
+def test_pass_through_fidelity_warning_on_mismatch_or_missing(ctx):
+    _desk_ok(ctx, lengths=False, extra={"constraints_len": 3, "standards_len": 999999})
+    sd.main(["--mode", "desk"], ctx=ctx)
+    txt = _log_text(ctx)
+    assert "pass-through fidelity MISMATCH: constraints_len=3" in txt
+    assert "fidelity OK" not in txt
+    ctx2_log = ctx.log_dir / "swarm_desk.log"
+    ctx2_log.write_text("")
+    _desk_ok(ctx, lengths=False)
+    sd.main(["--mode", "desk"], ctx=ctx)
+    assert "constraints_len not reported" in _log_text(ctx)
 
 
 def test_desk_mode_includes_maint_alerts_in_its_telegram(ctx):
@@ -488,6 +608,16 @@ def test_test_mode_uses_dry_run_args_and_reports_ok(ctx, capsys):
     out = capsys.readouterr().out
     assert "HEADLESS WORKFLOW: OK" in out and "ALL_REJECTED_AT_GATE" in out
     assert "TEST" in ctx.telegram.calls[0][0][0]
+    calls = [c[0][0] for c in ctx.git.calls]
+    assert ["push"] in calls                       # test mode commits + pushes the dryrun dir like a real run
+
+
+def test_test_mode_ok_is_not_vacuous_without_desk_artifacts(ctx, capsys):
+    _desk_ok(ctx, result_code="ALL_REJECTED_AT_GATE", report=True, critic=False)
+    rc = sd.main(["--mode", "test"], ctx=ctx)
+    assert rc != 0
+    out = capsys.readouterr().out
+    assert "HEADLESS WORKFLOW: FAILED" in out and "NO_ARTIFACTS" in out
 
 
 def test_test_mode_reports_unavailable_clearly(ctx, capsys):
@@ -527,6 +657,7 @@ def test_plist_files_are_versioned_and_shaped_like_the_existing_jobs(name, mode,
     for k in ("StandardOutPath", "StandardErrorPath"):
         assert d[k].startswith("/Users/jonaspenaso/Library/Logs/Phmex-S/"), d[k]
         assert "Desktop" not in d[k]
+    assert d["EnvironmentVariables"] == {"SWARM_BRANCH": "main"}
     assert d["StandardOutPath"].endswith(f"{name.split('.')[-1]}.out.log")
     assert d["StandardErrorPath"].endswith(f"{name.split('.')[-1]}.err.log")
 
@@ -540,10 +671,13 @@ def test_readme_cadence_section_is_complete():
                    "~/Library/Logs/Phmex-S/", "swarm_desk.log", "PAPER_STATUS.md",
                    "Gate A", "Gate B", "build.js is never invoked", "com.phmex.lab-adjudicator",
                    "WEB_BUDGET_EXHAUSTED", "--mode test", "SWARM_DESK_MODEL", "SWARM_JUDGE_MODEL",
-                   sd.MANUAL_LAUNCH_ONE_LINER, "research/swarm/launchd/"):
+                   sd.MANUAL_LAUNCH_ONE_LINER, "research/swarm/launchd/", "SWARM_BRANCH", "desk refused",
+                   "Known limit", "constraints_len", "NO_ARTIFACTS", "CRITIC.md", "pathspec", "NO push",
+                   "`--mode test` commits and pushes"):
         assert needle in cadence, needle
 
 
-def test_maint_state_file_is_gitignored():
+def test_maint_state_file_and_halt_sentinel_are_gitignored():
     gi = (BOT_DIR / ".gitignore").read_text()
     assert "research/swarm/kb/.maint_state.json" in gi
+    assert "scripts/.halt_swarm_desk" in gi

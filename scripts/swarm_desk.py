@@ -18,6 +18,11 @@ no JSON grades file) and rewrites research/swarm/kb/PAPER_STATUS.md. Appends ONE
 dated LESSONS line only when a slot crossed its registered kill line or reached
 verdict_n since the previous maint run (tracked in kb/.maint_state.json, gitignored;
 the first run is a baseline and announces nothing). Telegram only on such an alert.
+Commits (pathspec, no push) PAPER_STATUS.md / LESSONS.md when they changed so the
+daily pull never conflicts on them.
+
+Branch: desk/test refuse (Telegram + exit 1) unless HEAD == env SWARM_BRANCH
+(default "main"; both plists set it); maint only logs the branch.
 
 desk: maint first, then a headless `claude -p` whose prompt invokes the Workflow
 tool on research/swarm/workflows/desk.js with the args written to
@@ -63,6 +68,10 @@ DESK_TOOLS = ("Workflow", "WebSearch", "WebFetch", "Read", "Write", "Bash", "Glo
 DESK_SCRIPT = "research/swarm/workflows/desk.js"
 DESK_CODES = ("SURVIVORS", "NO_SURVIVORS", "ALL_REJECTED_AT_GATE", "GATE_FAILED", "NO_THESES",
               "WEB_BUDGET_EXHAUSTED")                      # desk.js result codes (verbatim)
+# Artifacts only desk.js's closing seats write; required for every code except the
+# pre-gate abort (WEB_BUDGET_EXHAUSTED writes one LESSONS line and nothing else).
+DESK_ARTIFACTS = ("REPORT.md", "CRITIC.md")
+DEFAULT_BRANCH = "main"                                  # env SWARM_BRANCH overrides
 RESULT_MARKER = "DESK_RESULT_JSON:"
 UNAVAILABLE_MARKER = "WORKFLOW_TOOL_UNAVAILABLE"
 COMMIT_TRAILER = "Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
@@ -79,8 +88,9 @@ EXIT_OK, EXIT_FAIL, EXIT_BUSY = 0, 1, 3
 # trader — bot.py:677-687); it is never a paper slot for PAPER_STATUS.
 MAIN_BOOK_LABELS = frozenset({"5m_scalp"})
 # adjudicator EXPERIMENTS keys → slot ids (legacy names; build.js slots use key == slot_id)
+# (mr_bundle is NOT mapped: it grades the live MR fills, not the paper row)
 ADJ_KEY_TO_SLOT = {"sr_bounce_v2": "SR_BOUNCE", "sr_bounce": "SR_BOUNCE_era1", "eth_tsm_28": "ETH_TSM_28",
-                   "htf_l2": "HTF_L2", "vwap_cross": "VWAP_CROSS", "mr_bundle": "5m_mean_revert"}
+                   "htf_l2": "HTF_L2", "vwap_cross": "VWAP_CROSS"}
 # Kill lines that live outside the adjudicator registry (read from the cited files).
 LEGACY_LINES = {
     # docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md "Kill criteria":
@@ -234,6 +244,25 @@ def other_desk_processes(pgrep_lines: list, my_pid: int) -> list:
         if re.search(r"--mode[ =](desk|test)\b", cmd):
             out.append(pid)
     return out
+
+
+def expected_branch() -> str:
+    return os.environ.get("SWARM_BRANCH") or DEFAULT_BRANCH
+
+
+def current_branch(ctx: Ctx) -> str:
+    rc, out = ctx.git(["rev-parse", "--abbrev-ref", "HEAD"])
+    return out.strip().splitlines()[0].strip() if rc == 0 and out.strip() else "?"
+
+
+def git_commit_paths(ctx: Ctx, msg: str, paths: list) -> tuple:
+    """`git add <paths>` (rc checked) then a PATHSPEC commit — never sweeps whatever
+    else happens to be staged. Returns (rc, output) of the commit."""
+    rc, out = ctx.git(["add", *paths])
+    if rc != 0:
+        log.error("git add %s failed (rc=%s): %s", paths, rc, out.strip()[:300])
+        return rc, out
+    return ctx.git(["commit", "-m", msg, "--", *paths])
 
 
 def git_pull(ctx: Ctx) -> bool:
@@ -567,7 +596,9 @@ def run_maint(ctx: Ctx) -> list:
     now = ctx.now()
     text = render_paper_status(slots, digest, ctx.bot_alive(), now)
     ctx.kb_dir.mkdir(parents=True, exist_ok=True)
+    old_text = ctx.paper_status_path.read_text() if ctx.paper_status_path.exists() else None
     ctx.paper_status_path.write_text(text)
+    status_changed = text != old_text
     active = [s.slot_id for s in slots if s.killed is None]
     log.info("maint: %d registered slots, %d active (%s), %d killed; PAPER_STATUS.md written",
              len(slots), len(active), ", ".join(active) or "none", len(slots) - len(active))
@@ -588,6 +619,14 @@ def run_maint(ctx: Ctx) -> list:
             f.write(line + "\n")
         log.info("maint: LESSONS line appended: %s", line[:200])
         ctx.telegram(f"🧪 swarm maint {today}\n" + "\n".join(events) + "\nsee research/swarm/kb/PAPER_STATUS.md")
+    # Commit (pathspec, NO push) what maint wrote so the daily `pull --ff-only` never
+    # trips on a dirty PAPER_STATUS.md / LESSONS.md; the weekly desk run pushes.
+    paths = (["research/swarm/kb/PAPER_STATUS.md"] if status_changed else []) + \
+            (["research/swarm/kb/LESSONS.md"] if events else [])
+    if paths:
+        stamp = datetime.fromtimestamp(now, tz=PT).strftime("%Y-%m-%d %I:%M %p PT")
+        rc, out = git_commit_paths(ctx, f"swarm: maint {stamp} — PAPER_STATUS{' + LESSONS' if events else ''}\n\n{COMMIT_TRAILER}", paths)
+        log.info("maint: commit %s → rc=%s %s", paths, rc, (out.strip().splitlines() or [""])[-1][:120])
     return events
 
 
@@ -618,9 +657,11 @@ def desk_prompt(launch_args_rel: str, run_id: str) -> str:
         f"1. Read the file {launch_args_rel} and parse it as JSON. It is the complete `args` object for run {run_id}.\n"
         f"2. Invoke the Workflow tool once: Workflow({{ scriptPath: \"{DESK_SCRIPT}\", args: <that object, every field verbatim, "
         f"nothing added, nothing changed> }}). Run it alone — do not start any other workflow or agent.\n"
-        f"3. When the workflow returns, reply with exactly one line: `{RESULT_MARKER} <the returned object as compact JSON>` "
-        f"and nothing else. If the workflow throws, reply `{RESULT_MARKER} {{\"run_id\": \"{run_id}\", \"result\": "
-        f"\"WORKFLOW_ERROR\", \"error\": \"<message>\"}}`.\n"
+        f"3. When the workflow returns, reply with exactly one line: `{RESULT_MARKER} <the returned object as compact JSON, "
+        f"plus two extra top-level fields constraints_len and standards_len = the character lengths (.length) of the "
+        f"constraints_md and standards_md strings you actually passed to Workflow>` and nothing else. If the workflow "
+        f"throws, reply `{RESULT_MARKER} {{\"run_id\": \"{run_id}\", \"result\": \"WORKFLOW_ERROR\", "
+        f"\"error\": \"<message>\", \"constraints_len\": <n>, \"standards_len\": <n>}}`.\n"
         f"Rules: if you do not have a Workflow tool, reply with exactly `{UNAVAILABLE_MARKER}` and stop. Never edit bot code, "
         f".env, any trading_state file or sentinel; never run launchctl, main.py or anything that places an order; never "
         f"resume or relaunch the workflow yourself; do not commit or push (the runner does that)."
@@ -663,18 +704,41 @@ def _counts(res: dict) -> str:
 
 
 def _commit_run(ctx: Ctx, run_id: str, code: str) -> str:
-    rel_run = f"research/swarm/runs/{run_id}"
-    ctx.git(["add", "research/swarm/kb", rel_run])          # never .env, never data (kb + this run dir only)
-    msg = f"swarm: desk run {run_id} — {code}\n\n{COMMIT_TRAILER}"
-    rc, out = ctx.git(["commit", "-m", msg])
+    paths = ["research/swarm/kb", f"research/swarm/runs/{run_id}"]   # never .env, never data; pathspec commit
+    rc, out = git_commit_paths(ctx, f"swarm: desk run {run_id} — {code}\n\n{COMMIT_TRAILER}", paths)
     if rc != 0:
         log.info("git commit: nothing committed (rc=%s): %s", rc, out.strip()[:200])
-        return "commit: nothing to commit"
+        return "nothing to commit" if "nothing to commit" in out else f"commit FAILED (rc={rc}, see log)"
     rc, out = ctx.git(["push"])
     if rc != 0:
         log.warning("git push failed (rc=%s): %s", rc, out.strip()[:300])
         return "committed; PUSH FAILED (push by hand)"
     return "committed + pushed"
+
+
+def check_passthrough(res: dict, args: dict) -> bool:
+    """One-time fidelity read: the headless session re-emits launch_args.json fields
+    verbatim, which cannot be verified from outside — it reports the lengths of the
+    two strings it passed and we compare them to the file contents. WARNING on
+    mismatch or when the fields are missing; True only on an exact match."""
+    ok = True
+    for key, fld in (("constraints_len", "constraints_md"), ("standards_len", "standards_md")):
+        got, want = res.get(key), len(args[fld])
+        if got is None:
+            log.warning("pass-through fidelity: %s not reported by the session (expected %d)", key, want)
+            ok = False
+        elif int(got) != want:
+            log.warning("pass-through fidelity MISMATCH: %s=%s but %s is %d chars — the session did not pass the file verbatim",
+                        key, got, fld, want)
+            ok = False
+    if ok:
+        log.info("pass-through fidelity OK: constraints_len=%d standards_len=%d match launch_args.json",
+                 len(args["constraints_md"]), len(args["standards_md"]))
+    return ok
+
+
+def missing_artifacts(run_dir: Path) -> list:
+    return [a for a in DESK_ARTIFACTS if not (run_dir / a).exists()]
 
 
 def run_desk(ctx: Ctx, test: bool = False) -> int:
@@ -718,6 +782,11 @@ def run_desk(ctx: Ctx, test: bool = False) -> int:
         else:
             res = parsed
             code = str(parsed.get("result") or "NO_RESULT")
+            check_passthrough(res, args)
+            if code in DESK_CODES and code != "WEB_BUDGET_EXHAUSTED" and missing_artifacts(run_dir):
+                log.error("desk%s: result %s but %s missing in %s — treating as NO_ARTIFACTS",
+                          tag, code, ", ".join(missing_artifacts(run_dir)), run_dir)
+                code = "NO_ARTIFACTS"
     log.info("desk%s: run %s → %s", tag, run_id, code)
 
     git_note = _commit_run(ctx, run_id, code)
@@ -739,15 +808,15 @@ def run_desk(ctx: Ctx, test: bool = False) -> int:
         lines.append(MANUAL_LAUNCH_ONE_LINER)
     elif code == "TIMEOUT":
         lines.append(f"desk TIMED OUT after {DESK_TIMEOUT_S // 60} min — manual launch: {MANUAL_LAUNCH_ONE_LINER}")
-    elif code in ("WEB_BUDGET_EXHAUSTED", "CLAUDE_FAILED", "NO_RESULT", "WORKFLOW_ERROR"):
+    elif code in ("WEB_BUDGET_EXHAUSTED", "CLAUDE_FAILED", "NO_RESULT", "NO_ARTIFACTS", "WORKFLOW_ERROR"):
         lines.append(f"{'FAILED' if code != 'WEB_BUDGET_EXHAUSTED' else 'analysts could not search'} — "
                      f"manual launch from a fresh session: {MANUAL_LAUNCH_ONE_LINER}")
     lines.append(f"git: {git_note} · log ~/Library/Logs/Phmex-S/swarm_desk.log")
     ctx.telegram("\n".join(lines))
 
     if test:
-        if code in DESK_CODES and run_dir.exists():
-            print(f"HEADLESS WORKFLOW: OK — result {code}, run dir research/swarm/runs/{run_id}")
+        if code in DESK_CODES and not missing_artifacts(run_dir):
+            print(f"HEADLESS WORKFLOW: OK — result {code}; REPORT.md + CRITIC.md present in research/swarm/runs/{run_id}")
         elif code == "WORKFLOW_UNAVAILABLE":
             print("HEADLESS WORKFLOW: UNAVAILABLE — `claude -p` has no Workflow tool; desk mode will fall back to the "
                   "Telegram paste instruction (README Cadence)")
@@ -787,6 +856,13 @@ def main(argv=None, ctx: Optional[Ctx] = None) -> int:
         log.warning("run-alone guard: another swarm_desk desk/test process is alive (pid %s) — refusing --mode %s",
                     ", ".join(map(str, busy)), a.mode)
         return EXIT_BUSY
+    branch, want = current_branch(ctx), expected_branch()
+    log.info("branch: %s (SWARM_BRANCH=%s)", branch, want)
+    if a.mode != "maint" and branch != want:
+        msg = f"⚠️ swarm desk refused: on branch {branch}, expected {want} (set SWARM_BRANCH or check out {want})"
+        log.error(msg)
+        ctx.telegram(msg)
+        return EXIT_FAIL
     git_pull(ctx)
     try:
         if a.mode == "maint":

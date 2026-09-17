@@ -49,3 +49,5 @@ research/swarm/runs/**/*.pkl
 research/swarm/runs/**/*.parquet
 # swarm v2 daily maintenance pass: crossing/verdict flags between runs (runtime state, never tracked)
 research/swarm/kb/.maint_state.json
+# swarm v2 kill switch sentinel (owner-touched, never tracked)
+scripts/.halt_swarm_desk
