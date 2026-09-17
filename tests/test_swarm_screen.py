@@ -21,6 +21,12 @@ def _frame(n=600, seed=0):
 
 CAUSAL = "import pandas as pd\ndef signals(df):\n    return ((df.close > df.close.shift(1)).astype(int)).where(df.index.hour == 0, 0)\n"
 LOOKAHEAD = "import pandas as pd\ndef signals(df):\n    return (df.close.shift(-1) > df.close).astype(int)\n"
+# review fix round 1, finding 1: sparse lookahead — fires on only a few % of bars, so a
+# last-value-only / small-random-sample causality check almost never lands on it.
+SPARSE_LOOKAHEAD = ("import pandas as pd\ndef signals(df):\n"
+                     "    return ((df.close.shift(-2) > df.close * 1.002) & (df.index.hour == 0)).astype(int)\n")
+BAD_VALUES = "import pandas as pd\ndef signals(df):\n    return pd.Series(2, index=df.index)\n"
+NEVER_FIRES = "import pandas as pd\ndef signals(df):\n    return pd.Series(0, index=df.index)\n"
 
 
 def _thesis(sig, tp=100, sl=100, hold=6, uni=("ETH",)):
@@ -43,6 +49,16 @@ def _write(d: Path, name: str, code: str) -> Path:
     p = d / name; p.write_text(code); return p
 
 
+def test_causality_check_catches_sparse_lookahead_signal(tmp_path: Path):
+    """Review fix round 1, finding 1: a signal that only leaks on a handful of bars must
+    still be caught — the fixed check tests every bar where the signal is nonzero, not a
+    small random sample compared only at its own index."""
+    df = _frame(600)
+    bad = sc.load_signal_fn(_write(tmp_path, "sparse_bad.py", SPARSE_LOOKAHEAD))
+    with pytest.raises(sc.LookaheadError):
+        sc.causality_check(bad, df)
+
+
 def test_simulate_enters_next_open_and_sl_wins_ties():
     idx = pd.date_range("2026-01-01", periods=5, freq="1h", tz="UTC")
     df = pd.DataFrame({"open": [100, 100, 100, 100, 100], "high": [100, 100, 103, 100, 100],
@@ -61,6 +77,19 @@ def test_simulate_max_hold_exits_at_close_and_one_position_per_symbol():
     sig = pd.Series([1, 1, 1, 0, 0, 0], index=idx)
     trades = sc.simulate(df, sig, tp_bps=500, sl_bps=500, max_hold_bars=2, cost_bps=0)
     assert len(trades) == 1 and trades.iloc[0].exit_reason == "TIME" and trades.iloc[0].gross_bps == pytest.approx(100)
+
+
+def test_simulate_signal_on_exit_bar_can_open_next_trade_at_next_open():
+    """Review fix round 1, finding 2: flat at the exit bar's close means a signal on that
+    same closed bar must still be tradeable — it opens the next trade at the NEXT open,
+    not skipped as a one-bar dead zone."""
+    idx = pd.date_range("2026-01-01", periods=6, freq="1h", tz="UTC")
+    df = pd.DataFrame({"open": [100] * 6, "high": [100.2] * 6, "low": [99.8] * 6, "close": [100] * 6, "volume": 1}, index=idx)
+    sig = pd.Series([0, 1, 0, 1, 0, 0], index=idx)  # second signal fires exactly on bar 3, the first trade's exit bar
+    trades = sc.simulate(df, sig, tp_bps=1000, sl_bps=1000, max_hold_bars=1, cost_bps=0)
+    assert len(trades) == 2
+    assert trades.iloc[0].exit_ts == idx[3] and trades.iloc[0].exit_reason == "TIME"
+    assert trades.iloc[1].entry_ts == idx[4] and trades.iloc[1].exit_reason == "TIME"
 
 
 def test_run_screen_finds_planted_edge_and_writes_out_json(tmp_path: Path, monkeypatch):
@@ -125,3 +154,51 @@ def test_run_screen_holdout_preserves_train_artifacts_and_writes_era_suffixed_fi
     assert (sdir / "trades.holdout.csv").exists()
     saved_holdout = json.loads((sdir / "out.holdout.json").read_text())
     assert saved_holdout["era"] == "holdout"
+
+
+def test_run_screen_rejects_signal_values_outside_pm1_0(tmp_path: Path, monkeypatch):
+    """Review fix round 1, finding 3: a score-valued signal (e.g. 2) must not silently
+    multiply TP/SL distance and gross_bps through astype(int)."""
+    df = _frame(300, seed=8)
+    monkeypatch.setattr(sc.ld, "load_ohlcv", lambda *a, **k: sc.ld.split_era(df, k.get("era", "train"), k.get("token")))
+    frozen = rg.freeze(_thesis(BAD_VALUES), tmp_path, "t")
+    with pytest.raises(ValueError, match="signal values must be in"):
+        sc.run_screen(frozen, tmp_path)
+
+
+def test_run_screen_refuses_tampered_signal_file(tmp_path: Path, monkeypatch):
+    """Review fix round 1, finding 4: overwriting screens/<id>/signal.py after a valid
+    freeze must take the verify()-failure branch and refuse to run."""
+    df = _frame(300, seed=9)
+    monkeypatch.setattr(sc.ld, "load_ohlcv", lambda *a, **k: sc.ld.split_era(df, k.get("era", "train"), k.get("token")))
+    frozen = rg.freeze(_thesis(CAUSAL), tmp_path, "t")
+    (tmp_path / "screens" / "t_demo" / "signal.py").write_text(LOOKAHEAD)
+    with pytest.raises(ValueError):
+        sc.run_screen(frozen, tmp_path)
+
+
+def test_run_screen_refuses_tampered_frozen_json(tmp_path: Path, monkeypatch):
+    """Review fix round 1, finding 4: editing a thesis field inside frozen.json (without
+    recomputing sha256) must fail rg.verify() and refuse to run."""
+    df = _frame(300, seed=10)
+    monkeypatch.setattr(sc.ld, "load_ohlcv", lambda *a, **k: sc.ld.split_era(df, k.get("era", "train"), k.get("token")))
+    frozen = rg.freeze(_thesis(CAUSAL), tmp_path, "t")
+    d = json.loads(frozen.read_text())
+    d["thesis"]["spec"]["expected_trades_per_week"] = 999  # tamper without touching sha256
+    frozen.write_text(json.dumps(d, indent=2, sort_keys=True))
+    with pytest.raises(ValueError):
+        sc.run_screen(frozen, tmp_path)
+
+
+def test_run_screen_zero_trades_writes_strict_json_null_time_to_verdict(tmp_path: Path, monkeypatch):
+    """Review fix round 1, finding 5: n==0 must serialize time_to_verdict_weeks as JSON
+    null, not the non-strict-JSON `Infinity` token math.inf would otherwise produce."""
+    df = _frame(300, seed=11)
+    monkeypatch.setattr(sc.ld, "load_ohlcv", lambda *a, **k: sc.ld.split_era(df, k.get("era", "train"), k.get("token")))
+    frozen = rg.freeze(_thesis(NEVER_FIRES), tmp_path, "t")
+    out = sc.run_screen(frozen, tmp_path)
+    assert out["n"] == 0 and out["time_to_verdict_weeks"] is None
+    raw_text = (tmp_path / "screens" / "t_demo" / "out.json").read_text()
+    assert "Infinity" not in raw_text
+    saved = json.loads(raw_text)  # must not raise on strict json.loads
+    assert saved["time_to_verdict_weeks"] is None
