@@ -65,6 +65,11 @@ ADJUDICATOR_LOG = LOG_DIR / "lab_adjudicator.log"
 
 DESK_TIMEOUT_S = 75 * 60
 DESK_TOOLS = ("Workflow", "WebSearch", "WebFetch", "Read", "Write", "Bash", "Glob", "Grep")
+# Scoped to this unattended `claude -p` invocation only (never a repo-wide settings.json,
+# which would also block interactive owner flows — README one-liner's `git push`, the
+# CLAUDE.md bot start command, any `grep ... main.py`).
+DESK_DISALLOWED_TOOLS = ("Bash(launchctl:*)", "Bash(*main.py*)", "Bash(git push:*)",
+                          "Bash(kill:*)", "Bash(pkill:*)", "Bash(rm -rf:*)")
 DESK_SCRIPT = "research/swarm/workflows/desk.js"
 DESK_CODES = ("SURVIVORS", "NO_SURVIVORS", "ALL_REJECTED_AT_GATE", "GATE_FAILED", "NO_THESES",
               "WEB_BUDGET_EXHAUSTED")                      # desk.js result codes (verbatim)
@@ -686,6 +691,7 @@ def build_claude_cmd(launch_args_rel: str, run_id: str, claude_bin: str = CLAUDE
     spawn itself lives in _real_launch."""
     cmd = [claude_bin, "-p", desk_prompt(launch_args_rel, run_id),
            "--allowedTools", *DESK_TOOLS,
+           "--disallowedTools", *DESK_DISALLOWED_TOOLS,
            "--permission-mode", "acceptEdits",
            "--max-turns", "40",
            "--output-format", "text"]

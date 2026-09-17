@@ -444,6 +444,15 @@ def test_build_claude_cmd_carries_required_tools_and_flags(monkeypatch):
         tools.append(tok)
     for t in ("Workflow", "WebSearch", "WebFetch", "Read", "Write", "Bash", "Glob", "Grep"):
         assert t in tools, t
+    k = cmd.index("--disallowedTools")
+    disallowed = []
+    for tok in cmd[k + 1:]:
+        if tok.startswith("--"):
+            break
+        disallowed.append(tok)
+    for d in ("Bash(launchctl:*)", "Bash(*main.py*)", "Bash(git push:*)",
+              "Bash(kill:*)", "Bash(pkill:*)", "Bash(rm -rf:*)"):
+        assert d in disallowed, d
     j = cmd.index("--permission-mode")
     assert cmd[j + 1] == "acceptEdits"
     assert "--model" not in cmd
