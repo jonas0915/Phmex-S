@@ -10,6 +10,7 @@ from . import load_data as ld
 
 REQUIRED = ("CONSTRAINTS.md", "STANDARDS.md", "DATA.md", "DEAD_LIST.md", "LESSONS.md", "SURVIVORS.md")
 _ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d{4}-\d{2}-\d{2})\s*\|\s*$")
+_SEP_CELL = re.compile(r"^:?-+:?$")
 
 
 def dead_rows(path: Path) -> list[tuple[int, str, str, str, str]]:
@@ -21,16 +22,46 @@ def dead_rows(path: Path) -> list[tuple[int, str, str, str, str]]:
     return rows
 
 
+def _table_cells(line: str) -> list[str]:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def _is_header_or_separator(line: str) -> bool:
+    cells = _table_cells(line)
+    if not cells:
+        return False
+    if cells[0].lower() == "n":                       # our header: "| n | family | ... |"
+        return True
+    return all(_SEP_CELL.match(c) for c in cells)      # markdown separator: "|---|---|...|"
+
+
+def malformed_dead_rows(path: Path) -> list[tuple[int, str]]:
+    """Lines in the DEAD_LIST table region that look like a row (start with '|') but
+    don't parse as a valid 5-column row, header, or markdown separator — e.g. wrong
+    column count, missing/malformed date, or a stray pipe inside a cell."""
+    bad = []
+    for i, line in enumerate(path.read_text().splitlines(), start=1):
+        if not line.lstrip().startswith("|"):
+            continue
+        if _ROW.match(line) or _is_header_or_separator(line):
+            continue
+        bad.append((i, line.strip()))
+    return bad
+
+
 def check(kb_dir: Path, root: Path) -> list[str]:
     problems = [f"missing {f}" for f in REQUIRED if not (kb_dir / f).exists()]
     if problems:
         return problems
-    rows = dead_rows(kb_dir / "DEAD_LIST.md")
+    dead_list_path = kb_dir / "DEAD_LIST.md"
+    rows = dead_rows(dead_list_path)
     nums = [r[0] for r in rows]
     if len(set(nums)) != len(nums):
         problems.append("DEAD_LIST.md has duplicate row numbers")
     if nums != sorted(nums):
         problems.append("DEAD_LIST.md rows not ascending")
+    for lineno, line in malformed_dead_rows(dead_list_path):
+        problems.append(f"DEAD_LIST.md: malformed row at line {lineno}: {line[:60]}")
     data_txt = (kb_dir / "DATA.md").read_text()
     for name, spec in ld.DATASETS.items():
         if spec["dir"] not in data_txt:
