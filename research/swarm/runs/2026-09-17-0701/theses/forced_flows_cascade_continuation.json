@@ -1,0 +1,66 @@
+{
+  "id": "forced_flows_cascade_continuation",
+  "lens": "forced_flows",
+  "mechanism": "A liquidation cascade is a forced flow that does not finish on the cascade bar. The engine's own selling is fast (the 1h bar that prints it), but it leaves behind (a) leveraged longs that survived the first wave with impaired collateral \u2014 cross-margin and coin-collateralised accounts are marked down by the very move that just happened, so their maintenance margin sits closer to the next tick down \u2014 and (b) liquidation-engine / ADL / market-maker inventory that was absorbed into a book whose depth has just vanished and must be worked out over hours. Both groups sell into the next 24-36h regardless of price, which is why the account's own record (DEAD_LIST row 6) found that high-vol bars CONTINUE rather than revert. This thesis takes the other side of that finding: SHORT after a down-cascade bar and hold up to 36 hours. The long side (up-cascades / short squeezes) is deliberately excluded: the crowded, collateral-impaired side in 2025-2026 was longs (85% of the Nov-21-2025 second wave were long liquidations).",
+  "counterparty": "Surviving leveraged perp longs with margin impaired by the cascade bar (forced to sell by the liquidation engine as price grinds into their maintenance level), plus the liquidation engine / ADL / market makers who absorbed cascade inventory and must unwind it into a book whose 1% depth has just collapsed. They pay because they cannot choose the time or price: the sale is triggered by the mark price, not by a view.",
+  "prediction": "On closed 1h bars, after a bar whose close-to-close return is <= -3.0x the trailing-168h return std and whose volume is >= 2.0x the trailing-168h median volume, a short entered at the next open with TP = SL = 300 bps and max hold 36 bars has mean net bps after c > 0 with the bootstrap CI95 excluding 0, and observed WR >= p*(300) = 0.5192 (research/swarm/runs/2026-09-17-0701/exploratory/forced_flows/probe3_sanity.json p_star_300). Falsified if the CI includes 0, if WR < p*, or if the sign flips in either tp +/-20% variant.",
+  "nearest_dead_rows": [
+    {
+      "row": 6,
+      "why_different": "Row 6 is liquidation-cascade REVERSION (buy the cascade) and died because 'high-vol bars CONTINUE, don't revert'. This thesis bets the continuation, not the reversion: the counterparty is the still-open, collateral-impaired long and the inventory-holding liquidation engine, not a 'snapback' buyer. It is the opposite side of row 6's own kill reason, not a relabel of it."
+    },
+    {
+      "row": 3,
+      "why_different": "Row 3 fades 1h vol expansion (mean-reversion of a range spike, direction opposite to the spike). This thesis trades WITH the direction of the spike, only on the down side, and only when volume confirms forced flow; no split-selection \u2014 one pre-registered config on the full train range."
+    },
+    {
+      "row": 13,
+      "why_different": "Row 13 is unconditional BTC time-series momentum (28d lookback, daily). This is an event-conditioned, single-bar forced-flow trigger with a 36h horizon; it fires only on cascade bars (609 signal bars across 19 symbols in ~50 weeks, probe3_sanity.json), not on trend state."
+    },
+    {
+      "row": 82,
+      "why_different": "Row 82 was a funding-settlement-timed volatility-regime breakout with a taker entry, killed as a magnitude-not-direction finding. This thesis has no settlement timing, no volatility-regime gate, and a definite direction (short) given by the sign of the forced flow; entry is the bot's normal maker limit at the next open."
+    },
+    {
+      "row": 80,
+      "why_different": "Row 80 (tape snap-back) bets a large print reverts within minutes on 5m bars. This is 1h bars, 36h horizon, continuation direction \u2014 the same family row 6/80 died to, but the opposite bet, and slow enough for the 5-min poller and Mac sleep."
+    }
+  ],
+  "source_urls": [
+    "https://news.bitcoin.com/learning-insights/crypto-liquidation-cascades-explained/",
+    "https://www.coinchange.io/blog/bitcoins-2-billion-reckoning-how-novembers-liquidations-cascade-exposed-cryptos-structural-fragilities",
+    "https://arxiv.org/html/2607.27070"
+  ],
+  "evidence": "Opened sources (numbers as read on the page): (1) news.bitcoin.com 'Liquidation Cascades Explained': Oct 10-11 2025 'total perpetual futures open interest across major exchanges collapsed 43% in a day, from $217 billion to $123 billion'; Hyperliquid OI 'fall 57%, from $14 billion to $6 billion'; mechanism sentence 'each forced sell pushes the price down a little more, which pushes the next trader's position below its maintenance threshold, triggering another forced sell'; 'leverage rebuilt after each 2026 flush'. (2) coinchange.io 'Bitcoin's $2 Billion Reckoning': BTC 'plunged from its October peak of $126,080 to as low as $81,600 \u2014 a 35% drawdown'; 'Perpetual futures open interest dropped 35% from the October peak, moving from $94 billion to $61 billion'; second wave 'Within four hours on November 21, $1.9 billion in positions vaporized, with 85% being long liquidations' \u2014 i.e. deleveraging continued in successive long-liquidation waves for weeks after the first cascade. (3) arXiv 2607.27070 (seven BTC perp cascades 2022-2025, 1-minute klines + 5-minute OI/long-short/taker-ratio dumps): October 2025 'intraday open interest falls -24.6%'; the paper studies pre-cascade warning signals and does NOT measure post-cascade drift \u2014 so the post-cascade direction claim rests on the two practitioner sources plus this desk's own exploratory probe. EXPLORATORY (not evidence, long_1h train only, 18 symbols, GIGGLE excluded): research/swarm/runs/2026-09-17-0701/exploratory/forced_flows/probe4_summary.json tp300: n=551, net_mean=34.44 bps, ci95=[11.84, 57.32], wr=0.5608 vs p_star=0.5192, trades_per_week=12.86, ttv_weeks=3.89, exit mix TP 284 / SL 190 / TIME 77; 46 of 551 trades enter on 2025-10-10 and excluding that day net_mean=20.80 with ci95=[-3.94, 44.86] (straddles 0) \u2014 the single-day cluster risk is the main weakness and is written into the DOA line. Probe selection disclosed: probe2_summary.json tried 10 (k,v,tp,hold) cells and probe4 previewed the tp 240/360 variants (tp240 ci95=[-3.16, 38.69], tp360 ci95=[19.05, 68.70]); the frozen screen is the single tp300/sl300/h36 config. Funding is not modelled by the screen: a 36h short crosses up to 5 settlements and post-cascade funding is often negative (short pays), a few bps per settlement of un-modelled cost.",
+  "spec": {
+    "dataset": "long_1h",
+    "universe": [
+      "1000PEPE",
+      "1000SHIB",
+      "AAVE",
+      "ADA",
+      "BNB",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "LINK",
+      "LTC",
+      "NEAR",
+      "ONDO",
+      "SOL",
+      "SUI",
+      "TAO",
+      "UNI",
+      "XLM",
+      "XRP"
+    ],
+    "timeframe": "1h",
+    "tp_bps": 300,
+    "sl_bps": 300,
+    "max_hold_bars": 36,
+    "expected_trades_per_week": 12.9,
+    "doa_line": "Dead on arrival if the train screen's net_bps CI95 includes 0, or WR < p*(300), or either tp +/-20% variant flips sign, or the CI95 of net_bps computed with bootstrap_ci.mean_ci on trades.csv after removing the single calendar day with the most entries includes 0 (a one-day-cluster edge is not an edge)."
+  },
+  "signal_py": "import numpy as np\nimport pandas as pd\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Post-liquidation-cascade continuation SHORT (closed 1h bars only).\n    Cascade bar = 1h close-to-close return <= -3.0 x the trailing 168-bar std of 1h\n    returns (std lagged one bar) AND bar volume >= 2.0 x the trailing 168-bar median\n    volume (lagged one bar). Signal -1 on that closed bar; the screen enters short at\n    the next bar's open. No long side: the crowded, collateral-impaired side is longs.\"\"\"\n    r = df[\"close\"].pct_change()\n    sd = r.rolling(168, min_periods=100).std().shift(1)\n    vm = df[\"volume\"].rolling(168, min_periods=100).median().shift(1)\n    cascade = (r <= -3.0 * sd) & (df[\"volume\"] >= 2.0 * vm)\n    return pd.Series(np.where(cascade.fillna(False), -1, 0), index=df.index).astype(int)\n",
+  "thesis_path": "research/swarm/runs/2026-09-17-0701/theses/forced_flows_cascade_continuation.json"
+}

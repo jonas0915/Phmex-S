@@ -1,0 +1,52 @@
+{
+ "id": "dealer_inventory_expiry_unwind",
+ "lens": "dealer_inventory",
+ "mechanism": "Deribit option market makers carry a delta hedge against expiring BTC/ETH/SOL/XRP options that settle at 08:00 UTC. On the largest (month-end Friday) expiries the dealer book is concentrated near ATM strikes; when dealers are net short gamma their hedging is positive-feedback (sell into a fall, buy into a rise) during the final hour, pushing spot/perp away from fair value. At 08:00 the options cease to exist, so the hedge accumulated in that last hour has no purpose and is flattened over the following ~2 hours, which mechanically reverses the pre-expiry move. Sub-lens 'who must flatten, and when': the option dealer, at a contract-defined clock time, in the direction opposite the last-hour move. The bot fades the 07:00-08:00 UTC bar's move at the 08:00 open with a maker limit and exits by 10:00 UTC (2 x 1h bars). The 5-min poller can hit a fixed 08:00 UTC entry; the hold tolerates Mac sleep for 2h only (event-driven, once per month per symbol).",
+ "counterparty": "Deribit option market makers hedging net-short-gamma expiring positions. They are forced to pay because (a) the hedge is mandatory (delta-neutral mandate), (b) its direction is dictated by the last-hour price path, and (c) the position it hedges disappears at a contract-fixed time (08:00 UTC settlement), so the unwind is not discretionary in timing or direction. The bot supplies the liquidity they take when they flatten.",
+ "prediction": "Falsifiable: on long_1h train, a symmetric fade of the closed 07:00 UTC bar on month-end Fridays (|open->close| >= 10 bps), entered at the 08:00 open, TP/SL 100 bps, max 2 bars, on BTC/ETH/SOL/XRP, shows net_bps_mean > 0 with bootstrap CI95 excluding 0 and WR >= fee_math.p_star(100) = 0.5575. The mechanism further predicts a strict OI-concentration gradient: month-end Fridays > other Fridays > non-expiry-concentrated days; if non-monthly days match or beat monthly, the effect is a clock artifact and the thesis is dead. Known weakness stated up front: expected frequency is ~0.7 trades/week (4 symbols x 1 event/month, minus the 10 bps filter), so fee_math.time_to_verdict_weeks(0.7) = 71.4 weeks, which FAILS CONSTRAINTS viable #3 (<= 26 weeks) \u2014 there is no honest way to raise frequency without diluting the mechanism (the exploratory non-monthly-Friday cell is ~0 net). Exploratory cell (NOT evidence, research/swarm/runs/2026-09-17-0701/exploratory/dealer_inventory/probe_expiry_symmetric.out.json key 'monthly|thr10|hold2|tp100'): n=30, net_mean 29.85 bps, ci95 [2.36, 53.81], wr 0.70; this is one of 54 exploratory cells and carries selection bias.",
+ "nearest_dead_rows": [
+  {
+   "row": 7,
+   "why_different": "Row 7 killed unconditional clock effects (time-of-day, CME gap, funding pre-stamp dip). This is not a clock effect: the exploratory everyday-08:00 control is net NEGATIVE with CI excluding 0 (probe_expiry_unwind.out.json 'everyday|*'), and the signal only fires on the month-end Deribit settlement whose counterparty (an option dealer flattening an expired hedge) has a contractual reason to trade at that minute."
+  },
+  {
+   "row": 84,
+   "why_different": "Row 84 was FOMC/CPI first-candle momentum CONTINUATION needing 1-minute entry precision. This is a FADE on a closed 1h bar at a fixed, known-in-advance 08:00 UTC time the 5-min poller can schedule; the counterparty is a hedger unwinding, not news-momentum. It shares row 84's low-frequency defect, which is disclosed in the prediction rather than hidden."
+  },
+  {
+   "row": 82,
+   "why_different": "Row 82 was a funding-settlement volatility-regime BREAKOUT gate with taker entries. This uses no funding data, is a fade not a breakout, and enters with a maker limit at a scheduled option settlement, not a funding stamp."
+  },
+  {
+   "row": 6,
+   "why_different": "Row 6 (liquidation-cascade reversion) and row 3 (vol-expansion fade) conditioned on volatility magnitude alone and died because high-vol bars continue. Here the conditioning variable is a scheduled forced unwind by an identified hedger, not bar volatility; the 10 bps filter is a floor, not a vol trigger."
+  },
+  {
+   "row": 20,
+   "why_different": "Rows 20/34/83 are the funding/basis hunt the owner closed. This thesis uses no funding, no basis, no OI feed \u2014 only the option-expiry calendar and OHLC."
+  }
+ ],
+ "source_urls": [
+  "https://cryptoslate.com/bitcoins-2-24-billion-friday-options-expiry-teased-a-reversal-then-gave-it-back-within-hours/",
+  "https://arxiv.org/html/2608.21888",
+  "https://blog.amberdata.io/the-rhythm-of-liquidity-temporal-patterns-in-market-depth"
+ ],
+ "evidence": "(1) cryptoslate.com report on the Finance Research Letters paper 'Bitcoin option expiration, gamma exposure, and intraday price reversals' (opened; the ScienceDirect and SSRN pages returned HTTP 403 so the primary is not cited): 'examined 1,059 Deribit expiry days from January 2021 through December 2023 using five-minute returns'; 'statistically significant tendency for Bitcoin to fall in the hour before expiry and reverse during the following two hours when at-the-money open interest ranked in the sample's top decile'; 'strongest when a reconstructed cumulative gamma proxy was negative'. Same page, 2026-09-11 expiry: 'Bitcoin declined about 0.16% to 0.18% from 07:00 to 08:00 UTC', 'gained about 0.19% to 0.21% by 09:00', then 'from 08:00 to 10:00 UTC, the Deribit perpetual slipped 0.014%, Coinbase fell 0.025% and Kraken lost 0.038%' (i.e. the reversal is ~20 bps on an ordinary weekly expiry \u2014 fee-trapped unless conditioned on high OI, which is why the spec restricts to month-end Fridays). (2) arXiv 2608.21888 (Kitron & Wengrowicz, Aug 2026, opened): 90% of 183 Binance pairs show significant 15-min directional reversal vs 2.7% of 187 US stocks, but 'gross edge peaks near 1.3 bp per trade against a 5 bp round-trip cost' and reversal 'concentrates after moves driven by aggressive taker flow' \u2014 unconditional reversal is fee-trapped; only a forced-flow event makes it tradeable. (3) Amberdata (opened; Binance BTC/FDUSD, 50,526 minutes, Jul 1-Aug 12 2025): depth surges at the 08:00 UTC European open, peak 11:00 UTC $3.86M vs trough 21:00 UTC $2.71M at 10 bps \u2014 the post-expiry window is a deep-book window, so the maker entry is realistic. Deribit lists options on BTC, ETH, SOL, XRP (search result: support.deribit.com contract policy), which fixes the universe.",
+ "spec": {
+  "dataset": "long_1h",
+  "universe": [
+   "BTC",
+   "ETH",
+   "SOL",
+   "XRP"
+  ],
+  "timeframe": "1h",
+  "tp_bps": 100,
+  "sl_bps": 100,
+  "max_hold_bars": 2,
+  "expected_trades_per_week": 0.7,
+  "doa_line": "Dead on arrival if the train screen's net_bps_mean <= 0 or its bootstrap CI95 includes 0, or observed WR < fee_math.p_star(100); and the desk should record that fee_math.time_to_verdict_weeks(0.7) = 71.4 weeks fails viable #3 regardless of the screen result."
+ },
+ "signal_py": "import numpy as np\nimport pandas as pd\n\n\ndef _last_friday(ts):\n    m_end = (ts + pd.offsets.MonthEnd(0)).normalize()\n    return m_end - pd.Timedelta(days=(m_end.weekday() - 4) % 7)\n\n\ndef signals(df):\n    \"\"\"Deribit monthly-expiry dealer-hedge unwind fade. Fires only on the closed 07:00 UTC\n    bar (the one that closes exactly at the 08:00 UTC settlement) of the last Friday of a\n    month. Long if that bar fell >= 10 bps open->close, short if it rose >= 10 bps.\n    Uses only the bar's own open/close and its timestamp; no rolling state.\"\"\"\n    idx = df.index\n    ret_bps = (df[\"close\"] / df[\"open\"] - 1.0).to_numpy() * 1e4\n    pre_expiry = (idx.hour == 7)\n    friday = (idx.weekday == 4)\n    month_end_friday = np.array([ts.normalize() == _last_friday(ts) for ts in idx], dtype=bool)\n    evt = pre_expiry & friday & month_end_friday\n    sig = pd.Series(0, index=idx, dtype=int)\n    sig[evt & (ret_bps <= -10.0)] = 1\n    sig[evt & (ret_bps >= 10.0)] = -1\n    return sig\n",
+ "thesis_path": "research/swarm/runs/2026-09-17-0701/theses/dealer_inventory_expiry_unwind.json"
+}

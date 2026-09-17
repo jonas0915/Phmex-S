@@ -1,0 +1,23 @@
+position_notional 200.0
+p_star(200) 0.52875 p_star(160) 0.5359375 p_star(240) 0.5239583333333333
+lot_check 1000PEPE {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check 1000SHIB {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check AAVE {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check ADA {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check BNB {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check BTC {'ok': True, 'lots': 2, 'lot_usd': 77.74}
+lot_check DOGE {'ok': True, 'lots': 199, 'lot_usd': 1.001}
+lot_check ETH {'ok': True, 'lots': 8, 'lot_usd': 24.9738}
+lot_check GIGGLE {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check LINK {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check LTC {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check NEAR {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check ONDO {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check SOL {'ok': True, 'lots': 197, 'lot_usd': 1.0143}
+lot_check SUI {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check TAO {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check UNI {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check XLM {'ok': True, 'lots': 200, 'lot_usd': None}
+lot_check XRP {'ok': True, 'lots': 199, 'lot_usd': 1.0044}
+time_to_verdict_weeks @6.1/wk 8.17657215557979
+time_to_verdict_weeks @4/wk 12.5

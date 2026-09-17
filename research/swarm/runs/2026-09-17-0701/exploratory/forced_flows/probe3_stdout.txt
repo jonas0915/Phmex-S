@@ -1,0 +1,134 @@
+{
+ "lot_check": {
+  "1000PEPE": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "1000SHIB": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "AAVE": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "ADA": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "BNB": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "BTC": {
+   "ok": true,
+   "lots": 2,
+   "lot_usd": 77.74
+  },
+  "DOGE": {
+   "ok": true,
+   "lots": 199,
+   "lot_usd": 1.001
+  },
+  "ETH": {
+   "ok": true,
+   "lots": 8,
+   "lot_usd": 24.9738
+  },
+  "GIGGLE": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "LINK": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "LTC": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "NEAR": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "ONDO": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "SOL": {
+   "ok": true,
+   "lots": 197,
+   "lot_usd": 1.0143
+  },
+  "SUI": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "TAO": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "UNI": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "XLM": {
+   "ok": true,
+   "lots": 200,
+   "lot_usd": null
+  },
+  "XRP": {
+   "ok": true,
+   "lots": 199,
+   "lot_usd": 1.0044
+  }
+ },
+ "causality": {
+  "1000PEPE": "PASS",
+  "1000SHIB": "PASS",
+  "AAVE": "PASS",
+  "ADA": "PASS",
+  "BNB": "PASS",
+  "BTC": "PASS",
+  "DOGE": "PASS",
+  "ETH": "PASS",
+  "GIGGLE": "PASS",
+  "LINK": "PASS",
+  "LTC": "PASS",
+  "NEAR": "PASS",
+  "ONDO": "PASS",
+  "SOL": "PASS",
+  "SUI": "PASS",
+  "TAO": "PASS",
+  "UNI": "PASS",
+  "XLM": "PASS",
+  "XRP": "PASS"
+ },
+ "train_span": [
+  "2025-06-27 06:00:00+00:00",
+  "2026-06-12 16:00:00+00:00"
+ ],
+ "train_weeks": 50.05952380952381,
+ "total_signal_bars": 609,
+ "signal_bars_per_week": 12.16551724137931,
+ "probe2_trades_k3_v2_tp300_h36": 576,
+ "probe2_trades_per_week": 11.50630202140309,
+ "time_to_verdict_weeks_at_probe2_rate": 4.345444775132275,
+ "p_star_300": 0.5191666666666667,
+ "p_star_240": 0.5239583333333333,
+ "p_star_360": 0.5159722222222223
+}
+{'1000PEPE': 27, '1000SHIB': 30, 'AAVE': 16, 'ADA': 40, 'BNB': 10, 'BTC': 71, 'DOGE': 42, 'ETH': 64, 'GIGGLE': 25, 'LINK': 17, 'LTC': 27, 'NEAR': 20, 'ONDO': 48, 'SOL': 55, 'SUI': 6, 'TAO': 18, 'UNI': 20, 'XLM': 30, 'XRP': 43}

@@ -1,0 +1,2239 @@
+Liquidity Provision to Leveraged ETFs and
+Equity Options Rebalancing Flows
+Evidence from End-of-Day Stock Prices ∗
+Andrea Barbon †, Heiner Beckmeyer ‡, Andrea Buraschi §, Mathis Moerke ¶
+Abstract
+Rebalancing of leveraged ETFs and delta-hedging of equity options are two distinct
+and economically signiﬁcant sources of order ﬂow and liquidity demands. We show
+that they induce signiﬁcant end-of-day momentum and mean-reversion in stock
+returns, while the eﬀects dissipate within the next trading day. While gamma ef-
+fects are persistent throughout our sample, those stemming from leveraged ETFs
+are decreasing signiﬁcantly over time. We argue that these dynamics arise from
+diﬀerent intermediation structures, generating heterogeneous levels of information
+asymmetry on rebalancing ﬂows. While leveraged ETF providers generate perfectly
+predictable ﬂows because of their strict mandate, option delta-hedgers have ﬂexibil-
+ity in deciding the strategic timing of their rebalancing, resulting in less predictable
+ﬂows. Consistent with this view, we ﬁnd that leveraged ETF ﬂows attract more liq-
+uidity provision and that their eﬀect on prices is shorter-lived. Our ﬁndings suggest
+that information disclosure is beneﬁcial for market liquidity.
+JEL classiﬁcation: G12, G13, G14, G23
+Keywords: Liquidity Provision, Gamma Exposure, Option Delta-Hedging, Leveraged
+ETF, End-of-Day Momentum
+∗We thank Kris Jacobs (discussant), Neil Pearson, Jason Wei (discussant), Dmitriy Muravyev, Ma-
+hendrarajah Nimalendran (discussant), Danny Qin (discussant), John J. Shim (discussant), Fabrice Riva
+(discussant), Alexander Wagner, and Angelo Ranaldo, as well as participants at the FMA Conference
+on Derivatives and Volatility 2021, the 37th International Conference of the French Finance Association,
+the EFMA annual meeting 2021, the 5th SAFE Market Microstructure Conference, the NFA annual
+meeting 2021, the FMA annual meeting 2021, the 13th annual Hedge Fund Research Conference, the
+MFA annual meeting 2022, internal seminars at Goldman Sachs, Bank of America Merrill Lynch, and
+Morgan Stanley, and the Brown Bag Seminar of the University of St.Gallen for insightful and construc-
+tive comments. This paper has been previously circulated under the title The Role of Leveraged ETFs
+and Option Market Imbalances on End-of-Day Price Dynamics. Parts of this paper were written while
+Mathis Moerke visited the Kellogg School of Management whose hospitality is gratefully acknowledged.
+†Swiss Institute of Banking and Finance, University of St.Gallen. andrea.barbon@unisg.ch.
+‡University of M¨ unster. heiner.beckmeyer@wiwi.uni-muenster.de.
+§Imperial College. andrea.buraschi@imperial.ac.uk.
+¶Swiss Institute of Banking and Finance, University of St.Gallen. mathis.moerke@unisg.ch.
+1. Introduction
+The role of options markets and leveraged ETFs on the dynamics of the underlying
+stock prices has recently received signiﬁcant attention, attracting negative press coverage
+for potentially contributing to market volatility during already turbulent times. The
+trading activity in options was blamed to increase the violent stock swings during the
+February-March 2020 Covid-19 selloﬀ. The Wall Street Journal wrote:
+“Investors searching for clues on what drove the back-to-back drops in the stock
+market are pointing to the options market as a contributor, saying hedging
+activity by traders may have exacerbated the decline.”
+Wall Street Journal, Feb. 27, 2020 1
+In this paper, we investigate the eﬀects of portfolio rebalancing on the intraday dy-
+namics of stock prices at the end of the trading day, arising from two distinct derivative
+instruments.
+The ﬁrst channel relates to the options market, where market makers and broker/dealers
+provide liquidity to clients who want to take positions in stock options. As they have
+institutional incentives to avoid directional exposures, they typically delta-hedge their
+positions. Since the option delta changes when the value of the underlying changes, mar-
+ket makers need to regularly update their positions to maintain delta neutrality. The
+direction of the resulting ﬂows depends on their initial gamma imbalance and the price
+movement of the underlying asset. Suppose, for instance, that the price of a stock expe-
+riences a positive jump, driven by positive unexpected news about future cash ﬂows. If
+the aggregate gamma of market makers is initially negative, maintaining delta-neutrality
+requires the purchase of additional shares in the underlying stock. On the contrary, a
+positive gamma exposure requires selling the underlying asset. Thus, if the aggregate
+gamma of market makers is signiﬁcantly negative, delta-hedging can give rise to signiﬁ-
+cant net buying, contributing to end-of-day momentum. Symmetrically, if the aggregate
+gamma imbalance of market makers were positive, delta-hedging would have a stabilizing
+eﬀect in the form of an end-of-day reversal. 2
+1https://www.wsj.com/articles/the-invisible-forces-exacerbating-market-swings-
+11582804802
+2Derivative markets are by construction in zero net demand since for each option there is a buyer
+and a seller. Therefore, the overall dollar value of aggregate gamma for each option is zero across all
+purchasers and sellers. However, some market participants are likely not involved in delta-hedging –
+think of retail investors or mutual funds – because of diﬀerent incentives. This implies that the ﬂows
+arising by delta-hedging activity may not be trivial.
+1
+The second channel relates to leveraged ETFs, that is, synthetic instruments that
+rely on total return swaps, and whose notional principal is a multiple of the value of a
+referenced index. Diﬀerent from a standard ETF, a price appreciation of the underlying
+index has the compounded eﬀect of increasing both the referenced portfolio and the
+required notional value of the swap. As a consequence, any price change gives rise to
+an imbalance between the required and eﬀective notional amount of the swap. The
+swap counterparty has to manage her risk exposure, thus potentially inducing a large
+rebalancing of the portfolio of physical assets used to hedge the swap (see Section 2.3).
+Cheng and Madhavan (2010) argue that the portfolio rebalancing of leveraged ETFs may
+have an impact on intraday prices.
+Figure 1 illustrates the rebalancing eﬀects caused by delta-hedgers and leveraged
+ETFs towards the end of the trading day. The upper panel shows the intraday return
+path for Tesla’s stock on 13 December 2012. At the beginning of the day, the aggregate
+gamma was positive and economically signiﬁcant. During the day, Tesla experienced a
+negative return equal to−6.62% by 15:30. Based on the information available, the gamma
+imbalance implied that delta-hedgers needed to trade an amount equal to 102.11% of the
+average dollar trading volume of Tesla shares in the last half-hour. Indeed, a strong price
+reversal emerged in the last 30 minutes of the trading day, which is consistent with the
+large initial positive gamma imbalance.
+An interesting example that relates to the role of leveraged ETFs is provided by the
+dynamics of Apple stock on 24 October 2018, see Figure 1 (middle panel). Apple shares
+are an important constituent for leveraged ETFs. At the same time, the aggregate gamma
+of delta-hedgers was close to zero at the beginning of the trading day. By 15:30, Apple
+shares had dropped by −2.24%. As a consequence, leveraged ETF swap counterparties
+had to sell large quantities of Apple shares to rebalance their portfolios for an estimated
+amount equal to 8 .85% of the average trading volume in Apple shares. Possibly as a
+result, the price dropped further by −1.22%.
+The timing of option delta-hedging and portfolio rebalancing by leveraged ETFs can
+be diﬀerent. Figure 1 (bottom panel) illustrates the potential eﬀect of this heterogeneity
+on the price dynamics. On 23 June 2016, the gamma imbalance of delta-hedgers on
+Amazon stock options was large and positive. At the market opening, the price dropped
+by almost 4%. The implied hedging demand by delta-hedgers required purchasing shares
+for approximately 50% of the average dollar volume in the last half trading hour in
+Amazon shares. Consistently, the share price started to mean revert at 15:30, albeit not
+completely. Leveraged ETF swap counterparties had to rebalance, which caused further
+2
+0.06
+0.04
+0.02
+0.00
+HP
+0.03
+0.02
+0.01
+0.00
+LETF
+10 11 12 13 14 15 16
+0.04
+0.03
+0.02
+LETF HP 0
+TSLA
+2012-12-13
+rpre
+rend
+HP
+LETF
+-6.62%
+2.08%
+-102.11%
+-0.01%
+AAPL
+2018-10-24
+rpre
+rend
+HP
+LETF
+-2.24%
+-1.22%
+-0.17%
+-8.85%
+AMZN
+2016-06-23
+rpre
+rend
+HP
+LETF
+-3.27%
+0.07%
+-49.96%
+-10.65%
+Fig. 1. Delta-Hedging and Leveraged ETF Rebalancing Eﬀects
+The ﬁgure depicts the eﬀects of delta-hedging and leveraged ETF rebalancing on three days in our
+sample for Tesla (TSLA), Apple (AAPL), and Amazon (AMZN) stock, respectively. rpre denotes the
+return from the previous day’s close price until 15:30. rend denotes the return from 15:30 to close. Γ HP
+is deﬁned in Equation (5) and is the product of rpre and the aggregate gamma imbalance, ΓIB . ΩLETF
+is the measure for leveraged ETF rebalancing, deﬁned in Equation (6). Γ HP and ΩLETF are expressed
+in relative terms to the average dollar trading volume in the last half hour over the last month.
+downward pressure as it emerged shortly before the market closing.
+We start our analysis by testing whether the above-described price eﬀects have em-
+pirical support. To do so, we build a novel dataset merging data from several options
+exchanges, including the identity of all option counterparties, and the portfolio composi-
+tion of 72 leveraged ETFs for 24 underlying benchmark ETFs, which represents almost
+the whole universe of leveraged ETFs on U.S. equity indexes. After computing the gamma
+imbalance of delta-hedgers and the rebalancing demand of leveraged ETFs, we merge with
+3
+NYSE TAQ data to get intraday prices of equity stocks. To the best of our knowledge,
+this is is the most comprehensive dataset covering options and leveraged ETFs – both in
+the cross-section and in the time series. Conﬁrming previous ﬁndings from the literature
+(Tuzun, 2014; Shim and Todorov, 2021; Baltussen, Da, Lammers, and Martens, 2021; Ni,
+Pearson, Poteshman, and White, 2020), we ﬁnd that both sources of mechanical ﬂows
+are signiﬁcantly related to stock returns in the last 30 minutes of the trading day. A
+standard-deviation increase in Γ depresses end-of-day returns by −113% of the average
+return in the last thirty minutes of a trading day, while a standard-deviation increase
+in leveraged ETF rebalancing ﬂows increases end-of-day returns by 430% of the average
+return in the last half hour. Moreover, the impact of both rebalancing sources is ampliﬁed
+when controlling for the magnitude of the other.
+These results are robust to a battery of control variables suggested in the literature,
+such as the trading volume in the option relative to the equity market (Roll, Schwartz,
+and Subrahmanyam, 2010), the put/call ratio (Blau, Nguyen, and Whitby, 2014), implied
+volatility, the riskiness of the underlying stock, and the release of fundamental news.
+Next, we turn our attention to the institutional diﬀerences between the two chan-
+nels and their implications. On the one hand, leveraged ETFs are subject to a strict
+mandate, which requires replicating the underlying index returns at the close multiplied
+by a leverage factor on a daily basis. This forces leveraged ETF providers to rebalance
+only a few minutes before the end of the trading day, with little room for discretion. On
+the other hand, option delta-hedgers enjoy some degree of ﬂexibility with regards to the
+timing of their rebalancing strategy. Moreover, while leveraged ETF holdings are fully
+disclosed and constant over a single trading day, the intraday inventory of delta-hedgers
+potentially changes and is not readily available. These diﬀerent sets of rules and incen-
+tives may generate a heterogeneous degree of information asymmetry regarding ﬂows for
+the two channels.
+An important empirical contribution of our analysis, therefore, relates to the conse-
+quences of disclosing order ﬂow information. By exploiting the institutional diﬀerences
+of the two channels, we shed light on the relationship between order ﬂow disclosure and
+market quality. First, do the transparency of leveraged ETFs and the predictability of
+their ﬂows lead to enhanced liquidity provision or does it attract predatory trading? How
+does this aﬀect the speed of reversal of stock prices after the liquidity shocks? Second,
+how do the eﬀects of the two sources of mechanical order ﬂow evolve over time? Do
+liquidity providers improve their ability to accommodate shocks over time? And does
+such a learning process depend on the availability of information on ﬂows?
+4
+We begin by investigating how quickly option delta-hedgers actively hedge following
+a large price shock in the underlying. If the large movement has occurred early during
+the trading day, we ﬁnd that the hedging activity is almost immediate. In contrast, the
+rebalancing activity of leveraged ETFs is unrelated to intraday jumps and takes place
+almost exclusively at the end-of-day. We note that these results can explain why the
+regression coeﬃcient on leveraged ETFs ﬂow is almost four times larger than its options-
+based counterpart. Leveraging on a numerical simulation, we show that the wedge may
+result from the measurement errors on our proxy for gamma imbalance – arising from
+the discretion of the rebalancing strategy of delta-hedgers.
+Next, we show that the price eﬀects of both channels are on average fully reversed,
+but with heterogeneous speed. While leveraged ETF-induced price pressure evaporates
+at the next-day opening, that arising from delta-hedging is signiﬁcantly longer-lived and
+requires almost a full trading day to be reversed. We also ﬁnd that for leveraged ETFs
+the price impact coeﬃcient is lower for larger ﬂows, while it does not change signiﬁcantly
+for gamma-related ﬂows. As in Brøgger (2021), we interpret these ﬁndings as evidence of
+enhanced liquidity provision for the more predictable leveraged ETF-based ﬂows.
+Finally, we exploit the length of our sample to analyze the time-series evolution and
+persistence of the two channels, using rolling-window regressions. The ﬁndings clearly in-
+dicate that the magnitude of the price eﬀects stemming from leveraged ETFs is declining
+over time, being barely statistically signiﬁcant in the last part of the sample. On the con-
+trary, the importance of gamma-induced price eﬀects is persistent throughout the sample
+and, if anything, has been increasing over time. The high and increasing fragmentation
+of the U.S. options market potentially causes the diﬀerence in the statistical performance
+over time, as it hinders market participants from constructing a precise measure of the
+true inventory positions of delta-hedgers.
+Overall, these results suggest that liquidity providers can better identify shocks coming
+from leveraged ETFs, thus incrementally limiting their impact on asset prices over time.
+On the contrary, the price eﬀects due to gamma imbalances and delta-hedging of options
+exposures persist throughout the sample, suggesting that liquidity provision is impeded
+by information asymmetry.
+Related Literature
+Our work relates to several streams of the literature. The ﬁrst concerns the role of
+order ﬂow information disclosure in microstructure dynamics (Madhavan, 2000). A num-
+5
+ber of theoretical works suggest that transparency is positively associated with market
+quality. Forster and George (1992) and Benveniste, Marcus, and Wilhelm (1992) model
+the eﬀects of anonymity in ﬁnancial markets and show that spreads and price impact are
+lower when dealers are partially informed about the direction of liquidity trades. Admati
+and Pﬂeiderer (1991) propose a model of sunshine trading, showing that liquidity traders
+who can pre-announce their order ﬂow enjoy better liquidity provision but increase ad-
+verse selection costs for others who cannot. Other models, however, argue in favor of
+opaqueness. For instance, Madhavan (1995) provides a theoretical setting featuring mar-
+ket segmentation where large institutional investors beneﬁt from non-disclosure of their
+liquidity trades. The empirical evidence on the subject has not yet settled the issue.
+Porter and Weaver (1998) study the eﬀects of increased transparency on the Toronto
+Stock Exchange, concluding that spreads widen after an increase in transparency. Gem-
+mill (1996), analyzes the consequences of an increase in post-trade transparency on the
+London Stock Exchange, ﬁnding no signiﬁcant impact on market liquidity. By exploit-
+ing the heterogeneous impact of two sources of mechanical intraday rebalancing, our
+results shed new light on the issue, providing evidence that order ﬂow transparency leads
+to better liquidity provision. We argue that, as the institutional mandate of leveraged
+ETFs forces them to act under full transparency, they collectively enjoy a positive equi-
+librium with lower spreads during their rebalancing operations. Conversely, the freedom
+of options delta-hedgers to partially control their rebalancing strategy generates a less
+desirable equilibrium with higher transaction costs and reduced price eﬃciency.
+The second stream studies the feedback eﬀects of options trading on the underly-
+ing stock price dynamics. The literature generally distinguishes between two channels
+through which options trading may have an impact on the price of the underlying. Hu
+(2014) provides evidence that the information found in market makers’ initial delta-
+hedges can signiﬁcantly aﬀect the price dynamics of the underlying. 3 However, a non-
+informational channel may also be at work: Ni, Pearson, and Poteshman (2005) and
+Golez and Jackwerth (2012) document that rebalancing and unwinding of option market
+makers’ delta hedges on or very close to expiration drive the prices of individual stocks
+and stock index futures towards option strike prices on option expiration dates. Lately,
+Ni et al. (2020) analyze the eﬀects of Γ-imbalance on absolute returns and the autocor-
+relation of returns, based on theoretical models that predict a negative relation between
+3Other studies advocating an informational channel are, among others, Easley, O’Hara, and Srinivas
+(1998), Pan and Poteshman (2006), Ni, Pan, and Poteshman (2008), Cremers and Weinbaum (2010),
+Roll et al. (2010), Johnson and So (2012), and Ge, Lin, and Pearson (2016).
+6
+stock volatility and Γ-imbalance.4 Whereas Ni et al. (2020) resort to daily data, Barbon
+and Buraschi (2020) concentrate on intraday price dynamics. They ﬁnd that Γ-imbalance
+is negatively related to intraday volatility and document that Γ-imbalance can aﬀect the
+frequency and magnitude of ﬂash crashes. Baltussen et al. (2021) show that end-of-day
+momentum in many futures contracts concentrates on days with negative Γ-exposure of
+option market makers. Finally, Chordia, Kurov, Muravyev, and Subrahmanyam (2021)
+propose a risk-based channel. The authors show that net buying pressure in index puts
+on the International Securities Exchange positively predicts subsequent S&P 500 index
+returns and trace the predictability to the purchase of protection when uncertainty is
+high.
+A diﬀerent, but related stream of the literature studies the eﬀects of the inventory of
+option market makers. Gˆ arleanu, Pedersen, and Poteshman (2009) have provided path-
+breaking work on how demand pressure aﬀects option prices. A closely related study is
+by Fournier and Jacobs (2020). Johnson, Liang, and Liu (2016) investigate the forces
+behind the use of S&P 500 index options and conclude that unspanned crash risk drives
+much of their demand. Relatedly, Jacobs and Mai (2020) ﬁnd a tight link between prices
+and demand in S&P 500 and VIX options. Chen, Joslin, and Ni (2019) infer ﬁnancial
+intermediary constraints via deep out-of-the-money index put options. The authors show
+that a tightening of intermediary constraints is accompanied by option expensiveness and
+broker-dealer deleveraging.
+A third stream focuses on the eﬀects of (leveraged) ETF ownership on the constituent
+stocks. Ben-David, Franzoni, and Moussawi (2018) show that stocks with higher ETF
+ownership exhibit higher volatility, as liquidity shocks caused by short-horizon traders in
+the ETF can be transmitted to the underlying stocks by an arbitrage mechanism. Shum,
+Hejazi, Haryanto, and Rodier (2016) show that the rebalancing ﬂows of leveraged ETFs
+amplify end-of-day volatility in the period from 2006 to 2011.
+Another part of the literature studies intraday return patterns. We ﬁnd high-frequency
+return continuation in the cross-section of stock returns, consistent with the evidence
+provided by Gao, Han, Zhengzi Li, and Zhou (2018) and Baltussen et al. (2021). Both
+studies focus on aggregate investment vehicles, such as ETFs and index Futures. Gao
+et al. (2018) show that their eﬀects are stronger on days with elevated volatility, which
+are typically also accompanied by higher trading volume. In the cross-section of stocks,
+we conﬁrm the ﬁnding of Komarov (2017) that stocks performing best in the ﬁrst half
+4For a theoretical foundation, see among others Frey and Stremme (1997), Frey (1998), Sircar and
+Papanicolaou (1998), Platen and Schweizer (1998), Wilmott and Sch¨ onbucher (2000).
+7
+of the day will likely lose in the second half if controlled for market returns. Another
+study on short-term return reversals is Heston, Korajczyk, and Sadka (2010). The authors
+show that the returns of a half-hour period have predictive power over the same half-hour
+periods for up to 40 days in the future when controlling for the impact of the market. They
+relate this to the usage of trade mechanisms by institutional traders, designed to limit the
+relative price impact of their orders. More recently, studies link investor heterogeneity on
+the stock level to cross-sectional intraday and overnight return variations. Lou, Polk, and
+Skouras (2019) hypothesize that diﬀerent investor types trade predominately at diﬀerent
+times throughout the trading day. Empirically, the authors document high persistence in
+overnight and intraday return components, which they ﬁnd not on a single-stock basis,
+but also for 14 equity strategies such as size, value or proﬁtability. Bogousslavsky (2020)
+focuses only on intraday returns and ﬁnds that a mispricing factor earns positive returns
+up to the last half hour, consistent with the idea that arbitrageurs trading on mispricing
+reduce their positions at the end of the trading day.
+Finally, the last stream focuses on the U.S. equity market closing auction. Bogous-
+slavsky and Muravyev (2020) show that the share of daily volume in the closing auction
+has more than doubled from 2010 to 2018. They attribute the increase in trading vol-
+ume to the rise of indexing and ETFs. Wu and Jegadeesh (2020) examine the price
+impact, including ts temporary component, of closing auctions. Trading strategies based
+on market-on-close imbalances generate outsized returns.
+2. Data and Measurements
+To conduct our empirical analysis we source data from several databases, including
+information for single stocks, single-name options, and leveraged ETFs. By merging these
+data sources we obtain a unique dataset allowing us to measure ﬂows coming from the
+hedging of options and rebalancing of leveraged ETFs to study their potential impact on
+stock prices.
+2.1. Data Sources
+Options Market. The ﬁrst dataset merges option data from ﬁve diﬀerent exchanges:
+(a) the CBOE C1 exchange, (b) NASDAQ GEMX (GEMX), (c) NASDAQ International
+Security Exchange (ISE), (d) NASDAQ Options Market (NOM), and (e) NASDAQ PHLX
+(PHLX). The dataset includes information on signed trading volume, the underlying
+8
+stock, and the category of the counterparties engaged in the trade.
+Each of the ﬁve exchanges provides four categories of volume for each option series:
+open buy, open sell, close buy, and close sell. Each category is further broken down into
+diﬀerent types of market participants: broker/dealer, proprietary, and customer.5 For
+each type of market participant, we sum the buy and sell trades to estimate the long and
+short open interest at the trader-type level. The ﬁve exchanges sum up to a substantial
+proportion of the equity options market, delivering the most comprehensive coverage
+available at the moment. Nonetheless, we do not cover volume outside of these exchanges
+and OTC options trading. We also gather daily bid and ask quotes, implied volatility,
+trading volume, open interest, and Greeks for each option contract from OptionMetrics.
+As individual stock options are of American type, OptionMetrics uses binomial trees to
+compute implied volatility and Greeks.
+Leveraged ETFs. We obtain information on all leveraged ETFs on U.S. equity indexes
+from ETFGlobal including the leverage amount, the benchmark index referenced by the
+fund and the assets under management of each leveraged ETF at the daily frequency. We
+compute the constituents of the benchmark index of each leveraged ETF and use TAQ
+data to calculate intraday returns of each selected benchmark referenced by the leveraged
+ETF.
+Table OA3.1 in the Online Appendix provides an overview of the properties of lever-
+aged ETFs included in our sample. On average, we consider 72 leveraged ETFs for 24
+underlying benchmark indices, with a cross-sectional distribution that is fairly stable over
+time. On average, 45% of the funds we consider are inverse or bear funds. Weighted by
+the AUM (VW), this number drops to 33%, but ﬂuctuates substantially over time, with
+a proportion of just 16% at the 10th percentile and 63% at the 90th. The average fund
+is leveraged by an absolute value of 2.35.
+Stock Market. Information on individual equity stocks is obtained from the Center for
+Research on Security Prices (CRSP) and includes trading volume, shares outstanding,
+and closing prices. We restrict our analysis to stocks with CRSP share codes 10 and 11,
+and exchange codes 1, 2, 3, 31, 32, and 33. Information on any type of distribution (e.g.
+dividends and stock splits) is also obtained from CRSP. We match data from CRSP with
+our options data via the matching algorithm provided by WRDS.
+High-frequency Data on Underlying Assets. Intraday stock price data and transaction
+volumes are obtained from TAQ. We use standard cleaning procedures and match intraday
+5In 2009, the type of professional customer has been introduced alongside the customer. We merge
+professional customers with customers.
+9
+trade prices with CRSP to obtain PERMNOs as unique identiﬁers. More details are given
+in Online Appendix OA1. Equipped with intraday prices, we calculate intraday returns
+relative to the previous day’s closing price. Following standard practice in the literature,
+(see Lou et al., 2019), we assume that corporate events that mechanically impact prices,
+e.g. dividend payments and stock splits, take place overnight and are realized at the time
+of the ﬁrst trade on the target date. If a delisting occurs as reported by CRSP, we assume
+that the delisting amount is realized at the respective day’s close.
+To summarize, our sample across optionable stocks and leveraged ETFs comprises
+1,882,332 stock-day observations from January 2012 through December 2019. 6
+2.2. Measuring Gamma Hedging Pressure
+Let V (t,S ) denote the value of an option contract and ∆( t,S ) = ∂V (t,S)
+∂S be the ﬁrst
+derivative of the option price with respect to the underlying, whereas Γ( t,S ) = ∂2V (t,S)
+∂S 2
+measures the change of ∆( t,S ) for changes in S. When Γ( t,S ) is not zero, ∆( t,S )
+changes depending on time to maturity and the level ofS and, consequently, any hedging
+position has to be adjusted periodically. If Γ( t,S ) is large in absolute terms, ∆( t,S ) is
+very sensitive to movements in the underlying and it implies a large amount of rebalancing
+for the market maker to remain delta-neutral.
+Since option market makers and broker/dealers have similar hedging incentives, we
+classify both as “delta-hedgers”. Consequently, we categorize proprietary and customers
+as non-delta-hedgers and refer to them jointly as “end-customers” in the remainder of
+the paper.
+To obtain the gamma imbalance of delta-hedgers, we proceed as follows. Let OIBuy,I
+o,t
+be the open interest of investors of type I in long positions in option o at time t, which
+is related to daily volume as follows (see Ni et al., 2020):
+OIBuy,I
+o,t =OIBuy,I
+o,t−1 +Volume OpenBuy,I
+o,t −Volume CloseSell,I
+o,t (1)
+OISell,I
+o,t =OISell,I
+o,t−1 +Volume OpenSell,I
+o,t −Volume CloseBuy,I
+o,t , (2)
+whereVolume OpenBuy,I
+o,t andVolume OpenSell,I
+o,t denote the volume from investors type I to
+open new long and short option positions, and Volume CloseBuy,I
+o,t and Volume CloseSell,I
+o,t
+6To appear in the sample, each stock has to be optionable and included in one or more leveraged
+ETFs.
+10
+refer to volumes with which investors of type I closed existing long and short positions,
+respectively.
+Second, we calculate the delta-hedgers’ net open interest in option series o at date t’s
+close as
+netOIo,t =−
+[
+OIBuy,Customer
+o,t −OISell,Customer
+o,t +OIBuy,Proprietary
+o,t −OISell,Proprietary
+o,t
+]
+,
+(3)
+where netOIo,t is measured in units of option contracts and OID,I
+o,t is the open interest
+of direction D (either buy or sell) by market participant type I (either customer or
+proprietary) in option series o at the close of date t. The net open interest of market
+makers is the opposite of the sum of the remaining market participant types. Assuming
+that broker/dealers are also delta-hedgers yields Equation (3).
+Let Γo(t,S ) denote the gamma of option series o on stock j at day t and underlying
+priceS, expressed in shares of the underlying. 7 To compute the dayt delta-hedger dollar
+gamma imbalance in option series o, we take the product of Γo(t,S ) with the stock price
+S at 15:30 on the target day and multiply by the contract multiplierMulto ofo (typically
+Multo = 100).8
+To obtain the aggregated gamma imbalance on an underlying stock j for trading day
+t, denoted by ΓIB
+j,t , we compute the sum over all options on the underlying:
+ΓIB
+j,t =
+(∑
+o
+netOIo,t−1× Γo(t− 1,Sclose
+j,t−1)×S15:30
+j,t ×Multo
+)
+  
+(⋆)
+×Sclose
+j,t−1
+100 × 1
+ADVend
+j,t−1
+. (4)
+The term (⋆) in Equation (4) denotes the total dollar gamma imbalance for a given
+stock at day t. It is the dollar amount delta-hedgers need to trade in the underlying
+for each one-dollar move in the underlying stock price S. By multiplying ( ⋆) by the
+underlying price divided by 100, we obtain the dollar gamma imbalance for a one percent
+move inS. This facilitates comparison over time and in the cross-section. Finally, we scale
+by the average dollar volume in the last half hour of a trading day, ADV end
+t−1, computed
+over the last month. Thereby, we express the delta-hedgers’ gamma imbalance in a given
+stock as a fraction of the typical trading taking place in the last half hour, which allows
+7OptionMetrics calculates the gamma of an option as the absolute change in delta given a $1.00
+change in the underlying.
+8Since we cannot observe intraday variations of the net open interest, we assume that Γ( t,S ) only
+changes due to innovations in the stock price. We hence use the observed stock price at 15:30 on day t
+to compute the best possible estimate of the amount to be traded by delta-hedgers.
+11
+us to obtain a timely proxy for the potential price impact of hedging adjustments.
+ΓIB
+j,t denotes the amount of hedging market makers would have to do for a 1%-move
+in the underlying stock j at time t. We combine this measure with information on how
+much the underlying has moved before the start of the hedging window. The return from
+the close of day t− 1 to the start of the hedging window at 15:30 is denoted as rpre
+j,t . The
+percentage hedging pressure is thus the interaction between Γ IB
+j,t and rpre
+j,t :
+ΓHP
+j,t = 100× ΓIB
+j,t×rpre
+j,t. (5)
+ΓHP is our main variable of interest. It directly captures the amount of hedging required
+for delta-hedgers to remain delta-neutral after observing intraday return rpre.
+2.3. Measuring Leveraged ETF Rebalancing Pressure
+To understand how leveraged ETFs may contribute to intraday price momentum, let
+L be the fund’s leverage factor, say −3 for a bear and +3 for a bull fund, and At the
+leveraged ETF’s assets under management (AUM). The required notional amount of total
+return swaps at dayt isSt =L×At. Hence, if the return on the index at timet+1 isrbench
+t+1 ,
+thenAt+1 =At×(1+L×rbench
+t+1 ). Therefore, the required notional amount of total return
+swaps att + 1 becomesSt+1 =L×At+1 =L×At× (1 +L×rbench
+t+1 ). However, the actual
+exposure of the total return swaps att+1 isEt+1 =St×(1+rbench
+t+1 ) =L×At×(1+rbench
+t+1 ).
+The diﬀerence between the required and the actual notional is the rebalancing amount,
+equal toSt+1−Et+1 =L×(L−1)×At×rbench
+t+1 . Given that the required hedging multiple
+L× (L− 1) is strictly positive for L∈ R\ [0, 1], leveraged ETF swap counterparties
+always have to trade in the same direction as the return of the underlying index, which
+may induce an end-of-day return momentum eﬀect in the stocks included in the index
+referenced by the leveraged ETF. 9 Unlike the gamma imbalance eﬀect, hedging demand
+by leveraged ETFs for a given stock is not necessarily proportional to the return of that
+speciﬁc stock but, rather, to the return of the underlying index. Therefore, leveraged
+ETFs rebalancing may induce return momentum in a stock, even if its return in the ﬁrst
+part of the trading day is zero.
+To compute the amount of rebalancing aﬀecting an individual stock, let stock j be
+9We assume that returns swap providers (or their counterparties) ultimately need to hold a quantity
+of the underlying stock proportional to the size of the swap contract. If some of the swaps are based on
+other instruments or on correlated assets, this would introduce noise in our proxy and bias our results
+toward zero.
+12
+included in the underlying of a leveraged ETF i with a weight of wi,j,t on day t. If the
+swap counterparty starts rebalancing their exposure at 15:30, and rpre
+i,t;bench denotes the
+return on the benchmark ETF up until that moment, the relative amount of rebalancing
+required in stock j is the sum over all leveraged ETFs in which stock j is included in:
+ΩLETF
+j,t =
+∑Ni,t
+i=1Li× (Li− 1)×Ai,t−1×wi,j,t−1×rpre
+i,t;bench
+ADVend
+j,t−1
+(6)
+We scale by the average dollar volume in the last half hour (ADV end
+t−1) to compare the
+impact of rebalancing with the average amount of trading at the end of the trading day.
+2.4. Summary Statistics
+In this section, we provide summary statistics for the gamma hedging pressure and
+leveraged ETF rebalancing quantity.
+20132014201520162017201820192020
+0.05
+0.00
+0.05
+0.10
+LETF
+20132014201520162017201820192020
+HP
+Fig. 2. Time Series Cross-sectional Distribution of ΩLETF and ΓHP
+This ﬁgure shows weekly averages of the cross-sectional distribution of the demand pressure from the
+rebalancing of leveraged ETFs (Ω LETF ) and Gamma imbalance (Γ HP ). The dark line represents the
+cross-sectional median, the dark-colored area the 25th/75th percentile, and the light-colored area the
+5th/95th percentile.
+Figure 2 shows the cross-sectional distribution of Ω LETF over time and compares it
+with the distribution of Γ HP . While both are time-varying, the distribution of Γ HP is
+13
+wider, with a larger interquartile range, suggesting that on the same day delta-hedgers
+can have a large negative gamma imbalance on some stocks and, at the same time, a large
+positive gamma imbalance on another stock. Table A1 in the Appendix provides more
+granular summary statistics on Γ HP and ΩLETF . Table A1 shows that the aggregate
+pressure arising from leveraged ETFs is on average higher than the one from delta-
+hedging, but the distribution of absolute Γ HP has a heavy right tail.
+Table 1: The Cross-Section of Demand Pressure from Gamma and Leveraged ETF Rebal-
+ancing
+This table reports the average daily number (N) and percentage (Share) of stocks with a combined re-
+balancing amount in the last 30 minutes of the trading day exceeding a certain threshold (ﬁrst column),
+as a percentage of the average dollar volume. The fourth column (% Gamma) reports the proportion
+of the total demand pressure due to the Gamma imbalance Γ HP relative to the combined rebalancing
+amount:|ΓHP|/(|ΓHP| +|ΩLETF|). Additionally, the table reports the average mean (Mean), standard
+deviation (Std), and 10%- and 90%-percentile of the share of the combined rebalancing amount condi-
+tional on exceeding the speciﬁed level. The sample contains stocks that are optionable and included in
+the benchmark index of at least one leveraged ETF. The sample period is from January 2012 – December
+2019.
+N Share % Gamma Mean Std 10% 90%
+1% 601 .7 60 .23% 49 .95% 5 .11 8 .29 1 .30 9 .81
+2% 354 .4 35 .48% 55 .76% 7 .68 10 .41 2 .86 13 .67
+5% 182 .6 18 .28% 63 .01% 12 .07 13 .72 5 .47 20 .28
+10% 69 .5 6 .95% 71 .86% 21 .23 19 .63 10 .83 34 .30
+15% 34 .0 3 .41% 76 .47% 30 .50 24 .34 16 .43 48 .97
+25% 12 .5 1 .25% 80 .91% 49 .00 31 .88 28 .92 76 .72
+50% 3 .4 0 .34% 84 .75% 94 .33 44 .86 72 .69 122 .20
+Table 1 documents the economic signiﬁcance of the demand pressure arising from
+the rebalancing activity of the leveraged ETFs and the delta hedging activity in the
+options market. The second column reports the average number of stocks in the joint
+sample for which the combined dollar rebalancing amount due to both channels exceeds
+a certain threshold of the average dollar volume in the last 30 minutes of the trading
+day (ADVend), depicted in the ﬁrst column. We ﬁnd that, on average, for 69 (12) stocks
+the combined rebalancing amount exceeds the 10% (25%) threshold. For these stocks,
+the average rebalancing dollar amount is equal to 21 .23% (49.00%) of ADV end. The
+cross-sectional dispersion is large and for stocks in the 90th percentile (last column)
+the average rebalancing dollar amount exceeds 34 .30% (76.72%) of the total end-of-day
+trading volume. The fourth column provides information about the relative importance
+14
+of each channel. The majority of the rebalancing amount is driven by Γ HP . For the
+group exceeding a rebalancing threshold of 10% (25%), 71 .86% (80.91%) of the average
+absolute combined rebalancing originates from the hedging activity of option market
+makers. Moreover, the share of ΓHP in the combined rebalancing amount is monotonically
+increasing in the threshold level, suggesting that the demand pressure from this channel
+dominates for large total rebalancing ﬂows.
+2.5. Abnormal Order Flow
+We deﬁne the abnormal order ﬂow in the last 30 minutes of trading day t for stock j
+as
+RSVOLend
+j,t = SVOLend
+j,t /ADVend
+j,t−1. (7)
+SVOLend
+j,t is the diﬀerence between the trading volumes in up- and down-minutes, deﬁned
+as
+SVOLend
+j,t =
+∑
+m∈ 15:30→Close
+VOLj,t,m× 1rj,t,m>0 −
+∑
+m∈ 15:30→Close
+VOLj,t,m× 1rj,t,m<0, (8)
+where m denotes the minutes within the hedging window for target day t.10
+3. Empirical Results
+3.1. Main Results
+Consider the case in which ΓIB
+j,t for stockj at timet is negative. If delta-hedgers want
+to maintain delta-neutrality, they have to sell the underlying stock if it has depreciated
+intraday, leading to additional momentum. Instead, for a positive Γ IB
+j,t , the delta-hedgers
+have to buy the underlying stock, trading against its previous price change, which gives
+rise to intraday reversals. Following Equation (6), rebalancing of the swap portfolios
+replicating the exposure of leveraged ETFs will always be in the same direction as the
+previous movement of the benchmark ETF, potentially leading to momentum for a large
+number of stocks. Another important diﬀerence between the two rebalancing sources is
+in the cross-section. Since Γ HP can greatly diﬀer across stocks even on the same day t,
+the eﬀect is inherently stock-speciﬁc. For Ω LETF in contrast, all stocks that belong to
+10We scale by ADVend
+t−1 to make the signed volume comparable across stocks and over time.
+15
+the same benchmark index are exposed to the same price pressure, proportional to their
+weighting in the index.
+In Table 2, we investigate the impact of the rebalancing activity of delta-hedgers and
+leveraged ETF swap counterparties on the order-ﬂow and returns of individual stocks in
+the last half hour before the close. To do so, we employ two types of panel regressions:
+RSVOLend
+j,t =β0rpre
+j,t +β1ΓHP
+j,t +β2ΩLETF
+j,t +FEj +FEt +ϵj,t,
+(9)
+rend
+j,t =β0rpre
+j,t +β1ΓHP
+j,t +β2ΩLETF
+j,t +FEj +FEt +ϵj,t. (10)
+including asset (FEj) and date ﬁxed eﬀects (FEt).11 Standard errors are double-clustered
+by day and asset, and return observations weighted by the stock’s market capitalization
+in the previous month to rule out that our results are driven by microstructure issues in
+small stocks.
+Table 2: Impact of Delta-Hedging and Leveraged ETF Rebalancing
+The table reports the results to regressing the returns in the last half hour of a trading day on returns until
+15:30 (rpre), on option hedging pressure ΓHP and leveraged ETF rebalancing quantity ΩLETF following
+Equation (9). T-statistics are in parentheses below and are computed using time-and-entity-clustered
+standard errors. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level. We include entity-ﬁxed eﬀects
+in all speciﬁcations and value-weight observations. The sample period is 2012 – December 2019.
+(1) (2) (3) (4) (5)
+Dependent RSVOL end
+t rend
+t RSVOLend
+t rend
+t rend
+t
+ΓHP
+t -9.438** -9.464*** -10.960***
+(-2.116) (-4.709) (-5.521)
+ΩLETF
+t 109.572*** 43.394*** 46.738***
+(5.450) (4.797) (5.198)
+rpre
+t -1.263*** -0.757*** -1.512*** -0.902*** -0.820***
+(-5.111) (-6.907) (-5.640) (-8.139) (-7.452)
+Observations 1,882,332 1,882,332 1,882,332 1,882,332 1,882,332
+R2 (%) 0.141 0.284 0.234 0.325 0.370
+Entity FE Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j]
+11In Appendix C, we add control variablesXj,t to Equation (9) to rule out that neither informational
+channels nor risk-based explanations are driving our results.
+16
+Gamma Hedging Pressure Column (1) shows that ΓHP negatively impacts RSVOLend
+t
+with a coeﬃcient of −9.44 (t-value:−2.12), which establishes a signiﬁcant link between
+the gamma-induced trading activity of delta-hedgers and end-of-day order ﬂow. At the
+same time, this additional directed volume has a direct impact on end-of-day returns
+(column 2). Speciﬁcally, the slope coeﬃcient of Γ HP is negative and highly signiﬁcant
+at−9.46 (t-value: −4.71), suggesting that a negative shock to Γ HP (additional buying
+pressure) ampliﬁes end-of-day returns. We furthermore control for the impact of other
+momentum-based intraday eﬀects by including the previous return from last day’s close
+to the start of the supposed hedging window at 15:30. While the estimated slope coef-
+ﬁcient is negative and signiﬁcant, its inclusion does not materially change the estimated
+impact of ΓHP on end-of-day returns.
+In Online Appendix OA7, we mitigate concerns that investors might trade options
+based on past information which is correlated with future intraday returns. Our results
+remain quantitatively and qualitatively the same when replacing Γ HP with an estimate
+based on older option inventories of delta-hedgers following Ni et al. (2020).
+Leveraged ETFs If the rebalancing pressure from leveraged ETFs is suﬃciently large,
+we should ﬁnd that it positively relates to end-of-day order ﬂow, as well as returns.
+Column (3) shows how a positive shock to Ω LETF clearly leads to additional buying
+pressure at the close. The slope coeﬃcient is estimated at 109.57 and is highly signiﬁcant
+(t-value: 5.45). The ensuing buying pressure also translates to higher end-of-day returns
+with a coeﬃcient of 43.40 (t-value: 4.80), as shown in column (4).
+Joint Rebalancing The two rebalancing channels may aﬀect closing stock returns in
+diﬀerent ways. In the example reported in the Introduction, for instance, an investor
+considering only gamma hedging ﬂows would have predicted positive returns for Amazon
+on June 23rd, 2016, given the large and negative magnitude of ΓHP . Had she also known
+about the signiﬁcant amount of expected selling from leveraged ETFs, she may have
+revised her prediction.
+In column (5) of Table 2 we estimate a model accounting for the two channels jointly,
+resulting in increases of both coeﬃcients in absolute magnitude to −10.96 for ΓHP and
+47.74 for ΩLETF , both of which are signiﬁcant at the 1%-level. A one standard deviation
+decrease in ΓHP is associated with a 113% increase in the magnitude of end-of-day returns
+relative to the stock-level mean return during that period, while a standard deviation
+increase in ΩLETF corresponds to an increase of 430%.
+17
+2012 2013 2014 2015 2016 2017 2018 2019
+0
+25
+50
+75
+100
+125
+150
+175
+200US-Dollar (in Billions)
+Option Delta-Hedging LETF
+Fig. 3. Year-by-Year Rebalancing Flows
+The ﬁgure shows the estimated overall absolute rebalancing ﬂows from leveraged ETFs and option delta-
+hedging for each year in the sample in billion USD.
+We ﬁnd that a shock to the buying pressure coming from leveraged ETF rebalancing
+ﬂows is estimated to impact end-of-day returns of a target stock two to four times as
+much as a similarly-sized shock from option delta-hedgers. But how do the estimated
+rebalancing amounts stack up when considered across all stocks in the universe of op-
+tionable stocks, which are also included in leveraged ETFs? Figure 3 shows the absolute
+year-by-year rebalancing amount in billion USD, summed across the entire cross-section
+of stocks in our sample. For each year, the total amount that would have to be traded in
+the underlying stocks to assure delta-neutrality exceeds that required by leveraged ETF
+counterparties. In fact, in most years the total rebalancing ﬂows from delta-hedgers are
+at least twice as large. We ﬁnd that the total trading amount for both rebalancing sources
+has increased over time, from approximately 80 billion USD in 2012 for Γ HP to 160 bil-
+lion USD in 2019 – a twofold increase. This growth has two reasons: ﬁrst, the general
+growth in options trading. Second, the staggered introduction of weekly options on single
+equities, which, due to their short lifespan and corresponding large gamma values, have
+a large impact on the overall gamma position of delta-hedgers, potentially prompting
+larger rebalancing trading. The total amount of rebalancing from leveraged ETFs has
+increased even more dramatically, starting at 35 billion USD in 2012 and growing to 85
+billion USD in 2019, which mimics the rapid growth of the industry.
+Information Quality of Rebalancing Proxies Why do gamma hedging ﬂows have
+a seemingly smaller impact on end-of-day order ﬂow and returns, despite being larger
+in terms of USD traded? It is well known that noise in the explanatory variable biases
+18
+regression estimates towards zero, which potentially explains the seemingly smaller one-
+to-one impact of gamma rebalancing. In this section, we investigate the role of uncertainty
+attached to acquiring the information necessary to determine the amount of rebalancing
+ﬂows from option delta-hedgers. As a counterpoint, consider the estimation of the re-
+balancing pressure from leveraged ETFs in Equation (6). To quantify Ω LETF we need
+to know the leverage factor, the assets-under-management, the return on the benchmark
+ETF before hedging begins, and the weight of the target stock in the benchmark ETF.
+All of these inputs are readily observable. Furthermore, leveraged ETFs are mandated to
+provide a daily multiple exposure to the benchmark, forcing their swap counterparties to
+trade near the market close. Consequently, all necessary information to determine their
+rebalancing activity is observed with little uncertainty.
+In contrast, the information used to quantify the total amount of rebalancing from
+delta-hedgers is more uncertain for a number of reasons: ﬁrst, we only observe approx-
+imately 50-70% of the transacted volume in equity options. In fact, the fragmented
+exchange landscape of equity options trading contributes to the opacity of rebalancing
+ﬂows. Only a fraction of exchanges reports on detailed volume data by type of market
+participant, while the remainder is invariably unobservable. Second, delta-hedgers are
+not explicitly required to rebalance at the close, but may do so at diﬀerent times during
+the day, or even hold on to some directional risk overnight. Third, the inventory data
+provides only an end-of-day snapshot of the delta-hedgers portfolio, which disregards
+intraday changes in the gamma imbalance.
+To understand the impact of information uncertainty on the estimation of how Γ HP
+inﬂuences end-of-day returns, we resort to a simulation study, outlined in detail in Ap-
+pendix B. Figure 4 shows the results for two levels of π∈ [10%, 50%], which denotes
+the probability that delta-hedgers rebalance at a diﬀerent time than between 15:30 and
+16:00. We also vary the amount of unobserved ﬂuctuation σ(∆) in the empirically ob-
+served gamma imbalance, relative to the ﬂuctuation of the true value, which addresses
+the inﬂuence of intraday shifts in the delta-hedger’s portfolio, as well as the unobserved
+portion of the total option inventory.
+Given the evidence in Figure 3 that the cumulative amount of rebalancing is much
+larger for ΓHP than it is for ΩLETF , we set the true impact of ΓHP on end-of-day returns
+to the empirical estimate for Ω LETF of -41 as a conservative estimate in the simulation.
+This true value is shown by the green line. We also highlight our empirical estimate of
+around−11. The blue line denotes the average estimated coeﬃcient for 1,000 simulations
+over 2,000 time steps, the blue-shaded area the 95% conﬁdence bounds.
+19
+0.0 0.2 0.4 0.6 0.8 1.0
+( )
+60
+50
+40
+30
+20
+10
+0
+( HP)
+True
+Estimate
+=10%
+0.0 0.2 0.4 0.6 0.8 1.0
+( )
+=50%
+Fig. 4. Simulating Error Sources in ΓHP
+The ﬁgure shows the impact of unobserved ﬂuctuation in the empirical gamma estimate σ(∆) and the
+probability with which option delta-hedgers may decide to rebalance their exposure at a diﬀerent time
+than at the close, denoted as π. The setup of the simulation study is outlined in Appendix B. The
+green line shows the true slope coeﬃcient of Γ HP in the simulation, which we ﬁx at −41, the black line
+highlights our empirical estimate from Table 2. The blue line denotes the average estimated coeﬃcient
+for 1,000 simulations over 2,000 time steps, the blue-shaded area the 95% conﬁdence bounds.
+For a low level of π = 10% we ﬁnd that we would require a very high level of σ(∆),
+about as high as the ﬂuctuation of its true value. If we increase the probability that
+delta-hedgers establish delta-neutrality of their positions at their own discretion and may
+deviate from the supposed hedging window at the close to 50%, we ﬁnd average coeﬃcients
+much closer to our empirical estimate of ≈− 11. In fact, an uncertainty level σ(∆) of
+around 0.6 generates the empirically-observed impact of Γ HP on end-of-day returns. In
+the following section, we empirically investigate the level of discretion of delta-hedgers,
+which can severely impede the estimation of its true impact as shown in the simulation.
+3.2. Discretionary Rebalancing Times
+Intraday jumps potentially present occasions where delta-hedgers are incentivized to
+deviate from end-of-day hedging. Consequently, we focus on the price eﬀects of rebalanc-
+ing activities following large price movements. We detect price jumps for the underlying
+stocks in the case of Γ HP and the benchmark ETF for Ω LETF . For this, we compare the
+return in each 30-minute interval of a given trading day with the return distribution of
+the same interval over the last year. We denote stock intervals where the returns exceed
+the top or bottom 2.5th percentile as jump events. We then record the cumulative return
+from the previous day close up to the end of the interval when the jump has occurred
+20
+(rincl. jump
+t ) and relate it to the return in the subsequent 30-minute interval ( rnext
+t ), and
+to ΓHP and ΩLETF computed using rincl. jump
+t . In Table 3 we separately report results for
+jump events occurring either before noon or between noon and 15:00.
+As evident in column (1), we ﬁnd large and signiﬁcantly negative coeﬃcients for jumps
+before noon in the case of ΓHP (−44.42, t-value:−1.98). This suggests that option delta-
+hedgers rebalance their exposure shortly after particularly large price movements. We do
+not ﬁnd any eﬀect for jumps in the second part of the trading day. In stark contrast to
+these results, the impact for leveraged ETF rebalancing is insigniﬁcant and economically
+negligible at all times, regardless of whether we consider jumps before or after noon
+(columns (3) and (4)).
+To further investigate how option delta-hedgers exploit the discretionary nature of
+their re-hedging needs, we focus on the gamma imbalance accumulated only after a jump
+event. For this, we assume the delta-hedger hedges her accrued exposure right after
+the jump, and hedges the remainder once more at the close. The remaining exposure
+consequently amounts to
+ΓHP
+j,t = 100× ΓIB
+j,t−1×rafter jump
+j,t , (11)
+where rafter jumps measures the return of the underlying after the identiﬁed jump period
+until 15:30.
+The results reported in columns (5) and (6) in Table 3 provide evidence of end-of-day
+rebalancing on identiﬁed jump-days only for jumps that happen after noon. In fact, the
+pattern of signiﬁcance and the magnitude of coeﬃcients inversely match the pattern for
+the impact of hedging directly after large price movements. Taken together, we conclude
+that delta-hedgers tend to rapidly rebalance after early jumps, but decide to wait to
+re-hedge after late jump events to take advantage of favorable liquidity patterns at the
+close (Lou et al., 2019; Andersen and Bollerslev, 1997).
+Although we ﬁnd substantial evidence that end-of-day rebalancing by delta-hedgers
+impacts stock prices, the results presented here highlight the signiﬁcant uncertainty re-
+garding the timing of the rebalancing activity. As the simulation study shows, this
+uncertainty introduces errors in the empirical measurement of Γ HP , which attenuates its
+estimated impact on end-of-day returns, driving coeﬃcients towards zero.
+21
+Table 3: Rebalancing Flows on Jump Days
+The table reports the results to regressing intraday jump returns on returns in the subsequent 30-minute
+interval. For Γ HP , we identify jumps in the underlying stock returns. For Ω LETF , we identify jumps
+in the benchmark of the leveraged ETF. To detect jumps, we compare each non-overlapping 30-minute
+return with returns of the same interval over the last year. If the return is higher (lower) than the 97.5%
+(2.5%) percentile, we regard the return as a jump. Next, we record the return from yesterday’s close
+until the end of the 30-minute interval, where the jump has occurred ( rincl. jump
+t ). We collect also the
+return of the subsequent 30-minute interval (rnext
+t ) on the stock level. In the case of leveraged ETFs, we
+select all stocks in leveraged ETFs for which a jump in the benchmark index of the leveraged ETF has
+occurred. Jumps can take place before noon or after noon, but before 3pm. Equipped with rincl. jump
+t ,
+rnext
+t , and the intraday return of the benchmark index, we reconstruct ΓHP
+t and ΩLETF
+t for each aﬀected
+stock j. Subsequently, we run Equation (9). T-statistics are in parentheses below and are computed
+using time-and-entity-clustered standard errors. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level.
+We include entity-ﬁxed eﬀects in all speciﬁcations and value-weight observations. The sample period is
+January 2012 – December 2019.
+(1) (2) (3) (4) (5) (6)
+Dependent rnext
+t rnext
+t rnext
+t rnext
+t rend
+t rend
+t
+ΓHP
+t -44.416** 0.251 -34.546 -77.316***
+(-1.984) (0.013) (-1.575) (-2.668)
+ΩLETF
+t -0.220 -0.493
+(-0.686) (-0.642)
+rincl. jump
+t -0.952*** -1.288*** -0.711** -0.266
+(-4.240) (-6.311) (-2.083) (-1.561)
+rafter jump -0.825*** -1.176***
+(-3.678) (-3.955)
+Observations 339,552 305,694 500,036 293,872 339,552 305,694
+R2 (%) 0.160 0.199 0.057 0.029 0.101 0.112
+Entity FE Yes Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j] [t;j]
+Jumps Until Pre-Noon After-Noon Pre-Noon After-Noon Pre-Noon After-Noon
+3.3. Reversal
+If the mechanical rebalancing activities of delta-hedgers and leveraged ETF swap
+counterparties move prices suﬃciently far from fundamental values, we should observe
+a quick reversal of these eﬀects at the next open as other market participants enter the
+market and correct these deviations. Consequently, we expect returns on the following
+market open to relate positively to ΓHP and negatively to ΩLETF . To test this hypothesis,
+22
+we run the panel regression
+rnight
+j,t =β0rend
+j,t +β1ΓHP
+j,t +β2ΩLETF
+j,t +FEj +FEt +ϵj,t, (12)
+where rnight
+j,t is the return from the close of day t to 10:00 on day t + 1.
+Table 4: Next-Day Reversal
+The table reports the results to regressing returns from closure of day t to 10:00 on day t + 1 on returns
+until 15:30, rpre, on option hedging pressure Γ HP and leveraged ETF rebalancing quantity Ω LETF
+following Equation (9). We also consider the return from 15:30 of day t to 10:00 on t + 1,rend+night, and
+the 24h return from day t’s 15:30 to day t + 1’s 15:30,rend+next pre, as dependent variables. T-statistics
+are in parentheses below and are computed using time-and-entity-clustered standard errors. ***, **, *
+denotes signiﬁcance at the 1%, 5%, 10% level. We include entity ﬁxed eﬀects in all speciﬁcations and
+value-weight observations. The sample period is January 2012 – December 2019.
+(1) (2) (3) (4) (5)
+Dependent rnight
+t rnight
+t rnight
+t rend+night rend+next pre
+rpre
+t 0.951** 1.268*** 1.057*** 0.235 -0.626
+(2.444) (3.126) (2.737) (0.585) (-1.163)
+ΓHP
+t 25.573*** 28.118*** 17.132* 13.316
+(3.208) (3.427) (1.844) (1.551)
+ΩLETF
+t -70.943*** -79.521*** -32.584 -40.628
+(-3.382) (-3.634) (-1.515) (-1.402)
+Observations 1,882,234 1,882,234 1,882,234 1,882,234 1,879,754
+R2 (%) 0.030 0.028 0.040 0.007 0.006
+Entity FE Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j]
+Table 4 highlights the relatively swift reversal of the impact of Γ HP and ΩLETF : the
+coeﬃcient on ΓHP in column (1) is positive at 25.57 (t-value: 3.28), while that on ΩLETF
+in column (2) is negative at −70.95 (t-value: −3.38). In column (3), we include both
+rebalancing ﬂows jointly and show a magniﬁcation of the proposed reversal eﬀects for
+both.
+In order to assess if the initial price impact is fully reverted over night, we substitute
+the overnight return in Equation (12) by the return from 15:30 of day t to 10:00 on
+t + 1,rend+night. A full reversal of the eﬀect would render the impact of Γ HP and ΩLETF
+on rend+night insigniﬁcant. As column (4) in Table 4 shows, this is the case for Ω LETF .
+However, the coeﬃcient on Γ HP is statistically signiﬁcant at the 10% level, suggesting
+23
+that rebalancing ﬂows from delta-hedgers take more time to be fully reversed. Indeed,
+we observe a full reversal eﬀect for the impact of gamma rebalancing when considering
+the return from t’s 15:30 to t + 1’s 15:30, rend+next pre, as shown in column (5).
+3.4. Liquidity Provision
+How do market participants react when delta-hedgers or leveraged ETF swap coun-
+terparties have to trade particularly large quantities of a certain stock? Strategic traders
+could engage in predatory trading by amplifying the rebalancing activities from op-
+tion delta-hedgers and leveraged ETF swap counterparties (Brunnermeier and Pedersen,
+2005). Predators initially buy (sell) the underlying while rebalancing ﬂows exert signif-
+icant buying (selling) pressure and unwind their position as the rebalancing concludes.
+Contrarily, strategic traders may provide liquidity instead, which Admati and Pﬂeiderer
+(1991) term a sunshine equilibrium. In this scenario, the price impact of rebalancing ﬂows
+is minimized.
+To investigate how strategic traders react to large rebalancing ﬂows, we augment
+Equation (9) with a dummy interaction for days when the rebalancing ﬂow exceeds a
+certain percentile:
+rend
+j,t =β0rpre
+j,t +β1Ϝj,t +β2Ϝj,t× Lj,t,x +FEj +FEt +ϵj,t, (13)
+where Ϝ is one of our two proxies for order ﬂow, and Lj,t,x is a dummy variable that is equal
+to 1 if the absolute magnitude of the respective rebalancing ﬂow of stock j exceeds the
+xth cross-sectional percentile. We consider three thresholds for x, i.e, x∈{ 95, 97.5, 99}.
+Columns (1) to (3) of Table 5 report the results for Γ HP , whereas columns (4) to (6)
+do so for Ω LETF . The estimated coeﬃcients for the interaction terms are positive, but
+not statistically signiﬁcant for Γ HP , implying that we neither ﬁnd evidence in favor of
+predatory trading nor in favor of a sunshine equilibrium. On the contrary, the estimated
+coeﬃcients for ΩLETF rebalancing ﬂows are negative and highly signiﬁcant for large ﬂows
+that exceed the 95th percentile of Ω LETF . We ﬁnd a monotonic increase in β2 in the
+threshold used to identify large leveraged ETF rebalancing ﬂows. This pattern is consis-
+tent with a sunshine equilibrium in the spirit of Admati and Pﬂeiderer (1991), in which
+other market participants accommodate the liquidity needs by large rebalancing ﬂows
+from leveraged ETFs.
+Table D3 in the Appendix provides supporting evidence using the change in the bid-
+ask spread of individual stocks. A shock to the absolute value of Γ HP prompts market
+24
+Table 5: Liquidity Provision Around Large Rebalancing Flows
+The table reports the results to regressing returns in the last half hour of a trading day on returns
+until 15:30 on delta-hedging and leveraged ETF rebalancing ﬂows including dummy variables for large
+rebalancing ﬂows. L j,t,x is a dummy variable that is equal to 1 if the size of the respective rebalancing
+ﬂow of stock j exceeds the xth cross-sectional percentile of the absolute rebalancing ﬂow. We consider
+three thresholds for x, i.e, x∈{ 95, 97.5, 99}. T-statistics are in parentheses below and are computed
+using time-and-entity-clustered standard errors. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level.
+We include entity-ﬁxed eﬀects in all speciﬁcations and value-weight observations.
+(1) (2) (3) (4) (5) (6)
+Dependent rend
+t rend
+t rend
+t rend
+t rend
+t rend
+t
+ΓHP
+t -11.588*** -11.294*** -10.333***
+(-3.407) (-4.358) (-4.114)
+ΓHP
+t × Lt,x 2.828 3.252 2.696
+(1.081) (1.373) (0.855)
+ΩLETF
+t 57.027*** 53.729*** 49.683***
+(4.803) (5.230) (5.672)
+ΩLETF
+t × Lt,x -22.267** -26.226*** -30.561***
+(-2.327) (-2.725) (-3.111)
+rpre
+t -0.754*** -0.753*** -0.755*** -0.909*** -0.908*** -0.908***
+(-6.905) (-6.902) (-6.894) (-8.212) (-8.183) (-8.187)
+Observations 1,882,332 1,882,332 1,882,332 1,882,332 1,882,332 1,882,332
+R2 (%) 0.284 0.285 0.284 0.334 0.335 0.333
+Entity FE Yes Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j] [t;j]
+xth perc. 95.0 97.5 99.0 95.0 97.5 99.0
+makers in the underlying stock to increase the corresponding spreads in advance. In
+contrast, we ﬁnd no such evidence for rebalancing ﬂows from leveraged ETFs. Together
+with the results regarding large ﬂows in Table 5, we ﬁnd convincing evidence in favor of
+a better liquidity provision for the ﬂows of leveraged ETF counterparties, driven by a
+greater transparency on their timing and of their magnitude. Conversely, market makers
+in the underlying stocks face the risk of adverse selection from the ﬂows of option market
+makers due to their opaque nature and discretionary timing.
+25
+3.5. Trading Strategies
+Next, we quantify the economic signiﬁcance of these frictions by studying trading
+strategies that use Γ HP and ΩLETF as timing signals. First, we construct a long-short
+portfolio based on ΓHP . On each trading day at 15:30, we sort our stock sample according
+to ΓHP into decile portfolios. Subsequently, we build a long-short strategy, denoted by
+LmHΓ, by taking a long (short) position in the lowest (highest) decile portfolio. We
+close our positions at the market close of the same trading day, such that the strategy
+is active for only 30 minutes each day. In the second strategy, HmL Ω, we use ΩLETF as
+a timing signal. We construct decile portfolios based on Ω LETF and take a long (short)
+position in the highest (lowest) decile. Finally, we use both Γ HP and ΩLETF as signals
+in a combined strategy. For each stock at 15:30, we sort our stock sample according to
+their aggregate imbalance Ω LETF − ΓHP into decile portfolios and subsequently build a
+long-short strategy, denoted by HmL Γ,Ω.
+Table 6: ΓHP and ΩLETF Based Trading Strategies
+The table reports the economic value of timing the last half-hour market return using using Γ HP ,
+ΩLETF and a joint signal based on both. The Γ HP -strategy, LmHΓ, takes a long (short) position in
+a stock when the stock’s Γ HP is in the lowest (highest) decile. The Ω LETF -strategy, HmLΩ, takes a
+long (short) position in a stock when the stock’s Ω LETF is in the highest (lowest) decile. The combined
+strategy, HmLΓ,Ω, computes a cross-sectional rank according to ΓHP and ΩLETF and takes a long (short)
+position in a stock when the stock’s aggregated ranking is in the highest (lowest) decile. As a benchmark,
+Marketend denotes investing in all stocks from 15:30 to 16:00. Portfolios are value-weighted, including
+for Marketend. For each strategy, we report the average return (Avg ret), standard deviation (Std dev),
+Sharpe ratio (Sharpe), Sharpe ratio assuming an eﬀective spread of 25% of the quoted bid-ask spread (Net
+Sharpe), skewness, kurtosis, and success rate (Success). The returns are annualized and in percentage.
+Newey and West (1987) robust t-statistics are in parentheses, and signiﬁcance at the 1%, 5%, or 10%
+level is denoted by ***, **, or *, respectively. The sample period is January 2012 – December 2019.
+Avg ret Std dev Sharpe Net Sharpe Skewness Kurtosis Success
+LmHΓ 5.20*** 1.36 3.83 1.76 0.17 3.00 61.07
+HmLΩ 5.78*** 2.31 2.51 0.05 0.13 3.54 56.29
+HmLΓ,Ω 6.63*** 1.54 4.29 1.77 0.27 2.80 62.70
+Marketend -1.39 3.26 -0.43 -0.43 -1.05 12.27 51.92
+Table 6 reports summary statistics of the resulting strategies using value-weighted
+portfolios. LmH Γ yields an average total excess return equal to 5.20% per year which are
+signiﬁcant at the 1%-level. Although HmL Ω yields a slightly higher average total excess
+return per year, 5.78%, LmH Γ exhibits a higher Sharpe ratio (3.83 vs. 2.51). Similarly,
+we observe higher success ratios for LmH Γ compared to HmL Ω (61% vs. 56%).
+26
+The combination of the two signals ΩLETF and ΓHP reduces the noise and improves the
+success ratio with an increase in the average return to 6.62% per year, which is signiﬁcant
+at the 1%-level. Consistent with this, the combined strategy exhibits the highest (gross)
+Sharpe ratio of 4.29 and a success rate of 62%. It is notable that the skewness of the three
+strategies are positive, compared to the negative skewness of the return on the market.
+12
+Table 7: Risk-adjusted Returns of ΓHP and ΩLETF Trading Strategies
+The table reports the estimation results from regressing returns of strategies timing the last half-hour
+based on Γ HP , ΩLETF and a combination of both on the returns of all stocks from 15:30 to 16:00
+(Marketend), the equity market excess return (MKT), size (SMB), book-to-market (HML), proﬁtability
+(RMW), investment (CMA), momentum (MOM), and an intermediary capital asset pricing factor (IC,
+proposed by He et al., 2017). The ΓHP -strategy, LmHΓ, takes a long (short) position in a stock when the
+stock’s ΓHP is in the lowest (highest) decile. The Ω LETF -strategy, HmLΩ, takes a long (short) position
+in a stock when the stock’s Ω LETF is in the highest (lowest) decile. The combined strategy, HmL Γ,Ω,
+computes a cross-sectional rank according to Γ HP and ΩLETF and takes a long (short) position in a
+stock when the stock’s aggregated ranking is in the highest (lowest) decile. Portfolios are value-weighted.
+Newey and West (1987) robust t-statistics are in parentheses, and signiﬁcance at the 1%, 5%, or 10%
+level is denoted by ***, **, or *, respectively. The sample period is January 2012 – December 2019.
+Intercept Marketend MKT SMB HML RMW CMA MOM IC R2 R2 adj
+LmHΓ 5.21 0.01 0.03% -0.02%
+(9.37***) (0.42)
+4.84 1.24 1.11 0.46 2.89 0.89 2.13 0.72 0.88% 0.45%
+(7.99***) (1.00) (0.88) (0.27) (1.58) (0.31) (2.10**) (0.86)
+HmLΩ 5.77 -0.01 0.02% -0.03%
+(6.07***) (-0.30)
+6.22 0.24 0.93 -1.11 -4.98 1.03 -4.06 -1.04 0.72% 0.29%
+(5.87***) (0.09) (0.42) (-0.36) (-1.27) (0.25) (-2.87***) (-0.61)
+HmLΓ,Ω 6.66 0.02 0.2% 0.1%
+(10.24***) (1.82*)
+6.30 3.05 0.19 -0.38 -0.02 4.79 1.30 -0.02 1.10% 0.70%
+(8.70***) (2.62***) (0.12) (-0.19) (-0.01) (1.55) (1.14) (-0.02)
+Because of the signiﬁcant turnover ratio required in such a strategy, it is important
+to investigate the potential impact of transaction costs if an trader were to implement
+such a strategy. We assume an eﬀective spread of 25% of the quoted bid-ask spread
+at 15:30 as a measure for transaction costs. As evident from Table 6, we ﬁnd that the
+trading strategy based on Γ HP continues to yield high risk-adjusted performance with a
+net Sharpe ratio of 1.76. On the other hand, the net Sharpe ratio for HmL Ω is reduced
+to 0.05. The strategy that combines the two signals HmL Γ,Ω generates the highest net
+12To put this in context, Jiang, Kelly, and Xiu (2020) use convolutional neural networks on price path
+images to predict the future return direction. They achieve a success rate of up to 53 .6%.
+27
+Sharpe ratio, which is equal to 1.77. This conﬁrms that the economic frictions generated
+by these two channels jointly are indeed economically signiﬁcant, although Γ HP plays a
+greater role.
+How much of these strategies’ end-of-day returns are explained by exposure to well-
+established risk factors? Table 7 summarizes the results of regressing LmH Γ, HmL Ω,
+and HmLΓ,Ω on the end-of-day market return (Market end) and the full-day Fama-French
+ﬁve-factor model (Fama and French, 2015), augmented by a momentum as well as an
+intermediary capital asset pricing factor (He et al., 2017). 13 We ﬁnd that neither the
+market nor the augmented ﬁve-factor model can explain the returns of LmH Γ, HmL Ω,
+and HmLΓ,Ω. The R2 is small on average. The only factor that is statistically signiﬁcant
+for the joint strategy is MKT, the other factors in the extended ﬁve-factor model are
+not signiﬁcant. Notwithstanding the statistical importance of MKT, the alphas of these
+regressions are statistically signiﬁcant and virtually unchanged and account for almost
+the entire average gross excess return.
+2015 2016 2017 2018 2019 2020
+0
+1
+2
+3
+4
+5
+6
+7Absolute t-statistics
+LETF
+HP
+Fig. 5. Rolling Regressions
+The ﬁgure shows the absolute t-statistics of estimated Γ HP and ΩLETF coeﬃcients over time, as mea-
+sured on a rolling basis for each three year-period starting in January 2012. Speciﬁcally, we estimate
+Equation (9) for the ﬁrst three years in our sample, shift the starting and end date by one day and repeat
+this for all days in the sample (January 2012 – December 2019).
+13Data on the Fama-French ﬁve-factor model and the momentum factor is taken from
+Kenneth French’s website, https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_
+library.html, whereas data on the intermediary capital asset pricing factor is obtained from Zhiguo He’s
+website, https://voices.uchicago.edu/zhiguohe/data-and-empirical-patterns/intermediary-
+capital-ratio-and-risk-factor/ .
+28
+2012 2013 2014 2015 2016 2017 2018 2019
+0
+20
+40
+60
+80
+100
+Percentage of HP Variance Explained by First Two Principal Components
+PC1
+PC2
+70.3%
+21.7%
+69.1%
+21.9%
+67.5%
+21.8%
+67.5%
+21.1%
+68.6%
+21.1%
+71.9%
+19.1%
+79.0%
+18.3%
+83.8%
+14.1%
+PHLX
+CBOE
+NOM
+ISE
+GEMX
+AMEX
+ARCA
+BZX
+Rest
+Fig. 6. Market Share of Option Exchange Volume
+The ﬁgure shows the annual share of transacted volume in equity options on each U.S. options exchange.
+The market share is given for the ﬁve option exchanges in our sample (PHLX, CBOE, NOM, ISE, and
+GEMX), as well as the three largest exchanges among the remainder (AMEX, ARCA, and BZX). Rest
+combines volumes on exchanges BOX, BXO, C2, EDGX, EMLD, MERC, MIAX, and PEARL. The upper
+part of the ﬁgure shows the percentage of ΓHP variance explained by the ﬁrst two principal components
+across all option exchanges in our sample on a year-by-year basis. PC1 and PC2 denote the ﬁrst and
+second principal component, respectively.
+3.6. The Evolution of the Imbalance and its Price Impact
+We investigate how the price impact of ΓHP and ΩLETF changed over time by running our
+baseline regression using a rolling window of three years. Figure 5 displays the absolute
+t-statistics of the coeﬃcients for ΓHP (blue line) and for ΩLETF (green line). We ﬁnd that
+the statistical signiﬁcance of ΓHP has stayed nearly unchanged until the end of 2016 and
+has since then further increased. On the other hand, the estimated signiﬁcance for ΩLETF
+has decreased over time. Figure E1 in Appendix E shows that the diﬀerence in statistical
+signiﬁcance over time is also reﬂected in the performance of the timing strategies based
+on ΓHP and ΩLETF .
+A probable reason for the diﬀerence in the statistical performance over time lies in the
+high fragmentation of the U.S. options market, which reduces the availability and quality
+of information about the inventory positions of delta-hedgers. 14 This limits the ability of
+arbitrageurs to construct a precise measure of the rebalancing demand of delta-hedgers.
+Figure 6 shows the year-by-year market share for the ﬁve exchanges in our sample, as
+well as the three largest remaining exchanges, measured by volume in 2019. The ﬁgure
+shows a trend towards higher dispersion of option volumes across exchanges. This was
+helped by the opening of new exchanges in recent years, which allows market makers to
+14See Andersen, Archakov, Grund, Hautsch, Li, Nasekin, Nolte, Pham, Taylor, and Todorov (2021)
+for a current account on the history of the U.S. options market.
+29
+strategically hide information about their inventory positions. At the start of the sample,
+there were nine active option exchanges; since then, seven new exchanges have been
+opened (Andersen et al., 2021). These new exchanges represent about a ﬁfth of the entire
+volume in equity options in 2019. Moreover, not all option venues provided information
+useful to approximate the inventory of delta-hedgers. For example, AMEX and ARCA,
+which correspond to roughly 30% of traded options volume at the start of our sample,
+started reporting a detailed breakdown of option volumes in March of 2022 (NYSE, 2022).
+The latter informational friction can be mitigated if option inventories of delta-hedgers are
+highly correlated across option exchanges. We run a principal component decomposition
+of the gamma imbalance across the option exchanges for which we observe the data. We
+ﬁnd that the ﬁrst principal component can explain between 67% and 84% of the total
+variance of the gamma imbalance. The second principal component explains between
+14% and 22%, suggesting that information from multiple exchanges is indeed needed to
+obtain a precise proxy of the aggregate gamma imbalance. We also ﬁnd that the average
+3-year rolling correlations range from 30% to 80% and are decreasing for ISE and CBOE
+over time (see Figure OA4.1). These results suggest the presence of an informational
+friction that may explain why the abnormal excess returns earned by strategies based on
+ΓHP have been large and persistent.
+4. Conclusion
+A growing literature focuses on cross-sectional intraday return variation, linking it to
+investor heterogeneity on the stock level. In this paper, we provide novel insights into how
+derivative markets add to cross-sectional variation towards the end of the trading day.
+By drawing upon a unique dataset merging data from several exchanges identifying types
+of market participants in U.S. stock options and the portfolio composition of U.S. equity-
+focused leveraged ETFs, we document large price pressure on end-of-day returns when
+option market makers engage in delta-hedging and leveraged ETF swap counterparties
+rebalance their positional exposure.
+We show that delta-hedging and leveraged ETF rebalancing exert an economically
+large price pressure on end-of-day returns. Whereas leveraged ETFs contribute to a
+basket-wide momentum eﬀect, delta-hedging can either have a stabilizing eﬀect in the
+form of end-of-day reversal, but may also exaggerate intraday momentum. The direction
+is determined by the previous return of the underlying and the aggregate option inven-
+tory of market makers. Moreover, our results reveal that option market makers have
+30
+discretion on the execution of their hedging strategies, especially after intraday jumps.
+On the contrary, leveraged ETF swap counterparties are required to establish the target
+exposure of the fund at the close. This institutional ﬂexibility translates into information
+asymmetry faced by liquidity providers, constituting a friction for liquidity provision.
+Consistent with the assumption that the impact of rebalancing is mechanical in nature,
+we also document that it is transitory, as the eﬀects fully reverse during the next trad-
+ing day. Such a reversal materializes in a shorter time frame for leveraged ETFs price
+pressure than for that induced by gamma imbalances.
+We ﬁnally show that the eﬀect of option market imbalances is persistent over the
+years, while that of leveraged ETFs is signiﬁcantly decreasing, further suggesting a key
+role of information asymmetry as the main friction underlying their dynamics.
+31
+References
+Admati, A. R., Pﬂeiderer, P., 1991. Sunshine trading and ﬁnancial market equilibrium.
+Review of Financial Studies 4, 443–481.
+Andersen, T., Archakov, I., Grund, L., Hautsch, N., Li, Y., Nasekin, S., Nolte, I., Pham,
+M. C., Taylor, S., Todorov, V., 2021. A descriptive study of high-frequency trade and
+quote option data. Journal of Financial Econometrics 19, 128–177.
+Andersen, T. G., Bollerslev, T., 1997. Intraday periodicity and volatility persistence in
+ﬁnancial markets. Journal of Empirical Finance 4, 115–158.
+Baltussen, G., Da, Z., Lammers, S., Martens, M., 2021. Hedging demand and market
+intraday momentum. Journal of Financial Economics 142, 377–403.
+Barbon, A., Buraschi, A., 2020. Gamma fragility. Working paper, University of St.Gallen,
+School of Finance Research Paper.
+Ben-David, I., Franzoni, F., Moussawi, R., 2018. Do etfs increase volatility? Journal of
+Finance 73, 2471–2535.
+Benveniste, L. M., Marcus, A. J., Wilhelm, W. J., 1992. What’s special about the spe-
+cialist? Journal of Financial Economics 32, 61–86.
+Blau, B. M., Nguyen, N., Whitby, R. J., 2014. The information content of option ratios.
+Journal of Banking & Finance 43, 179 – 187.
+Bogousslavsky, V., 2020. The Cross-Section of Intraday and Overnight Returns. Working
+paper.
+Bogousslavsky, V., Muravyev, D., 2020. Who trades at the close? implications for price
+discovery, liquidity. Working paper.
+Brøgger, S. B., 2021. The market impact of predictable ﬂows: Evidence from leveraged
+vix products. Journal of Banking & Finance 133, 106280.
+Brunnermeier, M. K., Pedersen, L. H., 2005. Predatory trading. Journal of Finance 60,
+1825–1863.
+32
+Chen, H., Joslin, S., Ni, S. X., 2019. Demand for Crash Insurance, Intermediary Con-
+straints, and Risk Premia in Financial Markets. Review of Financial Studies 32, 228–
+265.
+Cheng, M., Madhavan, A., 2010. The dynamics of leveraged and inverse exchange-traded
+funds. Journal of Investment Management 7, 43–62.
+Chordia, T., Kurov, A., Muravyev, D., Subrahmanyam, A., 2021. Index option trading
+activity and market returns. Management Science 67, 1758–1778.
+Cremers, M., Weinbaum, D., 2010. Deviations from put-call parity and stock return
+predictability. Journal of Financial and Quantitative Analysis 45, 335–367.
+Easley, D., O’Hara, M., Srinivas, P. S., 1998. Option volume and stock prices: Evidence
+on where informed traders trade. Journal of Finance 53, 431–465.
+Fama, E. F., French, K. R., 2015. A ﬁve-factor asset pricing model. Journal of Financial
+Economics 116, 1–22.
+Forster, M. M., George, T. J., 1992. Anonymity in securities markets. Journal of Financial
+Intermediation 2, 168–206.
+Fournier, M., Jacobs, K., 2020. A Tractable Framework for Option Pricing with Dynamic
+Market Maker Inventory and Wealth. Journal of Financial and Quantitative Analysis
+55, 1117–1162.
+Frey, R., 1998. Perfect option hedging for a large trader. Finance and Stochastics 2,
+115–141.
+Frey, R., Stremme, A., 1997. Market volatility and feedback eﬀects from dynamic hedging.
+Mathematical Finance 7, 351–374.
+Gao, L., Han, Y., Zhengzi Li, S., Zhou, G., 2018. Market intraday momentum. Journal
+of Financial Economics 129, 394–414.
+Ge, L., Lin, T.-C., Pearson, N. D., 2016. Why does the option to stock volume ratio
+predict stock returns? Journal of Financial Economics 120, 601–622.
+Gemmill, G., 1996. Transparency and liquidity: A study of block trades on the london
+stock exchange under diﬀerent publication rules. Journal of Finance 51, 1765–1790.
+33
+Golez, B., Jackwerth, J. C., 2012. Pinning in the s&p 500 futures. Journal of Financial
+Economics 106, 566 – 585.
+Gˆ arleanu, N., Pedersen, L. H., Poteshman, A. M., 2009. Demand-Based Option Pricing.
+Review of Financial Studies 22, 4259–4299.
+He, Z., Kelly, B., Manela, A., 2017. Intermediary asset pricing: New evidence from many
+asset classes. Journal of Financial Economics 126, 1–35.
+Heston, S. L., Korajczyk, R. A., Sadka, R., 2010. Intraday patterns in the cross-section
+of stock returns. Journal of Finance 65, 1369–1407.
+Holden, C. W., Jacobsen, S., 2014. Liquidity measurement problems in fast, competitive
+markets: Expensive and cheap solutions. Journal of Finance 69, 1747–1785.
+Hu, J., 2014. Does option trading convey stock price information α. Journal of Financial
+Economics 111, 625–645.
+Jacobs, K., Mai, A. T., 2020. The role of intermediaries in derivatives markets: Evidence
+from vix options. Working paper.
+Jiang, J., Kelly, B. T., Xiu, D., 2020. (re-) imag (in) ing price trends. Chicago Booth
+Research Paper .
+Johnson, T., Liang, M., Liu, Y., 2016. What Drives Index Options Exposures?*. Review
+of Finance 22, 561–593.
+Johnson, T. L., So, E. C., 2012. The option to stock volume ratio and future returns.
+Journal of Financial Economics 106, 262–286.
+Komarov, O., 2017. Intra-day momentum. Working paper.
+Lou, D., Polk, C., Skouras, S., 2019. A tug of war: Overnight versus intraday expected
+returns. Journal of Financial Economics 134, 192–213.
+Madhavan, A., 1995. Consolidation, fragmentation, and the disclosure of trading infor-
+mation. Review of Financial Studies 8, 579–603.
+Madhavan, A., 2000. Market microstructure: A survey. Journal of ﬁnancial markets 3,
+205–258.
+34
+Moskowitz, T. J., Ooi, Y. H., Pedersen, L. H., 2012. Time series momentum. Journal of
+Financial Economics 104, 228 – 250, special Issue on Investor Sentiment.
+Ni, S. X., Pan, J., Poteshman, A. M., 2008. Volatility information trading in the option
+market. Journal of Finance 63, 1059–1091.
+Ni, S. X., Pearson, N. D., Poteshman, A. M., 2005. Stock price clustering on option
+expiration dates. Journal of Financial Economics 78, 49–87.
+Ni, S. X., Pearson, N. D., Poteshman, A. M., White, J., 2020. Does Option Trading
+Have a Pervasive Impact on Underlying Stock Prices? Review of Financial Studies 34,
+1952–1986.
+NYSE, 2022. Nyse options open/close volume summary client speciﬁcation. Tech. report.
+Pan, J., Poteshman, A. M., 2006. The Information in Option Volume for Future Stock
+Prices. Review of Financial Studies 19, 871–908.
+Platen, E., Schweizer, M., 1998. On feedback eﬀects from hedging derivatives. Mathe-
+matical Finance 8, 67–84.
+Porter, D. C., Weaver, D. G., 1998. Post-trade transparency on nasdaq’s national market
+system. Journal of Financial Economics 50, 231–252.
+Roll, R., Schwartz, E., Subrahmanyam, A., 2010. O/s: The relative trading activity in
+options and stock. Journal of Financial Economics 96, 1 – 17.
+Shim, J. J., Todorov, K., 2021. Etfs, illiquid assets, and ﬁre sales. Working paper.
+Shum, P., Hejazi, W., Haryanto, E., Rodier, A., 2016. Intraday share price volatility and
+leveraged etf rebalancing. Review of Finance 20, 2379–2409.
+Sircar, K. R., Papanicolaou, G., 1998. General black-scholes models accounting for in-
+creased market volatility from hedging strategies. Applied Mathematical Finance 5,
+45–82.
+Tuzun, T., 2014. Are leveraged and inverse etfs the new portfolio insurers? In: Paris
+December 2014 Finance Meeting EUROFIDAI-AFFI Paper .
+Wilmott, P., Sch¨ onbucher, P. J., 2000. The feedback eﬀect of hedging in illiquid markets.
+SIAM Journal on Applied Mathematics 61, 232–272.
+35
+Wu, Y., Jegadeesh, N., 2020. Closing auctions: Information content and timeliness of
+price reaction. Working paper.
+36
+Appendix A. Detailed Summary Statistics on ΓHP and
+ΩLETF
+Table A1 provides detailed summary statistics on the main variables of interest in the
+main paper.
+Table A1: Summary Statistics
+The table reports means, standard deviations, and quantiles for the gamma, leveraged ETF variables
+and returns used in the regression models. The descriptive statistics are ﬁrst computed for each day
+and subsequently averaged across all days. rpre, rnight and rend are denoted in basis points. ADV end is
+given in million USD. RSVOL end, ΓIB , ΓHP , ΩLETF and their corresponding absolute values are given
+percentage. The sample period is from January 2012 to December 2019.
+Mean Std 2.5% 10% 25% 50% 75% 90% 97.5%
+rpre 4.75 203.33 -379.68 -187.53 -81.11 4.67 89.38 194.47 394.41
+rend 0.02 35.56 -73.4 -38.44 -17.9 -0.53 17.21 38.98 77.24
+rnight 4.16 167.3 -249.0 -117.38 -50.88 2.97 57.01 125.12 267.0
+ADVend 21.72 59.1 0.25 0.78 2.19 6.79 19.94 47.4 136.93
+RSVOLend 0.56 41.86 -86.08 -48.77 -23.39 0.49 24.45 50.03 87.63
+ΓIB 0.52 3.0 -3.96 -1.32 -0.26 0.08 0.93 2.91 6.99
+|ΓIB| 1.45 2.67 0.0 0.03 0.14 0.55 1.67 3.76 8.03
+ΓHP 0.04 3.27 -7.0 -2.25 -0.48 0.0 0.51 2.37 7.28
+|ΓHP| 1.61 2.86 0.0 0.02 0.1 0.48 1.75 4.51 10.38
+ΩLETF 0.15 1.79 -2.97 -1.72 -0.86 0.1 1.11 2.08 3.48
+|ΩLETF| 1.65 1.75 0.03 0.16 0.42 1.03 2.37 3.92 6.25
+ΩLETF− ΓHP 0.11 3.81 -7.99 -3.29 -1.27 0.1 1.52 3.56 8.1
+|ΩLETF− ΓHP| 2.64 3.14 0.05 0.22 0.61 1.63 3.48 6.25 11.43
+37
+Appendix B. Errors in Measuring ΓHP – A Simula-
+tion Study
+We simulate returns from last day’s close to 15:30 ( rpre) and during the last half
+hour of a trading day (rend), as well as the true Gamma imbalance of market makers for
+N = 1000 stocks, over a total of T = 2000 time steps, mirroring the eight years of daily
+data in our sample.
+We allow the delta-hedger to deviate from hedging at the close. She will hedge during
+a diﬀerent time with probability π, i.e. p∼ Bern(π), such that the true Gamma hedging
+pressure for stock j on day t equals
+ΓHP
+j,t (∗) =rpre
+j,t × ΓIB
+j,t (∗)×p,
+where rpre
+j,t ∼N (0,σ pre = 0.08). The choice of whether the market maker hedges end-of-
+day is inherently unobservable to other market participants. At the same time, Γ IB(∗)
+may only be approximated with the market maker’s inventory measured at the end of
+the last trading day. Intraday changes in the Gamma proﬁle are likewise unobservable.
+Consequently, the empirically-observed hedging pressure is measured with error:
+ΓHP
+j,t =rpre
+j,t × (ΓIB
+j,t (∗) +εΓ)j,t,
+where εΓ∼N [0,σ ∆× (σpre +σpost)
+√
+2], such that the standard deviation is scaled as a
+fraction of the variation of the true but unobservable Γ IB(∗).
+Next, imply a direct relationship between end-of-day returns and Γ HP (∗),
+rend
+j,t =βΓ(∗)× ΓHP
+j,t (∗) +εpost
+j,t ,
+withεpost∼N (0,σ post) and σpost = 0.04. We set the true slope coeﬃcient βΓ(∗) to−41,
+mimicking the impact of leveraged ETF rebalancing. Empirically, we can estimate the
+impact of Gamma rebalancing on end-of-day returns only through the noisy proxy Γ HP :
+rend
+j,t =βΓ× ΓHP
+j,t +εpost
+j,t ,
+We are consequently interested in how the degree of noise ( σ∆) and probability of dis-
+cretionary trading at a diﬀerent time than the close (π) impact the empirical estimate of
+the slope coeﬃcient, βΓ. Results to this are shown in Figure 4.
+38
+Appendix C. Controlling for Risk- and Information-
+based Alternative Explanations
+The unveiled empirical relationship may be consistent with alternative hypotheses. In
+particular, it may arise from intraday oscillations in the level of risk, for volatility-target
+investors might rebalance their portfolio away from risky assets towards the end of the
+trading day if volatility changes, generating directional order ﬂow. Since option demand
+is also a positive function of investors expectations about future volatility, changes in risk
+may impact the inventory of market makers and, potentially, their Γ imbalance. These
+two observations may generate a mechanical and negative relationship between gamma
+imbalance and order-ﬂow, driven by the dynamics of expected volatility.
+To rule out the above explanations, speciﬁcations in columns (1) to (3) in Table C2 add
+controls for proxies of expected volatility, namely the level of the at-the-money implied
+volatility (IV ) on day t− 1 and forecasts of future variance using an EGARCH model,
+ˆRV
+end
+and ˆRV
+pre
+. The EGARCH models the sum of 1-minute squared returns for each
+stock in the last half hour of a trading day, using historical data up until day t− 1 (see
+Moskowitz, Ooi, and Pedersen, 2012).
+Results show that neither of these two controls is signiﬁcant, nor does the inclusion
+of either materially alter the coeﬃcient and statistical signiﬁcance of Γ HP and ΩLETF .
+Besides risk-based explanations, our ﬁndings may arise from information being trans-
+mitted from the options market to the market of the underlying. A stream of the literature
+argues that options are often used because of their implicit leverage in presence of market
+frictions, for instance when short selling is expensive (Ge et al., 2016). Accordingly, Blau
+et al. (2014) ﬁnd that an increase in the put-call ratio negatively predicts future returns
+at the daily, weekly, and monthly frequency. Roll et al. (2010) and Hu (2014) show
+that the option-to-stock volume predicts options’ underlying returns. We thus extend
+the baseline regression to control for these explanatory variables. Columns (4) and (5)
+summarize the results and show that the coeﬃcients on Γ HP and ΩLETF are unchanged
+both in magnitude and signiﬁcance, suggesting that our results are not driven by an
+information channel.
+39
+Table C2: Controlling for Risk-based and Informational Channels
+The table reports the results to regressing the returns in the last half hour of a trading day on returns until
+15:30 (rpre), on options market maker hedging pressure Γ HP and leveraged ETF rebalancing quantity
+ΩLETF following Equation (9). IVt−1 denotes implied volatility at timet−1. ˆRV
+end
+t ( ˆRV
+pre
+t ) denote the
+square root of predicted realized variance for the time period from 15:30 to 16:00 (from previous day’s
+close to 15:30) on day t. PCt−1 is the put-call-ratio and O/S$
+t−1 denotes the option-to-stock volume
+in dollar terms. T-statistics are in parentheses below and are computed using time-and-entity-clustered
+standard errors. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level. We include entity-ﬁxed eﬀects
+in all speciﬁcations and value-weight observations. The sample period is 2012 – 2019.
+(1) (2) (3) (4) (5) (6)
+Dependent rend
+t rend
+t rend
+t rend
+t rend
+t rend
+t
+ΓHP
+t -10.925*** -10.958*** -10.938*** -10.961*** -10.961*** -10.914***
+(-5.513) (-5.522) (-5.507) (-5.521) (-5.523) (-5.503)
+ΩLETF
+t 46.832*** 46.768*** 46.790*** 46.755*** 46.738*** 46.835***
+(5.208) (5.202) (5.198) (5.195) (5.198) (5.204)
+rpre
+t -0.822*** -0.820*** -0.820*** -0.820*** -0.820*** -0.821***
+(-7.460) (-7.453) (-7.452) (-7.453) (-7.452) (-7.454)
+IVt−1 4.463*** 4.040***
+(5.079) (5.086)
+ˆRV
+pre
+t 19.132 -28.421*
+(1.065) (-1.754)
+ˆRV
+end
+t 414.582*** 336.520***
+(3.156) (2.777)
+PCt−1 0.005 -0.003
+(0.030) (-0.019)
+O/S$
+t−1 255.550 100.469
+(0.782) (0.321)
+Observations 1,882,332 1,882,236 1,882,236 1,879,828 1,882,327 1,879,753
+R2 (%) 0.388 0.371 0.380 0.370 0.370 0.393
+Entity FE Yes Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j] [t;j]
+40
+Appendix D. Liquidity Provision: Evidence from Spreads
+This appendix provides additional evidence of impeded liquidity provision for Gamma
+rebalancing ﬂows, which potentially arises because of their opacity. To do so, we measure
+the relative change in the bid-ask spread on each stock as
+ˆSt = S16:00:00
+t −S15:30:00
+t∑15:00:00
+τ=09:30:00Sτ
+t/12
+, with St =askt−bidt,
+and regress it on rebalancing ﬂows ΓHP and ΩLETF . Table D3 shows that market makers
+active in the stocks underlying options with large rebalancing ﬂows increase the corre-
+sponding spreads to alleviate the issue of adverse selection. We ﬁnd no such evidence for
+rebalancing ﬂows from leveraged ETFs.
+Table D3: Spreads and Rebalancing Flows
+The table reports the results to regressing the relative change in the bid-ask spread on Γ HP and ΩLETF .
+We measure the relative change in the spread as ˆSt = S16:00:00
+t −S15:30:00
+t∑15:00:00
+τ =09:30:00Sτ
+t/12 , where St = askt−bidt using
+consolidated national best bid and oﬀer quotes from the NYSE TAQ database (Holden and Jacobsen,
+2014). T-statistics are in parentheses below and are computed using time-and-entity-clustered standard
+errors. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level. We include entity-ﬁxed eﬀects in all
+speciﬁcations and value-weight observations.
+(1) (2) (3)
+Dependent ˆSt ˆSt ˆSt
+|ΓHP
+t | 6.081** 5.555*
+(2.058) (1.876)
+|ΩLETF
+t | 16.353 14.572
+(0.843) (0.750)
+rpre
+t 0.026 0.029 0.025
+(0.235) (0.259) (0.228)
+Observations 1,863,111 1,863,111 1,863,111
+R2 (%) 0.008 0.006 0.013
+Entity FE Yes Yes Yes
+Time FE Yes Yes Yes
+SEs [t;j] [t;j] [t;j]
+41
+Appendix E. Performance of Trading Strategies Over
+Time
+2012 2013 2014 2015 2016 2017 2018 2019 2020
+1.0
+1.2
+1.4
+1.6
+Cumulative returns
+LmHΓ
+HmLΩ
+HmLΓ,Ω
+Marketend
+Fig. E1. Performance of Trading Strategies Over Time
+The ﬁgure shows the cumulative performance of a one-dollar investment into trading strategies based on
+ΓHP and ΩLETF . The Γ HP -strategy, LmHΓ, takes a long (short) position in a stock when the stock’s
+ΓHP is in the lowest (highest) decile. The Ω LETF -strategy, HmLΩ, takes a long (short) position in a
+stock when the stock’s Ω LETF is in the highest (lowest) decile. The combined strategy, HmL Γ,Ω, takes
+a long (short) position in a stock when the stock’s Ω LETF − ΓHP is in the highest (lowest) decile. As a
+benchmark, Marketend denotes investing in all stocks from 15:30 to 16:00. The sample period is January
+2012 – December 2019.
+42
+Liquidity Provision to Leveraged ETFs and
+Equity Options Rebalancing Flows
+Evidence from End-of-Day Stock Prices
+Online Appendix
+(not for publication)
+by Andrea Barbon, Heiner Beckmeyer, Andrea Buraschi, Mathis Moerke
+Abstract
+This appendix provides supplementary results and additional analyses besides
+robustness checks not included in the paper.
+Table of Contents:
+• Appendix OA1 provides details on the cleaning of high-frequency data.
+• Appendix OA2 provides summary statistics for the underlying stocks in the
+sample.
+• Appendix OA3 provides summary statistics for the leveraged ETFs in the
+sample.
+• Appendix OA4 calculates the correlation between ΓHP for each option exchange
+and the total ΓHP .
+• Appendix OA5 investigates the eﬀect of altering the calculation of the average
+dollar volume.
+• Appendix OA6 investigates the eﬀect of altering the set of delta-hedgers.
+• Appendix OA7 splits Γ HP into new and old positions and investigates their
+eﬀects.
+• Appendix OA8 investigates the eﬀect of scaling returns according to Moskowitz
+et al. (2012).
+• Appendix OA9 investigates the eﬀect of Γ HP on news and non-news days and
+the eﬀect of ΩLETF on days with rpre
+j = 0.
+• Appendix OA10 investigates the eﬀect across diﬀerent industries.
+1
+Appendix OA1. Cleaning of High-Frequency Data
+To analyze intraday momentum eﬀects in individual stocks, we rely on the NYSE
+Trades and Quote (TAQ) database for January 1996 through July 2019. Since the NYSE
+provides the raw tape of all trades performed on the included exchanges, multiple cleaning
+steps are required. Additionally, we merge the TAQ database with CRSP to use the
+PERMNO as a unique identiﬁer per common share of any company.
+OA1.1. Cleaning Procedure
+We retain only trades with trade correction indicators “00” an “01”, which refer to
+correctly recorded trades, and those that have been subsequently altered, but reﬂect the
+actual trade price at the time. We further keep only trades with trade sale corrections
+”Z”, ”B”, ”U”, ”T”, ”L”, ”G”, ”W”, ”K”, and ”J”, as well as an accompanying ”I”
+reﬂecting odd lot trades. To rely on trade prices during regular trading hours only, we
+discard all observations before 9:30 and after 16:01. We explicitly include the minute of
+4pm, as many closing trades (denoted by sale conditions ”6” or ”M”) fall within the ﬁrst
+few seconds afterwards.
+If multiple trades occur at exactly the same point in time, we take the median price
+as the “correct price”. To make sure that prices are consistent by Ticker, we employ a
+bounce-back ﬁlter following Andersen, Bondarenko, and Gonzalez-Perez (2015), which
+eﬀectively checks whether any trade’s price deviates by more than 15 times the median
+absolute deviation of the day. If this is the case, we will kick this observation if we observe
+a reversion to the previous price within the next ﬁve minutes, or 10 trades, whichever
+encompasses more trades. We also drop price observations which deviate by more than
+two times|log(pt/ˆp)|, where ˆp is the median for the day. We choose trade-based ﬁlters to
+check for the internal consistency, instead of relying on the Quote database also provided
+by the NYSE, as some observations are falsely recorded in both. Afterwards, we span a
+minute-by-minute grid between 9:30 and 16:01 and map trades to these trading minutes,
+taking the volume-weighted average price within each minute to limit the impact of
+microstructure noise and single trades.
+OA1.2. Merge with CRSP
+The TAQ database provides intraday trade prices, but lacks information about dis-
+tributions, mergers, and delistings. We obtain this information from CRSP, as the low-
+2
+frequency database in ﬁnancial economics.
+We use the PERMNO provided by CRSP as an identiﬁer that is unique over time.
+In a ﬁrst step, we merge the historical CUSIP by CRSP (NCUSIP) with the CUSIPs in
+the master ﬁle taken from TAQ. In some occasions, we cannot merge available tickers in
+the trade ﬁle this way, and in a second step merge the two databases by the root ticker
+and ticker suﬃx, which indicates diﬀerent share classes. We keep only stocks with share
+codes 10 and 11, denoting common shares, as well as exchange codes 1, 2, 3, 31, 32 and
+32, representing the NYSE, AMEX and NASDAQ, respectively. Using this procedure,
+we can merge most stocks for which we have intraday data available and cover most of
+the CRSP sample.
+3
+Appendix OA2. Summary Statistics of the Underly-
+ing
+Table OA2.1: Industry Distribution of Underlying Stocks
+The table reports time-series averages of industry distributions of the Fama-French 12-industry classiﬁ-
+cation. For comparability to the CRSP universe, the distribution of the full CRSP sample is included.
+FF-12 Industry Our sample CRSP sample
+Consumer durables 0.44% 0.19%
+Consumer nondurables 4.57% 2.71%
+Manufacturing 10.23% 4.78%
+Energy 5.64% 3.4%
+Chemicals 3.22% 1.26%
+Business Equipment 15.68% 8.62%
+Telecom 2.38% 1.95%
+Utilities 3.73% 1.9%
+Wholesale 11.75% 4.91%
+Healthcare 10.64% 5.51%
+Finance 10.31% 44.15%
+Other 21.41% 20.62%
+4
+Table OA2.2: Summary Statistics of Underlying Stocks
+The table reports summary statistics on the stock-day sample for the underlying stocks. Panel A reports
+the time-series summary statistics and Panel B reports the time-series average of cross-sectional distri-
+butions. Percent coverage of the stock universe (EW) is the number of stocks in the sample, divided
+by the total number of CRSP stocks. Percent coverage of the stock universe (VW) is the total market
+capitalization of sample stocks divided by the total CRSP market capitalization. Percent coverage of
+stocks traded at NYSE or AMEX is the number of stocks in the sample trading at NYSE or AMEX,
+divided by the total number of stocks. The ﬁrm size percentiles are computed using the full CRSP
+sample. Number of LETF is the number of LETF a stock is included in. The sample period is January
+2012 – December 2019.
+Mean Std 10-Pctl Q1 Median Q3 90-Pctl
+Panel A: Time-Series Distribution
+Number of stocks in the sample each month 992.53 227.92 877.2 973.0 1043.0 1101.25 1140.0
+Stock coverage of stock universe (EW) 13.86 3.17 12.43 13.65 14.57 15.26 15.92
+Stock coverage of stock universe (VW) 48.79 10.17 48.47 49.76 50.92 51.85 52.72
+Stock traded at NYSE or AMEX 38.74 8.07 35.78 37.91 40.19 42.88 43.42
+Panel B: Time-Series Average of Cross-Sectional Distributions
+Firm size in million 15050 44338 454 1079 3152 11182 31883
+Firm size CSRP percentile 77 17 51 66 81 92 96
+Number of LETF 9 3 6 7 9 11 14
+5
+Appendix OA3. Summary Statistics of Leveraged ETFs
+Table OA3.1: Summary Statistics of Leveraged ETFs
+The table reports time-series summary statistics on the underlying leveraged ETFs in our sample. Num-
+ber of LETF is the number of leveraged ETFs. Number of benchmark indices is the number of unique
+benchmark indices underlying all leveraged ETFs. Aggregated AUM denotes the assets under man-
+agement across all leveraged ETFs, in million. Aggregated leverage-adjusted AUM is the assets under
+management adjusted for the rebalancing leverage of each leveraged ETF. Percentage of inverse LETF
+(EW) is the number of inverse ETFs divided by the total number of leveraged ETFs. Percentage of
+inverse LETF (VW) is the assets under management weighted proportion of inverse ETFs to the total
+leveraged ETF sample. Average absolute leverage factor (EW) is the average absolute leverage factor.
+Average absolute leverage factor (VW) is the assets under management weighted absolute leverage factor.
+The sample period is January 2012 – December 2019.
+Mean Std 10% 25% 50% 75% 90%
+Number of LETF 71.67 11.05 66.0 72.0 74.0 76.0 79.0
+Number of benchmark indices 23.72 3.7 21.0 23.0 25.0 25.0 27.0
+Agg. AUM 17.71 4.69 12.03 15.29 16.92 21.33 24.43
+Agg. leverage-adjusted AUM 95.33 28.55 64.23 73.01 86.97 121.12 131.71
+Perc. of inverse LETF (EW) 45.29 3.38 41.67 43.24 45.07 45.95 51.28
+Perc. of inverse LETF (VW) 33.14 15.66 16.31 22.75 28.48 41.77 62.64
+Avg. absolute leverage factor (EW) 2.35 0.13 2.21 2.22 2.32 2.45 2.5
+Avg. absolute leverage factor (VW) 2.43 0.14 2.29 2.35 2.44 2.53 2.6
+6
+Appendix OA4. Correlation of Exchange Speciﬁc ΓHP
+and Total ΓHP
+2015 2016 2017 2018 2019 2020
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+PHLX CBOE NOM ISE GEMX
+Fig. OA4.1. Average Three-year Rolling ΓHP Correlations
+The ﬁgure shows average three-year rolling correlations between ΓHP based on the delta-hedgers option
+inventory of one single exchange (either PHLX, CBOE, NOM, ISE, or GEMX) and Γ HP based on the
+pooled delta-hedgers option inventory across all exchanges in our sample.
+7
+Appendix OA5. Diﬀerent ADV Measures
+We investigate whether the choice of the time period over which we calculate the
+average dollar volume (ADV) eﬀects our results. We calculate ADV over the previous
+week (W) or previous quarter (W) and using the last half hour of a trading day (I) or
+the entire daily trading volume (D). As Table OA5.1 shows, the choice of denominator
+for ΓHP and ΩLETF has little impact on our results.
+Table OA5.1: Eﬀect of Diﬀerent ADV Measures
+The table reports the results to regressing returns in the last half hour of a trading day on returns
+until 15:30, rpre, gamma hedging pressure Γ HP , and leveraged ETF rebalancing ﬂows Ω LETF following
+Equation (9). We exchange the standard ADV measure as the average volume in the last half trading
+hour over the last month by similar measures using weekly (W) and quarterly horizons (Q), as well as
+measures using daily volume in their constructed (denoted by “-D”). T-statistics are in parentheses below
+and are computed using time-and-entity-clustered standard errors. ***, **, * denotes signiﬁcance at the
+1%, 5%, 10% level. We include entity ﬁxed eﬀects in all speciﬁcations and value-weight observations.
+The sample period is January 2012 – December 2019.
+(1) (2) (3) (4) (5) (6)
+Dependent rend
+t rend
+t rend
+t rend
+t rend
+t rend
+t
+ΓHP
+t -10.006*** -55.821*** -10.960*** -59.616*** -10.976*** -60.342***
+(-5.518) (-7.094) (-5.521) (-6.949) (-5.244) (-6.763)
+ΩLETF
+t 41.180*** 177.953*** 46.738*** 190.533*** 48.616*** 201.118***
+(4.658) (6.015) (5.198) (6.094) (5.084) (6.099)
+rpre
+t -0.817*** -0.803*** -0.820*** -0.804*** -0.824*** -0.809***
+(-7.430) (-7.176) (-7.452) (-7.148) (-7.501) (-7.227)
+Observations 1,882,332 1,882,332 1,882,332 1,882,332 1,882,332 1,882,332
+R2 (%) 0.363 0.380 0.370 0.382 0.376 0.391
+Entity FE Yes Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j] [t;j]
+ADV W-I W-D M-I M-D Q-I Q-D
+8
+Appendix OA6. Diﬀerent Sets of Delta-Hedgers
+In the main part of the paper, we assume that delta-hedgers are composed of market
+makers and broker/dealers. We exchange the set of delta-hedgers to include only market
+makers (Table OA6.1) or to include market makers, broker/dealers, and ﬁrm proprietary
+traders (Table OA6.2). The choice of the set of likely delta-hedgers has little impact on
+our results.
+Table OA6.1: Market Makers as the only Delta-Hedgers
+The table reports the results to regressing returns in the last half hour of a trading day on returns until
+15:30,rpre and gamma hedging pressure ΓHP , following Equation (9). We assume that market makers are
+delta-hedgers. T-statistics are in parentheses below and are computed using time-and-entity-clustered
+standard errors. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level. We include entity ﬁxed eﬀects
+in all speciﬁcations and value-weight observations. The sample period is January 2012 – December 2019.
+(1) (2) (3) (4) (5) (6)
+Dependent rend
+t rend
+t rend
+t rend
+t rend
+t rend
+t
+ΓHP
+t -10.354*** -10.292*** -10.345*** -10.312*** -10.355*** -10.355***
+(-3.094) (-3.077) (-3.093) (-3.077) (-3.094) (-3.094)
+rpre
+t -0.739*** -0.741*** -0.739*** -0.739*** -0.739*** -0.739***
+(-7.034) (-7.050) (-7.036) (-7.039) (-7.035) (-7.034)
+IVt−1 4.517***
+(5.029)
+ˆRV
+pre
+t 20.913
+(1.159)
+ˆRV
+end
+t 418.390***
+(3.143)
+PCt−1 -0.014
+(-0.092)
+O/S$
+t−1 244.126
+(0.770)
+Observations 1,882,332 1,882,332 1,882,236 1,882,236 1,879,827 1,882,327
+R2 (%) 0.267 0.286 0.269 0.277 0.267 0.268
+Entity FE Yes Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j] [t;j]
+9
+Table OA6.2: Market Makers, Broker/Dealer, and Firm Proprietary Traders as Delta-
+Hedgers
+The table reports the results to regressing returns in the last half hour of a trading day on returns until
+15:30, rpre and gamma hedging pressure Γ HP , following Equation (9). We assume that market makers,
+broker/dealer, and ﬁrm proprietary traders are delta-hedgers. T-statistics are in parentheses below and
+are computed using time-and-entity-clustered standard errors. ***, **, * denotes signiﬁcance at the 1%,
+5%, 10% level. We include entity ﬁxed eﬀects in all speciﬁcations and value-weight observations. The
+sample period is January 2012 – December 2019.
+(1) (2) (3) (4) (5) (6)
+Dependent rend
+t rend
+t rend
+t rend
+t rend
+t rend
+t
+ΓHP
+t -11.014*** -10.977*** -11.005*** -10.976*** -11.014*** -11.012***
+(-6.965) (-6.945) (-6.968) (-6.947) (-6.965) (-6.963)
+rpre
+t -0.706*** -0.708*** -0.706*** -0.707*** -0.706*** -0.706***
+(-6.817) (-6.834) (-6.818) (-6.821) (-6.817) (-6.817)
+IVt−1 4.516***
+(5.076)
+ˆRV
+pre
+t 18.816
+(1.034)
+ˆRV
+end
+t 410.953***
+(3.101)
+PCt−1 -0.010
+(-0.063)
+O/S$
+t−1 280.615
+(0.832)
+Observations 1,882,332 1,882,332 1,882,236 1,882,236 1,879,823 1,882,327
+R2 (%) 0.296 0.314 0.297 0.306 0.296 0.296
+Entity FE Yes Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j] [t;j]
+10
+Appendix OA7. ΓHP based on Older Positions
+Endogeneity concerns regarding Equation (9) might be raised given that traders with
+public and/or private information on the return of stock j in the last 30 minutes, rend
+j ,
+choose the option market to exploit this information. To mitigate any concerns, we
+follow Ni et al. (2020). Precisely, we split Γ HP in two parts: gamma hedging pressure
+originating from older positions held by delta-hedgers at time t−τ, and gamma hedging
+pressure stemming from new positions between t−τ and t. Ni et al. (2020) argue that
+option positions which existed at t− τ cannot be established due to private and/or
+public information after the close at t−τ. In case of short-lived private and/or public
+information, positions att−τ are of no use for predicting the return in the last 30 minutes
+on t, rpre.
+To decompose ΓHP , we ﬁrst deﬁne the gamma imbalance for stock j at time t which
+is based on option positions of delta-hedgers at time t−τ as
+ΓIB
+j,t;τ =
+
+
+Nt
+t−τ∑
+o=1
+netOIo,t−1−τ× Γo(t− 1,Sclose
+j,t−1)×S15:30
+j,t ×Multo
+
+
+× Sclose
+j,t−1
+100 × 1
+ADVend
+j,t−1
+, (OA1)
+whereNt
+t−τ denotes the number of options contracts on stock j that are available at time
+t−τ and expire after t. The diﬀerence between Equation (OA1) and Equation (4) in
+the main paper is that Equation (OA1) uses the net open interest of likely delta-hedgers
+at time t−τ and sums over options expiring after t. However, both deﬁnitions use the
+gamma of option contracts at the previous trading day, t− 1. Hence, Equation (OA1)
+denotes the gamma imbalance at time t of old positions.
+Next, we deﬁne the gamma hedging pressure due to old positions as
+ΓHP
+j,t;τ = 100× ΓIB
+j,t;τ×rpre
+j,t. (OA2)
+We decompose ΓHP at time t into the part that is due to old positions existing at
+time t−τ, ΓHP
+j,t;τ, and the part due to new positions, Γ HP
+j,t;new, as follows
+ΓHP
+j,t = ΓHP
+j,t;τ− ΓHP
+j,t;new, (OA3)
+where ΓHP
+j,t;new = ΓHP
+j,t − ΓHP
+j,t;τ.
+11
+Finally, we run the following speciﬁcation where we control for ﬁxed eﬀects and other
+control variables,Xj,t,
+rend
+j,t =β0rpre
+j,t +β1ΓHP
+j,t;τ +β2ΓHP
+j,t;new +γ′Xj,t +FEj +FEt +ϵj,t. (OA4)
+We hypothesize that β1 is negative and statistically signiﬁcant. Table OA7.1 and
+Table OA7.2 show results with τ set to ﬁve and ten business days, respectively. Both
+tables conﬁrm our hypothesis.
+12
+Table OA7.1: Option Hedging Pressure based on 5-Business Day Old Positions
+The table summarizes the results of regressions of returns in the last half hour of a trading day on
+gamma hedging pressure based on ﬁve business day old positions Γ HP
+t;τ and hedging pressure based on
+new positions, ΓHP
+t;new, after controlling for returns until 15:30 (rpre), as in speciﬁcation Equation (OA4).
+IVt−1 denotes implied volatility at time t− 1. ˆRV
+end
+t denote the square root of predicted realized
+variance for the time period from 15:30 to 16:00. PCt−1 is the put-call-ratio and O/S$
+t−1 denotes the
+option-to-stock volume in dollar terms. T-statistics are in parentheses below and are computed using
+time-and-entity-clustered standard errors. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level.
+We include entity ﬁxed eﬀects in all speciﬁcations and value-weight observations. The sample period is
+January 2012 – December 2019.
+(1) (2) (3) (4) (5) (6)
+Dependent rend
+t rend
+t rend
+t rend
+t rend
+t rend
+t
+ΓHP
+t;τ -16.375*** -16.324*** -16.370*** -16.366*** -16.376*** -16.372***
+(-6.954) (-6.942) (-6.954) (-6.947) (-6.954) (-6.955)
+ΓHP
+t;new -1.107*** -1.117*** -1.110*** -1.124*** -1.107*** -1.104***
+(-2.601) (-2.638) (-2.611) (-2.664) (-2.600) (-2.590)
+rpre
+t -0.810*** -0.813*** -0.811*** -0.811*** -0.810*** -0.810***
+(-6.765) (-6.776) (-6.767) (-6.767) (-6.766) (-6.765)
+IVt−1 5.133***
+(4.964)
+ˆRV
+pre
+t 22.224
+(1.058)
+ˆRV
+end
+t 435.201***
+(2.795)
+PCt−1 0.064
+(0.299)
+O/S$
+t−1 283.201
+(0.899)
+Observations 1,015,379 1,015,379 1,015,333 1,015,333 1,014,433 1,015,375
+R2 (%) 0.341 0.363 0.342 0.351 0.341 0.341
+Entity FE Yes Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j] [t;j]
+13
+Table OA7.2: Option Hedging Pressure based on 10-Business Day Old Positions
+The table summarizes the results of regressions of returns in the last half hour of a trading day on
+gamma hedging pressure based on ten business day old positions Γ HP
+t;τ and hedging pressure based on
+new positions, ΓHP
+t;new, after controlling for returns until 15:30 (rpre), as in speciﬁcation Equation (OA4).
+IVt−1 denotes implied volatility at time t− 1. ˆRV
+end
+t denote the square root of predicted realized
+variance for the time period from 15:30 to 16:00. PCt−1 is the put-call-ratio and O/S$
+t−1 denotes the
+option-to-stock volume in dollar terms. T-statistics are in parentheses below and are computed using
+time-and-entity-clustered standard errors. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level.
+We include entity ﬁxed eﬀects in all speciﬁcations and value-weight observations. The sample period is
+January 2012 – December 2019.
+(1) (2) (3) (4) (5) (6)
+Dependent rend
+t rend
+t rend
+t rend
+t rend
+t rend
+t
+ΓHP
+t;τ -17.973*** -17.912*** -17.972*** -17.959*** -17.973*** -17.973***
+(-6.714) (-6.694) (-6.715) (-6.710) (-6.713) (-6.715)
+ΓHP
+t;new -1.234*** -1.244*** -1.237*** -1.251*** -1.234*** -1.231***
+(-2.777) (-2.814) (-2.787) (-2.839) (-2.776) (-2.765)
+rpre
+t -0.821*** -0.823*** -0.821*** -0.821*** -0.821*** -0.821***
+(-6.837) (-6.848) (-6.839) (-6.838) (-6.838) (-6.837)
+IVt−1 5.138***
+(4.969)
+ˆRV
+pre
+t 22.482
+(1.069)
+ˆRV
+end
+t 435.447***
+(2.791)
+PCt−1 0.064
+(0.302)
+O/S$
+t−1 287.581
+(0.910)
+Observations 1,015,379 1,015,379 1,015,333 1,015,333 1,014,433 1,015,375
+R2 (%) 0.332 0.354 0.334 0.343 0.332 0.333
+Entity FE Yes Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j] [t;j]
+14
+Appendix OA8. Scaled Returns as in Moskowitz et al.
+(2012)
+Instead of using simple returns and value-weighted observations, Moskowitz et al.
+(2012) propose the use of scaled returns, which expresses returns in terms of units of
+expected risk:
+ˆr = r
+σr
+, (OA5)
+whereσr is calculated using an exponentially-weighted moving average from the realized
+variance of using 5-minute squared returns from last close to 15:30. The half life is chosen
+to equal 60 days.
+As shown in Table OA8.1, scaling returns does not alter our results.
+Table OA8.1: Using Scaled Returns
+The table reports the results to regressing returns in the last half hour of a trading day on returns until
+15:30,rpre and gamma hedging pressure ΓHP , following Equation (9). The regression setup follows that
+of Table 2 but uses scaled returns. T-statistics in parentheses are derived from standard errors clustered
+by date and entity. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level. We include entity ﬁxed
+eﬀects and weight returns by the stock’s market capitalization. The sample period is January 2012 –
+December 2019.
+(1) (2) (3)
+Dependent rend
+t rend
+t rend
+t
+ΩLETF
+t 165.089*** 173.968***
+(4.936) (5.233)
+ΓHP
+t -29.157*** -34.042***
+(-3.501) (-4.167)
+rpre
+t -0.060*** -0.068*** -0.063***
+(-7.644) (-8.695) (-7.948)
+Observations 1,882,236 1,882,236 1,882,236
+R2 (%) 0.487 0.536 0.563
+Entity FE Yes Yes Yes
+Time FE Yes Yes Yes
+SEs [t;j] [t;j] [t;j]
+15
+Appendix OA9. Mechanical Flows
+Index versus Stock Speciﬁc Eﬀects
+While ΓHP rebalancing activity depends on the return of the underlying stock, the
+rebalancing amount for leveraged ETFs depends on the return of the benchmark index of
+the leveraged ETF. We exploit this unique structure of the rebalancing ﬂows from lever-
+aged ETFs, by conditioning on those stocks for which the return until hedging begins is
+near zero (below 10 basis points in absolute terms). Given that the impact of rebalancing
+ﬂows is mechanical, we still expect an eﬀect of Ω LETF in roughly the same magnitude as
+for the full sample. This approach allows us to investigate the impact of leveraged ETF
+rebalancing without being conﬂated by other intraday return phenomena (Heston et al.,
+2010; Lou et al., 2019; Bogousslavsky, 2020), or option rebalancing in the form of Γ HP .
+The results in Table OA9.1 conﬁrm our prior.
+Table OA9.1: Near Zero Returns of the Underlying Stock
+The table reports the results to regressing the returns in the last half hour of a trading day on the
+Leveraged ETF rebalancing quantity Ω LETF . We have included only stock-day observations for which
+the absolute return from the previous day’s close until 15:30 of stockj is below 10 basis points in absolute
+terms. T-statistics are in parentheses below and are computed using time-and-entity-clustered standard
+errors. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level. We include entity ﬁxed eﬀects in all
+speciﬁcations and value-weight observations. The sample period is January 2012 – December 2019.
+(1)
+Dependent rend
+t
+ΩLETF
+t 69.400***
+(4.961)
+rpre
+t -0.899
+(-0.434)
+Observations 120,913
+R2 (%) 0.119
+Entity FE Yes
+Time FE Yes
+SEs [t;j]
+16
+What is the role of news on fundamentals?
+To test that delta-hedging eﬀects are unrelated to fundamental news on the under-
+lying stock, we perform sample splits on earnings announcements and material news.
+Information on earnings announcement days is obtained from Compustat and I/B/E/S.
+Whenever the announcement date for the same stock diﬀers between Compustat and
+I/B/E/S, we follow Dellavigna and Pollet (2009) and use the earlier date. Compustat
+and I/B/E/S are matched to our CRSP data via the matching algorithms provided by
+WRDS. We use the Dow Jones version of Ravenpack News Analytics and its sentiment
+scores to identify days with signiﬁcant news for each underlying. We restrict our news
+sample to articles that are most relevant for a particular stock, i.e. a relevance score of
+100. Furthermore, we only include news that is highly positive (sentiment score above
+0.75) or highly negative (sentiment score below 0.25).
+We identify the two weeks centered around earnings announcements and the releases
+of material news as indicated by RavenPack for each stock in our sample. The estimated
+coeﬃcients for stocks with and without material news releases or earnings announcements
+in Table OA9.2 barely diﬀer, conﬁrming the mechanical nature of Γ HP -ﬂows.
+17
+Table OA9.2: Impact of Fundamental Information
+The table reports the results to regressing the returns in the last half hour of a trading day on returns until
+15:30,rpre, and gamma hedging pressure ΓHP . The regression results are reported for several subsamples
+where we focus on or exclude days with fundamental information, either earnings announcements (EA)
+or fundamental news releases identiﬁed by RavenPack. Speciﬁcation (1) uses the subsample for which
+Compustat and/or I/B/E/S do not report earnings announcements (EA). Speciﬁcation (2) excludes day-
+asset observations for which Compustat and/or I/B/E/S report earnings announcements. In speciﬁcation
+(3) we exclude asset-day observations for which RavenPack documents either at least one negative (score
+≥ 25) or one positive (score ≤ 75) news appearance, whereas speciﬁcation (4) includes only these
+observations. Whenever earnings announcements or fundamental news are released on day t for asset
+j, we exclude also a window of 5 trading days around t for asset j. t-statistics are in parentheses
+below. T-statistics are in parentheses below and are computed using time-and-entity-clustered standard
+errors. ***, **, * denotes signiﬁcance at the 1%, 5%, 10% level. We include entity ﬁxed eﬀects in all
+speciﬁcations and value-weight observations. The sample period is January 2012 – December 2019.
+(1) (2) (3) (4)
+Dependent rend
+t rend
+t rend
+t rend
+t
+ΓHP
+t -9.865*** -8.117* -10.551*** -8.671***
+(-5.557) (-1.879) (-6.635) (-2.780)
+rpre
+t -0.749*** -0.744*** -0.662*** -0.850***
+(-6.907) (-4.296) (-6.824) (-5.168)
+Observations 1,607,439 274,893 1,567,086 315,246
+R2 (%) 0.263 0.335 0.219 0.390
+Entity FE Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j]
+Subsample Excluding EA Only EA Excluding News Only News
+18
+Appendix OA10. Eﬀects Across Industries
+Investor attention for stocks in respective sectors changes over time. To compare how
+hedging pressure from the options market impacts end-of-day returns, we sort stocks into
+their respective industry following the classiﬁcation on Kenneth French’s website.
+Table OA10.1 displays results. ΓIB− and ΩLETF−eﬀects are present and statistically
+signiﬁcant in all industries.
+Table OA10.1: Eﬀects in Diﬀerent Industries
+The table reports the results to regressing returns in the last half hour of a trading day on re-
+turns until 15:30, rpre and gamma hedging pressure Γ HP , following Equation (9). The sample is
+split by the industry classiﬁcation based on SIC codes, following Kenneth French’s website, https:
+//mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html. T-statistics in paren-
+theses are derived from standard errors clustered by date and entity. ***, **, * denotes signiﬁcance
+at the 1%, 5%, 10% level. We include entity ﬁxed eﬀects and weight returns by the stock’s market
+capitalization. The sample period is January 2012 – December 2019.
+(1) (2) (3) (4) (5)
+Dependent rend
+t rend
+t rend
+t rend
+t rend
+t
+ΓHP
+t -8.777*** -6.822*** -6.919* -20.417*** -16.849***
+(-5.212) (-3.145) (-1.814) (-4.111) (-5.734)
+ΩLETF
+t 31.260*** 21.224*** 47.491*** 95.533*** 38.054***
+(6.586) (3.642) (8.304) (6.488) (4.318)
+rpre
+t -0.680*** -0.839*** -0.978*** -0.959*** -0.654***
+(-5.585) (-4.495) (-4.630) (-4.689) (-3.491)
+Observations 346,342 427,144 366,477 201,183 541,186
+R2 (%) 0.269 0.295 0.430 0.748 0.308
+Entity FE Yes Yes Yes Yes Yes
+Time FE Yes Yes Yes Yes Yes
+SEs [t;j] [t;j] [t;j] [t;j] [t;j]
+Industry Consumer Manuf.+Energy Business Health Other
+19
+References
+Andersen, T. G., Bondarenko, O., Gonzalez-Perez, M. T., 2015. Exploring return dynam-
+ics via corridor implied volatility. Review of Financial Studies 28, 2902–2945.
+Bogousslavsky, V., 2020. The Cross-Section of Intraday and Overnight Returns. Working
+paper.
+Dellavigna, S., Pollet, J. M., 2009. Investor Inattention and Friday Earnings Announce-
+ments. Journal of Finance 64, 709–749.
+Heston, S. L., Korajczyk, R. A., Sadka, R., 2010. Intraday patterns in the cross-section
+of stock returns. Journal of Finance 65, 1369–1407.
+Lou, D., Polk, C., Skouras, S., 2019. A tug of war: Overnight versus intraday expected
+returns. Journal of Financial Economics 134, 192–213.
+Moskowitz, T. J., Ooi, Y. H., Pedersen, L. H., 2012. Time series momentum. Journal of
+Financial Economics 104, 228 – 250, special Issue on Investor Sentiment.
+20

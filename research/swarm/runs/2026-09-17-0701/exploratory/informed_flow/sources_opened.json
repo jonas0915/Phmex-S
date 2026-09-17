@@ -1,0 +1,24 @@
+{
+ "lens": "informed_flow",
+ "run_id": "2026-09-17-0701",
+ "web_searches_run": 11,
+ "web_fetches_attempted": 14,
+ "sources_opened_with_numbers_read": [
+  {"url": "https://link.springer.com/article/10.1007/s10690-026-09589-z", "what_read": "Asia-Pacific Financial Markets 2026, 'Price Transmission from Bitcoin to Altcoins: High-Frequency Evidence'. 1-min Binance closes; Granger null 'BTC returns one minute prior do not improve ALT prediction' rejected at 5% for all pairs; small caps QKC/BIFI/CITY have higher corr at lag-1 min than lag-0; ISI-vs-trade-frequency corr 0.561 (bull), 0.483 (bear); windows Feb-Mar 2024, Jun-Jul 2024, Aug-Sep 2024, Jan-Mar 2025."},
+  {"url": "https://arxiv.org/html/2606.25466", "what_read": "1-minute log-returns Jan 2020 - Mar 2025, 275 weekly windows; Granger networks, BIC lag <= 10 (minutes); ETH top out-strength throughout, BTC declining; example link GXBT->ETH variance reduction 3.24%; no exploitability statement."},
+  {"url": "https://arxiv.org/abs/2308.15769", "what_read": "Hourly VAR on 261 cryptos in 2021; node degree vs market cap rho=0.193; structure concentrated in a small subset; no lead horizon in hours reported."},
+  {"url": "https://arxiv.org/html/2506.08718", "what_read": "Sep 2023 - Sep 2024; CEX (Binance) leads Uniswap for ETH; futures tend to lead spot; no numeric information shares in accessible text."},
+  {"url": "https://smusg.elsevierpure.com/en/publications/cross-cryptocurrency-return-predictability/", "what_read": "Guo, Sang, Tu, Wang (JEDC 2024) abstract: lagged returns of other coins predict focal coins on Binance data; long-short portfolio 'sizable' OOS after costs; no number in the accessible abstract (the 2.16%/day figure seen in a search snippet was NOT read on an opened page and is not cited)."}
+ ],
+ "sources_blocked_403_or_unreadable": [
+  "https://www.sciencedirect.com/science/article/abs/pii/S0165188924000551",
+  "https://www.sciencedirect.com/science/article/abs/pii/S0927539823000956",
+  "https://peerj.com/articles/cs-3810/",
+  "https://www.mdpi.com/1911-8074/19/9/692",
+  "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4983566",
+  "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3974583",
+  "https://www.researchgate.net/publication/380164431_Cross-cryptocurrency_Return_Predictability",
+  "https://arxiv.org/pdf/2308.15769 (binary PDF not parsed)"
+ ],
+ "web_budget_exhausted": false
+}

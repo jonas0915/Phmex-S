@@ -1,0 +1,87 @@
+/Users/jonaspenaso/Desktop/Phmex-S/research/swarm/runs/2026-09-17-0701/exploratory/cross_asset/probe_c_lagfail_events.py:29: UserWarning: Converting to PeriodArray/Index representation will drop timezone information.
+  print(g.assign(m=g.ts.dt.to_period("M")).groupby("m").f.agg(["count","mean"]))
+/Users/jonaspenaso/Desktop/Phmex-S/research/swarm/runs/2026-09-17-0701/exploratory/cross_asset/probe_c_lagfail_events.py:29: UserWarning: Converting to PeriodArray/Index representation will drop timezone information.
+  print(g.assign(m=g.ts.dt.to_period("M")).groupby("m").f.agg(["count","mean"]))
+baseline all bars 8h fwd: n=50684 mean=2.2 ci=(-0.4037802484271779, 5.038574400294859)
+lagfail_dn: n=506 mean=28.3 ci=(-19.26746845182451, 81.37481335277381) pos=0.484
+         count       mean
+m                        
+2026-06    354  15.526498
+2026-07    148  59.373242
+2026-08      4   3.443977
+          count        mean
+sym                        
+WIF           9 -243.284207
+LINK          3 -237.975196
+UNI          12 -197.210038
+GIGGLE       18 -176.849268
+RENDER       11 -137.297438
+DOGE         10 -127.066351
+XRP           7 -121.720548
+1000PEPE     11 -109.123623
+BICO          6 -108.336268
+TAO           7  -98.187083
+ARB          11  -97.002121
+SUI           9  -88.169901
+BNB          19  -46.263478
+HYPE         19  -39.479931
+XLM          17  -28.140861
+LTC          19  -26.538639
+INJ          20  -21.676448
+AVAX         13   -4.808355
+1000SHIB     13   -0.312670
+ENA          18    3.011487
+SOL          12    3.075863
+BCH          20   12.701571
+EIGEN        18   13.310588
+PUMP         16   22.214393
+ONDO         18   25.496611
+AAVE         16   47.437586
+ADA           9   52.535552
+DEXE         29   71.684375
+ZAMA         27   71.689614
+ZEC          19   84.741398
+LIT          24  199.974545
+WLD          13  233.926308
+ALLO         33  539.328704
+lagfail_up: n=462 mean=-68.5 ci=(-105.34352661982142, -30.730775511814304) pos=0.351
+         count        mean
+m                         
+2026-06    211 -130.795277
+2026-07    219  -14.354094
+2026-08     32  -27.956520
+          count        mean
+sym                        
+EIGEN        12 -282.136166
+ALLO         27 -212.195440
+RENDER       13 -207.181201
+ENA           9 -186.774255
+ADA          13 -162.252566
+GIGGLE       13 -139.683087
+SOL           5 -123.279201
+INJ          17 -116.476001
+WIF           6 -115.825713
+1000PEPE      6 -115.815738
+TAO          15 -110.295614
+XLM          20 -109.049877
+AVAX         10  -97.949766
+AAVE         17  -75.649697
+DOGE         11  -68.807138
+UNI          12  -66.415324
+HYPE         20  -64.763698
+BNB          14  -61.239610
+LIT          21  -59.713941
+LINK          8  -58.331204
+ONDO          9  -46.857760
+LTC          19  -46.430241
+XRP           9  -43.919455
+PUMP         16  -42.399726
+SUI           9  -29.349355
+ARB          10  -26.966754
+BCH          16  -26.475647
+ZEC          15  -25.841628
+1000SHIB     14  -12.514295
+ZAMA         19   -9.636940
+WLD          23    1.797044
+BICO          8  101.343840
+DEXE         26  173.912107

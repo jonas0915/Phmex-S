@@ -1,0 +1,55 @@
+{
+  "label": "EXPLORATORY \u2014 not evidence",
+  "dataset": "long_1h",
+  "era": "train",
+  "tp": 200.0,
+  "sl": 200.0,
+  "hold": 72,
+  "n": 151,
+  "fires_per_symbol": {
+    "1000PEPE": 12,
+    "1000SHIB": 7,
+    "AAVE": 9,
+    "ADA": 10,
+    "BNB": 9,
+    "BTC": 5,
+    "DOGE": 6,
+    "ETH": 8,
+    "GIGGLE": 8,
+    "LINK": 6,
+    "LTC": 9,
+    "NEAR": 8,
+    "ONDO": 7,
+    "SOL": 3,
+    "SUI": 10,
+    "TAO": 8,
+    "UNI": 13,
+    "XLM": 7,
+    "XRP": 6
+  },
+  "net_bps_mean": -9.511043916464331,
+  "ci95": [
+    -41.96357615894045,
+    21.612582781456943
+  ],
+  "wr": 0.5033112582781457,
+  "p_star": 0.52875,
+  "trades_per_week": 3.5243123089747153,
+  "time_to_verdict_weeks": 14.187164932198044,
+  "by_side": {
+    "-1": {
+      "n": 74,
+      "net": -60.148648648648724
+    },
+    "1": {
+      "n": 77,
+      "net": 39.153667124855716
+    }
+  },
+  "exit_reasons": {
+    "TP": 76,
+    "SL": 74,
+    "TIME": 1
+  },
+  "causality": "PASS"
+}

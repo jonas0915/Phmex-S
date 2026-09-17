@@ -1,0 +1,22 @@
+EXCLUDE (train span differs from BTC): ALLO 2026-06-01 00:00:00+00:00 2026-07-26 17:00:00+00:00
+EXCLUDE (train span differs from BTC): BICO 2026-06-01 00:00:00+00:00 2026-06-22 22:00:00+00:00
+EXCLUDE (train span differs from BTC): DEXE 2026-06-01 00:00:00+00:00 2026-07-16 07:00:00+00:00
+EXCLUDE (train span differs from BTC): EIGEN 2026-06-01 00:00:00+00:00 2026-07-21 14:00:00+00:00
+EXCLUDE (train span differs from BTC): GIGGLE 2026-06-01 00:00:00+00:00 2026-07-21 13:00:00+00:00
+EXCLUDE (train span differs from BTC): INJ 2026-06-01 00:00:00+00:00 2026-07-29 18:00:00+00:00
+EXCLUDE (train span differs from BTC): WIF 2026-06-01 00:00:00+00:00 2026-07-21 13:00:00+00:00
+EXCLUDE (train span differs from BTC): WLD 2026-06-01 00:00:00+00:00 2026-07-24 11:00:00+00:00
+EXCLUDE (train span differs from BTC): ZAMA 2026-06-01 00:00:00+00:00 2026-07-21 13:00:00+00:00
+universe 24 ['1000PEPE', '1000SHIB', 'AAVE', 'ADA', 'ARB', 'AVAX', 'BCH', 'BNB', 'DOGE', 'ENA', 'HYPE', 'LINK', 'LIT', 'LTC', 'ONDO', 'PUMP', 'RENDER', 'SOL', 'SUI', 'TAO', 'UNI', 'XLM', 'XRP', 'ZEC']
+n=415 net_mean=22.6 ci95=(9.585974486402067, 35.3959529797016) wr=0.614 p_star=0.5383 tpw=41.2 ttv_weeks=1.2
+exit_reason
+TP      218
+SL      133
+TIME     64
+Name: count, dtype: int64
+   count       mean
+m                  
+6    211  37.515943
+7    170   3.473721
+8     34  25.091580
+{'1000PEPE': True, '1000SHIB': True, 'AAVE': True, 'ADA': True, 'ARB': True, 'AVAX': True, 'BCH': True, 'BNB': True, 'DOGE': True, 'ENA': True, 'HYPE': True, 'LINK': True, 'LIT': True, 'LTC': True, 'ONDO': True, 'PUMP': True, 'RENDER': True, 'SOL': True, 'SUI': True, 'TAO': True, 'UNI': True, 'XLM': True, 'XRP': True, 'ZEC': True}

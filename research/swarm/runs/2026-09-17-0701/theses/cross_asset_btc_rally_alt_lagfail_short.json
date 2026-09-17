@@ -1,0 +1,76 @@
+{
+  "id": "cross_asset_btc_rally_alt_lagfail_short",
+  "lens": "cross_asset",
+  "mechanism": "BTC-led rally that alts fail to follow = BTC-only flow (spot-ETF / treasury-company bid) plus rotation OUT of alts, not pending transmission. Kurihara & Matsumoto (Asia-Pacific Financial Markets, 2026) show on 1-minute Binance data that BTC->alt price transmission is unidirectional (Granger causality rejected at 5% for every pair) and completes within one minute even for small caps (lag-1 correlation comparable to lag-0; large caps react immediately). So when BTC has risen >100 bps over the last 4 closed 1h bars and the alt has captured less than half of that, the shortfall is not a lag to be closed - it is information that the marginal buyer is BTC-only and alt holders are the sellers. The alt keeps underperforming over the next 8h: relative-weakness continuation, the opposite sign of the alt-vs-ETH convergence bet in DEAD row 2.",
+  "counterparty": "Levered alt perp longs who buy the alt into a BTC-led rally expecting beta catch-up (the 'alt rotation' narrative the Block Scholes/Bybit report documents as still absent with BTC dominance near 60%). When the catch-up does not arrive within 4h they are underwater at leverage; their exits over the following hours (stop-outs, liquidations, taker selling into a BTC-only bid) are the flow that pays a resting maker short. They are forced to pay by leverage and by the absence of the counter-flow they were positioned for.",
+  "prediction": "On the mr_edge 1h train era, shorting an alt at the next open when BTC's 4-bar log return > +100 bps and the alt's 4-bar log return < 0.5x BTC's, with TP 150 / SL 150 bps and max hold 8 bars, yields net_bps_mean > 0 with bootstrap CI95 excluding 0, WR >= fee_math.p_star(150) = 0.5383, and n >= 30. Falsified if the CI95 includes 0, if WR < p*, or if TIME exits carry positive gross (which would mean the laggard catches up rather than continues down).",
+  "nearest_dead_rows": [
+    {
+      "row": 2,
+      "why_different": "Row 2 bet on CONVERGENCE (buy the alt that lagged ETH, expecting reversion). This thesis bets the opposite sign - the laggard keeps lagging - because the 2026 transmission evidence says liquid alts absorb BTC moves within minutes, so a 4h shortfall is rotation, not a gap to close."
+    },
+    {
+      "row": 5,
+      "why_different": "Row 5 was a market-neutral cross-sectional momentum BASKET needing 100+ names; this is a single-name event short conditioned on a BTC move, no long leg, no ranking, compatible with 2 paper slots."
+    },
+    {
+      "row": 6,
+      "why_different": "Row 6 faded high-vol bars expecting reversion; this thesis is continuation of a relative move and only fires on the alt that did NOT move, so it is not a fade of the alt's own volatility."
+    },
+    {
+      "row": 8,
+      "why_different": "Row 8 was pairs/cointegration (long one, short the other, spread reverts). Here there is no BTC leg and no reversion premise; BTC is only the conditioning event."
+    },
+    {
+      "row": 13,
+      "why_different": "Row 13 was BTC time-series momentum on BTC itself over 28 days; this never trades BTC and uses the BTC move only as the event, at a 4h/8h horizon."
+    },
+    {
+      "row": 82,
+      "why_different": "Row 82 was a funding-settlement time-of-day volatility gate with taker entries; this has no time-of-day component and no funding trigger, fires on a cross-asset relative move, and is maker-entered per screen.simulate."
+    }
+  ],
+  "source_urls": [
+    "https://link.springer.com/article/10.1007/s10690-026-09589-z",
+    "https://research-information.bris.ac.uk/en/publications/cross-cryptocurrency-return-predictability/",
+    "https://www.blockscholes.com/research/bybit-x-block-scholes-the-altcoin-rotation-why-and-when-altcoins-outperform-bitcoin"
+  ],
+  "evidence": "Kurihara & Matsumoto, 'Price Transmission from Bitcoin to Altcoins: High-Frequency Evidence and Implications for Trading Strategy', Asia-Pacific Financial Markets (2026), https://link.springer.com/article/10.1007/s10690-026-09589-z (opened): 1-minute Binance closes, four regimes (Bull Feb 25-Mar 25 2024, Bear Jun 22-Jul 19 2024, Sideways Aug 24-Sep 24 2024, Crash Jan 30-Mar 1 2025); Granger causality BTC->alt 'rejected at the 5% significance level for all pairs' (unidirectional); small caps show lag-1 correlation 'comparable to those at lag0' (one-minute delay) while large caps react immediately; trade-count vs responsiveness correlation 0.561 in the Bull regime; VAR lag-1 coefficients >= 0.1 for PIVX/QKC; lag strategy outperformed buy-and-hold for small caps net of 0.02% fees. Guo, Sang, Tu & Wang, 'Cross-cryptocurrency return predictability', JEDC vol. 163 (2024), https://research-information.bris.ac.uk/en/publications/cross-cryptocurrency-return-predictability/ (opened, abstract only): lagged returns of other coins predict focal coins; mechanism 'common shocks ... coupled with the limited attention of investors lead to slow information diffusion across coins'; a long-short portfolio 'can generate a sizable return out-of-sample after accounting for transaction costs' (no magnitude on the page). Block Scholes x Bybit, 'The Altcoin Rotation' (opened): BTC dominance 'still close to the 60% mark', 'well past' the ~230-days-post-halving point where dominance historically fell - i.e. the BTC-led regime persists. Exploratory (NOT evidence) train probes: research/swarm/runs/2026-09-17-0701/exploratory/cross_asset/probe_c_lagfail_events.out (event 8h forward mean -68.5 bps, CI (-105.3, -30.7), n=462, vs all-bar baseline +2.2) and probe_d_sim.out (draft sim n=415, net +22.6 bps, CI (9.6, 35.4), WR 0.614, June +37.5 / July +3.5 / Aug +25.1).",
+  "spec": {
+    "dataset": "mr_edge",
+    "universe": [
+      "1000PEPE",
+      "1000SHIB",
+      "AAVE",
+      "ADA",
+      "ARB",
+      "AVAX",
+      "BCH",
+      "BNB",
+      "DOGE",
+      "ENA",
+      "HYPE",
+      "LINK",
+      "LIT",
+      "LTC",
+      "ONDO",
+      "PUMP",
+      "RENDER",
+      "SOL",
+      "SUI",
+      "TAO",
+      "UNI",
+      "XLM",
+      "XRP",
+      "ZEC"
+    ],
+    "timeframe": "1h",
+    "tp_bps": 150,
+    "sl_bps": 150,
+    "max_hold_bars": 8,
+    "expected_trades_per_week": 40,
+    "doa_line": "DEAD if the train-era screen out.json shows ci95 including 0, or wr < p_star, or n < 30; in paper, DEAD when the first 50 fills have net mean bps <= 0 or the running CI95 upper bound < 0."
+  },
+  "signal_py": "import numpy as np\nimport pandas as pd\nfrom research.swarm.lib import load_data as ld\n\nBTC_THR_BPS = 100.0   # BTC 4-bar log return must exceed this (a BTC-led rally)\nCAPTURE = 0.5         # alt captured less than this fraction of the BTC move -> failed catch-up\nLAG = 4               # bars (1h dataset)\n\n\ndef _btc_close(df):\n    bt = ld.load_ohlcv(\"BTC\", \"1h\", era=\"train\", dataset=\"mr_edge\")[\"close\"]\n    if df.index.max() > bt.index.max():\n        # df carries rows past the train boundary: only the build stage's single registered\n        # holdout read can hand such a frame in; reuse the committee token there so the same\n        # BTC bars exist for those rows. Never reached in a train-era screen.\n        bt = ld.load_ohlcv(\"BTC\", \"1h\", era=\"all\", dataset=\"mr_edge\", token=ld.COMMITTEE_TOKEN)[\"close\"]\n    return bt.reindex(df.index)\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    b = _btc_close(df)\n    c = df[\"close\"]\n    b_ret = np.log(b / b.shift(LAG)) * 1e4\n    a_ret = np.log(c / c.shift(LAG)) * 1e4\n    fire = (b_ret > BTC_THR_BPS) & (a_ret < CAPTURE * b_ret)\n    fire = fire & b.notna() & b.shift(LAG).notna()\n    out = pd.Series(0, index=df.index, dtype=int)\n    out[fire.fillna(False)] = -1\n    return out\n",
+  "thesis_path": "research/swarm/runs/2026-09-17-0701/theses/cross_asset_btc_rally_alt_lagfail_short.json"
+}

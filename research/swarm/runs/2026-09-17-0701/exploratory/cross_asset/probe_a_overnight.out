@@ -1,0 +1,33 @@
+train span 2025-07-07 21:00:00+00:00 2026-04-21 21:00:00+00:00
+BTC all nights overnight: n=289 mean_gross_bps=-3.4 ci95=(-21.04106320442764, 15.932681426208749) net_mean=-14.9 pos_frac=0.491
+BTC all days intraday15-21: n=289 mean_gross_bps=-1.6 ci95=(-19.490165628661856, 15.790646538425474) net_mean=-13.1 pos_frac=0.509
+BTC Mon-Thu nights: n=166 mean_gross_bps=-17.2 ci95=(-44.28716884698592, 10.124174402514393) net_mean=-28.7 pos_frac=0.428
+BTC Fri-Sun nights: n=123 mean_gross_bps=15.3 ci95=(-10.895083230543829, 39.690470613805395) net_mean=3.8 pos_frac=0.577
+BTC at 10d high nights: n=5 mean_gross_bps=31.1 ci95=(-76.52392468103031, 138.70996469039022) net_mean=19.6 pos_frac=0.600
+BTC at 10d high Mon-Thu: n=4 mean_gross_bps=19.4 ci95=(-115.12500971393558, 153.9173520003401) net_mean=7.9 pos_frac=0.500
+ETH all nights overnight: n=289 mean_gross_bps=4.7 ci95=(-22.670790635560927, 33.78448882309892) net_mean=-6.8 pos_frac=0.502
+ETH all days intraday15-21: n=289 mean_gross_bps=5.5 ci95=(-22.14978606594673, 32.546564107275856) net_mean=-6.0 pos_frac=0.540
+ETH Mon-Thu nights: n=166 mean_gross_bps=-4.5 ci95=(-44.409875971974685, 34.91335515565832) net_mean=-16.0 pos_frac=0.470
+ETH Fri-Sun nights: n=123 mean_gross_bps=17.1 ci95=(-20.996771630555003, 55.0069536751373) net_mean=5.6 pos_frac=0.545
+ETH at 10d high nights: n=6 mean_gross_bps=8.3 ci95=(-166.26376844447935, 223.53096166917268) net_mean=-3.2 pos_frac=0.500
+ETH at 10d high Mon-Thu: n=5 mean_gross_bps=64.9 ci95=(-114.68858304899189, 285.0752384587687) net_mean=53.4 pos_frac=0.600
+SOL all nights overnight: n=289 mean_gross_bps=-2.6 ci95=(-30.617524047451603, 28.039318240014165) net_mean=-14.1 pos_frac=0.484
+SOL all days intraday15-21: n=289 mean_gross_bps=-5.3 ci95=(-37.69313355235694, 25.89917701618642) net_mean=-16.8 pos_frac=0.495
+SOL Mon-Thu nights: n=166 mean_gross_bps=-7.0 ci95=(-49.525517650323096, 36.03865052796954) net_mean=-18.5 pos_frac=0.440
+SOL Fri-Sun nights: n=123 mean_gross_bps=3.4 ci95=(-37.456251885811, 44.208059095607865) net_mean=-8.1 pos_frac=0.545
+SOL at 10d high nights: n=8 mean_gross_bps=-22.7 ci95=(-167.23154717897384, 168.64835278699) net_mean=-34.2 pos_frac=0.375
+SOL at 10d high Mon-Thu: n=7 mean_gross_bps=-18.9 ci95=(-179.60163806118538, 185.7955622849422) net_mean=-30.4 pos_frac=0.429
+XRP all nights overnight: n=289 mean_gross_bps=2.9 ci95=(-27.840061837529912, 36.32150066177901) net_mean=-8.6 pos_frac=0.484
+XRP all days intraday15-21: n=289 mean_gross_bps=-11.8 ci95=(-43.64121975384439, 16.704628718599455) net_mean=-23.3 pos_frac=0.484
+XRP Mon-Thu nights: n=166 mean_gross_bps=-19.8 ci95=(-63.65995077629864, 29.88047162052438) net_mean=-31.3 pos_frac=0.458
+XRP Fri-Sun nights: n=123 mean_gross_bps=33.5 ci95=(-7.702705628675681, 79.24544418687854) net_mean=22.0 pos_frac=0.520
+XRP at 10d high nights: n=6 mean_gross_bps=322.0 ci95=(76.05186000055089, 634.8079468464979) net_mean=310.5 pos_frac=0.667
+XRP at 10d high Mon-Thu: n=5 mean_gross_bps=398.3 ci95=(116.54803680656035, 705.1996499943577) net_mean=386.8 pos_frac=0.800
+DOGE all nights overnight: n=289 mean_gross_bps=-18.6 ci95=(-51.486436036654666, 19.349279547433547) net_mean=-30.1 pos_frac=0.453
+DOGE all days intraday15-21: n=289 mean_gross_bps=7.5 ci95=(-27.71162384613138, 39.38851380825374) net_mean=-4.0 pos_frac=0.536
+DOGE Mon-Thu nights: n=166 mean_gross_bps=-30.5 ci95=(-79.02783997664577, 19.885325993230207) net_mean=-42.0 pos_frac=0.416
+DOGE Fri-Sun nights: n=123 mean_gross_bps=-2.5 ci95=(-51.86746658241484, 46.34885284209946) net_mean=-14.0 pos_frac=0.504
+DOGE at 10d high nights: n=8 mean_gross_bps=-0.8 ci95=(-235.80354893982096, 236.7987300196271) net_mean=-12.3 pos_frac=0.500
+DOGE at 10d high Mon-Thu: n=6 mean_gross_bps=27.6 ci95=(-279.84852821925057, 319.3147798888309) net_mean=16.1 pos_frac=0.500
+ALL syms all nights: n=1445 mean_gross_bps=-3.4 ci95=(-17.136616333531542, 9.611141217207837) net_mean=-14.9 pos_frac=0.483
+ALL syms at_hi: n=33 mean_gross_bps=59.1 ci95=(-45.61451661465933, 170.4361148955061) net_mean=47.6 pos_frac=0.515

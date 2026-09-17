@@ -1,0 +1,20 @@
+train span 2026-06-01 00:00:00+00:00 2026-08-10 11:00:00+00:00
+pooled rows 49529
+lagBTC L=1h -> alt fwd K=1h: beta_btc=-0.0938 t=-7.27 | beta_own=-0.0050 t=-0.95
+lagBTC L=1h -> alt fwd K=4h: beta_btc=-0.2512 t=-10.01 | beta_own=-0.0277 t=-2.72
+lagBTC L=1h -> alt fwd K=8h: beta_btc=-0.4614 t=-13.23 | beta_own=0.0530 t=3.74
+lagBTC L=1h -> alt fwd K=24h: beta_btc=-0.2802 t=-4.54 | beta_own=0.0369 t=1.48
+lagBTC L=4h -> alt fwd K=1h: beta_btc=-0.0735 t=-10.95 | beta_own=-0.0076 t=-2.94
+lagBTC L=4h -> alt fwd K=4h: beta_btc=-0.2323 t=-17.80 | beta_own=0.0087 t=1.71
+lagBTC L=4h -> alt fwd K=8h: beta_btc=-0.3038 t=-16.73 | beta_own=0.0424 t=6.03
+lagBTC L=4h -> alt fwd K=24h: beta_btc=-0.1786 t=-5.56 | beta_own=0.0444 t=3.57
+lagBTC L=24h -> alt fwd K=1h: beta_btc=-0.0128 t=-4.47 | beta_own=0.0005 t=0.44
+lagBTC L=24h -> alt fwd K=4h: beta_btc=-0.0229 t=-4.10 | beta_own=0.0029 t=1.44
+lagBTC L=24h -> alt fwd K=8h: beta_btc=0.0112 t=1.44 | beta_own=0.0025 t=0.88
+lagBTC L=24h -> alt fwd K=24h: beta_btc=0.2781 t=20.35 | beta_own=-0.0259 t=-5.25
+L=1 K=4 thr=66bps  late-up n=454 mean=-38.2 ci=(-64.6779916030175, -13.026452623242124)  late-dn n=377 mean=16.7 ci=(-22.287123285916824, 55.889436330765065)
+L=4 K=8 thr=138bps  late-up n=421 mean=-113.3 ci=(-149.25519311048134, -78.43770904219402)  late-dn n=506 mean=-18.8 ci=(-70.08713332716948, 30.646544400103767)
+L=4 K=24 thr=138bps  late-up n=421 mean=-162.7 ci=(-240.6717897899025, -85.87251258499927)  late-dn n=506 mean=-54.3 ci=(-151.97754195732523, 43.33413736247312)
+L=24 K=24 thr=319bps  late-up n=298 mean=171.6 ci=(103.17472506903111, 242.11857773528556)  late-dn n=887 mean=-72.0 ci=(-154.4488796835125, 12.463400870919992)
+ETHBTC L=24 K=8 thr=149bps ratio-up n=6097 mean=-12.9 ci=(-20.989030910261604, -5.432609278659333) ratio-dn n=3796 mean=-28.4 ci=(-43.16278287348364, -14.000694053211708)
+ETHBTC L=24 K=24 thr=149bps ratio-up n=6097 mean=-16.0 ci=(-29.32228745920841, -2.2083229893355982) ratio-dn n=3796 mean=-38.3 ci=(-63.8646928114535, -10.382730201046444)

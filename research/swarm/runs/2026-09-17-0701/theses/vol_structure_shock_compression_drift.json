@@ -1,0 +1,73 @@
+{
+  "id": "vol_structure_shock_compression_drift",
+  "lens": "vol_structure",
+  "mechanism": "Compression-to-expansion at the daily horizon with a named short-gamma counterparty. While realised vol sits in the bottom tercile of its 30-day history, the market is in the pinned regime that Glassnode's flow-based GEX work attributes to option dealers being net LONG gamma around the strike cluster (they sell rallies and buy dips, so moves fade and RV prints below IV). A single closed 1h bar whose move is >= 4x the pre-shock 72-bar hourly vol AND that closes outside the 72-bar (3-day) range takes spot out of that cluster; beyond it dealer net gamma flips negative (Glassnode: dealers 'must buy as prices rise and sell as prices fall ... pro-cyclical trading adds fuel to the fire'), and perp market makers who absorbed the shock bar are left with inventory against the move that they unwind by hitting in the shock direction. Both flows are price-insensitive and continue for hours-to-days rather than minutes, which is the horizon the 5-min poller can actually execute (entry at the next 1h open, hold up to 48 bars = 2 days). The thesis is continuation of the shock direction to a 200 bps target before a 200 bps stop.",
+  "counterparty": "(1) Deribit BTC/ETH option dealers whose long-gamma inventory pinned the range: once spot exits the strike cluster their book is net short gamma and they are forced to re-hedge pro-cyclically (buy after up moves, sell after down moves) regardless of price; alts follow via beta/arb to the BTC/ETH hedging flow. (2) Perp market makers who provided liquidity into the shock bar and now carry inventory against the move; they are forced to unwind in the shock direction to cut inventory risk when realised vol jumps. Both pay because they are risk-limited and vol-limited, not because they have a view.",
+  "prediction": "Falsifiable on the long_1h train screen: entering in the direction of a shock-out-of-compression 1h close at the next bar's open with TP 200 bps / SL 200 bps / max hold 48 bars yields net_bps_mean > 0 after c = 11.5 bps with the bootstrap_ci.mean_ci CI95 excluding 0, observed WR >= p*(200 bps) = 0.52875 (research/swarm/runs/2026-09-17-0701/exploratory/vol_structure/lib_numbers.txt), and n >= 30. If the account's dead-row finding that post-shock behaviour is neither reversion nor exploitable continuation holds, net_bps_mean will be within a CI that includes 0 and the thesis dies. DISCLOSED: the exploratory probe at exactly this geometry on the same train era (research/swarm/runs/2026-09-17-0701/exploratory/vol_structure/probe_shock_drift_out_200_200_48.json) already reads n=262, net_bps_mean +9.75 bps, CI95 [-14.62, +33.39] (includes 0), WR 0.5534 (> p*), 6.12 trades/week; the registered screen is expected to reproduce these numbers, i.e. to FAIL viable #1 unless the screen differs from the probe.",
+  "nearest_dead_rows": [
+    {
+      "row": 6,
+      "why_different": "Row 6 killed FADING liquidation/high-vol bars because 'high-vol bars CONTINUE, don't revert'. This thesis bets WITH the continuation the row observed, and its counterparty is not the liquidated account but the short-gamma dealer / inventory-laden market maker who must chase after the shock. Row 6 never tested continuation as a trade."
+    },
+    {
+      "row": 3,
+      "why_different": "Row 3 is a 1h vol-expansion FADE (reversion); this is the opposite side, conditioned on the expansion emerging from a compressed (dealer-long-gamma) regime and breaking the 3-day range, with a named forced-hedger counterparty."
+    },
+    {
+      "row": 78,
+      "why_different": "Row 78 (1h Bollinger-squeeze breakout) was refuted for having no backtest with slippage/drift and a partial-TP structure, not on a mechanism verdict; it named no counterparty. This thesis names the option-dealer gamma flip and MM inventory unwind, uses the desk's simulator with c = 11.5 bps and a single TP/SL, and requires a >= 4-sigma single-bar shock, not a band-width squeeze indicator."
+    },
+    {
+      "row": 82,
+      "why_different": "Row 82 was a funding-SETTLEMENT time-of-day gate with taker entries (relabel of rows 7/49/67). This thesis has no clock/time-of-day component and uses the bot's maker-entry cost model; the trigger is a vol-regime transition on price, not a calendar stamp."
+    },
+    {
+      "row": 33,
+      "why_different": "Row 33 is the BTC/ETH Donchian trend-ensemble book the owner declined live; it is a slow channel-breakout trend follower held for days-weeks. This is a single-bar shock event trade (>= 4x hourly vol) with a fixed 200 bps bracket and 48-bar hold, on 19 symbols, and is not re-offering that book."
+    },
+    {
+      "row": 13,
+      "why_different": "Row 13 is daily BTC time-series momentum (28,5 lookback) that failed deflation; this thesis is not a rolling-return momentum signal but an event trigger conditioned on vol compression and a 4-sigma bar."
+    }
+  ],
+  "source_urls": [
+    "https://research.glassnode.com/gamma-exposure-heatmap/",
+    "https://www.coindesk.com/markets/2026/08/25/a-massive-usd6-4-billion-bitcoin-options-expiry-on-friday-could-amplify-volatility",
+    "https://cryptoslate.com/bitcoins-2-24-billion-friday-options-expiry-teased-a-reversal-then-gave-it-back-within-hours/",
+    "https://blog.amberdata.io/bitcoin-consolidates-below-90k-as-volatility-compresses",
+    "https://research.glassnode.com/gamma-exposure/"
+  ],
+  "evidence": "Opened this run via WebFetch. (a) Glassnode 'Tracking Volatility Regimes: Gamma Exposure Heatmap' (https://research.glassnode.com/gamma-exposure-heatmap/): in negative-gamma regimes dealers 'must buy as prices rise and sell as prices fall. This pro-cyclical trading adds fuel to the fire, turning small moves into liquidity cascades'; positive-GEX regimes give 'rangy' price action and lower realised vol; cites Aug-Nov 2025 predominantly negative GEX with BTC 120k -> ~80k and Dec 2025-Jan 2026 positive GEX with consolidation around 85k. The page gives NO quantified RV difference \u2014 this is a mechanism source, not a statistic. (b) CoinDesk 2026-08-25 (https://www.coindesk.com/markets/2026/08/25/...): $6.44B BTC options (81,700 contracts, P/C 0.83, max pain $68,000, spot $76,600.57) expiring 08:00 UTC; BTC $62,000 -> $80,000 in one week; Deribit CRO Shaun Fernando: DVOL up 30% relative in the week, term structure flipped backwardation -> contango, and 'over half a billion in notional sits within a 5% move of current price, which should result in increased gamma hedging' that can 'accelerate moves through them'. (c) CryptoSlate 2026-09-11 (https://cryptoslate.com/...): summarises the Finance Research Letters study 'Bitcoin option expiration, gamma exposure, and intraday price reversals' \u2014 1,059 Deribit expiry days Jan 2021-Dec 2023, five-minute returns, BTC falls in the hour before 08:00 UTC expiry and reverses over the following two hours when ATM OI is in the top decile, strongest when the reconstructed cumulative gamma proxy is negative; the 2026-09-11 event itself moved only -0.16%/-0.18% pre-expiry and +0.19%/+0.21% in the first hour. This confirms dealer gamma hedging moves BTC spot measurably, but its effect size (~20 bps, needing 5-min timing) is fee-trapped for this bot, so the thesis targets the multi-hour continuation regime instead. The paper itself (ScienceDirect S1544612326008688) returned HTTP 403 and was NOT read. (d) Amberdata 2026-01-06 (https://blog.amberdata.io/...): BTC 7-day RV 27.3% vs 90-day median 39.2% (normal band 34.8-43.3%), ETH 7d RV 32.8% vs median 60.4%; states compression 'historically precedes sharp directional moves' without a magnitude. (e) Glassnode 'Taker-Flow-Based Gamma Exposure' (https://research.glassnode.com/gamma-exposure/): positive GEX -> 'moves fade, breakouts struggle, realized volatility often comes in below implied'; negative GEX -> 'intraday swings can expand'; no numbers. EXPLORATORY (not evidence): probe files under research/swarm/runs/2026-09-17-0701/exploratory/vol_structure/ \u2014 probe_shock_drift_out_200_200_48.json: n=262, net_bps_mean +9.748, CI95 [-14.622, 33.387], WR 0.5534, 6.115 trades/wk, time_to_verdict 8.18 wks, causality PASS on all 19 symbols; probe_shock_drift_out_300_300_72.json: n=262, net +8.10, CI95 [-27.17, 42.71], WR 0.5229. Both CIs include 0.",
+  "spec": {
+    "dataset": "long_1h",
+    "universe": [
+      "1000PEPE",
+      "1000SHIB",
+      "AAVE",
+      "ADA",
+      "BNB",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "GIGGLE",
+      "LINK",
+      "LTC",
+      "NEAR",
+      "ONDO",
+      "SOL",
+      "SUI",
+      "TAO",
+      "UNI",
+      "XLM",
+      "XRP"
+    ],
+    "timeframe": "1h",
+    "tp_bps": 200,
+    "sl_bps": 200,
+    "max_hold_bars": 48,
+    "expected_trades_per_week": 6.0,
+    "doa_line": "Dead on arrival if the train-era long_1h screen at TP 200 / SL 200 / hold 48 shows n < 30, or net_bps_mean <= 0 after c, or a bootstrap_ci.mean_ci CI95 of net bps that includes 0, or observed WR < fee_math.p_star(200) = 0.52875 \u2014 the exploratory probe already reads a CI that includes 0, so the screen is expected to trigger this line."
+  },
+  "signal_py": "import pandas as pd\nimport numpy as np\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Shock-out-of-compression drift (closed 1h bars only).\n\n    Compression: the 72-bar realised vol measured on the bar BEFORE the shock bar is at\n    or below the 33rd percentile of its trailing 720-bar history. Shock: the closed bar's\n    absolute log return is >= 4x that pre-shock 72-bar vol AND the bar's close also\n    breaks the pre-shock 72-bar high/low (so the move leaves the pinned range). Fire in\n    the direction of the shock. Re-arm only after 48 bars have passed since the last\n    fire. Only current-and-prior bars are used.\n    \"\"\"\n    c = df[\"close\"].astype(float)\n    h = df[\"high\"].astype(float)\n    l = df[\"low\"].astype(float)\n    r = np.log(c).diff()\n    rv72 = r.rolling(72, min_periods=72).std()\n    rv_q = rv72.rolling(720, min_periods=360).quantile(0.33)\n    rv_prev = rv72.shift(1)\n    compressed = (rv_prev <= rv_q.shift(1))\n    hi_prev = h.rolling(72, min_periods=72).max().shift(1)\n    lo_prev = l.rolling(72, min_periods=72).min().shift(1)\n    shock_up = compressed & (r >= 4.0 * rv_prev) & (c > hi_prev)\n    shock_dn = compressed & (r <= -4.0 * rv_prev) & (c < lo_prev)\n    raw = np.where(shock_up.fillna(False), 1, np.where(shock_dn.fillna(False), -1, 0))\n    out = np.zeros(len(df), dtype=np.int64)\n    last = -10**9\n    for i in range(len(df)):\n        if raw[i] != 0 and i - last >= 48:\n            out[i] = raw[i]\n            last = i\n    return pd.Series(out, index=df.index)\n",
+  "thesis_path": "research/swarm/runs/2026-09-17-0701/theses/vol_structure_shock_compression_drift.json"
+}

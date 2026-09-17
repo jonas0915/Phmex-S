@@ -1,0 +1,62 @@
+symbols ['1000PEPE', 'AAVE', 'ADA', 'ALLO', 'ARB', 'AVAX', 'BCH', 'BNB', 'BTC', 'DOGE', 'EIGEN', 'ETH', 'HYPE', 'INJ', 'ONDO', 'SOL', 'TAO', 'WIF', 'WLD', 'XLM', 'XRP', 'ZEC'] BTC range 2026-05-20 03:50:00+00:00 2026-07-04 03:40:00+00:00 12959
+
+TEST1 BTC 5m return -> alt NEXT-bar open-to-close (bps), top-decile |BTC ret| threshold ~ 21.3 bps
+     alt  corr(BTC_t,alt_oc_t+1)  n_big(top10%|BTCret|)  mean_signed_next_oc_bps  se_bps
+1000PEPE                  0.0314                   1296                     2.88    1.09
+    AAVE                  0.0074                   1296                     2.04    1.13
+     ADA                  0.0139                   1296                     0.64    1.05
+    ALLO                  0.0132                   1296                     1.96    2.87
+     ARB                  0.0327                   1296                     2.72    1.16
+    AVAX                  0.0265                   1296                     1.79    1.00
+     BCH                  0.0267                   1296                     2.72    1.06
+     BNB                  0.0056                   1296                     0.45    0.67
+    DOGE                  0.0265                   1296                     1.76    0.88
+   EIGEN                  0.0074                   1296                     2.20    1.60
+     ETH                 -0.0034                   1296                     0.14    0.86
+    HYPE                  0.0179                   1296                     0.86    1.17
+     INJ                  0.0052                   1296                     2.50    1.45
+    ONDO                  0.0074                   1296                     1.85    1.44
+     SOL                  0.0146                   1296                     0.78    0.97
+     TAO                  0.0165                   1296                     2.85    1.18
+     WIF                  0.0229                   1296                     2.98    1.35
+     WLD                 -0.0131                   1296                     0.47    2.08
+     XLM                  0.0169                   1296                     1.14    1.25
+     XRP                  0.0184                   1296                     0.85    0.81
+     ZEC                  0.0055                   1296                     2.40    2.40
+pooled signed next-bar alt OC: mean 1.71 bps, se 0.31, n 27216, hit-rate 0.475
+
+TEST2 pooled alt 5m log-return by minutes-since-funding-stamp (bar START time; bar 475 = last bar before stamp, bar 0 = first bar after)
+     mean_bps     n    se
+m                        
+455      0.94  2835  0.70
+460     -1.02  2835  0.93
+465     -4.13  2835  0.82
+470     -1.08  2835  0.69
+475      2.91  2835  0.69
+0        0.57  2835  0.79
+5        1.98  2835  0.79
+10       1.53  2835  0.77
+15      -3.70  2835  0.78
+20      -3.04  2835  0.85
+25       1.25  2835  0.71
+all-bar mean -0.003 bps, se 0.077
+BTC only:
+     mean  count
+m               
+465 -1.07    135
+470 -0.20    135
+475  0.70    135
+0   -0.20    135
+5    1.16    135
+10   0.98    135
+
+TEST3 pooled alt 5m return: bars starting at :00/:15/:30/:45 (True) vs other (False)
+       mean_bps       n     se
+q                             
+False     0.278  181419  0.091
+True     -0.565   90699  0.141
+     mean  count
+o               
+0  -0.565  90699
+5   0.100  90699
+10  0.456  90720

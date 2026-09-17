@@ -1,0 +1,19 @@
+{
+ "lens": "session_calendar",
+ "verdict": "NO THESIS SUBMITTED - all three exploratory probes on long_1h TRAIN were null or negative for the externally sourced direction",
+ "holdout_touched": false,
+ "mr_edge_touched": false,
+ "sources_opened": [
+  {"url": "https://concretumgroup.com/seasonality-in-bitcoin-intraday-trend-trading/", "reports": "HF trend-following ensemble (2018-2025, 20% vol target) Sharpe ~1.6 vs long-only ~0.8; strongly positive returns starting Sunday ~7:00 PM New York, elevated ~24h into Monday (Asian cash-equity open); US Sunday morning negative / mean-reverting"},
+  {"url": "https://www.coindesk.com/markets/2026/03/18/bitcoin-s-rally-runs-into-sell-the-news-risk-ahead-of-fed-decision", "reports": "Two Prime: bitcoin posted negative returns in the 48 hours following 7 of 8 FOMC meetings in 2025"},
+  {"url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", "reports": "FOMC meeting dates 2025-2027 (used for the FOMC probe calendar)"},
+  {"url": "https://quantpedia.com/are-there-seasonal-intraday-or-overnight-anomalies-in-bitcoin/", "reports": "2015-2022 Gemini hourly: buy 21:00 / sell 23:00 UTC 33% ann. return, no costs - intraday, stale, not used"},
+  {"url": "https://paperswithbacktest.com/strategies/is-the-turn-of-the-month-an-anomaly-on-which-an-investment-strategy-could-be-based-evidence-from-bitcoin-and-ethereum", "reports": "TOM 4-day window strategy 2010-2026: 7.84% ann., Sharpe 0.53, MDD 29.68%, costs undisclosed - no counterparty mechanism, not pursued"},
+  {"url": "https://cryptoslate.com/how-thin-weekend-liquidity-turns-minor-geopolitical-news-into-massive-monday-price-gaps-for-etf-holders/", "reports": "47% of BTC volume in US weekday hours; weekday activity ~2x weekend; no Monday persistence/reversal statistics"}
+ ],
+ "probes": [
+  {"file": "probe_sunday_reopen.out.json", "rule": "weekend-move continuation at Sun 19:00 NY, |move|>=100bps, 200/200, 24 bars", "result": "n=621 net -29.9 bps CI [-44.9,-14.1] WR 0.443"},
+  {"file": "probe_post_fomc_short.out.json", "rule": "short at bar after FOMC statement, 200/200, 48 bars, 19 symbols", "result": "n=111 net -4.2 bps CI [-42.0,30.1] WR 0.514; only 6 independent events in train"},
+  {"file": "probe_monday_window_trend.out.json", "rule": "trailing-6h trend follow inside Sun 19:00 -> Mon 19:00 NY, 150/150, 12 bars", "result": "n=4386 net -15.5 bps CI [-19.9,-11.3] WR 0.484"}
+ ]
+}
