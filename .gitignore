@@ -47,3 +47,5 @@ research/swarm/kb/owner_trades/api_ccxt_deposits.json
 research/swarm/runs/*/screens/*/data*
 research/swarm/runs/**/*.pkl
 research/swarm/runs/**/*.parquet
+# swarm v2 daily maintenance pass: crossing/verdict flags between runs (runtime state, never tracked)
+research/swarm/kb/.maint_state.json

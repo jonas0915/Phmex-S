@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Edge Swarm v2: DAILY no-LLM paper-slot maintenance pass, 6:30 AM PT (after
+         the 6:00 AM com.phmex.lab-adjudicator digest). Rewrites
+         research/swarm/kb/PAPER_STATUS.md; Telegram only when a slot crossed its
+         registered kill line or reached verdict_n. Kill switch: touch
+         scripts/.halt_swarm_desk. StdOut/StdErr MUST stay in ~/Library/Logs (TCC,
+         memory/feedback_launchd_tcc.md). Versioned copy: research/swarm/launchd/;
+         installed copy: ~/Library/LaunchAgents/. -->
+    <key>Label</key>
+    <string>com.phmex.desk-maint</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Library/Frameworks/Python.framework/Versions/3.14/bin/python3</string>
+        <string>/Users/jonaspenaso/Desktop/Phmex-S/scripts/swarm_desk.py</string>
+        <string>--mode</string>
+        <string>maint</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/jonaspenaso/Desktop/Phmex-S</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>6</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/jonaspenaso/Library/Logs/Phmex-S/desk-maint.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/jonaspenaso/Library/Logs/Phmex-S/desk-maint.err.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

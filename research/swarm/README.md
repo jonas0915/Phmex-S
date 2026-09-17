@@ -118,4 +118,58 @@ Results: `BUILT` (→ Gate B), `DEAD_AT_HOLDOUT`, `HOLDOUT_INSUFFICIENT`, `HOLDO
 
 **The branch holds the only record of the holdout read** (the prereg doc + `out.holdout.json` in its commits). Never delete `swarm/<id>-slot` unmerged; never re-read holdout for the same thesis. `build.js` refuses to run while the branch exists on any ref, so a retry after `HOLDOUT_ERROR` (the read command itself failed, nothing was written) requires the owner to delete the branch by hand first — the script never does that. Build outcomes reach `kb/` through the desk's maintenance pass, not through `build.js`.
 
+## Cadence (`scripts/swarm_desk.py` + two launchd jobs)
+
+The desk runs on a schedule without the owner; nothing in this loop promotes a slot to live money, invokes `build.js`, or restarts the bot.
+
+**What runs when.**
+
+| job | schedule | command | what it does |
+|---|---|---|---|
+| `com.phmex.desk-weekly` | Sunday 3:00 AM PT (`Weekday 0 / Hour 3 / Minute 0`) | `swarm_desk.py --mode desk` | the maintenance pass, then ONE full desk run (`desk.js`, 8 analysts, ≤5 screens) through a headless `claude -p`; commits + pushes `kb/` and `runs/<run_id>/`; Telegram summary after every run |
+| `com.phmex.desk-maint` | daily 6:30 AM PT (after the 6:00 AM adjudicator digest) | `swarm_desk.py --mode maint` | no LLM: rewrites `kb/PAPER_STATUS.md` from every registered paper slot's `trading_state_<id>.json` + the adjudicator's latest digest; Telegram only on an alert |
+
+Weekly, not daily, by owner order (9/16): a full run is ~2.5M tokens and v1 died on rate ceilings. Both plists have `RunAtLoad false`, so loading a job never fires it. Every mode first checks the kill switch, then the run-alone guard, then `git pull --ff-only` (a failed pull is logged and the run continues on the local copy). The versioned plist files live in `research/swarm/launchd/`; the installed copies live in `~/Library/LaunchAgents/`.
+
+**The maintenance pass (`--mode maint`).** Reads the slot ids registered in `bot.py` (`slot_id="..."` inside `StrategySlot(...)`, minus the main-book label `5m_scalp`), each slot's `trading_state_<id>.json` + `_mode.json` sidecar, the `.kill_<id>` sentinel, and the last `digest:` block of `~/Library/Logs/Phmex-S/lab_adjudicator.log` (the adjudicator writes its grades only there, to stdout and to Telegram — there is no grades file). Kill lines come from `scripts/lab_adjudicator/adjudicate.py` `EXPERIMENTS` (build.js slots: `verdict_n` / `kill_net_usd` / `inconclusive_hard_n` / `registered_ts`; legacy `sr_bounce_v2` → SR_BOUNCE, `eth_tsm_28`) plus the Donchian spec's paper −$15 line; slots with no registered line say so. `PAPER_STATUS.md` shows per slot: mode, n, net USD (era `net_pnl` as-is), WR, days running, last close, kill line + distance to it, verdict_n progress, and the adjudicator's latest grade; killed slots (sentinel, sidecar `killed_at`, or the bot's own negative-Kelly switch at n ≥ 50) are listed separately; the file ends with `no paper slots running` when no active slot exists. The header states whether the bot process is alive and how old the adjudicator digest is. Crossing / verdict flags are kept in `kb/.maint_state.json` (gitignored); the first run is a baseline. When a slot newly crosses its kill line or newly reaches `verdict_n`, maint appends ONE dated line to `kb/LESSONS.md` and sends one Telegram; otherwise it is silent. `PAPER_STATUS.md` is regenerated on every pass — never edit it by hand. Read it before proposing any slot work.
+
+**The desk run (`--mode desk`).** After maint, the runner writes the exact `desk.js` args to `runs/<run_id>/launch_args.json` (`run_id` = launch time `YYYY-MM-DD-HHMM` PT, `now` = ISO UTC, `today` = PT date, `judge_model` from env `SWARM_JUDGE_MODEL` or null, `max_analysts 8`, `max_screens 5`, `dry_run false`, `constraints_md` / `standards_md` = the two kb files' contents) and launches `claude -p` with `--allowedTools Workflow WebSearch WebFetch Read Write Bash Glob Grep --permission-mode acceptEdits` (model from env `SWARM_DESK_MODEL`; unset = account default), 75-minute timeout. The prompt tells that session to invoke the Workflow tool on `desk.js` with the file's args verbatim and to reply with the result JSON. Then: `git add research/swarm/kb research/swarm/runs/<run_id>` (never `.env`, never data), commit `swarm: desk run <run_id> — <result>`, `git push`.
+
+**What Telegram sends.** Every desk run: the first 3 lines of `runs/<run_id>/REPORT.md` (or "REPORT.md missing"), the result code (`SURVIVORS`, `NO_SURVIVORS`, `ALL_REJECTED_AT_GATE`, `GATE_FAILED`, `NO_THESES`, `WEB_BUDGET_EXHAUSTED`), counts (theses · gate rejected · screened · passed), any maint alerts, and the git outcome. On `WEB_BUDGET_EXHAUSTED` (the analysts could not search), a timeout, a claude failure, or a missing result, the message says so and carries the manual launch one-liner below. Maint alone sends only on an alert (crossed kill line / reached verdict_n).
+
+**The two owner gates still apply.** A committee PASS in a scheduled run (`SURVIVORS`) → Telegram names the survivor and says "Gate A: owner decision required — STOP". build.js is never invoked by the scheduler (the runner's prompt and argv never name it); the owner launches it by hand after saying "go" (see Build stage). Gate B (audited restart) is likewise human. Gate B checklist item: the automatic kill lines (`grade_<id>` touching `.kill_<id>`) only work while `com.phmex.lab-adjudicator` is loaded — it is re-enabled together with the bot at the restart (unloaded since the 9/9 wind-down; its plist is in `~/Library/LaunchAgents/disabled/phmex-winddown-2026-09-09/`). Until then `PAPER_STATUS.md` says "kill lines are not being graded automatically", and the maintenance pass reports crossings but kills nothing.
+
+**Headless Workflow — which path is live.** `--mode test` runs the desk with the dry-run args (`max_analysts 1`, `max_screens 1`, `dry_run true`, run_id `dryrun-<stamp>`), then prints `HEADLESS WORKFLOW: OK` (run dir + a result code appeared), `UNAVAILABLE` (`claude -p` has no Workflow tool), or `FAILED`. If the Workflow tool is unavailable under `claude -p`, `--mode desk` cannot run the desk itself: it sends "desk run due — paste this into a fresh Claude Code session:" plus the one-liner, and the owner runs it interactively. Status: **not yet determined** — the controller runs `--mode test` once after installing the jobs and records the answer here.
+
+Manual launch one-liner (also what Telegram sends on `WEB_BUDGET_EXHAUSTED` / timeout / fallback):
+
+```
+cd ~/Desktop/Phmex-S && claude — then paste: "Run the desk alone per research/swarm/README.md (Running the desk): confirm /workflows shows nothing live, Read kb/CONSTRAINTS.md + kb/STANDARDS.md, and invoke Workflow research/swarm/workflows/desk.js with run_id <YYYY-MM-DD-HHMM PT>, now <ISO UTC>, judge_model null, max_analysts 8, max_screens 5, dry_run false, constraints_md/standards_md = those file contents; then python3 -m research.swarm.lib.kb_check && git add research/swarm && git commit && git push."
+```
+
+**Kill switch.** `touch scripts/.halt_swarm_desk` — every mode logs "halt sentinel present" and exits 0 without pulling, launching or writing anything. `rm` it to resume. `--mode desk|test` also refuses (exit 3) while another `swarm_desk.py --mode desk|test` process is alive (pgrep on argv — the desk never runs concurrently with another workflow); maint never blocks anything.
+
+**Logs.** `~/Library/Logs/Phmex-S/swarm_desk.log` (the runner's own log, every mode), `desk-weekly.out.log` / `desk-weekly.err.log` and `desk-maint.out.log` / `desk-maint.err.log` (launchd stdout/stderr). Never under `~/Desktop` (launchd + TCC → exit 78; `memory/feedback_launchd_tcc.md`). Judge the jobs by `launchctl print gui/$(id -u)/com.phmex.desk-weekly` counters (`runs`, `last exit code`), not by log mtimes.
+
+**Install (controller, after this task).**
+
+```
+cp research/swarm/launchd/com.phmex.desk-weekly.plist research/swarm/launchd/com.phmex.desk-maint.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.phmex.desk-weekly.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.phmex.desk-maint.plist
+launchctl print gui/$(id -u)/com.phmex.desk-weekly | grep -E "state|runs|last exit"
+python3 scripts/swarm_desk.py --mode maint     # by hand once; read kb/PAPER_STATUS.md
+python3 scripts/swarm_desk.py --mode test      # headless-Workflow feasibility; record the answer above
+```
+
+**Flip weekly ↔ daily.** Edit the installed `~/Library/LaunchAgents/com.phmex.desk-weekly.plist` (and the versioned copy so git matches): daily = delete the `Weekday` key from `StartCalendarInterval` (keeping `Hour 3 / Minute 0`); weekly = put `<key>Weekday</key><integer>0</integer>` back. launchd only reads a plist at load, so reload it:
+
+```
+launchctl bootout gui/$(id -u)/com.phmex.desk-weekly
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.phmex.desk-weekly.plist
+launchctl print gui/$(id -u)/com.phmex.desk-weekly | grep -E "state|runs|last exit"
+```
+
+Daily full runs are NOT the owner's standing order — flip only on an explicit instruction (token cost ~2.5M/run). To stop a job for good: `launchctl bootout gui/$(id -u)/<label>` and move the plist to `~/Library/LaunchAgents/disabled/`.
+
 Syntax check without running: the body uses top-level `return` inside the harness's async wrapper, so plain `node --check` reports "Illegal return statement" for both `desk.js` and `build.js`; wrap the body in an `async function` before `node --input-type=module --check` (see the Task 8 report for the one-liner).
