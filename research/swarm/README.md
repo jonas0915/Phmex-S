@@ -70,4 +70,52 @@ After a run: `python3 -m research.swarm.lib.kb_check && git add research/swarm &
 - Budget target: ≤ 2.5M tokens and ≤ 35 min per full run (8 analysts, ≤ 5 screens, ≤ 5 audits, 2 committee seats, 3 closing seats).
 
 Library tests: `python3 -m pytest tests/test_swarm_*.py -q`.
-Build stage (`workflows/build.js`) runs only on a committee pass AND the owner's "go"; it stops before any bot restart (`/pre-restart-audit`).
+
+## Build stage (`workflows/build.js`)
+
+`build.js` turns exactly ONE committee-PASS thesis into a pre-registered PAPER slot on the bot, following the bespoke Donchian recipe in `docs/2026-09-16-edge-swarm-v1/02_framework_audit.md` §3.6, on its own git branch — and stops. It never restarts the bot, never touches launchd, never places an order, never merges or pushes, and never edits the frozen spec or `signal.py`.
+
+**Two owner gates, both human.**
+
+- **Gate A — before launch.** A committee PASS from `desk.js` is not a go. The controller stops, reports the survivor (`runs/<run_id>/REPORT.md`, `kb/SURVIVORS.md`), and asks. `build.js` is invoked only after the owner says "go".
+- **Gate B — after build.js finishes.** The script returns the branch name and the list of files changed. The owner reviews the branch, runs `/pre-restart-audit`, and says "go" again before any restart. Until that audited restart nothing the build wrote is live (editing a file ≠ the bot using it).
+
+**Launch** (from a Claude Code session in this repo, alone — no other workflow live):
+
+```
+constraints_md = Read("research/swarm/kb/CONSTRAINTS.md")
+standards_md   = Read("research/swarm/kb/STANDARDS.md")
+
+Workflow({ scriptPath: "research/swarm/workflows/build.js",
+           args: { run_id: "<the desk run that produced the PASS>",   // runs/<run_id>/
+                   thesis_id: "<id>",                    // the survivor's id (^[a-z][a-z0-9_]{2,40}$)
+                   now: "<ISO UTC, e.g. 2026-09-18T03:00:00Z>",  // registered_ts + prereg date
+                   judge_model: null,                    // reviewer seat only (same convention as desk.js)
+                   constraints_md: <string>, standards_md: <string> } })
+```
+
+| arg | required | meaning |
+|---|---|---|
+| `run_id` | yes | the desk run whose `committee/{economics,statistics}.json` both pass this id |
+| `thesis_id` | yes | the survivor; becomes the slot_id, `<id>_slot.py`, `tests/test_<id>_slot.py`, `trading_state_<id>.json`, `.kill_<id>` |
+| `now` | yes | ISO UTC; becomes `registered_ts` in the adjudicator and the prereg filename date |
+| `constraints_md`, `standards_md` | yes | file CONTENTS of the two kb documents; every prompt embeds them |
+| `judge_model` | no (null) | model override for the reviewer seat only |
+| `today` | no | `YYYY-MM-DD` for the prereg filename / kb date cell; defaults to `now[:10]` |
+| `suite_baseline` | no | text of the expected pytest baseline (default: the post-Task-7 baseline) |
+
+**What it does, in order.** All work happens on branch `swarm/<id>-slot`, created from the current HEAD (the working tree is left checked out on that branch; nothing else on the tree is staged or touched).
+
+1. **Prereg** — checks the frozen sha (`registrar.verify`), that both committee seats voted pass for this id, and that `screens/<id>/out.holdout.json` does not already exist. Writes `docs/superpowers/specs/<date>-<id>-prereg.md` with the frozen verdict line and anti-fishing clause, and COMMITS it before any holdout read:
+   - verdict_n = 50; KILL if n ≥ 50 and net ≤ 0; KILL if net ≤ −$10 at any n; PASS if n ≥ 50 and the bootstrap CI95 lower bound of per-trade net USD (`bootstrap_ci.mean_ci`) > 0; n ≥ 50 with net > 0 but CI lower ≤ 0 = INCONCLUSIVE, hard stop at n = 100 (PASS if CI lower > 0 there, else KILL). `net_pnl` summed as-is (fee-inclusive at the source).
+   - anti-fishing: no change to tp/sl/max_hold/universe/timeframe/signal during the paper era; no second holdout read; deviations are findings, not fixes; rollback = `touch .kill_<id>`.
+   - Then the ONE registered holdout read, by a mechanical seat running exactly `python3 -m research.swarm.lib.screen runs/<run_id>/specs/<id>.frozen.json runs/<run_id> --era holdout --token COMMITTEE-HOLDOUT-READ` (the token is `load_data.COMMITTEE_TOKEN`). It writes `screens/<id>/out.holdout.json` and `trades.holdout.csv` (era-suffixed) and never touches the train `out.json`. The numbers are recorded in the prereg doc and committed. Decision rule (fixed in the doc before the read): CI95 upper < 0 → `DEAD_AT_HOLDOUT`; n < 10 or CI null → `HOLDOUT_INSUFFICIENT`; otherwise build. A non-build outcome stops here.
+2. **Implement** — TDD: `tests/test_<id>_slot.py` first (signal parity against the frozen `signal.py` on synthetic AND train data, forming-bar exclusion, exit golden cases identical to `screen.simulate`, sidecar roundtrip, AST wiring, bare-bot orchestration, live-mode-places-no-orders) and adjudicator tests; then `<id>_slot.py` (pure; `signals()` transcribed verbatim from `screens/<id>/signal.py`, closed bars only), `bot.py` (one `StrategySlot` with the rails opt-out `loss_cap_usdt=-999.0`, `kelly_min_trades=10**9`, `paper_mode=True`, strategy_name not in `STRATEGIES`; `self._evaluate_<id>(prices)` in `_evaluate_all_slots`; the evaluator checks `slot.enabled` every cycle so `.kill_<id>` — processed by the bot's generic `.kill_*` loop — is honoured), `scripts/lab_adjudicator/adjudicate.py` (`EXPERIMENTS["<id>"]`, `grade_<id>`, digest line). Files touched are limited to those five plus the module. Full suite must be at baseline + the new tests. One commit.
+3. **Review** — an independent reviewer (JUDGE_MODEL applies here only) verifies against the files: no forming-bar reads, verbatim signal transcription, exit rule = `simulate`, no live-order path, kill honoured, adjudicator numbers = prereg doc, tests exercise the signal, scope of the diff, full pytest. One fix round at most; a second BLOCK returns `REVIEW_BLOCKED`.
+4. **Reconcile** — one kb row on the branch (`SURVIVORS` on `BUILT`, `DEAD_LIST` on `DEAD_AT_HOLDOUT`, a `LESSONS` line otherwise, plus a `LESSONS` line recording that the holdout was read), `kb_check` until `KB OK`, commit. Then the script returns `{result, branch, base_sha, files_changed, commits, holdout, review, next}` and stops.
+
+Results: `BUILT` (→ Gate B), `DEAD_AT_HOLDOUT`, `HOLDOUT_INSUFFICIENT`, `HOLDOUT_ERROR`, `REVIEW_BLOCKED`, `IMPLEMENT_FAILED`, `PREREG_<reason>`.
+
+**The branch holds the only record of the holdout read.** Never delete `swarm/<id>-slot` unmerged; never re-read holdout for the same thesis. If the owner declines the build, merge (or cherry-pick) the two prereg commits and the kb commit anyway so the read stays on the record.
+
+Syntax check without running: the body uses top-level `return` inside the harness's async wrapper, so plain `node --check` reports "Illegal return statement" for both `desk.js` and `build.js`; wrap the body in an `async function` before `node --input-type=module --check` (see the Task 8 report for the one-liner).
