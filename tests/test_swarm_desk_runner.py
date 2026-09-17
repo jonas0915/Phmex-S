@@ -342,6 +342,13 @@ def test_maint_commits_paper_status_by_pathspec_without_push_and_only_when_chang
     assert not any(c[0][0][0] in ("add", "commit") for c in ctx.git.calls)
     assert "Written 2026-09-09 06:26 PM PT" in ctx.paper_status_path.read_text()   # the stamp itself is still refreshed
     ctx.now = lambda: NOW_TS
+    # a real flip on the header line (bot process STOPPED → RUNNING) is NOT masked by the stamp handling
+    ctx.git.calls.clear()
+    ctx.bot_alive = Recorder(result=True)
+    sd.main(["--mode", "maint"], ctx=ctx)
+    assert ["add", "research/swarm/kb/PAPER_STATUS.md"] in [c[0][0] for c in ctx.git.calls]
+    assert "Bot process: RUNNING" in ctx.paper_status_path.read_text()
+    ctx.bot_alive = Recorder(result=False)
     # a crossing → LESSONS.md joins the pathspec, still no push
     _write_state(ctx.bot_dir, "ALPHA", [0.5, -11.0], NOW_TS - 9 * DAY)
     ctx.git.calls.clear()
@@ -349,6 +356,17 @@ def test_maint_commits_paper_status_by_pathspec_without_push_and_only_when_chang
     commit = next(c[0][0] for c in ctx.git.calls if c[0][0][0] == "commit")
     assert commit[commit.index("--") + 1:] == ["research/swarm/kb/PAPER_STATUS.md", "research/swarm/kb/LESSONS.md"]
     assert ["push"] not in [c[0][0] for c in ctx.git.calls]
+
+
+def test_status_body_neutralises_only_the_clock_tokens():
+    a = "# PAPER_STATUS\n\nWritten 2026-09-09 05:26 PM PT. Bot process: STOPPED — x. Adjudicator digest: Sep 1 (7.8 d old) — not being graded.\n"
+    b = "# PAPER_STATUS\n\nWritten 2026-09-10 05:26 PM PT. Bot process: STOPPED — x. Adjudicator digest: Sep 1 (8.8 d old) — not being graded.\n"
+    c = "# PAPER_STATUS\n\nWritten 2026-09-10 05:26 PM PT. Bot process: RUNNING. Adjudicator digest: Sep 1 (8.8 d old) — not being graded.\n"
+    d = "# PAPER_STATUS\n\nWritten 2026-09-10 05:26 PM PT. Bot process: STOPPED — x. Adjudicator digest: Sep 1 (1.8 d old).\n"
+    assert sd._status_body(a) == sd._status_body(b)           # stamp + age ticked, nothing else → no change
+    assert sd._status_body(a) != sd._status_body(c)           # bot flip → change
+    assert sd._status_body(a) != sd._status_body(d)           # stale-flag flip → change
+    assert "STOPPED" in sd._status_body(a) and "not being graded" in sd._status_body(a)
 
 
 def test_git_add_failure_is_reported_and_skips_the_commit(ctx):
@@ -581,7 +599,7 @@ def test_pass_through_fidelity_warning_on_mismatch_or_missing(ctx):
     assert "constraints_len not reported" in _log_text(ctx)
 
 
-@pytest.mark.parametrize("bad", ["4523.0", "~4500", [1, 2], None, True])
+@pytest.mark.parametrize("bad", ["4523.0", "~4500", [1, 2], None, True, float("inf")])
 def test_pass_through_non_integer_length_never_blocks_the_commit_and_push(ctx, bad):
     _desk_ok(ctx, lengths=False, extra={"constraints_len": bad, "standards_len": bad})
     rc = sd.main(["--mode", "desk"], ctx=ctx)

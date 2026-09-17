@@ -561,10 +561,16 @@ def render_paper_status(slots: list, digest: Optional[dict], bot_alive: Optional
     return "\n".join(out).rstrip() + "\n"
 
 
+_STAMP_TOKEN = re.compile(r"^Written [^.]+\.", re.M)          # 'Written 2026-09-09 05:26 PM PT.' → neutral
+_AGE_TOKEN = re.compile(r"\(\d+\.\d d old\)")                   # '(7.8 d old)' → neutral (ticks daily by construction)
+
+
 def _status_body(text: str) -> str:
-    """PAPER_STATUS.md minus its 'Written <stamp>.' header line, so a stamp-only rewrite
-    does not count as a change (maint commits only on a real change)."""
-    return "\n".join(l for l in text.splitlines() if not l.startswith("Written "))
+    """PAPER_STATUS.md with ONLY the clock tokens neutralised — the 'Written <stamp>.'
+    token and the digest age — so a rewrite that changes nothing else is not a
+    change. The bot-alive text and the adjudicator summary (incl. the 'not being
+    graded automatically' flip when the digest goes stale) stay in the comparison."""
+    return _AGE_TOKEN.sub("(<age> d old)", _STAMP_TOKEN.sub("Written <stamp>.", text))
 
 
 def detect_events(prev: Optional[dict], slots: list) -> tuple:
@@ -732,7 +738,7 @@ def check_passthrough(res: dict, args: dict) -> bool:
         got, want = res.get(key), len(args[fld])
         try:                                   # never raise: this runs before the commit/push
             got = int(got) if not isinstance(got, bool) else None
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):     # OverflowError: int(float('inf')) — json accepts Infinity
             got = None
         if got is None:
             log.warning("pass-through fidelity: %s not reported as an integer by the session (got %r, expected %d)",
