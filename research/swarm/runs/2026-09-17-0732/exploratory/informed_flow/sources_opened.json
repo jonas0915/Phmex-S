@@ -1,0 +1,28 @@
+{
+ "lens": "informed_flow",
+ "run_id": "2026-09-17-0732",
+ "label": "EXPLORATORY sourcing log - numbers here are what the pages said, not screen evidence",
+ "web_searches_run": 11,
+ "web_fetches_attempted": 16,
+ "sources_opened_with_numbers_read": [
+  {"url": "https://link.springer.com/article/10.1007/s10690-026-09589-z", "what_read": "Kurihara & Matsumoto, Asia-Pacific Financial Markets 2026. 'We used the Binance cryptocurrency exchange API to obtain 1-min closing prices and trade count data.' Four regimes: Bull Feb 25-Mar 25 2024, Bear Jun 22-Jul 19 2024, Sideways Aug 24-Sep 24 2024, Crash Jan 30-Mar 1 2025. Large-cap BTC/ETH, mid LTC, small BIFI/CITY/PIVX/GNO/QKC. Granger null 'using BTC returns from one minute prior does not improve the prediction accuracy of ALT returns' rejected at 5% for all pairs. Large/medium caps: 'extremely high correlation coefficients at lag0, with no significant reactions observed in subsequent or previous periods.' Small caps QKC/BIFI/CITY 'slightly higher correlation coefficients at lag-1 than at lag0'. Fee assumed 0.02%."},
+  {"url": "https://ideas.repec.org/a/eee/dyncon/v163y2024ics0165188924000551.html", "what_read": "Guo, Sang, Tu, Wang, JEDC 163 (2024) abstract verbatim: lagged returns of other cryptocurrencies predict focal coins on Binance; long-short portfolio 'sizable return out-of-sample after accounting for transaction costs'; mechanism 'common shocks among cryptocurrencies coupled with the limited attention of investors lead to slow information diffusion across coins'. No numeric return on the opened page (the 2.16%/day figure appears only in a search snippet and is NOT cited)."},
+  {"url": "https://www.frontiersin.org/journals/blockchain/articles/10.3389/fbloc.2026.1811716/full", "what_read": "Frontiers in Blockchain 2026 'Microstructure alpha'. Binance spot+perp, BTC ETH SOL AVAX LINK DOT, Aug 2025-Feb 2026, minute bars. OLS microstructure model +1.23% incremental R2 over random walk (DM t=1.28). 'All net Sharpe ratios are deeply negative: -31.29 to -52.05 on spot, -10.68 to -18.42 on futures.' Turnover 124-204x notional/day. Cross-asset transfer poor; block-diagonal by asset. NEGATIVE evidence for minute-scale flow signals."},
+  {"url": "https://arxiv.org/html/2607.09426v2", "what_read": "Quarter-Hour Effect, Binance USDT perps BTC ETH XRP SOL DOGE ADA, Jan 2021-Oct 2024, 10s bars. Quarter-hour opening order imbalance predicts returns over 'four to twelve hours', peak 8-12h; but sign-weighted forecast target 'averages about 0.5 bp per boundary, about one tenth of a single standard-tier taker fee'. Needs order-flow data the screen does not have."},
+  {"url": "https://arxiv.org/abs/2608.21888", "what_read": "Short-horizon mean reversion, 183 Binance pairs, 15-min horizon: 'gross edge peaks near 1.3 bp per trade against a 5 bp round-trip cost' - fee-trapped, confirms CONSTRAINTS."}
+ ],
+ "sources_blocked_or_not_opened_do_not_cite": [
+  "https://www.sciencedirect.com/science/article/abs/pii/S0927539823000956 (seesaw effect, Jia/Wu/Yan/Liu JEF 2023) - 403; only search snippets say large coins negatively predict small coins; NOT cited as evidence",
+  "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3465924 - 403",
+  "https://www.researchgate.net/publication/336661825 - 403",
+  "https://www.readcube.com/articles/10.2139/ssrn.3465924 - empty",
+  "https://business.okstate.edu/research/finance_abstracts-2021.html - 403",
+  "https://ink.library.smu.edu.sg/lkcsb_research/6901/ - empty page",
+  "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3974583 - 403",
+  "https://www.tandfonline.com/doi/full/10.1080/1351847X.2022.2084343 - 403",
+  "https://arxiv.org/html/2506.08718 - opened but empirical numbers not in accessible text",
+  "https://arxiv.org/pdf/2512.14134 - opened; Korean equities, not crypto, not used"
+ ],
+ "cross_venue_verdict": "Cross-venue (Binance/CME -> Phemex) lead-lag is sub-second per the price-discovery literature surfaced in search (not opened with numbers) and needs other-venue data the desk does not have; not screenable by a 5-min poller on Phemex OHLCV. Lens sub-question declared dry.",
+ "web_budget_exhausted": false
+}

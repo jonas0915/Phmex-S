@@ -1,0 +1,70 @@
+{
+  "id": "cross_asset_rally_apart_laggard_short",
+  "lens": "cross_asset",
+  "mechanism": "Crypto rallies are structurally less synchronised than crashes ('rallying apart'): Mallela & Leonelli (arXiv 2606.16840, June 2026, daily returns of the 13 largest coins, 89 windows 2021-2025) find upper-tail extremal-graph edge density fell from 0.92 (2022) to 0.81 (2024) while the lower tail held 0.87-0.88, and the weakly-dependent cluster in the rally tail is 23 pairs vs 12 in the crash tail. Kurihara & Matsumoto (Asia-Pacific Financial Markets 2026, 1-min Binance data, four 2024-25 regimes) show BTC->alt transmission is unidirectional and completes within minutes: large caps (ETH, LTC) react at lag 0, small caps at lag 1 (one minute), effects dissipate beyond lag 3. Therefore when BTC has risen > +100 bps over the last 4 closed 1h bars and a major alt has captured < 50% of that move, the shortfall is not pending transmission - it is information that the marginal bid is BTC-only (spot-ETF / treasury flow) and the alt is being sold into the BTC rally. Two things then pay a short over the next 8h: (a) the BTC 4h rally itself mean-reverts and the alt carries beta to that, and (b) the alt's relative weakness continues (rotation, not a gap to close). Direction is the OPPOSITE of the alt-vs-leader convergence bet the account already killed (DEAD row 2).",
+  "counterparty": "Levered alt-perp longs who buy the laggard alt during a BTC-led rally expecting beta catch-up ('alt rotation' positioning). They are forced to pay because (1) the catch-up does not come - large-cap transmission is complete within minutes per Kurihara & Matsumoto, so a 4h shortfall is rotation - and (2) when the BTC 4h impulse fades they are underwater at leverage and their stop-outs and liquidations are taker sells; the 2026-09-02 print (CoinGlass via buildix.trade) shows the population is long-skewed: $300.42M of $367.73M 24h liquidations were longs (82%). A resting maker short on the laggard is filled by that forced selling.",
+  "prediction": "On the mr_edge 1h train era, shorting a universe alt at the next open when BTC's 4-bar log return > +100 bps and the alt's 4-bar log return < 0.5x BTC's, TP 150 / SL 150 bps, max hold 8 bars, yields net_bps_mean > 0 with bootstrap CI95 excluding 0, WR >= fee_math.p_star(150) = 0.5383 (research/swarm/runs/2026-09-17-0732/exploratory/cross_asset/probe_4_universe_long1h_names.out), n >= 30, and time-to-verdict <= 26 weeks. It is falsified if the CI95 includes 0, if WR < p*, or if TIME exits carry NEGATIVE gross for the short (i.e. the laggard catches up rather than continues down).",
+  "nearest_dead_rows": [
+    {
+      "row": 2,
+      "why_different": "Row 2 bought the alt that lagged ETH expecting CONVERGENCE (reversion of the spread). This thesis takes the opposite sign - the laggard keeps lagging - because the 2026 transmission evidence says liquid alts absorb BTC moves in minutes, so a 4h shortfall is rotation, not a gap to close; the counterparty is the convergence buyer, not the spread."
+    },
+    {
+      "row": 5,
+      "why_different": "Row 5 was a market-neutral cross-sectional momentum BASKET that needed 100+ names and died on the short leg; this is a single-name event short conditioned on a BTC move, no long leg, no ranking, sized for 2 paper slots."
+    },
+    {
+      "row": 8,
+      "why_different": "Row 8 was pairs/cointegration (long one leg, short the other, spread reverts). Here there is no BTC leg and no reversion premise; BTC is only the conditioning event and the alt is shorted outright."
+    },
+    {
+      "row": 3,
+      "why_different": "Row 3 faded the alt's own 1h volatility expansion. This thesis fires only on the alt that did NOT move (captured < 50% of BTC's move); the impulse being faded is BTC's, and the alt short is paid by BTC-beta reversion plus relative-weakness continuation, not by the alt's own vol-expansion reverting."
+    },
+    {
+      "row": 13,
+      "why_different": "Row 13 was BTC time-series momentum on BTC itself over 28 days. This never trades BTC; the BTC 4h move is the event, the horizon is 8h, and the traded leg is the alt."
+    },
+    {
+      "row": 6,
+      "why_different": "Row 6 (liquidation-cascade reversion) fades a crash. Our own train probe of the crash-side analogue (BTC 4h < -100 bps, alt overshoot, long) came back null - research/swarm/runs/2026-09-17-0732/exploratory/cross_asset/probe_3_draft_sim.out net -0.5 bps CI (-8.0, 7.5) - consistent with row 6, so it is NOT proposed; the rally side is continuation, the opposite trade."
+    }
+  ],
+  "source_urls": [
+    "https://arxiv.org/pdf/2606.16840",
+    "https://link.springer.com/article/10.1007/s10690-026-09589-z",
+    "https://www.buildix.trade/blog/crypto-long-squeeze-september-2-2026-368m-liquidations-fed-hike-odds",
+    "https://research-information.bris.ac.uk/en/publications/cross-cryptocurrency-return-predictability/"
+  ],
+  "evidence": "Mallela & Leonelli, 'Crashing Together, Rallying Apart: Dynamic Conditional Tail Dependence in Cryptocurrency Markets', arXiv 2606.16840 (15 Jun 2026), https://arxiv.org/pdf/2606.16840 (opened, PDF pages 1-12 read): 13 largest coins, daily returns 1 Oct 2020 - 14 Jun 2026, 89 overlapping 750-day windows; Table 3 lower-tail edge density 0.88 vs upper-tail 0.86 (avg over windows); dynamically, 'upper-tail density falls from a peak of 0.92 in 2022 to 0.88 in 2023 and 0.81 in 2024, while lower-tail density barely moves, holding between 0.87 and 0.88'; lower-tail dependence exceeds upper in 'every one of the 89 windows ... by 0.08 on average'; Table 4 bootstrap chi_minus - chi_plus = 0.11 [0.09,0.12] (mid-2022), 0.08 [0.07,0.10] (mid-2023), 0.08 [0.06,0.10] (mid-2024); weakly-dependent cluster = 12 pairs in the crash tail vs 23 in the rally tail ('rallies, increasingly, do not' draw assets together); BTC-ETH extremal correlation 0.78 lower / 0.72 upper. Kurihara & Matsumoto, 'Price Transmission from Bitcoin to Altcoins: High-Frequency Evidence and Implications for Trading Strategy', Asia-Pacific Financial Markets (2026), https://link.springer.com/article/10.1007/s10690-026-09589-z (opened): 1-min Binance closes; regimes Bull Feb 25-Mar 25 2024, Bear Jun 22-Jul 19 2024, Sideways Aug 24-Sep 24 2024, Crash Jan 30-Mar 1 2025; unidirectional Granger causality BTC->ALT significant at 5% for all pairs; large caps (ETH, LTC) 'extremely high correlation coefficients at lag0, with no significant reactions' at later lags; small caps lag-1 correlation 'comparable to those at lag0'; VAR effects 'dissipating beyond the third lag' (minutes); trade-count vs responsiveness correlation 0.561 (Bull) / 0.483 (Bear); fees 0.02%. buildix.trade, 2 Sep 2026 (opened): CoinGlass 24h liquidations $367.73M, longs $300.42M (82%) / shorts $67.31M, 90,090 traders, BTC $80,000 retest failed -> $76,548, ETH -3% to $2,368, SOL to $98, XRP $1.32, spot-ETF outflow $236.46M on Sep 1. Guo, Sang, Tu & Wang, 'Cross-cryptocurrency return predictability', JEDC 163 (2024), Bristol page (opened, abstract only): lagged returns of other coins predict focal coins via 'slow information diffusion'; no magnitude on the page. EXPLORATORY train probes (NOT evidence, labelled as such): probe_1 (research/swarm/runs/2026-09-17-0732/exploratory/cross_asset/probe_1_btc_move_alt_capture.out) 34-alt overlapping bars, rally+alt-lag fwd8h mean -84.5 bps CI (-112.5, -58.2) n=899 vs all-bar baseline -2.5; probe_2 (...probe_2_decompose_and_ethbtc.out) BTC's own fwd8h after a 4h rally >100 bps = -32.5 bps CI (-51.4, -14.1) n=136, alt-minus-BTC excess = -39.1 CI (-67.9, -13.4), first-bar-of-cluster events n=582 mean -88.2 CI (-123.3, -52.6), June -154.4 / July -17.9 / Aug -29.6; probe_4 draft simulate on the registered 17-name universe (...probe_4_universe_long1h_names.out): n=252, net +33.6 bps CI (17.8, 49.5), WR 0.651 vs p* 0.5383, 25.0 trades/week, ttv 2.00 weeks, TIME-exit gross +22.2, by month June +55.1 (n=126) / July +7.0 (n=104) / Aug +35.5 (n=22). Caveat recorded: July is near flat, so the edge is regime-concentrated in the June down-month; the registered screen decides.",
+  "spec": {
+    "dataset": "mr_edge",
+    "universe": [
+      "1000PEPE",
+      "1000SHIB",
+      "AAVE",
+      "ADA",
+      "BNB",
+      "DOGE",
+      "ETH",
+      "GIGGLE",
+      "LINK",
+      "LTC",
+      "ONDO",
+      "SOL",
+      "SUI",
+      "TAO",
+      "UNI",
+      "XLM",
+      "XRP"
+    ],
+    "timeframe": "1h",
+    "tp_bps": 150,
+    "sl_bps": 150,
+    "max_hold_bars": 8,
+    "expected_trades_per_week": 25,
+    "doa_line": "DEAD if the train-era screen out.json shows ci95 including 0, or wr < p_star, or n < 30, or TIME-exit gross mean < 0; in paper, DEAD when the first 50 fills have net mean bps <= 0 or the running CI95 upper bound < 0, or when July-type flat months exceed two consecutive."
+  },
+  "signal_py": "import numpy as np\nimport pandas as pd\nfrom research.swarm.lib import load_data as ld\n\n# BTC-led rally that the alt fails to follow -> short the alt (rally-apart, not a lag).\nBTC_THR_BPS = 100.0   # BTC 4-bar (4h) log return must exceed this\nCAPTURE = 0.5         # alt captured less than half of the BTC move\nLAG = 4               # closed 1h bars\n\n_BTC = None\n\n\ndef _btc_close():\n    # Train-era BTC closes only; rows of df beyond the train boundary get NaN -> signal 0.\n    global _BTC\n    if _BTC is None:\n        _BTC = ld.load_ohlcv(\"BTC\", \"1h\", era=\"train\", dataset=\"mr_edge\")[\"close\"]\n    return _BTC\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    b = _btc_close().reindex(df.index)\n    c = df[\"close\"]\n    b_ret = np.log(b / b.shift(LAG)) * 1e4\n    a_ret = np.log(c / c.shift(LAG)) * 1e4\n    fire = (b_ret > BTC_THR_BPS) & (a_ret < CAPTURE * b_ret)\n    fire = fire & b.notna() & b.shift(LAG).notna()\n    out = pd.Series(0, index=df.index, dtype=int)\n    out[fire.fillna(False)] = -1\n    return out\n",
+  "thesis_path": "research/swarm/runs/2026-09-17-0732/theses/cross_asset_rally_apart_laggard_short.json"
+}

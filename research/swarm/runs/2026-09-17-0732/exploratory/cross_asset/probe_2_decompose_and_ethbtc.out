@@ -1,0 +1,15 @@
+BTC own fwd8h after b>100: n=136 mean -32.5 CI (-51.4, -14.1)
+BTC own fwd8h after b<-100: n=141 mean 2.9 CI (-22.5, 28.4)
+B: alt fwd8h MINUS BTC fwd8h (excess): n=890 mean -39.1 CI (-67.9, -13.4)
+B first-bar-of-cluster only: n=582 mean -88.2 CI (-123.3, -52.6) share<0 0.662
+B first-bar by month: {'count': {6: 297, 7: 253, 8: 32}, 'mean': {6: -154.4, 7: -17.9, 8: -29.6}}
+B first-bar per symbol count: {'1000PEPE': 9, '1000SHIB': 16, 'AAVE': 18, 'ADA': 15, 'ALLO': 38, 'ARB': 14, 'AVAX': 11, 'BCH': 18, 'BICO': 11, 'BNB': 17, 'DEXE': 37, 'DOGE': 14, 'EIGEN': 17, 'ENA': 14, 'GIGGLE': 16, 'HYPE': 23, 'INJ': 23, 'LINK': 9, 'LIT': 25, 'LTC': 20, 'ONDO': 11, 'PUMP': 18, 'RENDER': 14, 'SOL': 9, 'SUI': 10, 'TAO': 17, 'UNI': 14, 'WIF': 8, 'WLD': 31, 'XLM': 27, 'XRP': 12, 'ZAMA': 28, 'ZEC': 19}
+  capture<0.0: n=323 mean -89.1 CI (-147.7, -28.9)
+  capture<0.25: n=436 mean -88.3 CI (-133.8, -43.2)
+  capture<0.5: n=582 mean -88.2 CI (-123.3, -52.6)
+  capture<0.75: n=813 mean -88.1 CI (-115.0, -61.8)
+--- ETH/BTC ratio 24h change regime -> alt fwd24 (all bars, overlapping) ---
+  r24 in (-1000000000.0,-150]: n=3796 mean -38.3 CI (-63.9, -10.4)
+  r24 in (-150,0]: n=19248 mean 17.5 CI (10.7, 24.7)
+  r24 in (0,150]: n=20452 mean -13.8 CI (-20.9, -6.8)
+  r24 in (150,1000000000.0]: n=6033 mean -17.2 CI (-30.2, -3.5)

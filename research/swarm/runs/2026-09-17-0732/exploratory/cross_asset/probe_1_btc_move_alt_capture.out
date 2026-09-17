@@ -1,0 +1,10 @@
+bars 52397 symbols 34
+ALL bars: fwd8h mean -2.5 bps CI (-4.977262160325408, 0.2111020144671633)
+A crash+alt_lag (b<-100, a>0.5b): n=916 fwd8h mean -14.9 bps CI (-47.9, 19.0) share<0 0.529
+A' crash+alt_overshoot (b<-100, a<1.5b): n=1608 fwd8h mean 38.1 bps CI (18.9, 56.4) share<0 0.457
+A'' crash all (b<-100): n=4613 fwd8h mean 25.9 bps CI (14.7, 36.9) share<0 0.460
+B rally+alt_lag (b>100, a<0.5b): n=899 fwd8h mean -84.5 bps CI (-112.5, -58.2) share<0 0.640
+B' rally+alt_overshoot (b>100, a>1.5b): n=1555 fwd8h mean -35.0 bps CI (-54.3, -12.4) share<0 0.561
+B'' rally all (b>100): n=4444 fwd8h mean -60.4 bps CI (-70.7, -50.8) share<0 0.611
+A crash+alt_lag (b<-100, a>0.5b) by month: {'count': {6: 665, 7: 247, 8: 4}, 'mean': {6: -36.9, 7: 44.0, 8: -0.7}}
+B rally+alt_lag (b>100, a<0.5b) by month: {'count': {6: 443, 7: 404, 8: 52}, 'mean': {6: -151.4, 7: -19.5, 8: -19.2}}

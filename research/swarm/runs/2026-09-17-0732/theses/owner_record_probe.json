@@ -1,0 +1,996 @@
+{
+  "label": "EXPLORATORY PROBE \u2014 not a thesis, not a screen",
+  "run": "2026-09-17-0732",
+  "lens": "owner-record",
+  "source_file": "research/swarm/kb/owner_trades/api_closed_pnl.json",
+  "scales": {
+    "closed_pnl_Ev_div": 10000.0,
+    "price_Ep_div": 10000.0,
+    "wallet_amountEv_div": 100000000.0,
+    "note": "Ev/Ep scales per SOURCES.md 2b; wallet 1e8 per SOURCES.md 2c XRP example."
+  },
+  "n_positions": 819,
+  "window_utc": {
+    "first_open": "2022-03-26 06:11:32.166000+00:00",
+    "last_close": "2023-02-16 15:44:55.384000+00:00"
+  },
+  "cum_realized_pnl_usd": {
+    "field": "sum(realizedPnlEv)/1e4",
+    "total": 4857.22,
+    "min_cum": -2036.28,
+    "min_cum_at": "2022-11-09 10:07:28.585000+00:00",
+    "max_cum": 6335.62,
+    "max_cum_at": "2022-11-10 07:55:25.822000+00:00"
+  },
+  "gross_pnl_usd_total": {
+    "field": "sum(closedPnlEv)/1e4",
+    "value": 5894.93
+  },
+  "fees_usd_total": {
+    "field": "sum(exchangeFeeEv)/1e4",
+    "value": 999.82
+  },
+  "funding_usd_total": {
+    "field": "sum(fundingFeeEv)/1e4",
+    "value": 37.89
+  },
+  "monthly_realized_usd": {
+    "2022-03-01": -110.44,
+    "2022-04-01": -256.89,
+    "2022-05-01": -455.31,
+    "2022-06-01": -170.12,
+    "2022-07-01": -64.63,
+    "2022-08-01": -288.76,
+    "2022-09-01": -295.41,
+    "2022-10-01": -310.15,
+    "2022-11-01": 7431.1,
+    "2022-12-01": -290.96,
+    "2023-01-01": -331.66,
+    "2023-02-01": 0.47
+  },
+  "monthly_cum_realized_usd": {
+    "2022-03-01": -110.44,
+    "2022-04-01": -367.34,
+    "2022-05-01": -822.65,
+    "2022-06-01": -992.77,
+    "2022-07-01": -1057.4,
+    "2022-08-01": -1346.16,
+    "2022-09-01": -1641.57,
+    "2022-10-01": -1951.72,
+    "2022-11-01": 5479.38,
+    "2022-12-01": 5188.42,
+    "2023-01-01": 4856.76,
+    "2023-02-01": 4857.22
+  },
+  "concentration": {
+    "field": "realizedPnlEv/1e4, positive rows only",
+    "total_positive_pnl_usd": 12899.2,
+    "n_positive": 397,
+    "largest_trade_usd": 1089.62,
+    "largest_trade_share_of_positive": 0.0845,
+    "largest_trade": {
+      "symbol": "u100TRYBUSD",
+      "side": "long",
+      "leverage": 20,
+      "opened": "2022-11-10 07:53:39.088000+00:00",
+      "closed": "2022-11-10 07:55:25.822000+00:00",
+      "hold_min": 1.8,
+      "ret_bps": 2326.1,
+      "closedSize": 1082
+    },
+    "top5_usd": 3805.91,
+    "top5_share_of_positive": 0.2951,
+    "top5_trades": [
+      {
+        "symbol": "u100TRYBUSD",
+        "side": "long",
+        "leverage": 20,
+        "usd": 1089.62,
+        "closed": "2022-11-10 07:55:25.822000+00:00",
+        "hold_min": 1.8,
+        "ret_bps": 2326.1
+      },
+      {
+        "symbol": "u100TRYBUSD",
+        "side": "short",
+        "leverage": 20,
+        "usd": 766.39,
+        "closed": "2022-11-10 07:53:26.313000+00:00",
+        "hold_min": 2.4,
+        "ret_bps": 2697.7
+      },
+      {
+        "symbol": "u100TRYBUSD",
+        "side": "long",
+        "leverage": 20,
+        "usd": 736.28,
+        "closed": "2022-11-10 07:50:24.546000+00:00",
+        "hold_min": 3.3,
+        "ret_bps": 1844.2
+      },
+      {
+        "symbol": "u100TRYBUSD",
+        "side": "long",
+        "leverage": 20,
+        "usd": 656.92,
+        "closed": "2022-11-10 07:31:40.469000+00:00",
+        "hold_min": 0.9,
+        "ret_bps": 1850.7
+      },
+      {
+        "symbol": "u100TRYBUSD",
+        "side": "short",
+        "leverage": 20,
+        "usd": 556.71,
+        "closed": "2022-11-10 05:20:44.518000+00:00",
+        "hold_min": 1.0,
+        "ret_bps": 3897.1
+      }
+    ],
+    "total_minus_largest_usd": 3767.6,
+    "total_minus_top5_usd": 1051.31
+  },
+  "win_rate": {
+    "field": "realizedPnlEv>0",
+    "wr": 0.4847,
+    "n_win": 397,
+    "n_loss": 422,
+    "n_zero": 0
+  },
+  "payoff_ratio": {
+    "field": "mean(win realized)/|mean(loss realized)|",
+    "avg_win_usd": 32.492,
+    "avg_loss_usd": -19.057,
+    "ratio": 1.705,
+    "median_win_usd": 9.371,
+    "median_loss_usd": -11.24
+  },
+  "per_trade_realized_usd": {
+    "mean": 5.9307,
+    "ci95_bootstrap_lib": [
+      1.012,
+      11.4839
+    ],
+    "median": -0.4184
+  },
+  "hold_minutes": {
+    "field": "(updatedTimeNs-openedTimeNs)/60000",
+    "median": 82.3,
+    "p25": 18.0,
+    "p75": 308.2,
+    "median_win": 123.3,
+    "median_loss": 52.8
+  },
+  "ret_bps_price_move": {
+    "field": "sign-adjusted (closePriceEp/openPriceEp-1)*1e4",
+    "median_win": 103.0,
+    "median_loss": -79.9,
+    "wr_gross_price_move_gt0": 0.5116
+  },
+  "symbols": {
+    "u100TRYBUSD": {
+      "n": 33,
+      "usd": 8128.01,
+      "wr": 0.818,
+      "median_hold_min": 3.3
+    },
+    "XRPUSD": {
+      "n": 73,
+      "usd": 44.39,
+      "wr": 0.521,
+      "median_hold_min": 100.3
+    },
+    "STORJUSD": {
+      "n": 1,
+      "usd": 5.75,
+      "wr": 1.0,
+      "median_hold_min": 551.9
+    },
+    "BNBUSD": {
+      "n": 1,
+      "usd": 1.58,
+      "wr": 1.0,
+      "median_hold_min": 298.6
+    },
+    "u100ANKRUSD": {
+      "n": 1,
+      "usd": -0.04,
+      "wr": 0.0,
+      "median_hold_min": 44.8
+    },
+    "BTCUSD": {
+      "n": 1,
+      "usd": -0.31,
+      "wr": 0.0,
+      "median_hold_min": 25.1
+    },
+    "DOGEUSD": {
+      "n": 3,
+      "usd": -5.46,
+      "wr": 0.333,
+      "median_hold_min": 25.4
+    },
+    "LINKUSD": {
+      "n": 1,
+      "usd": -11.92,
+      "wr": 0.0,
+      "median_hold_min": 5.9
+    },
+    "MASKUSD": {
+      "n": 6,
+      "usd": -26.11,
+      "wr": 0.667,
+      "median_hold_min": 47.7
+    },
+    "LUNAOLDUSD": {
+      "n": 31,
+      "usd": -38.6,
+      "wr": 0.387,
+      "median_hold_min": 80.0
+    },
+    "MANAUSD": {
+      "n": 2,
+      "usd": -54.41,
+      "wr": 0.5,
+      "median_hold_min": 34.6
+    },
+    "DASHUSD": {
+      "n": 2,
+      "usd": -55.01,
+      "wr": 0.5,
+      "median_hold_min": 1021.6
+    },
+    "GALAUSD": {
+      "n": 3,
+      "usd": -57.08,
+      "wr": 0.333,
+      "median_hold_min": 50.7
+    },
+    "APTUSD": {
+      "n": 8,
+      "usd": -59.25,
+      "wr": 0.125,
+      "median_hold_min": 48.0
+    },
+    "APEUSD": {
+      "n": 35,
+      "usd": -81.5,
+      "wr": 0.457,
+      "median_hold_min": 24.2
+    },
+    "ADAUSD": {
+      "n": 105,
+      "usd": -84.31,
+      "wr": 0.6,
+      "median_hold_min": 114.9
+    },
+    "AAVEUSD": {
+      "n": 11,
+      "usd": -117.52,
+      "wr": 0.273,
+      "median_hold_min": 22.6
+    },
+    "ETHUSD": {
+      "n": 13,
+      "usd": -149.16,
+      "wr": 0.231,
+      "median_hold_min": 43.5
+    },
+    "AVAXUSD": {
+      "n": 43,
+      "usd": -393.93,
+      "wr": 0.512,
+      "median_hold_min": 84.9
+    },
+    "MATICUSD": {
+      "n": 67,
+      "usd": -462.63,
+      "wr": 0.493,
+      "median_hold_min": 193.3
+    },
+    "SOLUSD": {
+      "n": 73,
+      "usd": -475.56,
+      "wr": 0.37,
+      "median_hold_min": 74.0
+    },
+    "uBTCUSD": {
+      "n": 306,
+      "usd": -1249.71,
+      "wr": 0.464,
+      "median_hold_min": 95.2
+    }
+  },
+  "side_split": {
+    "long": {
+      "n": 423,
+      "usd": 3158.4,
+      "wr": 0.473,
+      "median_hold_min": 73.8
+    },
+    "short": {
+      "n": 396,
+      "usd": 1698.82,
+      "wr": 0.497,
+      "median_hold_min": 98.8
+    }
+  },
+  "leverage_split": {
+    "-20": {
+      "n": 3,
+      "usd": 93.85,
+      "wr": 0.333
+    },
+    "-14": {
+      "n": 2,
+      "usd": 6.32,
+      "wr": 0.5
+    },
+    "-10": {
+      "n": 1,
+      "usd": -0.96,
+      "wr": 0.0
+    },
+    "0": {
+      "n": 8,
+      "usd": -70.39,
+      "wr": 0.375
+    },
+    "6": {
+      "n": 8,
+      "usd": -72.63,
+      "wr": 0.625
+    },
+    "7": {
+      "n": 1,
+      "usd": -50.6,
+      "wr": 0.0
+    },
+    "8": {
+      "n": 1,
+      "usd": -34.01,
+      "wr": 0.0
+    },
+    "9": {
+      "n": 1,
+      "usd": 20.98,
+      "wr": 1.0
+    },
+    "10": {
+      "n": 206,
+      "usd": -283.61,
+      "wr": 0.563
+    },
+    "11": {
+      "n": 1,
+      "usd": 6.12,
+      "wr": 1.0
+    },
+    "12": {
+      "n": 45,
+      "usd": -59.1,
+      "wr": 0.556
+    },
+    "13": {
+      "n": 10,
+      "usd": -252.97,
+      "wr": 0.4
+    },
+    "14": {
+      "n": 2,
+      "usd": 39.19,
+      "wr": 1.0
+    },
+    "15": {
+      "n": 2,
+      "usd": -1.51,
+      "wr": 0.5
+    },
+    "16": {
+      "n": 6,
+      "usd": -33.28,
+      "wr": 0.333
+    },
+    "17": {
+      "n": 2,
+      "usd": -71.41,
+      "wr": 0.0
+    },
+    "19": {
+      "n": 4,
+      "usd": -58.85,
+      "wr": 0.5
+    },
+    "20": {
+      "n": 6,
+      "usd": 26.84,
+      "wr": 0.833
+    },
+    "21": {
+      "n": 1,
+      "usd": -6.81,
+      "wr": 0.0
+    },
+    "25": {
+      "n": 51,
+      "usd": -251.03,
+      "wr": 0.49
+    },
+    "26": {
+      "n": 2,
+      "usd": -62.96,
+      "wr": 0.0
+    },
+    "30": {
+      "n": 4,
+      "usd": -105.19,
+      "wr": 0.25
+    },
+    "32": {
+      "n": 2,
+      "usd": -101.89,
+      "wr": 0.0
+    },
+    "33": {
+      "n": 1,
+      "usd": -25.02,
+      "wr": 0.0
+    },
+    "35": {
+      "n": 36,
+      "usd": -384.47,
+      "wr": 0.444
+    },
+    "40": {
+      "n": 5,
+      "usd": 6.33,
+      "wr": 0.4
+    },
+    "50": {
+      "n": 17,
+      "usd": -265.89,
+      "wr": 0.176
+    },
+    "74": {
+      "n": 1,
+      "usd": 15.64,
+      "wr": 1.0
+    },
+    "77": {
+      "n": 1,
+      "usd": -10.74,
+      "wr": 0.0
+    },
+    "100": {
+      "n": 44,
+      "usd": -207.74,
+      "wr": 0.364
+    }
+  },
+  "time_of_day_hour_utc": {
+    "0": {
+      "n": 54,
+      "usd": 46.58,
+      "wr": 0.5
+    },
+    "1": {
+      "n": 50,
+      "usd": -263.73,
+      "wr": 0.48
+    },
+    "2": {
+      "n": 45,
+      "usd": -9.89,
+      "wr": 0.467
+    },
+    "3": {
+      "n": 36,
+      "usd": -160.99,
+      "wr": 0.472
+    },
+    "4": {
+      "n": 37,
+      "usd": -193.45,
+      "wr": 0.405
+    },
+    "5": {
+      "n": 30,
+      "usd": 1813.05,
+      "wr": 0.533
+    },
+    "6": {
+      "n": 21,
+      "usd": 1194.79,
+      "wr": 0.571
+    },
+    "7": {
+      "n": 19,
+      "usd": 5010.35,
+      "wr": 0.789
+    },
+    "8": {
+      "n": 4,
+      "usd": -74.93,
+      "wr": 0.25
+    },
+    "9": {
+      "n": 3,
+      "usd": 4.04,
+      "wr": 0.333
+    },
+    "10": {
+      "n": 2,
+      "usd": -24.05,
+      "wr": 0.0
+    },
+    "11": {
+      "n": 6,
+      "usd": -77.26,
+      "wr": 0.5
+    },
+    "12": {
+      "n": 14,
+      "usd": -203.41,
+      "wr": 0.286
+    },
+    "13": {
+      "n": 30,
+      "usd": -174.21,
+      "wr": 0.533
+    },
+    "14": {
+      "n": 43,
+      "usd": -36.35,
+      "wr": 0.558
+    },
+    "15": {
+      "n": 42,
+      "usd": 39.75,
+      "wr": 0.571
+    },
+    "16": {
+      "n": 41,
+      "usd": -263.8,
+      "wr": 0.439
+    },
+    "17": {
+      "n": 46,
+      "usd": -473.73,
+      "wr": 0.217
+    },
+    "18": {
+      "n": 46,
+      "usd": -301.1,
+      "wr": 0.587
+    },
+    "19": {
+      "n": 42,
+      "usd": -170.82,
+      "wr": 0.571
+    },
+    "20": {
+      "n": 57,
+      "usd": -135.75,
+      "wr": 0.509
+    },
+    "21": {
+      "n": 53,
+      "usd": -245.04,
+      "wr": 0.491
+    },
+    "22": {
+      "n": 50,
+      "usd": -359.07,
+      "wr": 0.42
+    },
+    "23": {
+      "n": 48,
+      "usd": -83.74,
+      "wr": 0.458
+    }
+  },
+  "time_of_day_hour_pt": {
+    "0": {
+      "n": 8,
+      "usd": -22.81,
+      "wr": 0.625
+    },
+    "1": {
+      "n": 4,
+      "usd": 28.11,
+      "wr": 0.5
+    },
+    "2": {
+      "n": 2,
+      "usd": -15.59,
+      "wr": 0.0
+    },
+    "3": {
+      "n": 2,
+      "usd": -24.05,
+      "wr": 0.0
+    },
+    "4": {
+      "n": 6,
+      "usd": -77.26,
+      "wr": 0.5
+    },
+    "5": {
+      "n": 21,
+      "usd": -241.14,
+      "wr": 0.476
+    },
+    "6": {
+      "n": 36,
+      "usd": -96.58,
+      "wr": 0.556
+    },
+    "7": {
+      "n": 40,
+      "usd": -170.7,
+      "wr": 0.5
+    },
+    "8": {
+      "n": 43,
+      "usd": 24.32,
+      "wr": 0.512
+    },
+    "9": {
+      "n": 39,
+      "usd": -452.8,
+      "wr": 0.385
+    },
+    "10": {
+      "n": 54,
+      "usd": -323.77,
+      "wr": 0.37
+    },
+    "11": {
+      "n": 45,
+      "usd": -392.84,
+      "wr": 0.511
+    },
+    "12": {
+      "n": 32,
+      "usd": 77.94,
+      "wr": 0.656
+    },
+    "13": {
+      "n": 66,
+      "usd": -118.29,
+      "wr": 0.5
+    },
+    "14": {
+      "n": 52,
+      "usd": -333.79,
+      "wr": 0.462
+    },
+    "15": {
+      "n": 50,
+      "usd": -324.92,
+      "wr": 0.4
+    },
+    "16": {
+      "n": 43,
+      "usd": 11.14,
+      "wr": 0.535
+    },
+    "17": {
+      "n": 59,
+      "usd": -36.84,
+      "wr": 0.492
+    },
+    "18": {
+      "n": 47,
+      "usd": -298.94,
+      "wr": 0.404
+    },
+    "19": {
+      "n": 44,
+      "usd": 19.31,
+      "wr": 0.523
+    },
+    "20": {
+      "n": 38,
+      "usd": -267.16,
+      "wr": 0.421
+    },
+    "21": {
+      "n": 42,
+      "usd": 1720.02,
+      "wr": 0.5
+    },
+    "22": {
+      "n": 25,
+      "usd": 1232.14,
+      "wr": 0.56
+    },
+    "23": {
+      "n": 21,
+      "usd": 4941.73,
+      "wr": 0.667
+    }
+  },
+  "day_of_week_utc_0=Mon": {
+    "0": {
+      "n": 117,
+      "usd": 3.39,
+      "wr": 0.59
+    },
+    "1": {
+      "n": 151,
+      "usd": -752.89,
+      "wr": 0.45
+    },
+    "2": {
+      "n": 137,
+      "usd": -1066.14,
+      "wr": 0.387
+    },
+    "3": {
+      "n": 149,
+      "usd": 8181.79,
+      "wr": 0.617
+    },
+    "4": {
+      "n": 125,
+      "usd": -908.42,
+      "wr": 0.408
+    },
+    "5": {
+      "n": 63,
+      "usd": -137.62,
+      "wr": 0.46
+    },
+    "6": {
+      "n": 77,
+      "usd": -462.9,
+      "wr": 0.455
+    }
+  },
+  "after_loss_next_trade": {
+    "n": 422,
+    "next_size_ratio_median": 0.899,
+    "next_size_larger_share": 0.358,
+    "next_same_side_share": 0.531,
+    "next_same_symbol_share": 0.595,
+    "next_hold_min_median": 90.3,
+    "next_leverage_median": 20.0,
+    "next_wr": 0.443,
+    "next_realized_usd_mean": -2.035,
+    "gap_to_next_open_min_median": 40.7
+  },
+  "after_win_next_trade": {
+    "n": 396,
+    "next_size_ratio_median": 1.094,
+    "next_size_larger_share": 0.644,
+    "next_same_side_share": 0.619,
+    "next_same_symbol_share": 0.674,
+    "next_hold_min_median": 80.6,
+    "next_leverage_median": 15.0,
+    "next_wr": 0.53,
+    "next_realized_usd_mean": 14.436,
+    "gap_to_next_open_min_median": 37.4
+  },
+  "hold_bucket": {
+    "<5m": {
+      "n": 102,
+      "usd": 5913.17,
+      "wr": 0.343,
+      "median_ret_bps": -5.5
+    },
+    "5-15m": {
+      "n": 81,
+      "usd": 1663.82,
+      "wr": 0.42,
+      "median_ret_bps": -4.2
+    },
+    "15-60m": {
+      "n": 167,
+      "usd": -1067.5,
+      "wr": 0.377,
+      "median_ret_bps": -13.6
+    },
+    "1-4h": {
+      "n": 218,
+      "usd": -281.26,
+      "wr": 0.569,
+      "median_ret_bps": 22.5
+    },
+    "4-8h": {
+      "n": 95,
+      "usd": -49.18,
+      "wr": 0.6,
+      "median_ret_bps": 41.5
+    },
+    "8-24h": {
+      "n": 120,
+      "usd": -572.68,
+      "wr": 0.558,
+      "median_ret_bps": 25.1
+    },
+    ">24h": {
+      "n": 35,
+      "usd": -726.77,
+      "wr": 0.486,
+      "median_ret_bps": -36.1
+    }
+  },
+  "funding_by_side_usd": {
+    "long": {
+      "sum": -6.44,
+      "n": 423
+    },
+    "short": {
+      "sum": 44.33,
+      "n": 396
+    }
+  },
+  "equity_path": {
+    "note": "Deposits/withdrawals are mostly non-stable (XRP/ADA/MATIC/TRX/...). Only USDT flows are USD-denominated; non-stable flows are listed in NATIVE units unconverted because no historical price series for them is in the repo and this probe fabricates nothing. Therefore a TRUE equity path cannot be built from these files alone; the stable-only path below is a partial reconstruction.",
+    "window": [
+      "2022-03-24 06:11:32.166000+00:00",
+      "2023-03-18 15:44:55.384000+00:00"
+    ],
+    "deposits_native_by_currency_in_window": {
+      "ADA": 3002.6207,
+      "AVAX": 1.0784,
+      "MATIC": 507.9418,
+      "TRX": 0.0112,
+      "USDT": 2495.9724,
+      "XRP": 1542.323
+    },
+    "deposits_count_in_window": 55,
+    "withdrawals_native_by_currency_in_window": {
+      "ADA": 21567.0829,
+      "MATIC": 1362.7003,
+      "USDT": 826.5385,
+      "XRP": 3899.8907
+    },
+    "withdrawals_count_in_window": 56,
+    "first_deposit": {
+      "ts": "2022-03-25 05:20:26+00:00",
+      "currency": "XRP",
+      "amt_native": 30.0
+    },
+    "stable_only_equity_path_monthly_usd": {
+      "2022-03-01": 172.96,
+      "2022-04-01": 69.86,
+      "2022-05-01": -385.45,
+      "2022-06-01": -555.57,
+      "2022-07-01": -497.0,
+      "2022-08-01": -523.48,
+      "2022-09-01": -559.69,
+      "2022-10-01": -465.23,
+      "2022-11-01": 7496.0,
+      "2022-12-01": 7155.04,
+      "2023-01-01": 6823.38,
+      "2023-02-01": 6991.84,
+      "2023-03-01": 6526.65
+    },
+    "stable_only_usdt_deposits_in_window_usd": 2495.97,
+    "stable_only_usdt_withdrawals_in_window_usd": 826.54,
+    "withdrawals_within_3d_of_largest_win_native": [
+      {
+        "ts": "2022-11-10 16:05:57+00:00",
+        "currency": "XRP",
+        "amt_native": 596.25
+      },
+      {
+        "ts": "2022-11-10 15:47:56+00:00",
+        "currency": "MATIC",
+        "amt_native": 622.61
+      },
+      {
+        "ts": "2022-11-10 15:32:56+00:00",
+        "currency": "MATIC",
+        "amt_native": 499.9
+      },
+      {
+        "ts": "2022-11-10 15:07:05+00:00",
+        "currency": "MATIC",
+        "amt_native": 49.9
+      },
+      {
+        "ts": "2022-11-10 14:22:35+00:00",
+        "currency": "ADA",
+        "amt_native": 584.2299
+      },
+      {
+        "ts": "2022-11-10 08:55:47+00:00",
+        "currency": "ADA",
+        "amt_native": 2000.0
+      },
+      {
+        "ts": "2022-11-10 08:49:11+00:00",
+        "currency": "ADA",
+        "amt_native": 2000.0
+      },
+      {
+        "ts": "2022-11-10 08:42:46+00:00",
+        "currency": "XRP",
+        "amt_native": 495.8
+      },
+      {
+        "ts": "2022-11-10 08:35:21+00:00",
+        "currency": "ADA",
+        "amt_native": 1000.0
+      },
+      {
+        "ts": "2022-11-10 08:33:53+00:00",
+        "currency": "XRP",
+        "amt_native": 20.0
+      },
+      {
+        "ts": "2022-11-10 07:53:14+00:00",
+        "currency": "XRP",
+        "amt_native": 537.9776
+      },
+      {
+        "ts": "2022-11-10 07:45:22+00:00",
+        "currency": "ADA",
+        "amt_native": 2276.2379
+      },
+      {
+        "ts": "2022-11-10 07:27:26+00:00",
+        "currency": "XRP",
+        "amt_native": 1108.25
+      },
+      {
+        "ts": "2022-11-10 07:23:41+00:00",
+        "currency": "ADA",
+        "amt_native": 3648.1
+      },
+      {
+        "ts": "2022-11-10 06:41:43+00:00",
+        "currency": "ADA",
+        "amt_native": 835.0092
+      },
+      {
+        "ts": "2022-11-10 06:14:50+00:00",
+        "currency": "ADA",
+        "amt_native": 1710.6
+      },
+      {
+        "ts": "2022-11-10 06:01:35+00:00",
+        "currency": "ADA",
+        "amt_native": 927.8
+      },
+      {
+        "ts": "2022-11-10 05:50:35+00:00",
+        "currency": "ADA",
+        "amt_native": 200.0
+      },
+      {
+        "ts": "2022-11-10 05:38:42+00:00",
+        "currency": "ADA",
+        "amt_native": 100.0
+      },
+      {
+        "ts": "2022-11-10 05:36:12+00:00",
+        "currency": "ADA",
+        "amt_native": 200.0
+      },
+      {
+        "ts": "2022-11-09 04:30:43+00:00",
+        "currency": "ADA",
+        "amt_native": 135.863
+      },
+      {
+        "ts": "2022-11-09 04:30:08+00:00",
+        "currency": "XRP",
+        "amt_native": 128.0216
+      },
+      {
+        "ts": "2022-11-09 04:00:20+00:00",
+        "currency": "USDT",
+        "amt_native": 39.3
+      },
+      {
+        "ts": "2022-11-09 03:55:36+00:00",
+        "currency": "USDT",
+        "amt_native": 5.0
+      }
+    ]
+  }
+}

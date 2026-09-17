@@ -1,0 +1,17 @@
+1000PEPE: bars=1692 values=[-1, 0] nonzero=9 causality=PASS
+1000SHIB: bars=1692 values=[-1, 0] nonzero=19 causality=PASS
+AAVE: bars=1692 values=[-1, 0] nonzero=30 causality=PASS
+ADA: bars=1692 values=[-1, 0] nonzero=22 causality=PASS
+BNB: bars=1692 values=[-1, 0] nonzero=25 causality=PASS
+DOGE: bars=1692 values=[-1, 0] nonzero=14 causality=PASS
+ETH: bars=1692 values=[-1, 0] nonzero=9 causality=PASS
+GIGGLE: bars=1214 values=[-1, 0] nonzero=22 causality=PASS
+LINK: bars=1692 values=[-1, 0] nonzero=11 causality=PASS
+LTC: bars=1692 values=[-1, 0] nonzero=28 causality=PASS
+ONDO: bars=1692 values=[-1, 0] nonzero=15 causality=PASS
+SOL: bars=1692 values=[-1, 0] nonzero=10 causality=PASS
+SUI: bars=1692 values=[-1, 0] nonzero=14 causality=PASS
+TAO: bars=1692 values=[-1, 0] nonzero=21 causality=PASS
+UNI: bars=1692 values=[-1, 0] nonzero=20 causality=PASS
+XLM: bars=1692 values=[-1, 0] nonzero=43 causality=PASS
+XRP: bars=1692 values=[-1, 0] nonzero=12 causality=PASS

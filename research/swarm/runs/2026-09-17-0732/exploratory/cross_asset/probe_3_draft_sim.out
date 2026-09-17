@@ -1,0 +1,7 @@
+RALLY_LAG short tp=150 sl=150 hold=8: n=695 net_mean 11.2 CI (0.6,21.8) WR 0.576 p* 0.5383 tr/wk 69.0 ttv_wk 0.7
+   exits: {'TP': 359, 'SL': 264, 'TIME': 72} TIME gross mean: 21.6
+   by month: {'count': {6: 381, 7: 280, 8: 34}, 'mean': {6: 18.4, 7: -0.1, 8: 25.1}}
+CRASH_OVERSHOOT long tp=150 sl=150 hold=8: n=1375 net_mean -0.5 CI (-8.0,7.5) WR 0.528 p* 0.5383 tr/wk 136.6 ttv_wk 0.4
+   exits: {'TP': 710, 'SL': 601, 'TIME': 64} TIME gross mean: -19.3
+   by month: {'count': {6: 1130, 7: 237, 8: 8}, 'mean': {6: 2.5, 7: -14.6, 8: -8.2}}
+RALLY_LAG per-symbol net mean: {'count': {'1000PEPE': 8, '1000SHIB': 15, 'AAVE': 19, 'ADA': 15, 'ALLO': 55, 'ARB': 14, 'AVAX': 13, 'BCH': 19, 'BICO': 13, 'BNB': 18, 'DEXE': 57, 'DOGE': 13, 'EIGEN': 24, 'ENA': 20, 'ETH': 8, 'GIGGLE': 16, 'HYPE': 25, 'INJ': 28, 'LINK': 10, 'LIT': 36, 'LTC': 20, 'ONDO': 14, 'PUMP': 22, 'RENDER': 16, 'SOL': 8, 'SUI': 12, 'TAO': 19, 'UNI': 15, 'WIF': 9, 'WLD': 38, 'XLM': 30, 'XRP': 12, 'ZAMA': 32, 'ZEC': 22}, 'mean': {'1000PEPE': 40.0, '1000SHIB': -15.0, 'AAVE': 15.0, 'ADA': 17.0, 'ALLO': -20.0, 'ARB': 28.0, 'AVAX': 24.0, 'BCH': -18.0, 'BICO': 0.0, 'BNB': 72.0, 'DEXE': -59.0, 'DOGE': 31.0, 'EIGEN': 14.0, 'ENA': 42.0, 'ETH': 81.0, 'GIGGLE': 94.0, 'HYPE': 42.0, 'INJ': 25.0, 'LINK': 73.0, 'LIT': 14.0, 'LTC': 14.0, 'ONDO': 10.0, 'PUMP': -11.0, 'RENDER': 62.0, 'SOL': 71.0, 'SUI': 12.0, 'TAO': 27.0, 'UNI': 55.0, 'WIF': 24.0, 'WLD': -27.0, 'XLM': 10.0, 'XRP': 39.0, 'ZAMA': 17.0, 'ZEC': -19.0}}

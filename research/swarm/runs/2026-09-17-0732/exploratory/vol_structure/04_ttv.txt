@@ -1,0 +1,1 @@
+{'n': 26, 'train_weeks': 42.845238095238095, 'trades_per_week': 0.6068352320088913, 'time_to_verdict_weeks_n50': 82.39468864468864, 'p_star_200': 0.52875}

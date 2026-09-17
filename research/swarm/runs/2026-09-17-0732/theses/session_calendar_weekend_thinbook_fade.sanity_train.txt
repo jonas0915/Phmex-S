@@ -1,0 +1,24 @@
+1000PEPE: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=12 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+1000SHIB: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=5 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+AAVE: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=13 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+ADA: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=7 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+BNB: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=4 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+BTC: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[0, 1] nonzero=1 causality=PASS lot_check={'ok': True, 'lots': 2, 'lot_usd': 77.74}
+DOGE: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=10 causality=PASS lot_check={'ok': True, 'lots': 199, 'lot_usd': 1.001}
+ETH: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=6 causality=PASS lot_check={'ok': True, 'lots': 8, 'lot_usd': 24.9738}
+LINK: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=8 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+LTC: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=4 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+NEAR: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=9 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+ONDO: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=9 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+SOL: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=5 causality=PASS lot_check={'ok': True, 'lots': 197, 'lot_usd': 1.0143}
+SUI: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=11 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+TAO: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=14 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+UNI: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=13 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+XLM: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=6 causality=PASS lot_check={'ok': True, 'lots': 200, 'lot_usd': None}
+XRP: bars=7199 span=2025-06-27 06:00:00+00:00..2026-04-23 04:00:00+00:00 values=[-1, 0, 1] nonzero=5 causality=PASS lot_check={'ok': True, 'lots': 199, 'lot_usd': 1.0044}
+total nonzero signals (train): 142
+p_star(200) = 0.52875
+expected_trades_per_week (train count / 43 weeks) = 3.302325581395349
+time_to_verdict_weeks at that rate = 15.140845070422534
+time_to_verdict_weeks at registered 3.0/wk = 16.666666666666668
+C_BPS = 11.5

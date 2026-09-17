@@ -1,0 +1,76 @@
+{
+  "id": "session_calendar_weekend_thinbook_fade",
+  "lens": "session_calendar",
+  "mechanism": "Weekend price discovery in crypto perps happens on a structurally thinner book with the US institutional/ETF channel closed: Kraken XBT/USD hourly data 2016-2025 (87,672 obs) shows the weekend-to-weekday volatility ratio fell to 0.60 (2024) / 0.64 (2025) and the volume ratio to 0.43 / 0.46, while the nine US hours 13:00-21:59 UTC now carry 50.6% of daily realized variance (cryptoslate.com Wall-Street-time article, opened); weekend BTC-USDT spreads widen from 0.012% to 0.028% and volume drops 20-40% (dailycoin.com, opened); weekend share of BTC volume is down to 16-17% from 24% in 2018 and ~47% of volume sits in the US weekday session (investinglive.com citing Kaiko, opened). So a LARGE weekend move (>= 5% from the Friday 21:00 UTC CME close to Monday 00:00 UTC) is produced by a small set of leveraged crypto-native perp traders and liquidation engines pushing through a book roughly half as deep as a weekday book, with no ETF creation/redemption, no CME arbitrage and no institutional dealer inventory to absorb it. When the deep-liquidity participants return Monday (CME reopens Sunday 22:00 UTC, US ETF/AP channel 13:30 UTC Monday), the marginal price is re-set by a much larger, price-insensitive-to-weekend-narrative capital pool, and the thin-book overshoot component of the weekend move is given back over the Monday-Tuesday sessions. The trade fades the weekend move at the Monday 00:00 UTC open with a maker limit, symmetric 200 bps TP/SL, max hold 48 hourly bars (through Tuesday 23:00 UTC), on 18 long_1h symbols. Horizon is multi-day (hold > 8h; 6 funding settlements crossed); the 5-min poller trivially hits a fixed 00:00 UTC Monday entry and the 48h hold tolerates Mac sleep.",
+  "counterparty": "Two counterparties who must pay. (1) Weekend leveraged perp traders (and the exchange liquidation engines that close them) who moved price >= 5% into a book with ~0.43-0.46x weekday volume and ~2x weekday spreads: they hold positions marked at a thin-book price and, when Monday's deep liquidity reprices the asset, their late-weekend chasers are the ones who must exit at a loss or get liquidated into the reversal -- they paid a thin-book overshoot premium that the Monday book does not honour. (2) Monday-returning institutional / ETF-channel capital, which cannot transact on Saturday-Sunday by construction (US ETFs and CME are closed) and therefore supplies the counter-flow at Monday prices, not weekend prices. The fader is paid the difference between the weekend thin-book print and the Monday deep-book print. Nobody in this chain can choose to act on Saturday: the closure is a contract/venue rule, which is why the flow is structurally forced onto Monday.",
+  "prediction": "Falsifiable: on the long_1h train era, at every Sunday 23:00 UTC bar where close(Sun 23:00)/close(Fri 20:00) - 1 is >= +5% (short) or <= -5% (long), entering at the Monday 00:00 UTC open against the weekend move with 200/200 bps TP/SL and a 48-bar max hold yields n >= 30, net_bps_mean > 0 after c = 11.5 bps with bootstrap CI95 (research.swarm.lib.bootstrap_ci.mean_ci) excluding 0, and observed WR >= fee_math.p_star(200) = 0.52875 (research/swarm/runs/2026-09-17-0732/theses/session_calendar_weekend_thinbook_fade.sanity_train.txt). If weekend moves instead continue into Monday (the 'ETF holders chase the gap' alternative), net_bps_mean will be <= 0 and the thesis is dead. Secondary, NOT a pass criterion: the reversal should be larger for weekend rallies than for weekend dumps only if short-side liquidations dominate; the exploratory probe suggests the opposite (long side stronger), which the audit should report but not select on.",
+  "nearest_dead_rows": [
+    {
+      "row": 7,
+      "why_different": "Row 7's CME-gap-fill was a BTC-only bet that price returns to the Friday CME settlement level regardless of gap size, found 'backwards' on this account's 2026 data; its 'Saturday alt strength' and 'weekend boost' were UNCONDITIONAL day-of-week longs. This thesis has no level target and no unconditional calendar drift: it fires only on the extreme tail (>= 5% weekend move, ~3.3 sym-weekends/week out of ~18 candidates) on 18 symbols, with a fixed 200 bps TP/SL rather than a fill-the-gap exit, and its mechanism is thin-book overshoot vs deep-book repricing, not 'the gap fills'. The exploratory dose-response (sign-adjusted 48h forward return flat for moves < 3%, negative only for >= 5%, research/swarm/runs/2026-09-17-0732/exploratory/session_calendar/probe_weekend_gap.out.txt) is exactly what row 7's unconditional test would average away."
+    },
+    {
+      "row": 76,
+      "why_different": "Row 76 killed generic multi-day mean reversion and the 21-23 UTC overnight window as post-2022 dead via web sweep. This is not generic mean reversion of any N-day move: the conditioning variable is the venue-closure window (Fri 21:00 -> Mon 00:00 UTC), where the counterparty is defined by a contractual inability to trade, and the same 5% move Tuesday->Thursday is NOT a signal. The mechanism is liquidity-regime switching at a calendar boundary, not statistical mean reversion."
+    },
+    {
+      "row": 6,
+      "why_different": "Row 6 faded a single high-volatility 5m/1h liquidation bar and found continuation. Here the fade is not of a volatility bar but of a 51-hour cumulative move measured across the weekend closure, entered only once the deep-liquidity regime resumes (Monday 00:00 UTC), i.e. after the liquidation engine's window in the thin book has ended -- row 6 entered while the cascade was still in the same liquidity regime."
+    },
+    {
+      "row": 3,
+      "why_different": "Row 3 was a 1h vol-expansion fade whose OOS edge was a single-split artifact. This thesis does not condition on volatility expansion at all (a 5% weekend move on low weekend volume is by the sources a LOW-volume event, weekend vol ratio 0.60); the conditioning is calendar/venue closure, and the exploratory read reports per-weekend clustering explicitly so the audit can test the split-dependence row 3 died of."
+    },
+    {
+      "row": 18,
+      "why_different": "Row 18 rejected unconditional seasonality/weekend effects (adj-R2 <= 0.002). Consistent with that, the exploratory probe shows near-zero forward return for ordinary weekends (|move| < 3%: n=311, means -3 to +22 bps, CI spanning 0); the thesis lives only in the >= 5% tail, which a seasonality regression on all weekends cannot see."
+    },
+    {
+      "row": 67,
+      "why_different": "Row 67 tested day-of-week/hour gates as filters on the existing scalper books' entries. This is a standalone multi-day event trade with its own entry and exit, not a gate on another book."
+    },
+    {
+      "row": 13,
+      "why_different": "Row 13 is BTC 28d time-series momentum on daily bars. This bets AGAINST the short-horizon move, only on a calendar-defined window, on alts; the sign and the conditioning are both different."
+    }
+  ],
+  "source_urls": [
+    "https://cryptoslate.com/crypto-never-closes-but-bitcoin-ethereum-xrp-and-solana-now-move-on-wall-street-time/",
+    "https://dailycoin.com/bitcoins-weekend-gap-etfs-shift-liquidity-to-u-s-hours/",
+    "https://investinglive.com/cryptocurrency/bitcoin-isn-t-a-weekend-hedge-it-s-just-the-only-market-still-open/",
+    "https://acr-journal.com/article/the-weekend-effect-in-crypto-momentum-does-momentum-change-when-markets-never-sleep--1514/",
+    "https://ecoinometrics.substack.com/p/for-bitcoin-returns-flow-streaks"
+  ],
+  "evidence": "All five URLs were opened this run via WebFetch. (1) cryptoslate.com 'Crypto never closes, but Bitcoin, Ethereum, XRP and Solana now move on Wall Street time': study of '87,672 hourly observations from Kraken's XBT/USD market between 2016 and 2025'; 'the nine hours from 13:00 to 21:59 UTC accounted for 50.6% of Bitcoin's daily realized variance' in 2022-2025 vs 38.4% in 2016-2018 (37.5% baseline); weekend-to-weekday volatility ratio 0.96 (2016) -> 0.60 (2024) -> 0.64 (2025); weekend-to-weekday volume ratio 0.78 (2016) -> 0.43 (2024) -> 0.46 (2025); XRP US-hours variance share 37.2% -> 46.2%, ETH 41.8% -> 48.2%; on NYSE holidays BTC's US-hours variance share fell 13.9 percentage points (55.7% -> ~41.9%). (2) dailycoin.com 'Bitcoin's Weekend Gap: ETFs Shift Liquidity to U.S. Hours' (Kaiko, dated March 30 2026): 'U.S. trading sessions now account for 47% of global Bitcoin spot volume, up from 38% before the ETF launch'; BTC-USDT bid-ask spread widens from 0.012% on weekdays to 0.028% on weekends; weekend BTC volume drops 20-40% vs weekdays; liquidity ~42% lower by 21:00 UTC than the 11:00 UTC peak (Amberdata, >50,000 minutes of Binance BTC/FDUSD book data, mid-2025). (3) investinglive.com 'Bitcoin isn't a weekend hedge...' (citing Kaiko Research): weekend share of total Bitcoin volume 'declined from 24% in 2018 to roughly 16-17% in recent years'; spreads 'more than double on weekends'; 'around 47% of Bitcoin volume now occurs during the US trading day'. That article explicitly gives NO statistic on whether weekend moves reverse or continue on Monday -- the direction is this thesis's own falsifiable claim, not a sourced one. (4) acr-journal.com 'The Weekend Effect in Crypto Momentum' (8 coins, 2020-01-01 to 2025-04-30, 1,672 days): 7-day momentum daily returns higher on weekends than weekdays (BTC 0.0023 vs 0.0012, t=2.41; DOGE 0.0052 vs 0.0021, t=3.78; altcoin aggregate 0.0041 vs 0.0019), no transaction-cost adjustment. Used only as evidence that weekend price action is trend-chasing/retail-driven (the overshoot leg of the mechanism), NOT as evidence for the Monday reversal; note this journal is not a finance venue and the result is cited for direction of weekend flow only. (5) ecoinometrics.substack.com: 'Each 10k BTC of monthly inflows typically driving a 4.3% return' (ETF-flow model) -- used only to establish that the ETF channel, which is closed on weekends, is a material price-setting flow on weekdays. Sources NOT opened and therefore NOT cited for numbers: SSRN 'The Price Impact of Spot Bitcoin ETF Flows' (403), ScienceDirect 'One year of bitcoin spot ETPs' (403), MDPI 'Lagged Momentum and Reversal ... Daytime and Overnight Sessions' (403; search snippet says its session-rule gains were not significant in paired bootstrap -- a caution, not evidence). EXPLORATORY probe on long_1h TRAIN only (no mr_edge data touched; not evidence, saved at research/swarm/runs/2026-09-17-0732/exploratory/session_calendar/probe_weekend_gap.out.txt, probe_weekend_gap2.out.txt, probe_weekend_gap3.out.txt): 774 sym-weekends over 43 weekends, 18 symbols; sign-adjusted 48h forward return by |weekend move| bucket: [0,1%) n=172 -3.1 bps, [1,2%) n=139 +22.0, [2,3%) n=143 -11.8, [3,5%) n=178 -55.7, >=5% n=142 -126.8 bps CI95 (-220.8, -22.8) (bootstrap_ci.mean_ci); with screen.simulate at 200/200 bps, hold 48: n=142, net mean +53.3 bps CI95 (22.3, 84.3), WR 0.662; long side +98.4 vs short side +8.2; 17 of 33 distinct entry weeks have positive mean; the close-to-close sum is dominated by 3 weekends (2025-06-29, 2026-01-25, 2026-04-19), so the screen's independent-resampling CI overstates confidence -- the audit should cluster by weekend.",
+  "spec": {
+    "dataset": "long_1h",
+    "universe": [
+      "1000PEPE",
+      "1000SHIB",
+      "AAVE",
+      "ADA",
+      "BNB",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "LINK",
+      "LTC",
+      "NEAR",
+      "ONDO",
+      "SOL",
+      "SUI",
+      "TAO",
+      "UNI",
+      "XLM",
+      "XRP"
+    ],
+    "timeframe": "1h",
+    "tp_bps": 200,
+    "sl_bps": 200,
+    "max_hold_bars": 48,
+    "expected_trades_per_week": 3.0,
+    "doa_line": "Dead on arrival if the train screen's out.json shows n < 30, net_bps_mean <= 0 after c, a bootstrap CI95 including 0, or wr < fee_math.p_star(200) = 0.52875; additionally dead if, clustering trades.csv by entry week, fewer than half of the distinct entry weeks have positive mean net bps (the effect must not live in three weekends), or if the registered tp +/-20% robustness read flips the sign of net_bps_mean."
+  },
+  "signal_py": "import pandas as pd\nimport numpy as np\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"session_calendar_weekend_thinbook_fade \u2014 closed 1h bars only.\n    At the bar stamped Sunday 23:00 UTC (the last bar of the weekend, closing Monday 00:00 UTC),\n    measure the weekend move as close(Sun 23:00) / close(Fri 20:00) - 1, where the Fri 20:00 bar\n    (closing 21:00 UTC = CME close) sits exactly 51 hourly bars earlier. If the move is >= +5%\n    emit -1 (fade the thin-book weekend rally); if <= -5% emit +1 (fade the weekend dump).\n    Entry is at Monday 00:00 UTC open. Uses only shift(+51) and the bar's own index; no future bars.\n    A missing/irregular 51-bar gap (data hole) disables the bar.\"\"\"\n    c = df[\"close\"].astype(float)\n    idx = df.index\n    is_sun23 = (idx.dayofweek == 6) & (idx.hour == 23)\n    gap_ok = (idx.to_series().diff(51) == pd.Timedelta(hours=51)).to_numpy()\n    wk = (c / c.shift(51) - 1.0).to_numpy()\n    sig = pd.Series(0, index=idx, dtype=\"int64\")\n    ok = is_sun23 & gap_ok & ~np.isnan(wk)\n    sig[ok & (wk >= 0.05)] = -1\n    sig[ok & (wk <= -0.05)] = 1\n    return sig\n",
+  "thesis_path": "research/swarm/runs/2026-09-17-0732/theses/session_calendar_weekend_thinbook_fade.json"
+}

@@ -1,0 +1,5 @@
+universe 17 ['1000PEPE', '1000SHIB', 'AAVE', 'ADA', 'BNB', 'DOGE', 'ETH', 'GIGGLE', 'LINK', 'LTC', 'ONDO', 'SOL', 'SUI', 'TAO', 'UNI', 'XLM', 'XRP']
+n=252 net_mean 33.6 CI (17.8,49.5) WR 0.651 p* 0.5383 tr/wk 25.0 ttv_wk 2.00
+exits: {'TP': 134, 'SL': 66, 'TIME': 52} TIME gross mean: 22.2
+by month: {'count': {6: 126, 7: 104, 8: 22}, 'mean': {6: 55.1, 7: 7.0, 8: 35.5}}
+lot_check: {'1000PEPE': True, '1000SHIB': True, 'AAVE': True, 'ADA': True, 'BNB': True, 'DOGE': True, 'ETH': True, 'GIGGLE': True, 'LINK': True, 'LTC': True, 'ONDO': True, 'SOL': True, 'SUI': True, 'TAO': True, 'UNI': True, 'XLM': True, 'XRP': True}

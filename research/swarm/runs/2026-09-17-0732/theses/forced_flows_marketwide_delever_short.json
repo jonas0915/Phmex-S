@@ -1,0 +1,72 @@
+{
+  "id": "forced_flows_marketwide_delever_short",
+  "lens": "forced_flows",
+  "mechanism": "A liquidation cascade's forced selling is front-loaded (arXiv 2608.03616: 88% of post-onset forced selling within 30 minutes, 63% absorbed off-book by the venue backstop), but the deleveraging it starts is not: (a) the backstop/liquidator vault and market makers who absorbed the cascade inventory hold long risk they did not choose and must work it out into a book whose depth has just collapsed; (b) leveraged longs that survived the first wave now sit closer to their own maintenance margin (their collateral is marked down by the move that just happened), so the next tick down forces the next tranche; (c) open interest keeps clearing for hours after the print (news.bitcoin.com: OI collapsed 43% from $217B to $123B across the Oct 10-11 2025 day; coinchange.io: Nov 20-21 2025 second wave $1.9B in four hours, 85% long liquidations, weeks after the Oct flush). The thesis is that a closed 1h cascade bar (return <= -3 sigma of trailing 168h with >= 2x median volume) marks the start of a market-wide deleveraging and price continues DOWN over the next 24 hours as (a)+(b) are forced to sell. Short-only: the crowded, collateral-impaired side in 2025-2026 was longs. This is deliberately the OTHER side of DEAD_LIST row 6's kill reason (high-vol bars continue, don't revert).",
+  "counterparty": "Two forced sellers: (1) still-open leveraged perp longs whose margin is impaired by the cascade bar and who are closed by the liquidation engine at the mark price, not by choice, as price grinds into their maintenance level over the following hours; (2) the exchange backstop/liquidator vault and market makers who absorbed the cascade's inventory off-book (63% of forced-sale value on Hyperliquid, cryptoslate.com) and must unwind long inventory into a depleted book. Neither chooses the time or the price; both pay the continuation.",
+  "prediction": "On closed 1h bars across the 18-symbol long_1h universe, a short entered at the next open after a cascade bar with TP = SL = 300 bps and max hold 24 bars has net_bps_mean > 0 after c = 11.5 bps with the trade-level bootstrap CI95 (bootstrap_ci.mean_ci) excluding 0 AND the day-clustered CI95 (bootstrap_ci.mean_ci over per-entry-day mean net_bps from trades.csv) excluding 0 on the positive side, with observed WR >= p*(300) = 0.5192 (fee_math.p_star, research/swarm/runs/2026-09-17-0732/exploratory/forced_flows/probe2_summary.json p_star). Falsified if either CI includes 0, if WR < p*, or if either tp +/-20% variant flips sign. The exploratory day-clustered read is null (probe2_summary.json A_tp300_hold24 day_clustered_ci95 [-77.7, +4.8]); the screen adjudicates.",
+  "nearest_dead_rows": [
+    {
+      "row": 6,
+      "why_different": "Row 6 is liquidation-cascade REVERSION (buy the dump) and died because high-vol bars CONTINUE. This thesis bets the continuation: the counterparty is the still-open impaired long and the inventory-holding backstop, not a snap-back buyer. It is the opposite side of row 6's own kill reason. Exploratory probe4_breadth.json also shows the reversion (row 6) direction does win on single-symbol idiosyncratic 1h cascades (short mean -114 bps, 39 days) \u2014 that side is NOT proposed here."
+    },
+    {
+      "row": 80,
+      "why_different": "Row 80 (tape snap-back) fades a large print within minutes on 5m bars expecting reversion. This is a 1h-bar, 24h-horizon continuation trade with the direction of the forced flow, no tape input."
+    },
+    {
+      "row": 3,
+      "why_different": "Row 3 fades 1h vol expansion (trades against the spike) and died of single-split selection. This trades WITH the spike, down side only, volume-confirmed, one pre-registered config on the full train range, and pre-registers a day-clustered CI as the kill condition."
+    },
+    {
+      "row": 29,
+      "why_different": "The 5m_liq_cascade slot was a 5-minute reversion slot (fade). Different horizon (1h bars, 24h hold), different direction (continuation), maker entry at the next 1h open."
+    },
+    {
+      "row": 13,
+      "why_different": "Row 13 is unconditional daily BTC time-series momentum (28d lookback). This is an event-conditioned single-bar forced-flow trigger with a 24h horizon; it fires only on cascade bars (584 signal bars across 18 symbols in ~43 weeks, forced_flows_marketwide_delever_short.sanity_train.json), not on trend state."
+    },
+    {
+      "row": 82,
+      "why_different": "Row 82 was a funding-settlement-timed volatility-regime breakout with taker entry. No settlement timing, no volatility-regime gate, no funding input here; direction is fixed (short) by the sign of the forced flow."
+    }
+  ],
+  "source_urls": [
+    "https://arxiv.org/html/2608.03616",
+    "https://cryptoslate.com/shifting-576-million-of-forced-sales-off-public-order-books-saved-hyperliquid-from-a-systemic-crash-during-peak-panic/",
+    "https://www.coinchange.io/blog/bitcoins-2-billion-reckoning-how-novembers-liquidations-cascade-exposed-cryptos-structural-fragilities",
+    "https://news.bitcoin.com/learning-insights/crypto-liquidation-cascades-explained/",
+    "https://arxiv.org/html/2607.27070"
+  ],
+  "evidence": "Numbers as read on pages opened this run (WebFetch): (1) arXiv 2608.03616 'Measuring the engine of a liquidation cascade': '88% of all post-onset forced selling landed within thirty minutes and 63% was absorbed off-book by the venue's backstop'; Oct 2025: '$733M in forced liquidations occurred over 15.7 hours following onset', '87.8% occurred in first 30 minutes; 96.5% within one hour'; OI cleared 25-70% on Hyperliquid, -24.6% Binance BTC; the 'ordered phase (mean coupling 0.85-0.90) persisted for days'. The paper reports NO post-cascade price-drift statistic. (2) cryptoslate.com: '$641 million was force-sold on Hyperliquid at 21:19 UTC on Oct. 10', ~$576M to the backstop, ~$64M to the order book; no data on how the backstop unwound. (3) coinchange.io: Nov 20-21 2025 second wave '$1.9 billion liquidated within four hours' with '85% being long liquidations'; OI '$94 billion to $61 billion' (-35%) from the October peak; BTC '$126,080 to as low as $81,600'. (4) news.bitcoin.com: Oct 10-11 2025 OI 'collapsed 43% in a day, from $217 billion to $123 billion'; 'Open interest has rebuilt after every flush this year'. (5) arXiv 2607.27070: seven BTC cascades 2022-2025, Oct 2025 'intraday open interest falls -24.6%', '$1.05 billion' long liquidations vs '$130 million the prior day'; studies pre-cascade warnings only. HONEST GAP: none of the sources quantifies post-cascade price drift; the direction claim rests on the mechanism plus this desk's exploratory probes. EXPLORATORY (not evidence; long_1h train, 18 symbols, GIGGLE excluded, no mr_edge data): research/swarm/runs/2026-09-17-0732/exploratory/forced_flows/probe2_summary.json A_tp300_hold24: n=553, net_bps_mean +37.6, ci95 [15.8, 60.0], wr 0.571 vs p_star 0.5192, 12.9 trades/week, ttv 3.9 weeks; BUT day_clustered_mean -36.4, day_clustered_ci95 [-77.7, +4.8]; ex-top-day (2025-10-10, 47 trades) ci95 [-0.6, 47.8]. probe4_breadth.json: days with 8+ symbols firing (22 days, n=328) mean +75.8 ci95 [46.2, 103.7] wr 0.637; single-symbol days (39) mean -114.5 ci95 [-185.7, -35.5]. probe5_summary.json (majors only, BTC+ETH): n=117 ci95 [-1.3, 86.0], day-clustered ci95 [-38.6, 66.1]. The trade-level pass is cross-symbol clustering on ~22 market-wide days; independent-event frequency ~0.5/week.",
+  "spec": {
+    "dataset": "long_1h",
+    "universe": [
+      "1000PEPE",
+      "1000SHIB",
+      "AAVE",
+      "ADA",
+      "BNB",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "LINK",
+      "LTC",
+      "NEAR",
+      "ONDO",
+      "SOL",
+      "SUI",
+      "TAO",
+      "UNI",
+      "XLM",
+      "XRP"
+    ],
+    "timeframe": "1h",
+    "tp_bps": 300,
+    "sl_bps": 300,
+    "max_hold_bars": 24,
+    "expected_trades_per_week": 12.9,
+    "doa_line": "Dead on arrival if the train screen's trade-level net_bps CI95 includes 0, or WR < p*(300), or either tp +/-20% variant flips sign, or the day-clustered CI95 (bootstrap_ci.mean_ci over per-entry-day mean net_bps computed from trades.csv) includes 0 \u2014 a cross-symbol-clustered edge on a handful of market-wide days is not an edge at one trade per symbol."
+  },
+  "signal_py": "import numpy as np\nimport pandas as pd\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Post-cascade deleveraging continuation SHORT on closed 1h bars.\n    Cascade bar = 1h close-to-close return <= -3.0 x trailing-168-bar std of returns\n    (std lagged one bar) AND bar volume >= 2.0 x trailing-168-bar median volume (lagged\n    one bar). Signal -1 on that closed bar; the screen enters short at the next bar's\n    open. Long side deliberately excluded (the crowded, collateral-impaired side is longs).\n    Closed bars only: every rolling window ends at the current bar; no negative shifts.\"\"\"\n    r = df[\"close\"].astype(float).pct_change()\n    sd = r.rolling(168, min_periods=100).std().shift(1)\n    vm = df[\"volume\"].astype(float).rolling(168, min_periods=100).median().shift(1)\n    cascade = (r <= -3.0 * sd) & (df[\"volume\"].astype(float) >= 2.0 * vm)\n    return pd.Series(np.where(cascade.fillna(False).to_numpy(), -1, 0), index=df.index).astype(int)\n",
+  "thesis_path": "research/swarm/runs/2026-09-17-0732/theses/forced_flows_marketwide_delever_short.json"
+}
