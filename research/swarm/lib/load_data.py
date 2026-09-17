@@ -1,6 +1,6 @@
-"""Dataset loaders with a hard era split. Screens call era='train'. Holdout rows are
-refused without the committee token — the token is not a secret, it is a deliberate,
-greppable act (spec §5 step 4)."""
+"""Dataset loaders with a hard era split. Screens call era='train'. Holdout rows — for
+every loader, OHLCV and funding alike — are refused without the committee token; the
+token is not a secret, it is a deliberate, greppable act (spec §5 step 4)."""
 from __future__ import annotations
 
 import json
@@ -33,10 +33,12 @@ def holdout_start(t0: pd.Timestamp, t1: pd.Timestamp, frac: float = 0.25) -> pd.
     return t1 - (t1 - t0) * frac
 
 
-def split_era(df: pd.DataFrame, era: str, token: str | None = None, frac: float = 0.25) -> pd.DataFrame:
+def split_era(df: pd.DataFrame, era: str, token: str | None = None, frac: float = 0.25,
+              bounds: tuple[pd.Timestamp, pd.Timestamp] | None = None) -> pd.DataFrame:
     if era not in ("train", "holdout", "all"):
         raise ValueError(f"era must be train|holdout|all, got {era!r}")
-    hs = holdout_start(df.index.min(), df.index.max(), frac)
+    t0, t1 = bounds if bounds is not None else (df.index.min(), df.index.max())
+    hs = holdout_start(t0, t1, frac)
     if era == "train":
         return df[df.index < hs]
     if token != COMMITTEE_TOKEN:
@@ -67,12 +69,28 @@ def load_ohlcv(symbol: str, timeframe: str, era: str = "train", dataset: str = "
     return split_era(df, era, token)
 
 
-def load_funding(symbol: str, root: Path = REPO_ROOT) -> pd.DataFrame:
+def _mr_edge_1h_bounds(symbol: str, root: Path = REPO_ROOT) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """Index bounds of this symbol's mr_edge 1h OHLCV cache — a metadata read (min/max of
+    the index only) used to anchor the funding holdout boundary to the SAME boundary as
+    price data. Deliberately does not go through load_ohlcv/split_era, so this can never
+    be used as a backdoor to read holdout price rows."""
+    spec = DATASETS["mr_edge"]
+    path = root / spec["dir"] / spec["pattern"].format(sym=_cache_name(symbol), tf="1h")
+    # trusted local research cache (see load_ohlcv) — read only for its index bounds.
+    idx = pd.read_pickle(path).index
+    if idx.tz is None:
+        idx = idx.tz_localize("UTC")
+    return idx.min(), idx.max()
+
+
+def load_funding(symbol: str, era: str = "train", token: str | None = None, root: Path = REPO_ROOT) -> pd.DataFrame:
     path = root / DATASETS["mr_edge"]["dir"] / f"funding_{_cache_name(symbol)}.json"
     rows = json.loads(path.read_text())
     f = pd.DataFrame(rows)
     f["ts"] = pd.to_datetime(f["ts"], unit="ms", utc=True)
-    return f[["ts", "rate"]].sort_values("ts").reset_index(drop=True)
+    f = f[["ts", "rate"]].sort_values("ts").reset_index(drop=True).set_index("ts")
+    bounds = _mr_edge_1h_bounds(symbol, root)
+    return split_era(f, era, token, bounds=bounds).reset_index()
 
 
 def fetch_ohlcv_ccxt(symbol: str, timeframe: str, since_ms: int, until_ms: int, exchange_id: str = "phemex") -> pd.DataFrame:

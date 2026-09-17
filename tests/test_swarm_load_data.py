@@ -56,3 +56,25 @@ def test_real_mr_edge_train_never_reaches_september():
 def test_real_funding_schema():
     f = ld.load_funding("ETH")
     assert list(f.columns) == ["ts", "rate"] and f["ts"].dt.tz is not None and len(f) > 100
+
+
+@pytest.mark.skipif(not (ld.REPO_ROOT / ld.DATASETS["mr_edge"]["dir"]).exists(), reason="mr_edge cache absent")
+def test_real_funding_train_default_excludes_holdout():
+    t0, t1 = ld._mr_edge_1h_bounds("ETH")
+    hs = ld.holdout_start(t0, t1)
+    f = ld.load_funding("ETH")
+    assert (f["ts"] < hs).all()
+
+
+@pytest.mark.skipif(not (ld.REPO_ROOT / ld.DATASETS["mr_edge"]["dir"]).exists(), reason="mr_edge cache absent")
+def test_real_funding_holdout_requires_token():
+    with pytest.raises(ld.HoldoutError):
+        ld.load_funding("ETH", era="holdout")
+
+
+@pytest.mark.skipif(not (ld.REPO_ROOT / ld.DATASETS["mr_edge"]["dir"]).exists(), reason="mr_edge cache absent")
+def test_real_funding_holdout_with_token_returns_only_holdout_rows():
+    t0, t1 = ld._mr_edge_1h_bounds("ETH")
+    hs = ld.holdout_start(t0, t1)
+    f = ld.load_funding("ETH", era="holdout", token=ld.COMMITTEE_TOKEN)
+    assert len(f) > 0 and (f["ts"] >= hs).all()
