@@ -59,7 +59,7 @@ ${STANDARDS_MD}
 
 const BRIEF_PROMPT = `${RULES}
 You are the DESK BRIEF seat. Write ${RUN_DIR}/mandate.md (create the directory). Contents, in this order:
-1. Purpose: the owner's goal of growing a small account is the desk's PURPOSE and is stated as such — it is NOT a screening threshold. The pass bar is, and stays: per-trade net expectancy > 0 after c, with the 95% bootstrap CI excluding zero (CONSTRAINTS "viable" 1-5). No daily-ROI target anywhere in this run.
+1. Purpose: the owner's goal of growing a small account is the desk's PURPOSE and is stated as such — it is NOT a screening threshold. The owner's ULTIMATE aspiration (recorded 2026-09-17, owner's words: "keep it in mind, don't set it yet") is +10% account ROI per day; it is an aim the desk works toward by compounding real, verified edges — never a bar any thesis is judged against, and never a licence for leverage or aggression in place of edge. The pass bar is, and stays: per-trade net expectancy > 0 after c, with the 95% bootstrap CI excluding zero (CONSTRAINTS "viable" 1-5). No daily-ROI target is applied to any thesis in this run.
 2. Capital $200 and sizing (fee_math.position_notional; lot minimums via fee_math.lot_check).
 3. Minimum net edge in bps after c = 11.5 bps, justified from the embedded CONSTRAINTS — compute p* for the target ladder with fee_math.p_star (python3 -c "from research.swarm.lib import fee_math as f; print({x: f.p_star(x) for x in (100,150,200,300)})") and quote the output. Targets: 100-300 bps moves, where p* is roughly 52-56%.
 4. Horizons in scope: intraday-to-multi-day, explicitly NOT scalping; event-driven explicitly IN scope; at least two analyst lenses must target holds > 8h (funding at every 8h settlement must be accounted for on such holds).
