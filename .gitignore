@@ -38,3 +38,8 @@ docs/fix-proposals/st2-lab-*.md
 # Cycle-counter persistence (rewritten every cycle — tracking it would churn auto-backup)
 .bot_cycles.json
 .bot_cycles.json.tmp
+
+# owner trade history (wallet addresses in deposit/withdraw files) — not committed pending owner word
+research/swarm/kb/owner_trades/api_deposit_list_full.json
+research/swarm/kb/owner_trades/api_withdraw_list_full.json
+research/swarm/kb/owner_trades/api_ccxt_deposits.json
