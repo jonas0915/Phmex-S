@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(launchctl:*)",
+      "Bash(*main.py*)",
+      "Bash(git push:*)",
+      "Bash(kill:*)",
+      "Bash(pkill:*)",
+      "Bash(rm -rf:*)"
+    ]
+  }
+}

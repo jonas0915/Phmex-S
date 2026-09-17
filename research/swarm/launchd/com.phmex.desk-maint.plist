@@ -41,6 +41,8 @@
     <dict>
         <key>SWARM_BRANCH</key>
         <string>main</string>
+        <key>PATH</key>
+        <string>/Library/Frameworks/Python.framework/Versions/3.14/bin:/Users/jonaspenaso/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>
 
     <key>RunAtLoad</key>

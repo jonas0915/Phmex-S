@@ -1,4 +1,6 @@
 """load_data: era split + holdout refusal. Real-cache tests skip when the cache is absent."""
+import sys
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -78,3 +80,23 @@ def test_real_funding_holdout_with_token_returns_only_holdout_rows():
     hs = ld.holdout_start(t0, t1)
     f = ld.load_funding("ETH", era="holdout", token=ld.COMMITTEE_TOKEN)
     assert len(f) > 0 and (f["ts"] >= hs).all()
+
+
+@pytest.mark.skipif(not (ld.REPO_ROOT / ld.DATASETS["mr_edge"]["dir"]).exists(), reason="mr_edge cache absent")
+def test_fetch_ohlcv_ccxt_gates_late_until_without_network(monkeypatch):
+    # sys.modules["ccxt"] = None makes any "import ccxt" raise ImportError; if the holdout
+    # guard did not fire before that import, this test would see ImportError, not
+    # HoldoutError, proving the check runs before the lazy network-dependency import.
+    monkeypatch.setitem(sys.modules, "ccxt", None)
+    t0, t1 = ld._mr_edge_1h_bounds("ETH")
+    late_until_ms = int(ld.holdout_start(t0, t1).timestamp() * 1000)
+    with pytest.raises(ld.HoldoutError):
+        ld.fetch_ohlcv_ccxt("ETH", "1h", since_ms=0, until_ms=late_until_ms)
+
+
+@pytest.mark.skipif(not (ld.REPO_ROOT / ld.DATASETS["mr_edge"]["dir"]).exists(), reason="mr_edge cache absent")
+def test_fetch_ohlcv_ccxt_gates_none_until_as_now(monkeypatch):
+    # until_ms=None means "now", which is always at/after the (long-past) holdout boundary.
+    monkeypatch.setitem(sys.modules, "ccxt", None)
+    with pytest.raises(ld.HoldoutError):
+        ld.fetch_ohlcv_ccxt("ETH", "1h", since_ms=0, until_ms=None)

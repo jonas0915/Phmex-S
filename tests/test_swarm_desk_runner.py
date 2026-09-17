@@ -699,7 +699,10 @@ def test_plist_files_are_versioned_and_shaped_like_the_existing_jobs(name, mode,
     for k in ("StandardOutPath", "StandardErrorPath"):
         assert d[k].startswith("/Users/jonaspenaso/Library/Logs/Phmex-S/"), d[k]
         assert "Desktop" not in d[k]
-    assert d["EnvironmentVariables"] == {"SWARM_BRANCH": "main"}
+    assert d["EnvironmentVariables"] == {
+        "SWARM_BRANCH": "main",
+        "PATH": "/Library/Frameworks/Python.framework/Versions/3.14/bin:/Users/jonaspenaso/.local/bin:/usr/local/bin:/usr/bin:/bin",
+    }
     assert d["StandardOutPath"].endswith(f"{name.split('.')[-1]}.out.log")
     assert d["StandardErrorPath"].endswith(f"{name.split('.')[-1]}.err.log")
 

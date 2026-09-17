@@ -41,7 +41,7 @@ const A = args || {}
 const RUN_ID = A.run_id
 const THESIS_ID = A.thesis_id
 const NOW = A.now || null                                               // ISO UTC; registered_ts source (required)
-const TODAY = A.today || (NOW ? NOW.slice(0, 10) : null)                 // YYYY-MM-DD; prereg filename + kb date cell
+const TODAY = A.today || (NOW ? NOW.slice(0, 10) : null)                 // YYYY-MM-DD; prereg filename
 const JUDGE_MODEL = A.judge_model || null                                // applied ONLY to the reviewer seat
 const CONSTRAINTS_MD = A.constraints_md
 const STANDARDS_MD = A.standards_md
@@ -76,7 +76,7 @@ const VERDICT_N = 50
 const KILL_NET_USD = -10.0
 const INCONCLUSIVE_HARD_N = 2 * VERDICT_N
 
-// The files the IMPLEMENT/FIX seats may touch, and nothing else (bot trading code is
+// The files the IMPLEMENT seat may touch, and nothing else (bot trading code is
 // modified ONLY here, ONLY on the branch).
 const ALLOWED_FILES = [MODULE, TEST, 'bot.py', 'scripts/lab_adjudicator/adjudicate.py', 'tests/test_lab_adjudicator.py']
 
@@ -131,7 +131,7 @@ Step 1 — write ${PREREG} in the house format (tone and section shape of docs/s
   # PRE-REGISTRATION — ${ID} paper slot
   **Registered**: ${NOW} UTC (also give the PT wall time via python3 -c "from datetime import datetime; from zoneinfo import ZoneInfo; print(datetime.fromisoformat('${NOW.replace('Z', '+00:00')}').astimezone(ZoneInfo('America/Los_Angeles')).strftime('%Y-%m-%d %-I:%M %p PT'))"), run ${RUN_ID}, Gate A (owner "go") passed before this script was invoked.
   **Thesis**: mechanism, counterparty, prediction — VERBATIM from the "thesis" object in ${FROZEN} (fields mechanism / counterparty / prediction), plus source_urls (from the same thesis object) and evidence_grade (from ${RUN_DIR}/gate_kept.json, the gatekeeper's kept entry for this id).
-  ## Frozen data — dataset, universe, timeframe, tp_bps, sl_bps, max_hold_bars, expected_trades_per_week, doa_line (all from ${FROZEN}); frozen spec path + its sha256 field; signal sha256 from ${OUT_TRAIN}; train_span from ${OUT_TRAIN}; holdout = final 25% of the dataset range per load_data.holdout_start (state it as the rule, do not compute dates from holdout rows).
+  ## Frozen data — dataset, universe, timeframe, tp_bps, sl_bps, max_hold_bars, expected_trades_per_week, doa_line (all from ${FROZEN}); frozen spec path + its sha256 field; signal sha256 from ${OUT_TRAIN}; train_span from ${OUT_TRAIN}; holdout = final 25% of the dataset range per load_data.holdout_start (state it as the rule, do not compute dates from holdout rows). If the frozen spec's dataset is "long_1h", this section also records the caveat verbatim: "holdout window overlaps mr_edge train; treat the holdout read as a sanity read only" (cross-dataset holdout caveat, STANDARDS #6).
   ## Economics — $200 basis; notional per trade = the printed output of python3 -c "from research.swarm.lib import fee_math as f; print(f.position_notional())"; c = fee_math.C_BPS (print it); p* = p_star from ${OUT_TRAIN}; lot_check per symbol from ${OUT_TRAIN}; if max_hold_bars × bar size > 8h, state the funding exposure per CONSTRAINTS. Paper convention: 1x paper book, margin recorded AS the notional (Donchian convention, donchian_slot.py / _donchian_open_paper), so USD PnL = notional × price move and ROI% = price move %.
   ## Slot design (paper only) — slot_id ${ID}; module ${MODULE}; tests ${TEST}; state file ${STATE_FILE} (auto-discovered by web_dashboard.read_all_slot_states); sidecars ${ID}_slot_state.json + ${ID}_signal_<SYM>.json (never prefixed trading_state_); signals computed on CLOSED bars only, transcribed from ${SIGNAL_PY} (signal on closed bar i → paper entry at the first price after bar i closes, ≈ open[i+1]); exit rule transcribed from research/swarm/lib/screen.py simulate(): each later closed bar checks SL then TP against low/high (SL wins ties), TIME exit at max_hold_bars at that bar's close; exit tags stop_loss / take_profit / time_exit; paper_mode True, loss_cap_usdt −999.0, kelly_min_trades 10**9, durable_trail_enabled False (rails opt-out: the verdict line below is the only kill); kill file ${KILL_FILE} touched automatically by the adjudicator on a KILL (see the verdict line) or by hand, honoured by the bot's generic .kill_* sentinel loop and by the evaluator's slot.enabled check every cycle; live path NOT implemented (a promoted slot logs an error once per UTC day and places nothing, identical to _donchian_adjust_position).
   ## Verdict line (frozen) — copy the following block verbatim:

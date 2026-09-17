@@ -93,13 +93,30 @@ def load_funding(symbol: str, era: str = "train", token: str | None = None, root
     return split_era(f, era, token, bounds=bounds).reset_index()
 
 
-def fetch_ohlcv_ccxt(symbol: str, timeframe: str, since_ms: int, until_ms: int, exchange_id: str = "phemex") -> pd.DataFrame:
-    """Public OHLCV for horizons the caches don't cover (e.g. daily bars back years). Network."""
+def fetch_ohlcv_ccxt(symbol: str, timeframe: str, since_ms: int, until_ms: int | None = None,
+                      exchange_id: str = "phemex", token: str | None = None) -> pd.DataFrame:
+    """Public OHLCV for horizons the caches don't cover (e.g. daily bars back years). Network.
+    Gated exactly like load_ohlcv/load_funding: refuses a request reaching at/after the
+    mr_edge holdout boundary for this symbol (falling back to ETH's boundary when the
+    symbol has no mr_edge 1h cache) without the committee token — a longer public pull is
+    not a side door around the holdout gate. The check runs BEFORE any network call."""
+    try:
+        t0, t1 = _mr_edge_1h_bounds(symbol)
+    except FileNotFoundError:
+        t0, t1 = _mr_edge_1h_bounds("ETH")
+    boundary = holdout_start(t0, t1)
+    until_ts = pd.Timestamp(until_ms, unit="ms", tz="UTC") if until_ms is not None else pd.Timestamp.now(tz="UTC")
+    if until_ts >= boundary and token != COMMITTEE_TOKEN:
+        raise HoldoutError(
+            f"fetch_ohlcv_ccxt({symbol!r}, until={until_ts}): reaches the mr_edge holdout "
+            f"boundary {boundary} for this symbol — committee token required (spec §5 step 4)"
+        )
     import ccxt  # local import: optional dependency path
     ex = getattr(ccxt, exchange_id)({"enableRateLimit": True})
     market = f"{_cache_name(symbol).split('_')[0]}/USDT:USDT"
+    until_bound_ms = int(until_ts.timestamp() * 1000)
     out, since = [], since_ms
-    while since < until_ms:
+    while since < until_bound_ms:
         batch = ex.fetch_ohlcv(market, timeframe, since=since, limit=1000)
         if not batch:
             break
@@ -109,4 +126,4 @@ def fetch_ohlcv_ccxt(symbol: str, timeframe: str, since_ms: int, until_ms: int, 
             break
     df = pd.DataFrame(out, columns=["ts", "open", "high", "low", "close", "volume"])
     df["ts"] = pd.to_datetime(df["ts"], unit="ms", utc=True)
-    return df.set_index("ts").loc[: pd.Timestamp(until_ms, unit="ms", tz="UTC")]
+    return df.set_index("ts").loc[:until_ts]
