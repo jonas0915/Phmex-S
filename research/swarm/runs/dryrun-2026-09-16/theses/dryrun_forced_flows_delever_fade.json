@@ -1,0 +1,41 @@
+{
+  "id": "dryrun_forced_flows_delever_fade",
+  "lens": "forced_flows",
+  "mechanism": "DRY RUN relabel. Claimed mechanism: a 5m bar with both range and volume >3 sigma vs the trailing 48-bar baseline is a forced-liquidation burst; liquidation engines sell/buy at market into thin books, so the burst bar overshoots and mean-reverts once the forced flow is exhausted. This is the liquidation-cascade-reversion / vol-fade mechanism of DEAD_LIST row 6 with the indicator renamed ('deleveraging-exhaustion z-score' instead of 'high-vol bar').",
+  "counterparty": "Liquidated leveraged perp holders whose positions the exchange liquidation engine closes at market regardless of price; they pay because they cannot choose timing or price.",
+  "prediction": "Falsifiable: after a burst bar (z_range>3 and z_volume>3 on closed 5m bars), price reverts against the burst direction by >=150 bps before moving 150 bps further in the burst direction, at a rate >= p*(150 bps) = 0.5383 (research/swarm/lib/fee_math.py p_star), within 24 bars. Row 6 says the opposite: high-vol bars CONTINUE.",
+  "nearest_dead_rows": [
+    {
+      "row": 6,
+      "why_different": "NOT different. Same mechanism: fading a high-volatility / liquidation burst bar expecting reversion. Row 6 killed it as 'vol-fade with extra steps; high-vol bars CONTINUE, don't revert'. Only the indicator name (z-score of range x volume) changed. This is a deliberate dry-run relabel to exercise the gatekeeper's row-cited rejection path."
+    },
+    {
+      "row": 80,
+      "why_different": "NOT different. tape_snapback was refuted as 'economically the same bet as row 6'; this thesis is the same bet again on OHLCV instead of tape."
+    },
+    {
+      "row": 3,
+      "why_different": "NOT different in kind. 1h vol-expansion fade died from split-luck; this is the same fade on 5m bars."
+    }
+  ],
+  "source_urls": [
+    "https://www.coinglass.com/LiquidationData"
+  ],
+  "evidence": "DRY RUN \u2014 deliberate relabel of row 6. Sourcing outcome, honestly: WebSearch budget was exhausted for this session (0 searches possible). Fetch 1 (https://arxiv.org/abs/2507.08744) was a guessed URL that resolved to an unrelated motion-capture paper and is NOT cited. Fetch 2 (https://www.coinglass.com/LiquidationData, opened) is a real liquidation data feed but rendered client-side: the fetched text showed placeholder values ('total liquidations comes in at $0', largest liquidation 'undefined'), so NO external number was read from any source. No statistic is claimed from any page. This thesis carries no supporting external evidence and should be rejected on that ground as well as on row 6.",
+  "spec": {
+    "dataset": "mr_edge",
+    "universe": [
+      "BTC",
+      "ETH",
+      "SOL"
+    ],
+    "timeframe": "5m",
+    "tp_bps": 150,
+    "sl_bps": 150,
+    "max_hold_bars": 24,
+    "expected_trades_per_week": 4,
+    "doa_line": "Dead on arrival if train-era n>=30 and the bootstrap CI95 of net_bps (research.swarm.lib.bootstrap_ci.mean_ci, after c=11.5) includes or is below 0, or observed WR < p*(150)=0.5383, or either +/-20% tp_bps perturbation flips the sign of net_bps_mean."
+  },
+  "signal_py": "import pandas as pd\nimport numpy as np\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Deleveraging-exhaustion fade (5m, closed bars only).\n\n    A bar whose range and volume are both extreme vs the trailing 48-bar\n    baseline (baseline shifted by one bar so the current bar is excluded)\n    is treated as a forced-liquidation burst. Fade it: short after an\n    up-burst, long after a down-burst. Entry happens at the next bar open\n    (screen.simulate convention).\n    \"\"\"\n    rng = (df[\"high\"] - df[\"low\"]) / df[\"close\"]\n    vol = df[\"volume\"].astype(float)\n    base_rng_mu = rng.rolling(48, min_periods=48).mean().shift(1)\n    base_rng_sd = rng.rolling(48, min_periods=48).std().shift(1)\n    base_vol_mu = vol.rolling(48, min_periods=48).mean().shift(1)\n    base_vol_sd = vol.rolling(48, min_periods=48).std().shift(1)\n    z_rng = (rng - base_rng_mu) / base_rng_sd.replace(0, np.nan)\n    z_vol = (vol - base_vol_mu) / base_vol_sd.replace(0, np.nan)\n    burst = (z_rng > 3.0) & (z_vol > 3.0)\n    body = df[\"close\"] - df[\"open\"]\n    sig = pd.Series(0, index=df.index, dtype=\"int64\")\n    sig[burst & (body > 0)] = -1\n    sig[burst & (body < 0)] = 1\n    return sig.fillna(0).astype(\"int64\")\n",
+  "thesis_path": "research/swarm/runs/dryrun-2026-09-16/theses/dryrun_forced_flows_delever_fade.json"
+}
