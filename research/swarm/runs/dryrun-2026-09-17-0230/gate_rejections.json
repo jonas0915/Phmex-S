@@ -1,0 +1,7 @@
+[
+  {
+    "id": "dryrun_forced_flows_deleverage_snapback",
+    "dead_row": 6,
+    "reason": "relabel of DEAD_LIST row 6 (Liquidation-cascade reversion — 'vol-fade with extra steps; high-vol bars CONTINUE, don't revert', research/swarm/kb/DEAD_LIST.md:18). Mechanism is identical (fade a liquidation-driven high-vol 5m bar expecting snap-back); only the indicator name ('forced-deleverage exhaustion bar'), thresholds (3x median TR / 3x median volume / close in outer 20% of range) and universe changed. Same family also killed as row 80 (tape_snapback, DEAD_LIST.md:92), row 29 (5m_liq_cascade slot, DEAD_LIST.md:41) and row 3 (1h vol-expansion fade, DEAD_LIST.md:15); the thesis's own nearest_dead_rows why_different entries all state 'NOT different'. Sanity checks otherwise passed (id regex OK; ETH/SOL/XRP/DOGE in mr_edge and lot_check ok at $200 notional; 5m timeframe exists; signal_py imports only pandas/numpy; source_urls non-empty). Source verification (step 2) not reached; note the thesis's own evidence field concedes arXiv 2607.27070 describes PRE-cascade early-warning signals, not post-cascade reversion, so the single cited source does not support the snap-back claim."
+  }
+]
