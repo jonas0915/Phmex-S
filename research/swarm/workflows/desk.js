@@ -74,6 +74,7 @@ const INTERNET_FIRST = `INTERNET-FIRST SOURCING (owner order 2026-09-16 9:22 PM 
 const THESIS_RULES = `Produce at most 2 theses. Each MUST: name the counterparty and why they are forced to pay; state a falsifiable prediction; list the nearest DEAD_LIST.md rows by number (nearest_dead_rows, never empty — read the file) and say precisely why the MECHANISM differs (not the parameters, not the indicator name); carry source_urls and evidence per the sourcing rule above; and give a full spec: dataset mr_edge or long_1h (only these two are screenable — long_1h for multi-day/event-driven), universe = symbols present in that dataset per ${KB}/DATA.md, timeframe 5m or 1h (must exist in the dataset), tp_bps and sl_bps (targets of 100-300 bps; scalping-size targets are fee-trapped), max_hold_bars (consistent with the horizon and the bar size), expected_trades_per_week, doa_line (the pre-registered kill condition in one sentence). id must match ^[a-z][a-z0-9_]{2,40}$ (snake_case, 3-41 chars, the registrar rejects anything else), unique across the desk — prefix it with your lens key with hyphens replaced by underscores (owner-record → owner_record).
 signal_py: Python source defining signals(df) -> pd.Series indexed like df with values exactly in {-1, 0, 1}, computed on CLOSED bars only — no .shift(-k), no future index use, no iloc[-1] forming-bar tricks; the screen runs a whole-prefix causality check on every symbol and any lookahead kills the thesis; a signal that returns any other value (NaN is fine, it is filled to 0) also kills it. df has columns open/high/low/close/volume with a UTC DatetimeIndex. Funding is available via research.swarm.lib.load_data.load_funding(symbol) (train era only, rate rows {ts, rate}) if the signal needs it — merge_asof on ts and use only rates settled BEFORE the bar. Import only pandas/numpy and research.swarm.lib inside signal_py.
 You MAY run exploratory probes on TRAIN data (load_data.load_ohlcv(sym, tf, era="train", dataset=...)) to shape the thesis; save probe scripts and outputs under ${RUN_DIR}/exploratory/<lens>/ and label them exploratory — they are NOT the screen and their numbers are not evidence. Do not touch holdout.
+web_budget_exhausted: set it true if WebSearch refuses for budget/limit reasons before you completed your sourcing, and say so in exploratory_notes; do not fabricate sourcing and do not substitute the dead list for the web. Otherwise set it false.
 Write each thesis as JSON (all schema fields, exactly the field names below) to ${RUN_DIR}/theses/<id>.json and return them in the schema with thesis_path set to that path. If your lens yields no thesis with a genuine counterparty and a real source, return an empty theses list and say why in exploratory_notes — that is a valid outcome.`
 
 const DRY_RUN_ANALYST = `DRY RUN (plumbing test, owner-sanctioned): produce exactly ONE thesis and make it a DELIBERATE relabel of a DEAD_LIST.md row (same mechanism, renamed indicator) so the gatekeeper's row-cited rejection path is exercised end to end; set its id prefix to dryrun_, put "DRY RUN — deliberate relabel of row <n>" in evidence, and in nearest_dead_rows say honestly that the mechanism is NOT different. Keep web work to at most 2 searches and 1 fetched page (still cite one real URL you opened) — this overrides the 8-12 search target above. Skip exploratory probes.`
@@ -153,7 +154,7 @@ Pass only if (a)-(f) all hold; each reason cites the file and the number. Write 
 
 const synthesisPrompt = (ctx) => `${RULES}
 SYNTHESIS seat: write ${RUN_DIR}/REPORT.md. Run context (from the orchestrator): ${JSON.stringify(ctx)}.
-Verdict first (one sentence: how many theses, how many screened, how many passed committee). Then one paragraph per thesis in this run — gate-rejected ones (from ${RUN_DIR}/gate_rejections.json) in one line each with the dead row (or "source verification F" / "not screenable" / "duplicate" / "over cap" as recorded); screened ones with n, net bps, CI95, WR vs p*, evidence grade, audit verdict, committee votes (economics, statistics, BH table, tp±20% read) — EVERY number followed by the file path it came from (out.json, audit.json, committee/*.json, out.robust_*.json). Then "What was not done": every analyst lens that returned no thesis (with its exploratory_notes), every registrar/screen/audit that errored (with the error text), any source that could not be fetched. Then "Next run should": 3 bullets, process not strategy. Plain English, verdict first, no tables wider than 6 columns, no daily-ROI targets. Numbers only from files you read this turn; if a file is missing say "not run". Return the report text.`
+Verdict first (one sentence: how many theses, how many screened, how many passed committee). Then one paragraph per thesis in this run — gate-rejected ones (from ${RUN_DIR}/gate_rejections.json) in one line each with the dead row (or "source verification F" / "not screenable" / "duplicate" / "over cap" as recorded); screened ones with n, net bps, CI95, WR vs p*, evidence grade, audit verdict, committee votes (economics, statistics, BH table, tp±20% read) — EVERY number followed by the file path it came from (out.json, audit.json, committee/*.json, out.robust_*.json). Then "What was not done": every analyst lens that returned no thesis (with its exploratory_notes), every lens whose web_budget_exhausted is true in the run context (its sourcing was cut short), every registrar/screen/audit that errored (with the error text), any source that could not be fetched. Then "Next run should": 3 bullets, process not strategy. Plain English, verdict first, no tables wider than 6 columns, no daily-ROI targets. Numbers only from files you read this turn; if a file is missing say "not run". Return the report text.`
 
 const criticPrompt = `${RULES}
 COMPLETENESS CRITIC. Read ${RUN_DIR}/REPORT.md, then list the run dir recursively (find ${RUN_DIR} -type f | sort). Find and list, each with the concrete file/line: (a) any screens/<id>/ or exploratory/ or committee/ artifact not cited in the report; (b) any number in the report without a file path next to it; (c) contradictions between gate_rejections.json, theses/*.json, out.json, audit.json, committee/*.json, out.robust_*.json and the report (re-open the files; do not trust the report); (d) any thesis whose nearest_dead_rows is empty or whose why_different is generic, or whose evidence field has no number; (e) holdout access — grep -rn "COMMITTEE-HOLDOUT-READ\\|era=\\"holdout\\"\\|era='holdout'\\|era=\\"all\\"\\|--era holdout\\|--era all" ${RUN_DIR} (any hit is a process failure); (f) any frozen spec or signal.py whose sha no longer verifies (python3 -c "from research.swarm.lib import registrar as r; import glob; print({p: r.verify(p) for p in glob.glob('${RUN_DIR}/specs/*.frozen.json')})"); (g) any daily-ROI target or hand-computed statistic in the report. Write ${RUN_DIR}/CRITIC.md (a numbered list under headings a-g, "none" where nothing was found) and return it.`
@@ -166,6 +167,9 @@ For each screened thesis:
 Then append dated lines ("- ${TODAY} — <what failed>. Rule: <process rule>") to ${KB}/LESSONS.md for every PROCESS failure the critic found in ${RUN_DIR}/CRITIC.md (not strategy lessons — process; if the critic found nothing, append one line recording that this run's critic was clean).${DRY ? ' This is a DRY RUN: nothing was screened, so the LESSONS entry (what the plumbing test showed) is the ONLY kb write.' : ''}
 Never edit or delete existing rows or lines in any kb file; append only. Never edit ${KB}/CONSTRAINTS.md, STANDARDS.md, DATA.md or anything under ${KB}/owner_trades/.
 Finally run exactly: python3 -m research.swarm.lib.kb_check — if it does not print KB OK, fix ONLY the row(s) you just wrote (never other rows) and re-run until it prints KB OK. Return the kb_check output verbatim plus every row/line you added, each with its file path.`
+
+const abortPrompt = `${RULES}
+RECONCILER (aborted run). Every analyst reported that WebSearch refused for budget/limit reasons, so this run stops before the gate under the internet-first directive. Append exactly ONE line to ${KB}/LESSONS.md: "- ${TODAY} — run ${RUN_ID} aborted: WebSearch budget exhausted at spawn — relaunch from a fresh session". Write nothing else to any kb file. Then run exactly: python3 -m research.swarm.lib.kb_check and return its output verbatim plus the line you added.`
 
 // ---------------------------------------------------------------------------
 // Schemas — every schema has an object root and required ⊆ properties.
@@ -191,8 +195,9 @@ const THESIS_SCHEMA = {
       required: ['id', 'lens', 'mechanism', 'counterparty', 'prediction', 'nearest_dead_rows', 'source_urls', 'evidence', 'spec', 'signal_py', 'thesis_path'],
     } },
     exploratory_notes: { type: 'string' },
+    web_budget_exhausted: { type: 'boolean' },
   },
-  required: ['theses'],
+  required: ['theses', 'web_budget_exhausted'],
 }
 
 const GATE_SCHEMA = { type: 'object', properties: {
@@ -230,8 +235,18 @@ const lensSummary = LENSES.map((lens, i) => ({
   lens: lens.key,
   theses: analystOut[i] ? analystOut[i].theses.length : null,
   notes: analystOut[i] ? (analystOut[i].exploratory_notes ?? '') : 'agent returned null',
+  web_budget_exhausted: analystOut[i] ? analystOut[i].web_budget_exhausted === true : null,
 }))
 for (const s of lensSummary) if (!s.theses) log(`analyst ${s.lens}: ${s.theses === null ? 'no result (null)' : '0 theses'} — ${s.notes.slice(0, 160)}`)
+const live = analystOut.filter(Boolean)
+if (live.length && live.every(r => r.web_budget_exhausted === true)) {
+  log(`WebSearch budget exhausted at spawn: ${live.length}/${LENSES.length} analysts could not source — aborting before the gate (internet-first directive); relaunch from a fresh session`)
+  phase('Close')
+  const reconcile = await agent(abortPrompt, { label: 'reconcile', phase: 'Close', effort: 'low' })
+  return { run_id: RUN_ID, result: 'WEB_BUDGET_EXHAUSTED', lenses: lensSummary, reconcile }
+}
+const exhausted = lensSummary.filter(l => l.web_budget_exhausted).map(l => l.lens)
+if (exhausted.length) log(`WebSearch budget exhausted for ${exhausted.length}/${live.length} analysts (${exhausted.join(', ')}) — continuing; recorded for synthesis`)
 const theses = analystOut.filter(Boolean).flatMap(r => r.theses)
 log(`${theses.length} theses from ${analystOut.filter(Boolean).length}/${LENSES.length} analysts`)
 if (!theses.length) {

@@ -13,6 +13,8 @@ Spec: `docs/superpowers/specs/2026-09-16-edge-swarm-v2-design.md`. Plan: `docs/s
 
 ## Running the desk
 
+**Preconditions.** Launch real runs from a FRESH Claude Code session with an unused WebSearch budget — the analysts are internet-first, and if every analyst reports `web_budget_exhausted` the run aborts before the gate with `WEB_BUDGET_EXHAUSTED` (one LESSONS line, nothing else written). The controller checks `/workflows` for no live workflow before launching.
+
 The script has no clock and no filesystem, so the launch invocation carries the timestamps AND the contents of the two governing documents (every prompt embeds them verbatim). Run it **alone** — never concurrently with another workflow (v1 died 4× on a shared rate ceiling). The controller verifies nothing else is live with `/workflows` before launching; `desk.js` logs "run alone — controller confirmed no other Workflow live" and does not shell out to `ps`.
 
 From a Claude Code session in this repo, the controller reads the two files and passes them as strings:
