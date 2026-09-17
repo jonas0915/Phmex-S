@@ -335,10 +335,13 @@ def test_maint_commits_paper_status_by_pathspec_without_push_and_only_when_chang
     assert commit[-2:] == ["--", "research/swarm/kb/PAPER_STATUS.md"]
     assert "Co-Authored-By: Claude" in commit[commit.index("-m") + 1]
     assert ["push"] not in calls
-    # unchanged content (fixed clock) → no second commit
+    # unchanged body → no second commit, even though the "Written <stamp>" header moved an hour
     ctx.git.calls.clear()
+    ctx.now = lambda: NOW_TS + 3600
     sd.main(["--mode", "maint"], ctx=ctx)
     assert not any(c[0][0][0] in ("add", "commit") for c in ctx.git.calls)
+    assert "Written 2026-09-09 06:26 PM PT" in ctx.paper_status_path.read_text()   # the stamp itself is still refreshed
+    ctx.now = lambda: NOW_TS
     # a crossing → LESSONS.md joins the pathspec, still no push
     _write_state(ctx.bot_dir, "ALPHA", [0.5, -11.0], NOW_TS - 9 * DAY)
     ctx.git.calls.clear()
@@ -576,6 +579,27 @@ def test_pass_through_fidelity_warning_on_mismatch_or_missing(ctx):
     _desk_ok(ctx, lengths=False)
     sd.main(["--mode", "desk"], ctx=ctx)
     assert "constraints_len not reported" in _log_text(ctx)
+
+
+@pytest.mark.parametrize("bad", ["4523.0", "~4500", [1, 2], None, True])
+def test_pass_through_non_integer_length_never_blocks_the_commit_and_push(ctx, bad):
+    _desk_ok(ctx, lengths=False, extra={"constraints_len": bad, "standards_len": bad})
+    rc = sd.main(["--mode", "desk"], ctx=ctx)
+    assert rc == 0
+    calls = _git_calls(ctx)
+    assert any(c[0] == "commit" and "desk run" in c[2] for c in calls)
+    assert ["push"] in calls
+    txt = _log_text(ctx)
+    assert "not reported as an integer" in txt and "crashed" not in txt
+    assert "fidelity OK" not in txt
+
+
+def test_test_mode_web_budget_exhausted_is_ok_without_artifacts(ctx, capsys):
+    _desk_ok(ctx, result_code="WEB_BUDGET_EXHAUSTED", report=False, critic=False)
+    rc = sd.main(["--mode", "test"], ctx=ctx)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "HEADLESS WORKFLOW: OK (budget exhausted" in out and "FAILED" not in out
 
 
 def test_desk_mode_includes_maint_alerts_in_its_telegram(ctx):

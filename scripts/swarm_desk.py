@@ -561,6 +561,12 @@ def render_paper_status(slots: list, digest: Optional[dict], bot_alive: Optional
     return "\n".join(out).rstrip() + "\n"
 
 
+def _status_body(text: str) -> str:
+    """PAPER_STATUS.md minus its 'Written <stamp>.' header line, so a stamp-only rewrite
+    does not count as a change (maint commits only on a real change)."""
+    return "\n".join(l for l in text.splitlines() if not l.startswith("Written "))
+
+
 def detect_events(prev: Optional[dict], slots: list) -> tuple:
     """(events, new_state). Events fire only on a False→True transition since the
     previous maint run; with no previous state (first run) the flags are recorded
@@ -598,7 +604,7 @@ def run_maint(ctx: Ctx) -> list:
     ctx.kb_dir.mkdir(parents=True, exist_ok=True)
     old_text = ctx.paper_status_path.read_text() if ctx.paper_status_path.exists() else None
     ctx.paper_status_path.write_text(text)
-    status_changed = text != old_text
+    status_changed = old_text is None or _status_body(text) != _status_body(old_text)
     active = [s.slot_id for s in slots if s.killed is None]
     log.info("maint: %d registered slots, %d active (%s), %d killed; PAPER_STATUS.md written",
              len(slots), len(active), ", ".join(active) or "none", len(slots) - len(active))
@@ -724,10 +730,15 @@ def check_passthrough(res: dict, args: dict) -> bool:
     ok = True
     for key, fld in (("constraints_len", "constraints_md"), ("standards_len", "standards_md")):
         got, want = res.get(key), len(args[fld])
+        try:                                   # never raise: this runs before the commit/push
+            got = int(got) if not isinstance(got, bool) else None
+        except (TypeError, ValueError):
+            got = None
         if got is None:
-            log.warning("pass-through fidelity: %s not reported by the session (expected %d)", key, want)
+            log.warning("pass-through fidelity: %s not reported as an integer by the session (got %r, expected %d)",
+                        key, res.get(key), want)
             ok = False
-        elif int(got) != want:
+        elif got != want:
             log.warning("pass-through fidelity MISMATCH: %s=%s but %s is %d chars — the session did not pass the file verbatim",
                         key, got, fld, want)
             ok = False
@@ -817,6 +828,8 @@ def run_desk(ctx: Ctx, test: bool = False) -> int:
     if test:
         if code in DESK_CODES and not missing_artifacts(run_dir):
             print(f"HEADLESS WORKFLOW: OK — result {code}; REPORT.md + CRITIC.md present in research/swarm/runs/{run_id}")
+        elif code == "WEB_BUDGET_EXHAUSTED":
+            print("HEADLESS WORKFLOW: OK (budget exhausted — Workflow tool ran, relaunch from a fresh session)")
         elif code == "WORKFLOW_UNAVAILABLE":
             print("HEADLESS WORKFLOW: UNAVAILABLE — `claude -p` has no Workflow tool; desk mode will fall back to the "
                   "Telegram paste instruction (README Cadence)")
