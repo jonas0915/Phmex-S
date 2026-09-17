@@ -5,11 +5,28 @@ import pytest
 from research.swarm.lib import bootstrap_ci as bc
 
 
-def test_mean_ci_contains_true_mean_and_is_ordered():
+def test_mean_ci_contains_sample_mean_and_is_ordered():
+    """A percentile bootstrap CI must always contain the sample mean."""
     rng = np.random.default_rng(1)
     x = rng.normal(5.0, 1.0, size=400)
     lo, hi = bc.mean_ci(x, n_boot=1000, seed=1)
-    assert lo < 5.0 < hi and lo < hi
+    assert lo < x.mean() < hi and lo < hi
+
+
+def test_mean_ci_coverage_is_nominal():
+    """Verify that nominal 95% CI achieves ~95% coverage across seeds."""
+    coverage_count = 0
+    num_seeds = 200
+    true_mean = 5.0
+
+    for seed in range(num_seeds):
+        x = np.random.default_rng(seed).normal(true_mean, 1.0, size=400)
+        lo, hi = bc.mean_ci(x, n_boot=500, seed=seed)
+        if lo < true_mean < hi:
+            coverage_count += 1
+
+    coverage = coverage_count / num_seeds
+    assert 0.92 <= coverage <= 0.98, f"Coverage {coverage:.1%} outside [92%, 98%] (n={num_seeds})"
 
 
 def test_mean_ci_empty_input_raises():
