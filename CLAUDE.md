@@ -66,6 +66,7 @@ Signal → Global cooldown (2 min) → Per-pair cooldown (10 min) → Daily cap 
 - `.env` — API keys + thresholds (NEVER commit)
 - `trading_state.json` — Live trade history
 - `trading_state_5m_*.json` — Paper slot state files
+- `research/swarm/` — edge-research desk (v2). Pull first, read kb/ before proposing any strategy work. See research/swarm/README.md.
 
 ## Memory System
 - `memory/lessons.md` — **Read first every session.** META-RULES + operational lessons.

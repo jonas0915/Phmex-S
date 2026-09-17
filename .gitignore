@@ -43,3 +43,7 @@ docs/fix-proposals/st2-lab-*.md
 research/swarm/kb/owner_trades/api_deposit_list_full.json
 research/swarm/kb/owner_trades/api_withdraw_list_full.json
 research/swarm/kb/owner_trades/api_ccxt_deposits.json
+# swarm v2: raw data copies inside run dirs never go to git
+research/swarm/runs/*/screens/*/data*
+research/swarm/runs/**/*.pkl
+research/swarm/runs/**/*.parquet
