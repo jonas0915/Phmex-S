@@ -44,3 +44,33 @@ def test_freeze_is_deterministic_and_tamper_evident(tmp_path: Path):
 def test_freeze_refuses_invalid_thesis(tmp_path: Path):
     with pytest.raises(ValueError):
         rg.freeze({**GOOD, "signal_py": ""}, tmp_path, "t")
+
+
+def test_verify_detects_signal_py_tampering(tmp_path: Path):
+    p = rg.freeze(GOOD, tmp_path, "2026-09-16T20:00:00Z")
+    signal_file = tmp_path / "screens" / "demo_thesis" / "signal.py"
+    signal_file.write_text("corrupted code")
+    assert rg.verify(p) is False
+
+
+def test_verify_detects_signal_py_deletion(tmp_path: Path):
+    p = rg.freeze(GOOD, tmp_path, "2026-09-16T20:00:00Z")
+    signal_file = tmp_path / "screens" / "demo_thesis" / "signal.py"
+    signal_file.unlink()
+    assert rg.verify(p) is False
+
+
+def test_verify_handles_nonexistent_frozen_file(tmp_path: Path):
+    assert rg.verify(tmp_path / "nonexistent.frozen.json") is False
+
+
+def test_verify_handles_invalid_json(tmp_path: Path):
+    bad_file = tmp_path / "bad.json"
+    bad_file.write_text("not valid json {")
+    assert rg.verify(bad_file) is False
+
+
+def test_verify_handles_missing_thesis_key(tmp_path: Path):
+    bad_file = tmp_path / "missing_thesis.json"
+    bad_file.write_text(json.dumps({"sha256": "abc123", "frozen_at": "t"}))
+    assert rg.verify(bad_file) is False

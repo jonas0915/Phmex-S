@@ -45,8 +45,23 @@ def freeze(thesis: dict, run_dir: Path, frozen_at: str) -> Path:
 
 
 def verify(frozen_path: Path) -> bool:
-    d = json.loads(Path(frozen_path).read_text())
-    return hashlib.sha256(_canonical(d["thesis"]).encode()).hexdigest() == d.get("sha256")
+    try:
+        frozen_path = Path(frozen_path)
+        d = json.loads(frozen_path.read_text())
+        thesis = d["thesis"]
+        # Verify thesis integrity via SHA256
+        if hashlib.sha256(_canonical(thesis).encode()).hexdigest() != d.get("sha256"):
+            return False
+        # Verify signal.py file exists and matches
+        run_dir = frozen_path.parent.parent
+        signal_file = run_dir / "screens" / thesis["id"] / "signal.py"
+        if not signal_file.exists():
+            return False
+        if signal_file.read_text() != thesis["signal_py"]:
+            return False
+        return True
+    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError):
+        return False
 
 
 if __name__ == "__main__":
