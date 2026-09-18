@@ -802,7 +802,12 @@ def run_desk(ctx: Ctx, test: bool = False) -> int:
         code = "TIMEOUT"
     elif launch.returncode != 0:
         code = "CLAUDE_FAILED"
-        log.error("claude rc=%s stderr=%s", launch.returncode, (launch.stderr or "")[:500])
+        log.error("claude rc=%s stderr=%s stdout_tail=%s", launch.returncode, (launch.stderr or "")[:500],
+                  (launch.stdout or "")[-800:])
+        try:  # keep the full session output next to the run for post-mortem (never committed: *.log is ignored)
+            (run_dir / "claude_stdout.log").write_text(launch.stdout or "")
+        except OSError:
+            pass
     else:
         parsed = parse_desk_result(launch.stdout)
         if parsed is None:
