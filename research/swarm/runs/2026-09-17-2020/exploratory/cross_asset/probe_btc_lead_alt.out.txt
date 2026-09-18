@@ -1,0 +1,13 @@
+symbol  n_bars  span_days  fires_long  fires_short  fires_per_week
+  DOGE    1692       70.5          47           48            9.44
+   XRP    1692       70.5          47           48            9.44
+   SOL    1692       70.5          47           48            9.44
+   ADA    1692       70.5          47           48            9.44
+  LINK    1692       70.5          47           48            9.44
+  AVAX    1692       70.5          47           48            9.44
+   BCH    1692       70.5          47           48            9.44
+   UNI    1692       70.5          47           48            9.44
+   XLM    1692       70.5          47           48            9.44
+   LTC    1692       70.5          47           48            9.44
+
+Total fires/week across universe: 94.4

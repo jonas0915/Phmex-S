@@ -1,6 +1,6 @@
 # PAPER_STATUS — paper-slot forward tests (auto-written by `scripts/swarm_desk.py --mode maint`; do not edit — regenerated daily)
 
-Written 2026-09-17 11:52 AM PT. Bot process: STOPPED — no state file advances until an audited restart. Adjudicator digest: Sep 9 6:00 AM PT (8.2 d old) — kill lines are not being graded automatically (com.phmex.lab-adjudicator is unloaded until the bot restart; README Cadence, Gate B).
+Written 2026-09-17 08:20 PM PT. Bot process: STOPPED — no state file advances until an audited restart. Adjudicator digest: Sep 9 6:00 AM PT (8.6 d old) — kill lines are not being graded automatically (com.phmex.lab-adjudicator is unloaded until the bot restart; README Cadence, Gate B).
 
 Per slot: n and net USD are the registered era's closed trades (no registered era → every closed trade in the file; net_pnl as-is, fee-inclusive at the source); WR = share of era trades with net > 0; days = era start (registration, else first trade) → now, or → kill. Distance = USD above the kill line. Nothing here promotes or restarts anything.
 

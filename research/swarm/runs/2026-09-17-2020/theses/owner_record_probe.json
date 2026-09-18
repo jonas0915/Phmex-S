@@ -1,0 +1,301 @@
+{
+  "source_file": "research/swarm/kb/owner_trades/api_closed_pnl.json",
+  "n_trades": 819,
+  "date_range_utc": [
+    "2022-03-26T06:11:32.166000+00:00",
+    "2023-02-16T15:44:55.384000+00:00"
+  ],
+  "equity_path": {
+    "true_usd_equity_available": false,
+    "note": "deposit/withdraw files present but denominated in native asset units (XRP/ADA/USDT/ETH/...), not USD-at-time -- no USD conversion source available locally, so true USD equity(t) cannot be computed; falling back to cumulative realized PnL only, per SOURCES.md sec 2c/2d",
+    "fallback": "cumulative realized PnL (sum of realizedPnlEv/1e4, chronological by updatedTimeNs)",
+    "cum_realized_pnl_final_usd": 4857.22,
+    "cum_realized_pnl_min_usd": -2036.28,
+    "cum_realized_pnl_max_usd": 6335.62,
+    "n_points": 819,
+    "field": "realizedPnlEv/1e4 per row, api_closed_pnl.json"
+  },
+  "concentration": {
+    "total_positive_pnl_usd": 12899.2,
+    "n_positive_trades": 397,
+    "largest_single_trade_pnl_usd": 1089.62,
+    "share_of_positive_pnl_from_largest_trade": 0.0845,
+    "top5_trades_pnl_usd": 3805.91,
+    "share_of_positive_pnl_from_top5_trades": 0.2951,
+    "field": "realizedPnlEv/1e4, positive rows only, api_closed_pnl.json"
+  },
+  "win_rate": {
+    "value": 0.4847,
+    "n_wins": 397,
+    "n_losses": 422,
+    "n_flat": 0,
+    "n_total": 819,
+    "field": "sign of realizedPnlEv, api_closed_pnl.json"
+  },
+  "payoff_ratio": {
+    "avg_win_usd": 32.49,
+    "avg_loss_usd": -19.06,
+    "ratio": 1.705,
+    "field": "mean(realizedPnlEv/1e4) split by sign, api_closed_pnl.json"
+  },
+  "median_hold": {
+    "seconds": 4939.6,
+    "hours": 1.372,
+    "field": "(updatedTimeNs - openedTimeNs)/1000, api_closed_pnl.json"
+  },
+  "symbols": {
+    "n_distinct": 22,
+    "top10_by_count": [
+      [
+        "uBTCUSD",
+        306
+      ],
+      [
+        "ADAUSD",
+        105
+      ],
+      [
+        "SOLUSD",
+        73
+      ],
+      [
+        "XRPUSD",
+        73
+      ],
+      [
+        "MATICUSD",
+        67
+      ],
+      [
+        "AVAXUSD",
+        43
+      ],
+      [
+        "APEUSD",
+        35
+      ],
+      [
+        "u100TRYBUSD",
+        33
+      ],
+      [
+        "LUNAOLDUSD",
+        31
+      ],
+      [
+        "ETHUSD",
+        13
+      ]
+    ],
+    "top10_by_pnl": [
+      [
+        "u100TRYBUSD",
+        8128.01
+      ],
+      [
+        "XRPUSD",
+        44.39
+      ],
+      [
+        "STORJUSD",
+        5.75
+      ],
+      [
+        "BNBUSD",
+        1.58
+      ],
+      [
+        "u100ANKRUSD",
+        -0.04
+      ],
+      [
+        "BTCUSD",
+        -0.31
+      ],
+      [
+        "DOGEUSD",
+        -5.46
+      ],
+      [
+        "LINKUSD",
+        -11.92
+      ],
+      [
+        "MASKUSD",
+        -26.11
+      ],
+      [
+        "LUNAOLDUSD",
+        -38.6
+      ]
+    ],
+    "bottom5_by_pnl": [
+      [
+        "ETHUSD",
+        -149.16
+      ],
+      [
+        "AVAXUSD",
+        -393.93
+      ],
+      [
+        "MATICUSD",
+        -462.63
+      ],
+      [
+        "SOLUSD",
+        -475.56
+      ],
+      [
+        "uBTCUSD",
+        -1249.71
+      ]
+    ],
+    "field": "symbol column grouped, api_closed_pnl.json"
+  },
+  "side_split": {
+    "counts": {
+      "1": 423,
+      "2": 396
+    },
+    "pnl": {
+      "1": 3158.4,
+      "2": 1698.82
+    },
+    "note": "side '1'/'2' raw codes from api_closed_pnl.json (ccxt/Phemex Buy/Sell convention unconfirmed at row level -- reporting raw codes only)",
+    "field": "side column, api_closed_pnl.json"
+  },
+  "time_of_day_utc_of_open": {
+    "0": {
+      "n": 54,
+      "pnl": 46.58
+    },
+    "1": {
+      "n": 50,
+      "pnl": -263.73
+    },
+    "2": {
+      "n": 45,
+      "pnl": -9.89
+    },
+    "3": {
+      "n": 36,
+      "pnl": -160.99
+    },
+    "4": {
+      "n": 37,
+      "pnl": -193.45
+    },
+    "5": {
+      "n": 30,
+      "pnl": 1813.05
+    },
+    "6": {
+      "n": 21,
+      "pnl": 1194.79
+    },
+    "7": {
+      "n": 19,
+      "pnl": 5010.35
+    },
+    "8": {
+      "n": 4,
+      "pnl": -74.93
+    },
+    "9": {
+      "n": 3,
+      "pnl": 4.04
+    },
+    "10": {
+      "n": 2,
+      "pnl": -24.05
+    },
+    "11": {
+      "n": 6,
+      "pnl": -77.26
+    },
+    "12": {
+      "n": 14,
+      "pnl": -203.41
+    },
+    "13": {
+      "n": 30,
+      "pnl": -174.21
+    },
+    "14": {
+      "n": 43,
+      "pnl": -36.35
+    },
+    "15": {
+      "n": 42,
+      "pnl": 39.75
+    },
+    "16": {
+      "n": 41,
+      "pnl": -263.8
+    },
+    "17": {
+      "n": 46,
+      "pnl": -473.73
+    },
+    "18": {
+      "n": 46,
+      "pnl": -301.1
+    },
+    "19": {
+      "n": 42,
+      "pnl": -170.82
+    },
+    "20": {
+      "n": 57,
+      "pnl": -135.75
+    },
+    "21": {
+      "n": 53,
+      "pnl": -245.04
+    },
+    "22": {
+      "n": 50,
+      "pnl": -359.07
+    },
+    "23": {
+      "n": 48,
+      "pnl": -83.74
+    }
+  },
+  "behaviour_after_a_loss": {
+    "n_trades_after_a_loss": 422,
+    "median_size_usd_after_loss": null,
+    "median_size_usd_baseline": null,
+    "median_hold_s_after_loss": 5417.409,
+    "median_hold_s_baseline": 4833.5835,
+    "side_counts_after_loss": {
+      "1": 211,
+      "2": 211
+    },
+    "side_counts_baseline": {
+      "1": 211,
+      "2": 185
+    }
+  },
+  "single_event_dependency_check": {
+    "description": "EXPLORATORY follow-up: isolates the u100TRYBUSD symbol, which the symbols.top10_by_pnl block above shows dwarfs every other symbol (8128.01 USD of 12899.20 USD total positive PnL).",
+    "u100TRYBUSD_trade_count": 33,
+    "u100TRYBUSD_trade_count_share_of_n": 0.0403,
+    "u100TRYBUSD_time_window_utc": [
+      "1668055648336",
+      "1668069849340"
+    ],
+    "u100TRYBUSD_time_window_note": "all 33 rows open/close between 2022-11-10T04:47:28Z and 2022-11-10T07:55:47Z (~3 hours), the FTX-collapse liquidity-crisis window (FTX halted withdrawals / filed Chapter 11 on 2022-11-11 UTC per Wikipedia Bankruptcy of FTX)",
+    "total_realized_pnl_all_trades_usd": 4857.22,
+    "total_realized_pnl_u100TRYBUSD_only_usd": 8128.01,
+    "total_realized_pnl_excluding_u100TRYBUSD_usd": -3270.79,
+    "n_excluding_u100TRYBUSD": 786,
+    "win_rate_excluding_u100TRYBUSD": 0.4707,
+    "avg_win_usd_excluding_u100TRYBUSD": 12.19,
+    "avg_loss_usd_excluding_u100TRYBUSD": -18.71,
+    "payoff_ratio_excluding_u100TRYBUSD": 0.6518,
+    "field": "realizedPnlEv/1e4, api_closed_pnl.json, grouped by symbol==u100TRYBUSD vs not",
+    "finding": "A single 33-trade, ~3-hour window in one thinly-traded pegged-token symbol (u100TRYBUSD, TRYB=BiLira Turkish-lira stablecoin, 100x-labeled inverse contract) supplies 8128.01 USD of the account cumulative realized PnL, i.e. more than the 4857.22 USD final cumulative total (equity_path.cum_realized_pnl_final_usd above). Excluding it, the remaining 786 trades over the full 2022-03-26 to 2023-02-16 window are net -3270.79 USD, WR 47.07%, payoff ratio 0.65 (losers bigger than winners on average) -- i.e. a losing record."
+  }
+}

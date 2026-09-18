@@ -1,0 +1,59 @@
+{
+  "id": "session_calendar_fomc_drift_short",
+  "lens": "session_calendar",
+  "mechanism": "FOMC decisions are pre-positioned: rate-path expectations are already priced in over the days before the statement (a documented pre-FOMC drift), so the announcement itself carries little genuinely new information for a market that has been running up into it on 'cut/hold priced in' positioning. Once the statement lands with no incremental dovish surprise, there is no confirming catalyst to hold the pre-meeting long positioning together, and the unwind is not a one-bar reaction — it plays out over the following days as leveraged longs built during the run-up get stopped out, funding stays positive against them, and momentum/CTA-style flow extends the move. This is a calendar-anchored, multi-day 'sell the news' drift, not a same-bar volatility spike.",
+  "counterparty": "Leveraged perp longs (and 'FOMC pivot' options buyers) who added risk into the meeting expecting a dovish confirmation or rate-cut catalyst. When the statement gives them no incremental win, they are stuck holding pre-priced-in longs with no new buyer behind them; over the following days they are forced out by stop-losses, margin calls, and the funding/carry cost of holding a long that stopped working, and that forced de-risking is the flow a resting short captures across the week after the meeting.",
+  "prediction": "On the long_1h train era, shorting the universe at the next open after the closed 1h bar covering each FOMC statement release (see signal_py FOMC_EVENTS, all within 2025-06-27..2026-04-24), TP 200 / SL 200 bps, max hold 168 bars (7 days), yields net_bps_mean > 0 with bootstrap CI95 (bootstrap_ci.mean_ci) excluding 0, and observed WR >= fee_math.p_star(200) = 0.52875, with n >= 30 pooled across the 19-symbol universe. Falsified if CI95 includes 0, if WR < p*, or if n < 30 given only 6 calendar events in the train window.",
+  "nearest_dead_rows": [
+    {
+      "row": 7,
+      "why_different": "Row 7 killed day-of-week / weekend / CME-gap / Saturday-alt calendar effects as mostly null after FDR and stale. This thesis is not a weekday or weekend seasonal regularity; it fires on 6 specific pre-scheduled FOMC statement timestamps in a 10-month window and holds a full week, a completely different calendar object (a discrete monetary-policy event, not a recurring weekday/session pattern)."
+      },
+    {
+      "row": 84,
+      "why_different": "Row 84 killed FOMC/CPI momentum because it needed 1-minute precision to trade the announcement-bar reaction itself. This thesis deliberately does NOT trade the announcement bar or its immediate volatility spike; it enters at the next 1h open after the statement and holds for 7 days, targeting the multi-day post-announcement drift, which is computable on the bot's slower cadence and does not need minute-level timing."
+    },
+    {
+      "row": 76,
+      "why_different": "Row 76 was multi-day MEAN REVERSION, dead post-2022. This is a multi-day MOMENTUM/continuation short conditioned on a specific macro calendar event, not a reversion-to-mean bet, and has no reversion premise."
+    }
+  ],
+  "source_urls": [
+    "https://stocktwits.com/news-articles/markets/cryptocurrency/bitcoin-price-fed-fomc-meeting-history-post-fed-selloff-crypto-analysts-split/cZNRtKKRJRq",
+    "https://phemex.com/blogs/btc-drop-fomc-history-analysis",
+    "https://www.sciencedirect.com/science/article/abs/pii/S154461231930159X"
+  ],
+  "evidence": "Stocktwits, 'Bitcoin Price Fed FOMC Meeting History...' (opened): crypto chartist Ardi is quoted reporting that in the week following 8 of the last 9 FOMC meetings, Bitcoin dropped an average of 11% over the following 7 days ('an average drop of 11% in the 7 days post-FOMC'); the single exception (May 2025) followed a meeting where BTC had already fallen ~24% from its all-time high beforehand, i.e. the pre-meeting positioning was already washed out. Phemex, 'BTC Dropped After 8 of 9 FOMC Meetings' (opened, independent write-up of the same practitioner pattern): documents the same 8-of-9 count within a 48-hour post-announcement window across the 9 meetings from May 2025 through April 2026, average decline ~5.6% across the eight negative instances (range 1.6%-8.6%), with concrete examples (Oct 2025 ~$126,000 -> $118,700, -5.8%; Jan 2026 ~$90,400 -> $83,383, -7.8%), and attributes it to a 'sell the news' dynamic since rate expectations are priced in ahead of the meeting. ScienceDirect, Corbet et al.-type 'Do FOMC and macroeconomic announcements affect Bitcoin prices?' (abstract page opened): establishes the academic baseline that FOMC announcements are a priced macro-event for Bitcoin, supporting that the mechanism (pre-positioning around a scheduled monetary event) is real and not solely a practitioner narrative, though neither of the two practitioner sources gives a formal bootstrap CI and both describe the same 2025-2026 sample window, so this prediction must be confirmed independently on long_1h train data via research.swarm.lib before any verdict. Funding caveat (not separately quantified here, per fee_math not covering it): a 7-day hold crosses ~21 funding settlements; net-bps math at grading time must add realized funding drag on top of fee_math.C_BPS, which this thesis's p_star check does not yet include.",
+  "spec": {
+    "dataset": "long_1h",
+    "universe": [
+      "1000PEPE",
+      "1000SHIB",
+      "AAVE",
+      "ADA",
+      "BNB",
+      "BTC",
+      "DOGE",
+      "ETH",
+      "GIGGLE",
+      "LINK",
+      "LTC",
+      "NEAR",
+      "ONDO",
+      "SOL",
+      "SUI",
+      "TAO",
+      "UNI",
+      "XLM",
+      "XRP"
+    ],
+    "timeframe": "1h",
+    "tp_bps": 200,
+    "sl_bps": 200,
+    "max_hold_bars": 168,
+    "expected_trades_per_week": 2.65,
+    "doa_line": "DEAD if the train-era screen out.json shows n < 30, or bootstrap CI95 of net bps includes 0, or observed WR < fee_math.p_star(200) = 0.52875; in paper, DEAD if the first 6 live FOMC events (one full annual cycle) show running net mean bps <= 0."
+  },
+  "signal_py": "import pandas as pd\n\n# FOMC decision-day (second day of the 2-day meeting) closed 1h bar covering the\n# ~2pm ET statement release, used as the short-entry trigger. Times are hardcoded\n# public Fed calendar dates converted to UTC (EDT=UTC-4, EST=UTC-5); this is\n# calendar metadata, not derived from price, so it carries no lookahead risk and\n# is identical whether or not future bars are present (causality-safe).\nFOMC_EVENTS = [\n    \"2025-07-30 18:00\",\n    \"2025-09-17 18:00\",\n    \"2025-10-29 18:00\",\n    \"2025-12-10 19:00\",\n    \"2026-01-28 19:00\",\n    \"2026-03-18 18:00\",\n]\n\n_EVENT_SET = {pd.Timestamp(ts, tz=\"UTC\") for ts in FOMC_EVENTS}\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    out = pd.Series(0, index=df.index, dtype=int)\n    fire = df.index.isin(_EVENT_SET)\n    out[fire] = -1\n    return out\n",
+  "thesis_path": "research/swarm/runs/2026-09-17-2020/theses/session_calendar_fomc_drift_short.json"
+}
