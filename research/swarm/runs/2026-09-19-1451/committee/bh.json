@@ -1,0 +1,49 @@
+{
+  "q": 0.10,
+  "m": 5,
+  "source": "p_i = numbers.p_boot from each screen's audit.json",
+  "table": [
+    {
+      "id": "informed_flow_btc_alt_cascade",
+      "p": 0.0025,
+      "rank": 1,
+      "threshold": 0.02,
+      "significant": true,
+      "p_source": "research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/audit.json:numbers.p_boot"
+    },
+    {
+      "id": "vol_structure_mm_withdrawal_drift",
+      "p": 1.0,
+      "rank": 2,
+      "threshold": 0.04,
+      "significant": false,
+      "p_source": "research/swarm/runs/2026-09-19-1451/screens/vol_structure_mm_withdrawal_drift/audit.json:numbers.p_boot"
+    },
+    {
+      "id": "vol_structure_gamma_unclamp",
+      "p": 1.0,
+      "rank": 3,
+      "threshold": 0.06,
+      "significant": false,
+      "p_source": "research/swarm/runs/2026-09-19-1451/screens/vol_structure_gamma_unclamp/audit.json:numbers.p_boot"
+    },
+    {
+      "id": "cross_asset_btc_shock_lag",
+      "p": 1.0,
+      "rank": 4,
+      "threshold": 0.08,
+      "significant": false,
+      "p_source": "research/swarm/runs/2026-09-19-1451/screens/cross_asset_btc_shock_lag/audit.json:numbers.p_boot"
+    },
+    {
+      "id": "cross_asset_ethbtc_regime_rotation",
+      "p": 1.0,
+      "rank": 5,
+      "threshold": 0.10,
+      "significant": false,
+      "p_source": "research/swarm/runs/2026-09-19-1451/screens/cross_asset_ethbtc_regime_rotation/audit.json:numbers.p_boot"
+    }
+  ],
+  "k_star": 1,
+  "note": "Ties among the four p=1.0 screens ordered arbitrarily (ranks 2-5); order among tied p-values does not affect k* since none satisfy p_(k) <= (k/m)*q."
+}

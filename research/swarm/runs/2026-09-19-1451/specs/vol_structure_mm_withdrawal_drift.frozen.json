@@ -1,0 +1,51 @@
+{
+  "frozen_at": "2026-09-19T21:51:39Z",
+  "sha256": "e54a321fb06c04bc45a90e0f78ad3134911e814a5b631220e81ff0377cb83267",
+  "thesis": {
+    "counterparty": "Delta-neutral market makers/basis-arb desks that get auto-deleveraged during a liquidation cascade and then withdraw quoting liquidity for a documented multi-week period, leaving fewer dampening bids/offers to absorb post-shock order flow.",
+    "evidence": "bitmex.com/blog/state-of-crypto-perps-2025 (fetched): describes the Oct 10-11 2025 crash ($20B liquidation cascade, the largest on record) as forcing delta-neutral market makers' 'profitable short legs' to be 'aggressively auto-deleveraged,' after which MMs 'pull[ed] liquidity globally in Q4, resulting in the thinnest orderbooks seen since 2022' -- i.e. the liquidity impairment documented as persisting for a multi-week/quarter window, not just the cascade minutes. arxiv.org/html/2607.27070 (fetched, 'Where does the criticality live?'): confirms the same Oct 2025 event magnitude (>$19B force-closed across ~1.6M accounts, open interest fell 24.6%) and, separately, identifies compression of taker order-flow variance as a population-level pre-cascade precursor (p ~= 5e-6 in placebo testing) -- used here only as corroboration that a measurable realized-vol/flow regime shift brackets these events, not as the traded signal itself (the paper does not test post-cascade continuation/reversion, which is why this remains a thesis rather than a citation of a result).",
+    "id": "vol_structure_mm_withdrawal_drift",
+    "lens": "vol_structure",
+    "mechanism": "Delta-neutral market makers run basis/funding-arb books that get auto-deleveraged (ADL'd) when a liquidation cascade breaches their hedge, per BitMEX's own 2025 report on the Oct-10-11 cascade. Once ADL'd, an MM's book is no longer neutral, and the documented response is to pull quoting liquidity across venues for an extended period (BitMEX: 'thinnest orderbooks seen since 2022' persisted through the following quarter), not just the minutes of the cascade itself. With less liquidity provision, subsequent price moves in the days after a large realized-vol shock face less dampening (wider spreads, thinner books absorb less order flow), so realized vol stays elevated and directional moves extend further than they would with MMs fully re-engaged. The counterparty is the departed/impaired market maker, whose absence -- not any predictive signal in the price itself -- is what lets the post-shock move run.",
+    "nearest_dead_rows": [
+      {
+        "row": 6,
+        "why_different": "Row 6 tested liquidation-cascade REVERSION (fade) and found the opposite -- high-vol bars continue -- but never built a screened continuation strategy off that finding. This thesis is the continuation trade explicitly, sized at a multi-day (72-bar) horizon rather than the original 1h-scale test, and names the forced mechanism (ADL'd delta-neutral MMs pulling quoting liquidity for a documented multi-week period) as the reason continuation, not reversion, should persist beyond the shock bar itself."
+      },
+      {
+        "row": 3,
+        "why_different": "Row 3 (1h vol-expansion fade) traded the fade direction with no named counterparty and died to single-split selection bias at the 1h horizon. This thesis trades the continuation direction over 1-3 days and cites a specific, sourced structural cause (MM ADL and liquidity withdrawal persisting well past the shock) rather than a generic technical vol-expansion reading."
+      },
+      {
+        "row": 78,
+        "why_different": "Row 78 (Bollinger-squeeze breakout) is a pure band-width indicator with no named forced counterparty. This thesis's trigger is a realized-vol-multiple shock (not a band squeeze) and its edge case rests on a documented, sourced liquidity-withdrawal mechanism (BitMEX 2025 report), not indicator geometry."
+      },
+      {
+        "row": 82,
+        "why_different": "Row 82 relabeled a funding-settlement time-of-day gate with taker entries. This thesis has no funding-settlement anchor and no time-of-day gate at all -- the trigger is purely a realized-vol shock magnitude computed from OHLCV, with maker-style next-bar entries, at a multi-day hold horizon."
+      }
+    ],
+    "prediction": "In the 1-3 days following a 1h realized-vol shock bar (defined on closed bars, not calendar events), price continues in the shock bar's direction more often, and by a larger net magnitude after costs, than on randomly selected non-shock days of the same symbol, because the market-maker liquidity that would normally dampen and mean-revert the move is structurally impaired for that window.",
+    "signal_py": "import numpy as np\nimport pandas as pd\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    out = pd.Series(0, index=df.index, dtype=int)\n    n = len(df)\n    if n < 500:\n        return out\n\n    close = df[\"close\"]\n    ret1h = close.pct_change()\n\n    # realized-vol shock: current 24h rolling stdev of hourly returns vs the\n    # trailing 20-day (480h) rolling stdev, both computed on closed bars only\n    # (rolling() at position i only uses bars up to and including i, and we\n    # trigger off bar i-1's fully-closed window, entering at bar i).\n    rv_24h = ret1h.rolling(24).std()\n    rv_20d = ret1h.rolling(480, min_periods=200).std()\n\n    shock_ratio = rv_24h / rv_20d\n\n    in_position_until = -1\n    for i in range(480, n - 1):\n        if i <= in_position_until:\n            continue\n        prior_ratio = shock_ratio.iloc[i]\n        if pd.isna(prior_ratio):\n            continue\n        if prior_ratio < 3.0:\n            continue\n        # direction = sign of the trailing 24h return that produced the shock\n        trailing_ret = close.iloc[i] / close.iloc[i - 24] - 1.0\n        direction = np.sign(trailing_ret)\n        if direction == 0:\n            continue\n        entry_loc = i + 1\n        if entry_loc >= n:\n            continue\n        out.iloc[entry_loc] = int(direction)\n        in_position_until = entry_loc + 48  # respect max_hold_bars before re-arming\n\n    return out.fillna(0).astype(int)\n",
+    "source_urls": [
+      "https://www.bitmex.com/blog/state-of-crypto-perps-2025",
+      "https://arxiv.org/html/2607.27070"
+    ],
+    "spec": {
+      "dataset": "long_1h",
+      "doa_line": "Kill if, after n>=30 shock-triggered signals across the 4-symbol universe, bootstrap CI95 (bootstrap_ci.mean_ci) of net bps (after fee_math.C_BPS=11.5bps) does not exclude zero, or observed win rate is below fee_math.p_star(200), or the +-20% tp_bps robustness read (STANDARDS #9) flips sign in either variant.",
+      "expected_trades_per_week": 1.5,
+      "max_hold_bars": 48,
+      "sl_bps": 150,
+      "timeframe": "1h",
+      "tp_bps": 200,
+      "universe": [
+        "BTC",
+        "ETH",
+        "SOL",
+        "XRP"
+      ]
+    },
+    "thesis_path": "research/swarm/runs/2026-09-19-1451/theses/vol_structure_mm_withdrawal_drift.json"
+  }
+}

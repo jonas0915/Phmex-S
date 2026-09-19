@@ -1,0 +1,49 @@
+{
+  "id": "cross_asset_ethbtc_regime_rotation",
+  "spec_sha256": "00c11b0c951b6fc11ecf8a1728c6970676cab46ff8abc0e442adccab2b64c3e4",
+  "era": "train",
+  "n": 729,
+  "net_bps_mean": -31.01090893963594,
+  "ci95": [
+    -45.11928814189359,
+    -16.70117517727141
+  ],
+  "wr": 0.4513031550068587,
+  "p_star": 0.52875,
+  "trades_per_week": 17.014726312864685,
+  "time_to_verdict_weeks": 2.9386308707296362,
+  "lot_check": {
+    "SOL": {
+      "ok": true,
+      "lots": 197,
+      "lot_usd": 1.0143
+    },
+    "ADA": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "XRP": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.0044
+    },
+    "LINK": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    }
+  },
+  "per_symbol": {
+    "SOL": 180,
+    "ADA": 187,
+    "XRP": 173,
+    "LINK": 189
+  },
+  "train_span": [
+    "2025-06-27 06:00:00+00:00",
+    "2026-04-23 04:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "1fa4251286938c4655a1351a51c39f8a8156534b4fff82dfd7541ae22d50b922"
+}

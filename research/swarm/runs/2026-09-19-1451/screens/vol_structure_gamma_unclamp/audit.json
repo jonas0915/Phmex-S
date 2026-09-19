@@ -1,0 +1,25 @@
+{
+  "verdict": "CONFIRMED",
+  "ci_excludes_zero": false,
+  "findings": [
+    "n=3 (out.json:4) is far below the n>=30 viability minimum in CONSTRAINTS.md item 1 -- thesis fails the run's pass bar regardless of this audit's CONFIRMED verdict on process integrity.",
+    "Observed wr=0.3333333333333333 (out.json:7) is below fee_math.p_star(200)=0.52875 (recomputed, matches out.json:8) -- fails viability item 2.",
+    "ci95=[-161.50000000000014, 188.50000000000014] (out.json:6) straddles zero (lower bound negative) -- ci_excludes_zero is False, fails viability item 1's CI requirement.",
+    "Bootstrap one-sided p-value (ladder resolution via bootstrap_ci.mean_ci on trades.csv net_bps, alpha up to 1.0) never produced a lower bound > 0 -- p_boot recorded as 1.0, i.e. no evidence of positive mean edge at any tested confidence level.",
+    "time_to_verdict_weeks=714.09 (out.json:11, recomputed via fee_math.time_to_verdict_weeks(0.07001944984717977)=714.0873015873017) is far beyond the spec's own doa_line horizon and the run mandate's 26-week viability item 3 bar."
+  ],
+  "numbers": {
+    "n": 3,
+    "net_bps_mean": -44.83333333333337,
+    "ci95": [-161.50000000000014, 188.50000000000014],
+    "wr": 0.3333333333333333,
+    "p_star": 0.52875,
+    "time_to_verdict_weeks": 714.0873015873017,
+    "p_boot": 1.0,
+    "rerun": {
+      "n": 3,
+      "net_bps_mean": -44.83333333333337,
+      "ci95": [-161.50000000000014, 188.50000000000014]
+    }
+  }
+}

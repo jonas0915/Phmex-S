@@ -1,0 +1,16 @@
+{
+  "votes": [
+    {
+      "id": "informed_flow_btc_alt_cascade",
+      "pass": true,
+      "reasons": [
+        "(a) n=246 >= 30 -- research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/out.json:n",
+        "(b) CI95=[12.271245400252258, 56.30117389045181] excludes 0, both bounds > 0 -- research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/out.json:ci95",
+        "(c) BH at q=0.10, m=5: p_i from each screen's audit.json numbers.p_boot -- informed_flow_btc_alt_cascade p=0.0025 (research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/audit.json:numbers.p_boot), vol_structure_mm_withdrawal_drift p=1.0 (.../vol_structure_mm_withdrawal_drift/audit.json:numbers.p_boot), vol_structure_gamma_unclamp p=1.0 (.../vol_structure_gamma_unclamp/audit.json:numbers.p_boot), cross_asset_btc_shock_lag p=1.0 (.../cross_asset_btc_shock_lag/audit.json:numbers.p_boot), cross_asset_ethbtc_regime_rotation p=1.0 (.../cross_asset_ethbtc_regime_rotation/audit.json:numbers.p_boot). Sorted ascending, rank 1 = informed_flow_btc_alt_cascade (p=0.0025 <= threshold (1/5)*0.10=0.02); no other rank satisfies p_(k) <= (k/5)*0.10. k*=1, so rank<=k* holds only for informed_flow_btc_alt_cascade -> bh_significant=true. Full table written to research/swarm/runs/2026-09-19-1451/committee/bh.json",
+        "(d) Month spread from trades.csv entry_ts (246 rows): max single calendar month is 2026-02 with 68/246 = 27.6%, well under 50% -- research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/trades.csv",
+        "(e) per_symbol dominance: max symbol is TAO/NEAR at 25/246 = 10.2%, well under 60% (universe size 16) -- research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/out.json:per_symbol",
+        "(f) Robustness (STANDARDS #9), tp_bps +-20% of registered 250 bps, via research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/robust/make_variants.py + registrar + screen (era=train): registered net_bps_mean=34.07147326187418 (research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/out.json), plus variant (tp_bps=300) net_bps_mean=38.988748766962445 (research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/out.robust_plus.json), minus variant (tp_bps=200) net_bps_mean=22.245729624354507 (research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/out.robust_minus.json). All three positive -- same sign in both variants, pass."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "id": "vol_structure_gamma_unclamp",
+  "spec_sha256": "4285ccc0929af4e2eb7a3b327c86d551a15a0246076454cf6aad6f78df54e9b4",
+  "era": "train",
+  "n": 3,
+  "net_bps_mean": -44.83333333333337,
+  "ci95": [
+    -161.50000000000014,
+    188.50000000000014
+  ],
+  "wr": 0.3333333333333333,
+  "p_star": 0.52875,
+  "trades_per_week": 0.07001944984717977,
+  "time_to_verdict_weeks": 714.0873015873017,
+  "lot_check": {
+    "BTC": {
+      "ok": true,
+      "lots": 2,
+      "lot_usd": 77.74
+    },
+    "ETH": {
+      "ok": true,
+      "lots": 8,
+      "lot_usd": 24.9738
+    }
+  },
+  "per_symbol": {
+    "BTC": 2,
+    "ETH": 1
+  },
+  "train_span": [
+    "2025-06-27 06:00:00+00:00",
+    "2026-04-23 04:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "ff52c904e729091aa7eb32b7819ca9aa54363ba95ecd070be781eee5d8b31019"
+}

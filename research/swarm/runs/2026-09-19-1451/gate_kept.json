@@ -1,0 +1,32 @@
+[
+  {
+    "id": "vol_structure_mm_withdrawal_drift",
+    "thesis_path": "research/swarm/runs/2026-09-19-1451/theses/vol_structure_mm_withdrawal_drift.json",
+    "evidence_grade": "A",
+    "reason": "Passed dedup/relabel/sanity (valid id, all 4 universe symbols exist in long_1h and clear fee_math.lot_check at $200, signal imports only pandas/numpy, no mr_edge/holdout use, distinct continuation mechanism vs dead row 6's reversion finding); both source_urls (bitmex.com/blog/state-of-crypto-perps-2025, arxiv.org/html/2607.27070) were fetched directly and confirmed verbatim -- the $20B Oct-10-11-2025 cascade, MM auto-deleveraging of delta-neutral books, the 'thinnest orderbooks since 2022' liquidity withdrawal, the $19B/1.6M-account/24.6% OI-drop cascade stats, and the taker-flow-variance precursor p~=5e-6 all check out, and the arXiv paper's explicit non-claim about post-cascade trading strategies matches the thesis's own honest caveat -- grade A."
+  },
+  {
+    "id": "vol_structure_gamma_unclamp",
+    "thesis_path": "research/swarm/runs/2026-09-19-1451/theses/vol_structure_gamma_unclamp.json",
+    "evidence_grade": "A",
+    "reason": "Passed dedup (kept over dealer_inventory_gamma_flush as the better-specified sibling), relabel/sanity (valid id, BTC/ETH exist in long_1h and clear lot_check at $200, imports clean, no mr_edge/holdout use, distinguished from rows 84/82/3/78); all 3 source_urls were fetched directly and confirmed the cited numbers exactly -- bitget.com's four 2025 quarterly post-expiry moves (+8%/-5%/+4.2%/+12%) and 'gamma release' framing, research.glassnode.com's dealer positive/negative-gamma pinning-vs-amplifying explanation, and cryptodaily.co.uk's specific May-2026 realized-vol (24-27% short vs 42-46% long) and $8B negative-gamma-near-$75k figures all matched the thesis's evidence field -- grade A."
+  },
+  {
+    "id": "informed_flow_btc_alt_cascade",
+    "thesis_path": "research/swarm/runs/2026-09-19-1451/theses/informed_flow_btc_alt_cascade.json",
+    "evidence_grade": "A",
+    "reason": "Passed dedup/relabel/sanity (valid id, all 16 universe symbols exist in long_1h and clear lot_check at $200, imports clean, exploratory probe confirmed to use only long_1h/train data with no mr_edge leak, mechanism distinguished from dead rows 6/5/13); zenodo.org/records/17084252 and arxiv.org/abs/2506.08718 were fetched directly and confirmed the cited lead-lag numbers exactly (BTC 5-min CEX lead, Solana 40-min DEX lead; VECM/Hasbrouck methodology, centralized markets lead ETH, BTC futures lead spot), and the paywalled Springer source's claims (small-cap delayed BTC response, liquidity-conditioned reaction speed, unidirectional BTC->ALT Granger causality) were independently confirmed via search of the article's own abstract, matching the thesis's honest 'abstract-level only' caveat -- grade A."
+  },
+  {
+    "id": "cross_asset_btc_shock_lag",
+    "thesis_path": "research/swarm/runs/2026-09-19-1451/theses/cross_asset_btc_shock_lag.json",
+    "evidence_grade": "B",
+    "reason": "Passed dedup/relabel/sanity (valid id, all 4 universe symbols exist in long_1h and clear lot_check at $200, imports clean, no mr_edge/holdout use, distinguished from rows 5/13/12/76); the businessperspectives.org tick-by-tick BTC-ADA lead-lag figures (16-118s, mean ~57s) and the dergipark VAR-model quote (BTC lags positively significant with ETH/ADA/BNB but not XRP) were both independently confirmed to match exactly, but the third source cited as 'Aslanidis et al., Finance Research Letters 2021' is real at that exact URL/journal/volume with the claimed asymmetric-shock finding confirmed, except the actual authors are Demir/Simonyan/Garcia-Gomez/Lau, not Aslanidis -- a citation-attribution error on a correctly-linked, honestly-flagged countervailing source rather than a fabricated number, so mechanism confirmed / numbers partially confirmed -- grade B."
+  },
+  {
+    "id": "cross_asset_ethbtc_regime_rotation",
+    "thesis_path": "research/swarm/runs/2026-09-19-1451/theses/cross_asset_ethbtc_regime_rotation.json",
+    "evidence_grade": "B",
+    "reason": "Passed dedup/relabel/sanity (valid id, all 4 universe symbols exist in long_1h and clear lot_check at $200, imports clean, no mr_edge/holdout use, distinguished from rows 33/76/5/8, and correctly plans to net funding drag for its 48h holds per mandate section 4); coingecko.com/research's ETH/BTC sub-0.05 streak dates (14 consecutive months from 2024-07-25; prior 33-month streak 2018-08-14 to 2021-04-28) were confirmed exactly, and dobermanvc.com's September-2025 numbers (-$1.17B BTC ETF outflows, ETH/BTC +2.8%/72h, ARB +12%/OP +8%/Base +15%) were also present verbatim on the page, but that primary mechanism-confirming example comes from a single VC-blog 'backtested example' with no disclosed methodology rather than a peer-reviewed or exchange-native source -- mechanism confirmed, numbers confirmed but resting on secondary/practitioner-blog support -- grade B."
+  }
+]

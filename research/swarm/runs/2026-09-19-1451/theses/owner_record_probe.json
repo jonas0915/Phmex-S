@@ -1,0 +1,136 @@
+{
+  "note": "PROBE, not a thesis or a screen result. Source files: api_closed_pnl.json (819 rows), api_deposit_list_full.json, api_withdraw_list_full.json, all under research/swarm/kb/owner_trades/.",
+  "n_closed_positions": 819,
+  "date_range": {
+    "earliest": "2022-03-26 06:11:32.166000+00:00",
+    "latest": "2023-02-16 00:16:06.711000+00:00"
+  },
+  "equity_path_caveat": "deposit/withdrawal files exist but are in raw per-currency asset units (e.g. XRP, ADA units), not USD -- SOURCES.md confirms no USD conversion was attempted. A true USD equity curve was NOT built. Reporting cumulative REALIZED PnL only (sum of realizedPnlEv/1e4, field: closed[i]['realizedPnlEv']), which excludes deposits/withdrawals and unrealized PnL.",
+  "cumulative_realized_pnl_usd": {
+    "field": "sum(realizedPnlEv)/1e4 across all 819 rows, chronological by openedTimeNs",
+    "final": 4857.22,
+    "peak": 6335.62,
+    "peak_at_row_index_chronological": 634,
+    "peak_at_date": "2022-11-10 07:53:39.088000+00:00"
+  },
+  "concentration": {
+    "field": "realizedPnlEv/1e4, positive rows only, n_positive=397",
+    "total_positive_pnl_usd": 12899.2,
+    "largest_single_trade_share_of_total_positive": 0.0845,
+    "top5_trades_share_of_total_positive": 0.2951,
+    "largest_trade_pnl_usd": 1089.62
+  },
+  "win_rate": {
+    "field": "count(realizedPnlEv>0)/n",
+    "value": 0.4847,
+    "n_wins": 397,
+    "n_losses": 422,
+    "n_flat": 0
+  },
+  "payoff_ratio": {
+    "field": "mean(realizedPnlEv>0)/abs(mean(realizedPnlEv<0)), both /1e4",
+    "avg_win_usd": 32.49,
+    "avg_loss_usd": -19.06,
+    "ratio": 1.705
+  },
+  "median_hold": {
+    "field": "median(updatedTimeNs - openedTimeNs)/1e9 seconds, both fields on api_closed_pnl.json rows",
+    "seconds": 4973.3,
+    "hours": 1.38
+  },
+  "symbols": {
+    "field": "Counter(row['symbol'])",
+    "top10": [
+      [
+        "uBTCUSD",
+        306
+      ],
+      [
+        "ADAUSD",
+        105
+      ],
+      [
+        "SOLUSD",
+        73
+      ],
+      [
+        "XRPUSD",
+        73
+      ],
+      [
+        "MATICUSD",
+        67
+      ],
+      [
+        "AVAXUSD",
+        43
+      ],
+      [
+        "APEUSD",
+        35
+      ],
+      [
+        "u100TRYBUSD",
+        33
+      ],
+      [
+        "LUNAOLDUSD",
+        31
+      ],
+      [
+        "ETHUSD",
+        13
+      ]
+    ],
+    "n_unique_symbols": 22
+  },
+  "side_split": {
+    "field": "Counter(row['side']) -- '1'=long/Buy, '2'=short/Sell per Phemex convention",
+    "counts": {
+      "1": 423,
+      "2": 396
+    }
+  },
+  "time_of_day_utc_hour": {
+    "field": "Counter(datetime.fromtimestamp(openedTimeNs/1e9, utc).hour)",
+    "counts": {
+      "0": 54,
+      "1": 50,
+      "2": 45,
+      "3": 36,
+      "4": 37,
+      "5": 30,
+      "6": 21,
+      "7": 19,
+      "8": 4,
+      "9": 3,
+      "10": 2,
+      "11": 6,
+      "12": 14,
+      "13": 30,
+      "14": 43,
+      "15": 42,
+      "16": 41,
+      "17": 46,
+      "18": 46,
+      "19": 42,
+      "20": 57,
+      "21": 53,
+      "22": 50,
+      "23": 48
+    }
+  },
+  "behavior_after_loss": {
+    "field": "for each losing row i (realizedPnlEv<0), inspect row i+1 (next trade by openedTimeNs order)",
+    "n_loss_events_with_next_trade": 422,
+    "avg_size_all_trades": 286.3065,
+    "avg_size_of_trade_immediately_after_a_loss": 251.763,
+    "avg_hold_seconds_of_trade_immediately_after_a_loss": 21515.3,
+    "pct_next_trade_same_side_as_losing_trade": 0.5332
+  },
+  "deposits_withdrawals_row_counts_not_usd_equity": {
+    "field": "len(api_deposit_list_full.json), len(api_withdraw_list_full.json)",
+    "n_deposits": 112,
+    "n_withdrawals": 68
+  }
+}

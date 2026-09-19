@@ -1,0 +1,15 @@
+{
+  "votes": [
+    {
+      "id": "informed_flow_btc_alt_cascade",
+      "pass": true,
+      "reasons": [
+        "WR >= p*: out.json wr=0.524390243902439 >= out.json p_star=0.523 (fee_math.p_star(250)=0.523, verified live via `python3 -c \"from research.swarm.lib import fee_math as f; print(f.p_star(250))\"` -> 0.523) -- research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/out.json",
+        "lot_check ok for all 16 universe symbols at fee_math.position_notional()=200.0 (verified live: `python3 -c \"from research.swarm.lib import fee_math as f; print(f.position_notional())\"` -> 200.0): DOGE/ADA/XRP/LTC/LINK/UNI/NEAR/SUI/ONDO/AAVE/TAO/XLM/1000PEPE/1000SHIB/GIGGLE/BNB all {\"ok\": true} -- research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/out.json (lot_check block)",
+        "Feasible on a 5-min poller: frozen spec timeframe=\"1h\" (>= 5m), signal.py uses only closed bars (pct_change(K) on close[i] vs close[i-K], no shift(-k), no forming-bar read per its own docstring) and out.json causality=\"PASS\" confirms the whole-prefix causality_check passed -- research/swarm/runs/2026-09-19-1451/specs/informed_flow_btc_alt_cascade.frozen.json (spec.timeframe), research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/out.json (causality), research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/signal.py",
+        "Funding exposure at max_hold: frozen spec max_hold_bars=7 on timeframe=\"1h\" => 7 bars x 1h = 7h, which is <= 8h, so the CONSTRAINTS 'hold > 8h must account for funding' trigger is not met -- no funding-cost adjustment is required and none is claimed -- research/swarm/runs/2026-09-19-1451/specs/informed_flow_btc_alt_cascade.frozen.json (spec.max_hold_bars, spec.timeframe)",
+        "time_to_verdict_weeks <= 26: out.json time_to_verdict_weeks=10.174699961285327 -- research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade/out.json"
+      ]
+    }
+  ]
+}

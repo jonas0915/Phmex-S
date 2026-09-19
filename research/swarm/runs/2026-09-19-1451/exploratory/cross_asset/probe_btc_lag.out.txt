@@ -1,0 +1,20 @@
+ETH h 1 n_up 459 mean_fwd_up_bps -1.77 unconditional_bps 0.18
+ETH h 3 n_up 459 mean_fwd_up_bps 7.57 unconditional_bps 0.57
+ETH h 6 n_up 459 mean_fwd_up_bps 13.66 unconditional_bps 1.24
+ETH h 8 n_up 459 mean_fwd_up_bps 19.33 unconditional_bps 1.73
+ETH raw_signal_bars 459 transitions(proxy trades) 395 transitions_per_week 9.22
+ADA h 1 n_up 459 mean_fwd_up_bps -3.25 unconditional_bps -0.77
+ADA h 3 n_up 459 mean_fwd_up_bps 5.82 unconditional_bps -2.28
+ADA h 6 n_up 459 mean_fwd_up_bps 12.19 unconditional_bps -4.47
+ADA h 8 n_up 459 mean_fwd_up_bps 12.49 unconditional_bps -5.86
+ADA raw_signal_bars 459 transitions(proxy trades) 395 transitions_per_week 9.22
+XRP h 1 n_up 459 mean_fwd_up_bps -4.89 unconditional_bps -0.28
+XRP h 3 n_up 459 mean_fwd_up_bps 4.52 unconditional_bps -0.82
+XRP h 6 n_up 459 mean_fwd_up_bps 7.56 unconditional_bps -1.55
+XRP h 8 n_up 459 mean_fwd_up_bps 9.91 unconditional_bps -2.0
+XRP raw_signal_bars 459 transitions(proxy trades) 395 transitions_per_week 9.22
+SOL h 1 n_up 459 mean_fwd_up_bps -2.58 unconditional_bps -0.39
+SOL h 3 n_up 459 mean_fwd_up_bps 7.31 unconditional_bps -1.15
+SOL h 6 n_up 459 mean_fwd_up_bps 13.59 unconditional_bps -2.2
+SOL h 8 n_up 459 mean_fwd_up_bps 16.82 unconditional_bps -2.89
+SOL raw_signal_bars 459 transitions(proxy trades) 395 transitions_per_week 9.22

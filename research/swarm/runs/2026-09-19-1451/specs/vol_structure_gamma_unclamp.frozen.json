@@ -1,0 +1,50 @@
+{
+  "frozen_at": "2026-09-19T21:51:39Z",
+  "sha256": "4285ccc0929af4e2eb7a3b327c86d551a15a0246076454cf6aad6f78df54e9b4",
+  "thesis": {
+    "counterparty": "Deribit BTC/ETH options market makers who must unwind large delta-hedge books the moment options settle, mechanically removing volatility-dampening flow within a 4-72 hour window post-expiry.",
+    "evidence": "bitget.com/academy/what-happens-after-crypto-options-expiry (fetched): reports that every 2025 quarterly BTC options expiry produced a move of at least 4% within 72 hours of settlement (Mar 2025 +8% over 3 days, Jun 2025 -5% over 2 days, Sep 2025 +4.2% over 3 days, Dec 2025 +12% over 4 days), attributes this to 'gamma release' -- dealers unwinding delta hedges that become unnecessary at settlement, removing the pre-expiry 'pin to max pain' suppression, with directional commitment visible in the 4-12h post-settlement window and the strongest moves in 48-72h. research.glassnode.com/gamma-exposure (fetched): confirms the mechanism qualitatively -- positive dealer gamma near a strike cluster dampens vol (pinning), negative gamma amplifies it, driven purely by dealer hedging flow direction. cryptodaily.co.uk/2026/05 piece (fetched): shows a live example of this regime-shift signature -- short-window realized vol 24-27% vs 3-6mo realized vol 42-46% (compressed short-vol regime) coinciding with $8B of negative gamma clustered near a specific strike band ahead of a large May 2026 Deribit expiry, explicitly framed as a compression-then-release setup.",
+    "id": "vol_structure_gamma_unclamp",
+    "lens": "vol_structure",
+    "mechanism": "Deribit BTC/ETH options dealers hedge net option exposure by trading spot/futures delta-neutral. In the days before a scheduled monthly/quarterly expiry, dealers are typically net long gamma near the 'max pain' cluster and their re-hedging (buy dips, sell rallies) pins price and suppresses realized vol. At settlement, that entire hedge book unwinds within hours because the options cease to exist -- the dampening flow disappears all at once. Dealers are not choosing to stop hedging, they are structurally forced to because the position they were hedging is gone. This creates a mechanical compression-to-expansion event: pinned/low-RV pre-expiry regime -> forced gamma unclamp -> a multi-day directional realized-vol expansion in whatever direction the post-settlement order flow commits to. The counterparty paying is the pre-expiry premium sellers/pinning flow (their suppression is temporary and reverses), not the desk trading the post-expiry breakout.",
+    "nearest_dead_rows": [
+      {
+        "row": 84,
+        "why_different": "Row 84 (event first-candle momentum) needs 1-minute precision to catch the immediate reaction candle, which this bot's 5-min poller cannot do. This thesis is calendar-anchored (public, known-in-advance Deribit expiry dates) and trades the 3-day post-settlement drift, not the first candle, so it is executable on daily/hourly bars with maker entries."
+      },
+      {
+        "row": 82,
+        "why_different": "Row 82 relabeled a funding-settlement time-of-day gate plus taker entries on an already-dead lever. This thesis is not a gate on an existing strategy and is not anchored to funding settlement (every 8h, every symbol) -- it is anchored to the much rarer Deribit options expiry calendar (12 monthly + 4 quarterly dates/year) and uses the disappearance of dealer gamma hedging, a structurally different and independently documented forced-flow event, as the trigger."
+      },
+      {
+        "row": 3,
+        "why_different": "Row 3 (1h vol-expansion fade) faded vol expansion with no named counterparty and died to single-split selection bias. This thesis trades continuation (not fade), is calendar-anchored rather than purely technical, and names a specific forced unwind (dealer delta-hedge unwind at a known settlement time) as the cause of the expansion."
+      },
+      {
+        "row": 78,
+        "why_different": "Row 78 (Bollinger-squeeze breakout) is a pure technical-indicator squeeze/breakout with no forced counterparty and was refuted as backtest-only. This thesis's compression/expansion is not indicator-defined; it is timed to a public options-expiry calendar with a documented structural cause (gamma unclamp), independent of any band-width parameter."
+      }
+    ],
+    "prediction": "On the calendar day of and the 3 trading days following a Deribit BTC/ETH monthly (last-Friday, 08:00 UTC) or quarterly options expiry, price shows a directional realized-vol expansion move (>=150-200 bps net of the pre-expiry compression) in the direction established by the first large-range bar after settlement, more often than chance and more often than on randomly chosen non-expiry days of equal count.",
+    "signal_py": "import numpy as np\nimport pandas as pd\n\n# Deribit BTC/ETH options expiry calendar: last Friday of each calendar month,\n# 08:00 UTC (monthly), with the March/June/September/December expiries also\n# serving as the quarterly expiry (same date, same mechanism, larger notional).\n# This is a public, fixed exchange calendar, not derived from any price data,\n# so it is trivially closed-bar-safe and identical on any historical prefix.\n\ndef _last_friday_expiries(index):\n    dates = pd.Series(index.normalize().unique())\n    out = []\n    for d in dates:\n        # last Friday of d's month at 08:00 UTC\n        month_end = (d + pd.offsets.MonthEnd(0))\n        # walk back from month end to the last Friday (weekday()==4)\n        offset = (month_end.weekday() - 4) % 7\n        last_friday = month_end - pd.Timedelta(days=offset)\n        out.append(last_friday.normalize() + pd.Timedelta(hours=8))\n    return sorted(set(out))\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    out = pd.Series(0, index=df.index, dtype=int)\n    if len(df) < 40:\n        return out\n\n    expiries = _last_friday_expiries(df.index)\n    close = df[\"close\"]\n    ret1h = close.pct_change()\n\n    # pre-expiry realized-vol compression check: last 24h stdev of hourly\n    # returns vs trailing 20-day (480h) average stdev, using only bars\n    # strictly before the current bar (closed-bar safe).\n    rv_short = ret1h.rolling(24).std()\n    rv_long = ret1h.rolling(480, min_periods=120).std()\n\n    for exp_ts in expiries:\n        # find first bar at/after settlement (closed bar only)\n        post = df.index[df.index >= exp_ts]\n        if len(post) == 0:\n            continue\n        settle_bar = post[0]\n        loc = df.index.get_loc(settle_bar)\n        if loc < 30 or loc + 1 >= len(df):\n            continue\n        # compression check uses data strictly before settlement\n        pre_rv_short = rv_short.iloc[loc - 1]\n        pre_rv_long = rv_long.iloc[loc - 1]\n        if pd.isna(pre_rv_short) or pd.isna(pre_rv_long) or pre_rv_long == 0:\n            continue\n        compressed = pre_rv_short < 0.7 * pre_rv_long\n        if not compressed:\n            continue\n        # first large-range bar in the 0-8h post-settlement window sets direction\n        window_end = min(loc + 8, len(df) - 1)\n        window = df.iloc[loc:window_end + 1]\n        bar_range = (window[\"close\"] - window[\"open\"]).abs() / window[\"open\"]\n        atr_proxy = ((df[\"high\"] - df[\"low\"]) / df[\"close\"]).rolling(48).mean().iloc[loc - 1]\n        if pd.isna(atr_proxy) or atr_proxy == 0:\n            continue\n        big = bar_range[bar_range > 1.5 * atr_proxy]\n        if big.empty:\n            continue\n        trigger_ts = big.index[0]\n        trigger_loc = df.index.get_loc(trigger_ts)\n        direction = np.sign(df[\"close\"].iloc[trigger_loc] - df[\"open\"].iloc[trigger_loc])\n        if direction == 0 or trigger_loc + 1 >= len(df):\n            continue\n        # enter at the bar after the triggering large-range bar (closed-bar entry)\n        entry_loc = trigger_loc + 1\n        out.iloc[entry_loc] = int(direction)\n\n    return out.fillna(0).astype(int)\n",
+    "source_urls": [
+      "https://www.bitget.com/academy/what-happens-after-crypto-options-expiry",
+      "https://research.glassnode.com/gamma-exposure/",
+      "https://cryptodaily.co.uk/2026/05/bitcoin-volatility-compression-quiet-markets-break-suddenly"
+    ],
+    "spec": {
+      "dataset": "long_1h",
+      "doa_line": "Kill if, after n>=30 signals (roughly 15 months of monthly+quarterly expiries across BTC+ETH, or earlier if fewer expiries fall in the long_1h train window force a longer wait explicitly logged), bootstrap CI95 (bootstrap_ci.mean_ci) of net bps (after fee_math.C_BPS=11.5bps) does not exclude zero, or observed win rate is below fee_math.p_star(200).",
+      "expected_trades_per_week": 0.5,
+      "max_hold_bars": 72,
+      "sl_bps": 150,
+      "timeframe": "1h",
+      "tp_bps": 200,
+      "universe": [
+        "BTC",
+        "ETH"
+      ]
+    },
+    "thesis_path": "research/swarm/runs/2026-09-19-1451/theses/vol_structure_gamma_unclamp.json"
+  }
+}

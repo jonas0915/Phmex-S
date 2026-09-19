@@ -1,0 +1,7 @@
+[
+  {
+    "id": "dealer_inventory_gamma_flush",
+    "dead_row": null,
+    "reason": "duplicate of vol_structure_gamma_unclamp: both name the identical forced counterparty (Deribit BTC/ETH options dealers unwinding a short/long-gamma delta hedge at settlement) and trade the identical instrument/direction (Phemex BTC/ETH perp breakout continuation in the hours after a Deribit weekly/monthly/quarterly 08:00 UTC options expiry) -- the only differences are calendar cadence (every Friday vs monthly/quarterly only) and hold length (1-6h vs up to 72h), which are parameters/timeframe, not a different mechanism. vol_structure_gamma_unclamp is the better-specified of the pair: its signal actually verifies the pre-expiry realized-vol compression precondition (rv_short<0.7*rv_long) that the shared mechanism requires before it fires, while dealer_inventory_gamma_flush's signal fires on every one of the 52 weekly Friday expiries regardless of whether pinning/compression was present; and vol_structure_gamma_unclamp's cited evidence (bitget.com's per-quarter move percentages, cryptodaily.co.uk's specific compression/gamma numbers) is about the same large monthly/quarterly expiries it actually trades, whereas dealer_inventory_gamma_flush cites a large ($24B) expiry as evidence for a signal that fires on every much-smaller weekly expiry too -- a mismatch between the cited magnitude and the traded population."
+  }
+]

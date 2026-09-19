@@ -1,0 +1,24 @@
+{
+  "verdict": "CONFIRMED",
+  "ci_excludes_zero": false,
+  "findings": [
+    "Audit process passes all checks 1-5 (frozen sha verified, rerun exact match, no lookahead, causality PASS, entry-fill and cost mechanics correct) -- this CONFIRMED verdict certifies the screen artifacts are legitimate and reproducible, not that the thesis is viable.",
+    "Thesis fails viability on the numbers themselves: net_bps_mean = -31.01 bps with ci95 = [-45.12, -16.70] (research/swarm/runs/2026-09-19-1451/screens/cross_asset_ethbtc_regime_rotation/out.json) -- CI is entirely negative, so it excludes zero but on the wrong (loss) side; per this audit's literal ci_excludes_zero test (both bounds > 0) that flag is False.",
+    "Observed WR = 45.13% (out.json wr=0.4513031550068587) is well below p*(200bps)=52.875% (fee_math.p_star(200)) -- CONSTRAINTS viability item 2 fails.",
+    "Per-screen bootstrap p-value (one-sided P(mean<=0) proxy) = 1.0, i.e. even at alpha=1.0 the resampled CI lower bound never clears 0 -- consistent with a confidently negative, not merely inconclusive, result."
+  ],
+  "numbers": {
+    "n": 729,
+    "net_bps_mean": -31.01090893963594,
+    "ci95": [-45.11928814189359, -16.70117517727141],
+    "wr": 0.4513031550068587,
+    "p_star": 0.52875,
+    "time_to_verdict_weeks": 2.9386308707296362,
+    "p_boot": 1.0,
+    "rerun": {
+      "n": 729,
+      "net_bps_mean": -31.01090893963594,
+      "ci95": [-45.11928814189359, -16.70117517727141]
+    }
+  }
+}

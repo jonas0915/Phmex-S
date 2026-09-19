@@ -1,0 +1,22 @@
+{
+  "verdict": "CONFIRMED",
+  "ci_excludes_zero": false,
+  "findings": [
+    "Informational (not a reproducibility defect): thesis fails its own pre-registered doa_line. Observed WR=46.90% < p*(150bps)=53.83%, and net_bps_mean=-15.58 bps with ci95=[-22.17, -8.38] — the CI excludes zero but lies entirely in negative territory (opposite sign of the thesis's predicted positive drift), so ci_excludes_zero (defined here as both bounds > 0) is false. The screen mechanics are sound; the mechanism itself is refuted by the train-era data.",
+    "Informational: lot_check for ADA reports lot_usd: null (fee_math.LOT_MIN_USD has no ADA entry, unlike ETH/XRP/SOL). This is reproduced identically in both the original and rerun screens (not a mismatch), but flagged for committee awareness since ADA lot economics are not verified by name against CONSTRAINTS.md's explicit list (BTC, ETH, SOL, XRP, DOGE only)."
+  ],
+  "numbers": {
+    "n": 1518,
+    "net_bps_mean": -15.577896901113876,
+    "ci95": [-22.174270844541198, -8.380931448219512],
+    "wr": 0.46903820816864294,
+    "p_star": 0.5383333333333333,
+    "time_to_verdict_weeks": 1.4112397264571177,
+    "p_boot": 1.0,
+    "rerun": {
+      "n": 1518,
+      "net_bps_mean": -15.577896901113876,
+      "ci95": [-22.174270844541198, -8.380931448219512]
+    }
+  }
+}

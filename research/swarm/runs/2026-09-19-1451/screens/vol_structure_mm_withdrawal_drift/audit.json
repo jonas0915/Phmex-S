@@ -1,0 +1,25 @@
+{
+  "verdict": "CONFIRMED",
+  "ci_excludes_zero": false,
+  "findings": [
+    "n=1 (single trade, XRP short 2025-10-11), far below CONSTRAINTS viability item 1's n>=30 minimum -- the train-era screen cannot be judged for edge from this sample; the thesis needs a much longer/broader trigger sample before any viability call.",
+    "ci95 is null (bootstrap_ci.mean_ci requires n>=2), so ci_excludes_zero is false per audit step 6's definition.",
+    "Observed wr=0.0 is below fee_math.p_star(200)=0.52875 (CONSTRAINTS viability item 2 fails), and the single trade lost -161.5 net bps (SL hit intrabar on the entry bar).",
+    "bootstrap one-sided p_boot could not be computed on ladder resolution (n<2), recorded as 1.0 per the audit script's own fallback.",
+    "Signal review found no lookahead: no .shift(-k) with k>0, no negative-index/future-timestamp use, no rolling(center=True), no iloc[-1]-style forming-bar logic, and no data outside df (no load_funding/fetch_ohlcv_ccxt calls). out.json causality == 'PASS', confirmed independently by re-derivation."
+  ],
+  "numbers": {
+    "n": 1,
+    "net_bps_mean": -161.49999999999903,
+    "ci95": null,
+    "wr": 0.0,
+    "p_star": 0.52875,
+    "time_to_verdict_weeks": 2142.2619047619046,
+    "p_boot": 1.0,
+    "rerun": {
+      "n": 1,
+      "net_bps_mean": -161.49999999999903,
+      "ci95": null
+    }
+  }
+}

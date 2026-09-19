@@ -1,0 +1,49 @@
+{
+  "id": "cross_asset_btc_shock_lag",
+  "spec_sha256": "33a6be5e219794dfba901f52f962265219ef7feecda1ee22112bf1c769d64326",
+  "era": "train",
+  "n": 1518,
+  "net_bps_mean": -15.577896901113876,
+  "ci95": [
+    -22.174270844541198,
+    -8.380931448219512
+  ],
+  "wr": 0.46903820816864294,
+  "p_star": 0.5383333333333333,
+  "trades_per_week": 35.42984162267297,
+  "time_to_verdict_weeks": 1.4112397264571177,
+  "lot_check": {
+    "ETH": {
+      "ok": true,
+      "lots": 8,
+      "lot_usd": 24.9738
+    },
+    "ADA": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "XRP": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.0044
+    },
+    "SOL": {
+      "ok": true,
+      "lots": 197,
+      "lot_usd": 1.0143
+    }
+  },
+  "per_symbol": {
+    "ETH": 380,
+    "ADA": 379,
+    "XRP": 371,
+    "SOL": 388
+  },
+  "train_span": [
+    "2025-06-27 06:00:00+00:00",
+    "2026-04-23 04:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "a173a56e3ccc493b3e9f40752528e5817c268f08ccebfe564263b8edf039d6db"
+}

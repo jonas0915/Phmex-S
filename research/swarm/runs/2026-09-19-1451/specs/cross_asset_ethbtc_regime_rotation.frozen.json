@@ -1,0 +1,51 @@
+{
+  "frozen_at": "2026-09-19T21:51:39Z",
+  "sha256": "00c11b0c951b6fc11ecf8a1728c6970676cab46ff8abc0e442adccab2b64c3e4",
+  "thesis": {
+    "counterparty": "Passive alt market makers and short-term mean-reversion sellers on the follower symbol's own book, who fade the initial move because it looks like noise relative to their own book's history; they do not see the ETH/BTC regime signal and are steadily picked off by the multi-day rotation flow that the regime cross anticipates.",
+    "evidence": "(1) Dobermanvc's 2025 guide reports a concrete real-world instance: in September 2025, Bitcoin ETFs saw $1.17B net outflows, ETH/BTC expanded +2.8% within 72 hours, and over that window Arbitrum (ARB) rose +12%, Optimism (OP) +8%, and the Base ecosystem +15% -- i.e. a documented case of an ETH/BTC regime move preceding/coinciding with multi-day L2/altcoin outperformance, which is the flow-lag mechanism this thesis trades. The same source states an ETH/BTC ratio move of >+2 standard deviations has historically preceded a ~72-hour window of sustained altcoin outperformance. (2) CoinGecko's ETH/BTC ratio history piece documents the ratio's long-run trend-cross behavior is a real, trackable regime object: it fell below 0.05 on 2024-07-25 and stayed there for 14 consecutive months, versus a prior 33-month sub-0.05 stretch from 2018-08-14 to 2021-04-28 that ended in a large multi-month alt-outperformance run -- i.e. historically, exits from a prolonged ETH/BTC downtrend have coincided with sustained (not single-day) alt rotations, which is why this thesis's hold horizon is 48h rather than a single bar.",
+    "id": "cross_asset_ethbtc_regime_rotation",
+    "lens": "cross_asset",
+    "mechanism": "The ETH/BTC ratio is a slow-moving regime variable that tracks structural capital rotation (ETF flow direction, L2/altcoin risk appetite). When the ratio crosses back above its own multi-day trend after being below it, it marks the start of a rotation window into alt risk. That rotation is executed over days by flow-driven allocators (ETF-adjacent rebalancers, basket rotators) using scheduled/algorithmic execution, not instantly -- so alt market makers who price purely off their own order book underprice the sustained buy pressure that follows, and get run over for the following 1-2 days.",
+    "nearest_dead_rows": [
+      {
+        "row": 33,
+        "why_different": "Row 33 is a Donchian breakout on the traded asset's OWN price channel (owner declined, never reoffer). This signal is not a channel breakout on the follower's own price at all -- it is triggered by a cross-asset ratio (ETH/BTC) regime shift, and the follower symbol's own price series only supplies the entry/exit fills, never the trigger."
+      },
+      {
+        "row": 76,
+        "why_different": "Row 76 is multi-day mean-reversion back to a prior level over an overnight window. This is a momentum/continuation thesis (rotation flow keeps pushing the follower up for ~2 days after the regime cross), not reversion, and uses no overnight-session boundary."
+      },
+      {
+        "row": 5,
+        "why_different": "Row 5 needs a ~100-470-name cross-sectional long-short book and collapses at a handful of positions. This trades one follower symbol at a time off a single shared regime trigger -- no cross-sectional ranking, no basket average, no short leg."
+      },
+      {
+        "row": 8,
+        "why_different": "Row 8 (pairs/cointegration) is a stat-arb spread trade between two legs converging back together, and its apparent edge was 96% one coin's luck. This is a single-leg directional trade on the follower symbol; ETH/BTC is read only as a regime indicator, never traded or held as a spread position."
+      }
+    ],
+    "prediction": "When ETH/BTC crosses above its own trailing 48-hour moving average from below, a follower alt (SOL/ADA/XRP/LINK, tested independently) shows a materially more positive mean forward return over the next 48 hours than its unconditional mean forward return over the same dataset -- i.e. the regime cross marks a turn even in a period where the unconditional drift is negative. If a bootstrap CI95 on screened net bps (after the 11.5 bps cost) does not exclude zero, or WR < p*(200 bps)=52.875%, the thesis is falsified.",
+    "signal_py": "import pandas as pd\nfrom research.swarm.lib import load_data as ld\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Long-only: fires 1 when ETH/BTC crosses back above its trailing 48-bar (48h) moving\n    average from below, on the theory that this follower alt keeps rising for up to 48h\n    after the regime cross as rotation flow into alts continues. BTC/ETH data are loaded\n    fully (train era) and only combined via reindex onto df's own index, so no bar beyond\n    the current alt timestamp is ever used at any truncation point.\n    \"\"\"\n    btc = ld.load_ohlcv(\"BTC\", \"1h\", era=\"train\", dataset=\"long_1h\")\n    eth = ld.load_ohlcv(\"ETH\", \"1h\", era=\"train\", dataset=\"long_1h\")\n    idx = btc.index.intersection(eth.index)\n    ratio = eth[\"close\"].reindex(idx) / btc[\"close\"].reindex(idx)\n    ma = ratio.rolling(48).mean()\n    cross_up = (ratio > ma) & (ratio.shift(1) <= ma.shift(1))\n    cross_up = cross_up.reindex(df.index).fillna(False)\n\n    sig = pd.Series(0, index=df.index, dtype=int)\n    sig[cross_up] = 1\n    return sig\n",
+    "source_urls": [
+      "https://dobermanvc.com/eth-btc-ratio-the-overlooked-rotation-signal-2025-guide/",
+      "https://www.coingecko.com/research/publications/ethbtc-ratio-history"
+    ],
+    "spec": {
+      "dataset": "long_1h",
+      "doa_line": "Kill if, on the frozen long_1h train screen, n<30 OR bootstrap CI95 of net bps includes 0 OR observed WR < p*(200bps)=52.875% (fee_math.p_star), OR the +/-20% tp_bps robustness read (STANDARDS #9: 160bps and 240bps variants) flips net_bps_mean sign in either variant. Because max_hold_bars=48h spans 8h funding settlements, any surviving screen must additionally net out funding drag/gain from load_data.load_funding(symbol, era='train') before the pre-reg doc is written (STANDARDS mandate section 4).",
+      "expected_trades_per_week": 5,
+      "max_hold_bars": 48,
+      "sl_bps": 200,
+      "timeframe": "1h",
+      "tp_bps": 200,
+      "universe": [
+        "SOL",
+        "ADA",
+        "XRP",
+        "LINK"
+      ]
+    },
+    "thesis_path": "research/swarm/runs/2026-09-19-1451/theses/cross_asset_ethbtc_regime_rotation.json"
+  }
+}

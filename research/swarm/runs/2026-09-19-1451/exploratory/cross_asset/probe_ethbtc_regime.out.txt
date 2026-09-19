@@ -1,0 +1,14 @@
+n cross_up events 272 over 7199 bars
+SOL h 12 n_events 272 mean_fwd_bps -1.17 unconditional_bps -4.35
+SOL h 24 n_events 272 mean_fwd_bps -4.79 unconditional_bps -8.58
+SOL h 48 n_events 272 mean_fwd_bps 22.26 unconditional_bps -19.87
+ADA h 12 n_events 272 mean_fwd_bps -1.8 unconditional_bps -8.75
+ADA h 24 n_events 272 mean_fwd_bps -10.58 unconditional_bps -17.52
+ADA h 48 n_events 272 mean_fwd_bps 9.82 unconditional_bps -36.91
+XRP h 12 n_events 272 mean_fwd_bps 0.7 unconditional_bps -2.95
+XRP h 24 n_events 272 mean_fwd_bps -4.91 unconditional_bps -6.17
+XRP h 48 n_events 272 mean_fwd_bps 23.02 unconditional_bps -14.69
+LINK h 12 n_events 272 mean_fwd_bps -2.41 unconditional_bps -1.08
+LINK h 24 n_events 272 mean_fwd_bps -0.61 unconditional_bps -2.0
+LINK h 48 n_events 272 mean_fwd_bps 21.6 unconditional_bps -5.68
+events_per_week 6.35

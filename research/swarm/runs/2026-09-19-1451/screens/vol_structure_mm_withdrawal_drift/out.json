@@ -1,0 +1,46 @@
+{
+  "id": "vol_structure_mm_withdrawal_drift",
+  "spec_sha256": "e54a321fb06c04bc45a90e0f78ad3134911e814a5b631220e81ff0377cb83267",
+  "era": "train",
+  "n": 1,
+  "net_bps_mean": -161.49999999999903,
+  "ci95": null,
+  "wr": 0.0,
+  "p_star": 0.52875,
+  "trades_per_week": 0.02333981661572659,
+  "time_to_verdict_weeks": 2142.2619047619046,
+  "lot_check": {
+    "BTC": {
+      "ok": true,
+      "lots": 2,
+      "lot_usd": 77.74
+    },
+    "ETH": {
+      "ok": true,
+      "lots": 8,
+      "lot_usd": 24.9738
+    },
+    "SOL": {
+      "ok": true,
+      "lots": 197,
+      "lot_usd": 1.0143
+    },
+    "XRP": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.0044
+    }
+  },
+  "per_symbol": {
+    "BTC": 0,
+    "ETH": 0,
+    "SOL": 0,
+    "XRP": 1
+  },
+  "train_span": [
+    "2025-06-27 06:00:00+00:00",
+    "2026-04-23 04:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "c77e2a92837087d7c310accc71073ae8fedb5bbf3ad686b1c74931db96511fd4"
+}

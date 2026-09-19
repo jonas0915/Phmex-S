@@ -1,0 +1,121 @@
+{
+  "id": "informed_flow_btc_alt_cascade",
+  "spec_sha256": "420cc3d99a28354316d0ecbbeede17987cd2b15a28f9bbb8d911ff571a7bdee4",
+  "era": "train",
+  "n": 236,
+  "net_bps_mean": 38.988748766962445,
+  "ci95": [
+    13.662338705915966,
+    62.95175084805643
+  ],
+  "wr": 0.5084745762711864,
+  "p_star": 0.5191666666666667,
+  "trades_per_week": 4.714387633769322,
+  "time_to_verdict_weeks": 10.60583131557708,
+  "lot_check": {
+    "DOGE": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.001
+    },
+    "ADA": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "XRP": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.0044
+    },
+    "LTC": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "LINK": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "UNI": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "NEAR": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "SUI": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "ONDO": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "AAVE": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "TAO": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "XLM": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "1000PEPE": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "1000SHIB": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "GIGGLE": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "BNB": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    }
+  },
+  "per_symbol": {
+    "DOGE": 7,
+    "ADA": 5,
+    "XRP": 6,
+    "LTC": 24,
+    "LINK": 8,
+    "UNI": 14,
+    "NEAR": 23,
+    "SUI": 13,
+    "ONDO": 5,
+    "AAVE": 11,
+    "TAO": 25,
+    "XLM": 15,
+    "1000PEPE": 16,
+    "1000SHIB": 21,
+    "GIGGLE": 19,
+    "BNB": 24
+  },
+  "train_span": [
+    "2025-06-27 06:00:00+00:00",
+    "2026-06-12 16:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "cddbd71b1bb9a7015bd0a852b288d59bd24f6c39e625feff225ac394befac0c1"
+}

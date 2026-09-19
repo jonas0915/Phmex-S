@@ -1,0 +1,52 @@
+{
+  "frozen_at": "2026-09-19T21:51:39Z",
+  "sha256": "33a6be5e219794dfba901f52f962265219ef7feecda1ee22112bf1c769d64326",
+  "thesis": {
+    "counterparty": "Retail/algo liquidity takers and passive alt market makers who are still quoting off the pre-shock price during the lag window; they are the ones who transact (or get run over) at the stale price before the alt catches up to BTC's already-realized move. The bot's maker entry effectively front-runs their repricing.",
+    "evidence": "(1) Business Perspectives' tick-by-tick BTC-vs-Cardano lead-lag study reports a measured BTC-leads-ADA lead time of 16-118 seconds, mean ~57 seconds -- direct evidence BTC is the price leader and ADA reprices with a lag, though at a much shorter timescale than this 1h-bar thesis uses (a scale-mismatch caveat, not a refutation: the mechanism -- differential reaction speed -- is the same one this thesis stretches to an hourly trigger with a several-hour resolution window). (2) DergiPark/PressAcademia 'Bitcoin's Lagged Effect on Altcoins: A Short-Term Research' (VAR model) finds daily short-term-lagged BTC values have a positive, significant relationship with ETH, ADA and BNB, but explicitly NOT with XRP -- motivating this thesis's universe choice (ETH/ADA/XRP/SOL tested; XRP's weaker literature support is a known risk flagged here, not hidden). (3) Countervailing evidence noted for honesty: Aslanidis et al. (Finance Research Letters, 2021, NARDL model on ETH/XRP/LTC 2015-2019) find BTC's negative shocks have a LARGER effect on altcoins than positive shocks of equal size -- i.e. their asymmetry runs opposite in sign/direction detail to what this thesis's exploratory probe found (see exploratory/cross_asset/probe_btc_lag.out.txt: down-shocks showed a bounce, not amplified continuation, in the 2025-2026 long_1h sample) -- which is exactly why this thesis registers ONLY the up-shock/long side and treats the down side as unresolved rather than symmetric.",
+    "id": "cross_asset_btc_shock_lag",
+    "lens": "cross_asset",
+    "mechanism": "BTC is the most liquid, most-arbed instrument in the market and absorbs new information first; thinner-book alt market makers (ETH/ADA/XRP/SOL here) observe and reprice a BTC shock with a measurable lag because their own order flow and cross-venue arb links are slower/thinner. During that lag window the alt's quoted price is stale relative to the new BTC-implied fair value.",
+    "nearest_dead_rows": [
+      {
+        "row": 5,
+        "why_different": "Row 5 is a cross-sectional rank/long-short book across ~100-470 names that collapses when trimmed to a handful of positions. This thesis trades each of 4 alts independently off one shared exogenous trigger (BTC's own realized shock) -- no basket, no ranking, no short leg, no dilution mechanism to fail."
+      },
+      {
+        "row": 13,
+        "why_different": "Row 13 (BTC-TSM) is BTC trading its OWN price trend against its own history. Here BTC is never traded at all -- it is only read as an exogenous trigger so a DIFFERENT, slower-reacting asset can be traded. The mechanism is inter-asset information diffusion lag, not own-asset time-series momentum."
+      },
+      {
+        "row": 12,
+        "why_different": "Row 12 is a 12-coin basket average diluted by uncorrelated names. This thesis has no basket average -- each symbol's trades are simulated and reported independently in screen.run_screen, so one weak name cannot dilute another's edge."
+      },
+      {
+        "row": 76,
+        "why_different": "Row 76 is multi-day mean-reversion over an overnight window (price reverting to a prior level). This is a continuation/momentum mechanism over a 6-hour lag following a shock, not mean reversion, and does not use an overnight session boundary."
+      }
+    ],
+    "prediction": "Following an hour in which BTC's own return exceeds +60 bps, each of ETH/ADA/XRP/SOL will show a positive mean forward return over the next 6 hours that is materially larger than its unconditional mean forward return over the same dataset \u2014 i.e. the alt keeps drifting up after the BTC shock instead of the move being fully priced in within the same hour. If a bootstrap CI95 on screened net bps (after the 11.5 bps cost) does not exclude zero, or WR < p*(150 bps)=53.83%, the thesis is falsified.",
+    "signal_py": "import pandas as pd\nfrom research.swarm.lib import load_data as ld\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Long-only: fires 1 when BTC's own PRIOR closed 1h bar returned > 60 bps, on the\n    theory that this alt (ETH/ADA/XRP/SOL) reprices the shock with a multi-hour lag.\n    Uses only BTC bars with ts <= the current alt bar's ts (merge_asof backward) so no\n    future information ever enters the signal at any truncation point.\n    \"\"\"\n    btc = ld.load_ohlcv(\"BTC\", \"1h\", era=\"train\", dataset=\"long_1h\")\n    btc_ret_prior = btc[\"close\"].pct_change().shift(1)\n\n    b = btc_ret_prior.rename(\"btc_ret_prior\").reset_index()\n    b.columns = [\"ts\", \"btc_ret_prior\"]\n    b = b.sort_values(\"ts\")\n\n    alt_ts = pd.DataFrame({\"ts\": df.index}).sort_values(\"ts\")\n    merged = pd.merge_asof(alt_ts, b, on=\"ts\", direction=\"backward\")\n    merged = merged.set_index(\"ts\").reindex(df.index)\n\n    thresh = 0.006\n    sig = pd.Series(0, index=df.index, dtype=int)\n    sig[merged[\"btc_ret_prior\"] > thresh] = 1\n    return sig\n",
+    "source_urls": [
+      "https://businessperspectives.org/index.php/journals/investment-management-and-financial-innovations/issue-421/a-tick-by-tick-level-measurement-of-the-lead-lag-duration-between-cryptocurrencies-the-case-of-bitcoin-versus-cardano",
+      "https://dergipark.org.tr/en/pub/pap/article/1061522",
+      "https://ideas.repec.org/a/eee/finlet/v40y2021ics1544612319310311.html"
+    ],
+    "spec": {
+      "dataset": "long_1h",
+      "doa_line": "Kill if, on the frozen long_1h train screen, n<30 OR bootstrap CI95 of net bps includes 0 OR observed WR < p*(150bps)=53.83% (fee_math.p_star), OR the \u00b120% tp_bps robustness read (STANDARDS #9: 120bps and 180bps variants) flips net_bps_mean sign in either variant.",
+      "expected_trades_per_week": 20,
+      "max_hold_bars": 6,
+      "sl_bps": 150,
+      "timeframe": "1h",
+      "tp_bps": 150,
+      "universe": [
+        "ETH",
+        "ADA",
+        "XRP",
+        "SOL"
+      ]
+    },
+    "thesis_path": "research/swarm/runs/2026-09-19-1451/theses/cross_asset_btc_shock_lag.json"
+  }
+}
