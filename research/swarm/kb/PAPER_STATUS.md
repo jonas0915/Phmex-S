@@ -1,6 +1,6 @@
 # PAPER_STATUS — paper-slot forward tests (auto-written by `scripts/swarm_desk.py --mode maint`; do not edit — regenerated daily)
 
-Written 2026-09-18 06:30 AM PT. Bot process: STOPPED — no state file advances until an audited restart. Adjudicator digest: Sep 9 6:00 AM PT (9.0 d old) — kill lines are not being graded automatically (com.phmex.lab-adjudicator is unloaded until the bot restart; README Cadence, Gate B).
+Written 2026-09-19 06:30 AM PT. Bot process: STOPPED — no state file advances until an audited restart. Adjudicator digest: Sep 9 6:00 AM PT (10.0 d old) — kill lines are not being graded automatically (com.phmex.lab-adjudicator is unloaded until the bot restart; README Cadence, Gate B).
 
 Per slot: n and net USD are the registered era's closed trades (no registered era → every closed trade in the file; net_pnl as-is, fee-inclusive at the source); WR = share of era trades with net > 0; days = era start (registration, else first trade) → now, or → kill. Distance = USD above the kill line. Nothing here promotes or restarts anything.
 
@@ -8,9 +8,9 @@ Per slot: n and net USD are the registered era's closed trades (no registered er
 
 | slot | mode | n | net USD | WR | days | last close | kill line | distance | verdict_n | adjudicator (latest digest) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 5m_mean_revert | paper | 54 | +3.59 | 46% | 174 | 2026-09-07 | live rail only: auto-demote at $-5.00 (sidecar loss_cap_usdt); no paper kill line registered | — | — | — |
-| DONCHIAN_BTC | paper | 12 | +4.70 | 50% | 63 | 2026-09-07 | KILL if paper net <= $-15.00 (spec; fidelity line graded separately) (docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md) | 19.70 above $-15.00 | — | — |
-| DONCHIAN_ETH | paper | 18 | +4.23 | 67% | 63 | 2026-09-09 | KILL if paper net <= $-15.00 (spec; fidelity line graded separately) (docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md) | 19.23 above $-15.00 | — | — |
+| 5m_mean_revert | paper | 54 | +3.59 | 46% | 175 | 2026-09-07 | live rail only: auto-demote at $-5.00 (sidecar loss_cap_usdt); no paper kill line registered | — | — | — |
+| DONCHIAN_BTC | paper | 12 | +4.70 | 50% | 64 | 2026-09-07 | KILL if paper net <= $-15.00 (spec; fidelity line graded separately) (docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md) | 19.70 above $-15.00 | — | — |
+| DONCHIAN_ETH | paper | 18 | +4.23 | 67% | 64 | 2026-09-09 | KILL if paper net <= $-15.00 (spec; fidelity line graded separately) (docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md) | 19.23 above $-15.00 | — | — |
 
 ## Killed / retired
 
