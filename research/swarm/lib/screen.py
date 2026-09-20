@@ -50,8 +50,15 @@ def causality_check(signals_fn, df: pd.DataFrame, n_points: int = 12, seed: int 
     frames shorter than 60 bars use every index in [10, len-1) instead. `n_points` is
     kept for interface compatibility but is no longer the knob — the point counts above
     are fixed by the controller's fix ruling.
+
+    Reference symbols (2026-09-20): every signals_fn call here runs under
+    ld.reference_until(<last bar of the frame it is handed>), so a signal's
+    load_reference/load_reference_funding rows are clipped to that prefix's end. Without
+    that clip a forward transform confined to the reference series (e.g.
+    ref.close.shift(-3)) is identical in every prefix and would pass undetected.
     """
-    full = signals_fn(df).reindex(df.index).fillna(0).astype(int)
+    with ld.reference_until(df.index.max()):
+        full = signals_fn(df).reindex(df.index).fillna(0).astype(int)
     n = len(df)
     rng = np.random.default_rng(seed)
     if n < 60:
@@ -64,7 +71,8 @@ def causality_check(signals_fn, df: pd.DataFrame, n_points: int = 12, seed: int 
         uniform_idx = rng.choice(uniform_range, size=min(20, len(uniform_range)), replace=False)
         idxs = sorted(set(int(x) for x in nonzero_idx) | set(int(x) for x in uniform_idx))
     for i in idxs:
-        trunc = signals_fn(df.iloc[: i + 1]).reindex(df.index[: i + 1]).fillna(0).astype(int)
+        with ld.reference_until(df.index[i]):
+            trunc = signals_fn(df.iloc[: i + 1]).reindex(df.index[: i + 1]).fillna(0).astype(int)
         ref = full.iloc[: i + 1]
         if not trunc.equals(ref):
             mism = (trunc != ref).to_numpy().nonzero()[0]
@@ -133,7 +141,8 @@ def run_screen(frozen_path: Path, run_dir: Path, era: str = "train", token: str 
         for sym in spec["universe"]:
             df = ld.load_ohlcv(sym, spec["timeframe"], era=era, dataset=spec["dataset"], token=token)
             frames[sym] = df
-            sig = signals_fn(df).reindex(df.index).fillna(0).astype(int)
+            with ld.reference_until(df.index.max()):   # full frame: reference clipped to its last bar
+                sig = signals_fn(df).reindex(df.index).fillna(0).astype(int)
             bad = sig[~sig.isin((-1, 0, 1))]
             if not bad.empty:
                 raise ValueError("signal values must be in {-1,0,1}")

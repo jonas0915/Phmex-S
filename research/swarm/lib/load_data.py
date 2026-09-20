@@ -8,7 +8,12 @@ never through `load_ohlcv`/`load_funding` with an era argument. Those helpers ta
 era and token from the screen-era context that `screen.run_screen` sets around every
 signal call (`screen_context(era, token)`), so one frozen signal is valid in both train
 and holdout. Without a context the helpers are plain train loads; the context never
-grants holdout on its own — the token is still required (LESSONS 2026-09-19)."""
+grants holdout on its own — the token is still required (LESSONS 2026-09-19).
+
+The context also carries an optional `until` timestamp: reference loads are clipped to
+rows with index <= until. `screen.causality_check` sets it to each prefix's last bar
+(and the full frame's last bar), so a forward-looking transform applied to the reference
+BEFORE intersecting on df.index is no longer invisible to the causality check."""
 from __future__ import annotations
 
 import contextvars
@@ -36,22 +41,24 @@ class HoldoutError(PermissionError):
 
 
 # --- screen-era context for reference symbols -------------------------------------------
-# (era, token) the running screen was given, or None when no screen is running. A
+# (era, token, until) the running screen was given, or None when no screen is running. A
 # ContextVar so nested/threaded use restores cleanly; read only by load_reference*.
-_SCREEN_CONTEXT: contextvars.ContextVar[tuple[str, str | None] | None] = contextvars.ContextVar(
+_SCREEN_CONTEXT: contextvars.ContextVar[tuple[str, str | None, pd.Timestamp | None] | None] = contextvars.ContextVar(
     "swarm_screen_context", default=None)
 
 
-def get_screen_context() -> tuple[str, str | None]:
-    """(era, token) reference loads will use: the running screen's, else ("train", None)."""
+def get_screen_context() -> tuple[str, str | None, pd.Timestamp | None]:
+    """(era, token, until) reference loads will use: the running screen's, else
+    ("train", None, None). `until` clips reference rows to index <= until when set."""
     ctx = _SCREEN_CONTEXT.get()
-    return ctx if ctx is not None else ("train", None)
+    return ctx if ctx is not None else ("train", None, None)
 
 
-def set_screen_context(era: str, token: str | None = None) -> contextvars.Token:
-    """Set the screen era/token for reference loads; returns a handle for reset_screen_context.
-    Prefer the `screen_context` context manager, which restores on exit and on exceptions."""
-    return _SCREEN_CONTEXT.set((era, token))
+def set_screen_context(era: str, token: str | None = None, until: pd.Timestamp | None = None) -> contextvars.Token:
+    """Set the screen era/token (and optional until clip) for reference loads; returns a handle
+    for reset_screen_context. Prefer the `screen_context` context manager, which restores on
+    exit and on exceptions."""
+    return _SCREEN_CONTEXT.set((era, token, until))
 
 
 def reset_screen_context(handle: contextvars.Token) -> None:
@@ -59,14 +66,24 @@ def reset_screen_context(handle: contextvars.Token) -> None:
 
 
 @contextmanager
-def screen_context(era: str, token: str | None = None):
-    """`with screen_context(era, token):` — every load_reference/load_reference_funding call
-    inside the block loads that era; the previous context is restored on exit."""
-    handle = set_screen_context(era, token)
+def screen_context(era: str, token: str | None = None, until: pd.Timestamp | None = None):
+    """`with screen_context(era, token[, until]):` — every load_reference/load_reference_funding
+    call inside the block loads that era (clipped to index <= until when given); the previous
+    context is restored on exit."""
+    handle = set_screen_context(era, token, until)
     try:
         yield
     finally:
         reset_screen_context(handle)
+
+
+@contextmanager
+def reference_until(until: pd.Timestamp | None):
+    """Layer an `until` clip on the CURRENT era/token: reference loads inside the block return
+    only rows with index <= until. Used by screen.causality_check for each prefix rerun."""
+    era, token, _ = get_screen_context()
+    with screen_context(era, token, until):
+        yield
 
 
 def _cache_name(symbol: str) -> str:
@@ -117,9 +134,11 @@ def load_reference(symbol: str, timeframe: str, dataset: str = "mr_edge", root: 
     """OHLCV for a REFERENCE symbol inside a signal (e.g. BTC while screening an alt). The
     era and token come from the screen-era context (`screen_context`), so the frozen
     signal is valid in train and holdout alike; with no context this is a train load.
-    Holdout gating is unchanged — `load_ohlcv` still refuses without the token."""
-    era, token = get_screen_context()
-    return load_ohlcv(symbol, timeframe, era=era, dataset=dataset, token=token, root=root)
+    Holdout gating is unchanged — `load_ohlcv` still refuses without the token. When the
+    context carries `until`, only rows with index <= until are returned."""
+    era, token, until = get_screen_context()
+    df = load_ohlcv(symbol, timeframe, era=era, dataset=dataset, token=token, root=root)
+    return df if until is None else df[df.index <= until]
 
 
 def _mr_edge_1h_bounds(symbol: str, root: Path = REPO_ROOT) -> tuple[pd.Timestamp, pd.Timestamp]:
@@ -148,9 +167,11 @@ def load_funding(symbol: str, era: str = "train", token: str | None = None, root
 
 def load_reference_funding(symbol: str, root: Path = REPO_ROOT) -> pd.DataFrame:
     """Funding rows for a reference symbol inside a signal; era/token from the screen-era
-    context exactly like `load_reference` (train load when no context is set)."""
-    era, token = get_screen_context()
-    return load_funding(symbol, era=era, token=token, root=root)
+    context exactly like `load_reference` (train load when no context is set; rows with
+    ts <= until only when the context carries `until`)."""
+    era, token, until = get_screen_context()
+    f = load_funding(symbol, era=era, token=token, root=root)
+    return f if until is None else f[f["ts"] <= until].reset_index(drop=True)
 
 
 def fetch_ohlcv_ccxt(symbol: str, timeframe: str, since_ms: int, until_ms: int | None = None,

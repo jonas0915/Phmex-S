@@ -242,13 +242,13 @@ def test_run_screen_sets_screen_context_so_load_reference_matches_frame_era(tmp_
     assert train_out["causality"] == "PASS" and train_out["n"] > 0
     train_trades = pd.read_csv(tmp_path / "screens" / "t_demo" / "trades.csv", parse_dates=["entry_ts"])
     assert (train_trades["entry_ts"] < hs).all()
-    assert sc.ld.get_screen_context() == ("train", None)  # cleared after the run
+    assert sc.ld.get_screen_context() == ("train", None, None)  # cleared after the run
 
     hold_out = sc.run_screen(frozen, tmp_path, era="holdout", token=sc.ld.COMMITTEE_TOKEN)
     assert hold_out["causality"] == "PASS" and hold_out["n"] > 0   # reference series non-empty in holdout
     hold_trades = pd.read_csv(tmp_path / "screens" / "t_demo" / "trades.holdout.csv", parse_dates=["entry_ts"])
     assert (hold_trades["entry_ts"] >= hs).all()
-    assert sc.ld.get_screen_context() == ("train", None)  # cleared after the run
+    assert sc.ld.get_screen_context() == ("train", None, None)  # cleared after the run
 
 
 def test_run_screen_clears_screen_context_when_signal_raises(tmp_path: Path, monkeypatch):
@@ -257,7 +257,7 @@ def test_run_screen_clears_screen_context_when_signal_raises(tmp_path: Path, mon
     frozen = rg.freeze(_thesis(LOOKAHEAD), tmp_path, "t")
     with pytest.raises(sc.LookaheadError):
         sc.run_screen(frozen, tmp_path, era="holdout", token=sc.ld.COMMITTEE_TOKEN)
-    assert sc.ld.get_screen_context() == ("train", None)
+    assert sc.ld.get_screen_context() == ("train", None, None)
 
 
 def test_run_screen_hardcoded_train_reference_is_void_in_holdout_regression(tmp_path: Path, monkeypatch):
@@ -269,3 +269,31 @@ def test_run_screen_hardcoded_train_reference_is_void_in_holdout_regression(tmp_
     frozen = rg.freeze(_thesis(HARDCODED_TRAIN_REF_SIGNAL, uni=("SOL",)), tmp_path, "t")
     assert sc.run_screen(frozen, tmp_path)["n"] > 0
     assert sc.run_screen(frozen, tmp_path, era="holdout", token=sc.ld.COMMITTEE_TOKEN)["n"] == 0
+
+
+# reviewer probe (2026-09-20 follow-up): forward shift confined to the REFERENCE series and
+# only then intersected on df.index. load_reference returns the full era series, so without
+# clipping every prefix rerun sees the same reference rows and the check passes wrongly.
+REF_LOOKAHEAD_SIGNAL = REF_SIGNAL.replace("ref['close'] > ref['close'].shift(1)", "ref['close'].shift(-3) > ref['close']")
+
+
+def test_run_screen_catches_reference_confined_lookahead(tmp_path: Path, monkeypatch):
+    frames = {"ETH": _frame(800, seed=21), "SOL": _frame(800, seed=22)}
+    monkeypatch.setattr(sc.ld, "load_ohlcv", _two_symbol_loader(frames))
+    frozen = rg.freeze(_thesis(REF_LOOKAHEAD_SIGNAL, uni=("SOL",)), tmp_path, "t")
+    with pytest.raises(sc.LookaheadError):
+        sc.run_screen(frozen, tmp_path)
+    assert sc.ld.get_screen_context() == ("train", None, None)
+
+
+def test_causality_check_clips_reference_to_each_prefix_end(tmp_path: Path, monkeypatch):
+    """Direct check: the reference-confined lookahead fails causality_check itself, and the
+    causal reference signal still passes (clipping the reference to the prefix end must not
+    perturb a signal that only intersects on df.index)."""
+    frames = {"ETH": _frame(800, seed=21), "SOL": _frame(800, seed=22)}
+    monkeypatch.setattr(sc.ld, "load_ohlcv", _two_symbol_loader(frames))
+    df = sc.ld.split_era(frames["SOL"], "train")
+    with sc.ld.screen_context("train", None):
+        sc.causality_check(sc.load_signal_fn(_write(tmp_path, "ref_ok.py", REF_SIGNAL)), df)
+        with pytest.raises(sc.LookaheadError):
+            sc.causality_check(sc.load_signal_fn(_write(tmp_path, "ref_bad.py", REF_LOOKAHEAD_SIGNAL)), df)

@@ -126,7 +126,7 @@ def _synthetic_cache(tmp_path, monkeypatch, n=100):
 
 
 def test_screen_context_default_is_train_without_token():
-    assert ld.get_screen_context() == ("train", None)
+    assert ld.get_screen_context() == ("train", None, None)
 
 
 def test_load_reference_without_context_is_a_train_load(tmp_path, monkeypatch):
@@ -155,15 +155,15 @@ def test_load_reference_inside_holdout_context_without_token_raises(tmp_path, mo
 def test_screen_context_is_restored_after_block_and_on_exception(tmp_path, monkeypatch):
     _synthetic_cache(tmp_path, monkeypatch)
     with ld.screen_context("holdout", ld.COMMITTEE_TOKEN):
-        assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN)
+        assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN, None)
         with ld.screen_context("train", None):
-            assert ld.get_screen_context() == ("train", None)
-        assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN)
-    assert ld.get_screen_context() == ("train", None)
+            assert ld.get_screen_context() == ("train", None, None)
+        assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN, None)
+    assert ld.get_screen_context() == ("train", None, None)
     with pytest.raises(RuntimeError):
         with ld.screen_context("holdout", ld.COMMITTEE_TOKEN):
             raise RuntimeError("boom")
-    assert ld.get_screen_context() == ("train", None)
+    assert ld.get_screen_context() == ("train", None, None)
     # the context alone never grants holdout: a plain load_ohlcv outside it is still train-only
     with pytest.raises(ld.HoldoutError):
         ld.load_ohlcv("ETH", "1h", era="holdout", dataset="synth", root=tmp_path)
@@ -172,10 +172,10 @@ def test_screen_context_is_restored_after_block_and_on_exception(tmp_path, monke
 def test_set_screen_context_returns_reset_handle(tmp_path, monkeypatch):
     handle = ld.set_screen_context("holdout", ld.COMMITTEE_TOKEN)
     try:
-        assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN)
+        assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN, None)
     finally:
         ld.reset_screen_context(handle)
-    assert ld.get_screen_context() == ("train", None)
+    assert ld.get_screen_context() == ("train", None, None)
 
 
 def test_load_reference_funding_follows_screen_context(tmp_path, monkeypatch):
@@ -189,3 +189,22 @@ def test_load_reference_funding_follows_screen_context(tmp_path, monkeypatch):
     with ld.screen_context("holdout", None):
         with pytest.raises(ld.HoldoutError):
             ld.load_reference_funding("ETH", root=tmp_path)
+
+
+def test_load_reference_clips_to_until_and_reference_until_keeps_era_token(tmp_path, monkeypatch):
+    df = _synthetic_cache(tmp_path, monkeypatch)
+    cut = df.index[40]
+    with ld.screen_context("train", None, until=cut):
+        ref = ld.load_reference("ETH", "1h", dataset="synth", root=tmp_path)
+        f = ld.load_reference_funding("ETH", root=tmp_path)
+    assert len(ref) == 41 and ref.index.max() == cut
+    assert len(f) == 41 and f["ts"].max() == cut
+    hs = ld.holdout_start(df.index.min(), df.index.max())
+    cut_h = df.index[80]
+    with ld.screen_context("holdout", ld.COMMITTEE_TOKEN):
+        with ld.reference_until(cut_h):
+            assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN, cut_h)
+            ref = ld.load_reference("ETH", "1h", dataset="synth", root=tmp_path)
+        assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN, None)
+    assert (ref.index >= hs).all() and ref.index.max() == cut_h and len(ref) == 6
+    assert ld.get_screen_context() == ("train", None, None)
