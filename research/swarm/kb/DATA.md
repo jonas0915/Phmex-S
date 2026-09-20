@@ -2,6 +2,8 @@
 
 Use `research.swarm.lib.load_data`; never read caches by hand in a screen.
 
+**Reference symbols inside a signal (STANDARDS #16):** A signal that needs a second symbol (a reference such as BTC) must load it through `load_data.load_reference(symbol, timeframe, dataset)` (or `load_reference_funding`), never through `load_ohlcv`/`load_funding` with an era argument — the screen supplies the era, so the same frozen signal is valid in both train and holdout. `screen.run_screen` sets the era with `load_data.screen_context(era, token)`; outside a screen the helpers are plain train loads and can never grant holdout without the token.
+
 | dataset key | path | coverage | timeframes | notes |
 |---|---|---|---|---|
 | `mr_edge` | `reports/cache/mr_edge_20260601_20260903/` | 35 symbols, 2026-06-01 → 2026-09-02 23:55 UTC | 1m, 5m, 1h | pkl DataFrames, cols open/high/low/close/volume, UTC index. Funding: `funding_<SYM>_USDT_USDT.json`, a list of `{ts ms, rate}` rows, loaded via `load_funding(symbol, era, token)` — funding is holdout-gated exactly like price data, anchored to the same era boundary. Train ends ≈ 2026-08-10; holdout after. |

@@ -124,18 +124,24 @@ def run_screen(frozen_path: Path, run_dir: Path, era: str = "train", token: str 
     signals_fn = load_signal_fn(signal_path)
 
     frames, sigs, all_trades, per_symbol = {}, {}, [], {}
-    for sym in spec["universe"]:
-        df = ld.load_ohlcv(sym, spec["timeframe"], era=era, dataset=spec["dataset"], token=token)
-        frames[sym] = df
-        sig = signals_fn(df).reindex(df.index).fillna(0).astype(int)
-        bad = sig[~sig.isin((-1, 0, 1))]
-        if not bad.empty:
-            raise ValueError("signal values must be in {-1,0,1}")
-        sigs[sym] = sig
-    # causality is checked for EVERY symbol, before any simulate() call, so a lookahead
-    # signal is refused no matter which symbol in the universe carries it.
-    for sym, df in frames.items():
-        causality_check(signals_fn, df, symbol=sym)
+    # Every signals_fn call (the full-frame call and the causality check's prefix reruns)
+    # runs inside the screen-era context, so a signal that loads a REFERENCE symbol via
+    # ld.load_reference / ld.load_reference_funding gets the same era (and token) as the
+    # frame it was handed — never a hard-coded train frame that empties the holdout
+    # intersection (LESSONS 2026-09-19). The context is restored when the block exits.
+    with ld.screen_context(era, token):
+        for sym in spec["universe"]:
+            df = ld.load_ohlcv(sym, spec["timeframe"], era=era, dataset=spec["dataset"], token=token)
+            frames[sym] = df
+            sig = signals_fn(df).reindex(df.index).fillna(0).astype(int)
+            bad = sig[~sig.isin((-1, 0, 1))]
+            if not bad.empty:
+                raise ValueError("signal values must be in {-1,0,1}")
+            sigs[sym] = sig
+        # causality is checked for EVERY symbol, before any simulate() call, so a lookahead
+        # signal is refused no matter which symbol in the universe carries it.
+        for sym, df in frames.items():
+            causality_check(signals_fn, df, symbol=sym)
     for sym, df in frames.items():
         tr = simulate(df, sigs[sym], spec["tp_bps"], spec["sl_bps"], spec["max_hold_bars"])
         tr.insert(0, "symbol", sym)

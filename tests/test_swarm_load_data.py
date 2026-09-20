@@ -100,3 +100,92 @@ def test_fetch_ohlcv_ccxt_gates_none_until_as_now(monkeypatch):
     monkeypatch.setitem(sys.modules, "ccxt", None)
     with pytest.raises(ld.HoldoutError):
         ld.fetch_ohlcv_ccxt("ETH", "1h", since_ms=0, until_ms=None)
+
+
+# ---------------------------------------------------------------------------
+# screen-era context for reference symbols (2026-09-20 fix: a cross-asset signal
+# must not hard-code era="train" — the screen supplies the era via screen_context and
+# the signal loads its second symbol through load_reference / load_reference_funding).
+# All frames below are synthetic (written to tmp_path); no real holdout rows are read.
+# ---------------------------------------------------------------------------
+
+def _synthetic_cache(tmp_path, monkeypatch, n=100):
+    """A tmp dataset 'synth' with an ETH 1h pkl, plus mr_edge re-pointed at the same dir
+    (with a funding json) so load_funding's bounds anchor works without the real cache."""
+    d = tmp_path / "cache"
+    d.mkdir()
+    df = _frame(n)
+    df.to_pickle(d / "ETH_USDT_USDT_1h.pkl")
+    ts_ms = [int(t.timestamp() * 1000) for t in df.index]
+    (d / "funding_ETH_USDT_USDT.json").write_text(
+        pd.Series([{"ts": t, "rate": 0.0001} for t in ts_ms]).to_json(orient="values"))
+    spec = {"dir": "cache", "pattern": "{sym}_{tf}.pkl", "timeframes": ("1h",), "span": "synthetic"}
+    monkeypatch.setitem(ld.DATASETS, "synth", spec)
+    monkeypatch.setitem(ld.DATASETS, "mr_edge", spec)
+    return df
+
+
+def test_screen_context_default_is_train_without_token():
+    assert ld.get_screen_context() == ("train", None)
+
+
+def test_load_reference_without_context_is_a_train_load(tmp_path, monkeypatch):
+    df = _synthetic_cache(tmp_path, monkeypatch)
+    ref = ld.load_reference("ETH", "1h", dataset="synth", root=tmp_path)
+    train = ld.load_ohlcv("ETH", "1h", era="train", dataset="synth", root=tmp_path)
+    assert len(ref) == 75 and ref.equals(train)
+    assert ref.index.max() < ld.holdout_start(df.index.min(), df.index.max())
+
+
+def test_load_reference_inside_holdout_context_with_token_returns_holdout_rows(tmp_path, monkeypatch):
+    df = _synthetic_cache(tmp_path, monkeypatch)
+    hs = ld.holdout_start(df.index.min(), df.index.max())
+    with ld.screen_context("holdout", ld.COMMITTEE_TOKEN):
+        ref = ld.load_reference("ETH", "1h", dataset="synth", root=tmp_path)
+    assert len(ref) == 25 and (ref.index >= hs).all()
+
+
+def test_load_reference_inside_holdout_context_without_token_raises(tmp_path, monkeypatch):
+    _synthetic_cache(tmp_path, monkeypatch)
+    with ld.screen_context("holdout", None):
+        with pytest.raises(ld.HoldoutError):
+            ld.load_reference("ETH", "1h", dataset="synth", root=tmp_path)
+
+
+def test_screen_context_is_restored_after_block_and_on_exception(tmp_path, monkeypatch):
+    _synthetic_cache(tmp_path, monkeypatch)
+    with ld.screen_context("holdout", ld.COMMITTEE_TOKEN):
+        assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN)
+        with ld.screen_context("train", None):
+            assert ld.get_screen_context() == ("train", None)
+        assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN)
+    assert ld.get_screen_context() == ("train", None)
+    with pytest.raises(RuntimeError):
+        with ld.screen_context("holdout", ld.COMMITTEE_TOKEN):
+            raise RuntimeError("boom")
+    assert ld.get_screen_context() == ("train", None)
+    # the context alone never grants holdout: a plain load_ohlcv outside it is still train-only
+    with pytest.raises(ld.HoldoutError):
+        ld.load_ohlcv("ETH", "1h", era="holdout", dataset="synth", root=tmp_path)
+
+
+def test_set_screen_context_returns_reset_handle(tmp_path, monkeypatch):
+    handle = ld.set_screen_context("holdout", ld.COMMITTEE_TOKEN)
+    try:
+        assert ld.get_screen_context() == ("holdout", ld.COMMITTEE_TOKEN)
+    finally:
+        ld.reset_screen_context(handle)
+    assert ld.get_screen_context() == ("train", None)
+
+
+def test_load_reference_funding_follows_screen_context(tmp_path, monkeypatch):
+    df = _synthetic_cache(tmp_path, monkeypatch)
+    hs = ld.holdout_start(df.index.min(), df.index.max())
+    f_train = ld.load_reference_funding("ETH", root=tmp_path)
+    assert list(f_train.columns) == ["ts", "rate"] and (f_train["ts"] < hs).all() and len(f_train) == 75
+    with ld.screen_context("holdout", ld.COMMITTEE_TOKEN):
+        f_hold = ld.load_reference_funding("ETH", root=tmp_path)
+    assert len(f_hold) == 25 and (f_hold["ts"] >= hs).all()
+    with ld.screen_context("holdout", None):
+        with pytest.raises(ld.HoldoutError):
+            ld.load_reference_funding("ETH", root=tmp_path)

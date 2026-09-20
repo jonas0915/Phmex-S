@@ -202,3 +202,70 @@ def test_run_screen_zero_trades_writes_strict_json_null_time_to_verdict(tmp_path
     assert "Infinity" not in raw_text
     saved = json.loads(raw_text)  # must not raise on strict json.loads
     assert saved["time_to_verdict_weeks"] is None
+
+
+# ---------------------------------------------------------------------------
+# screen-era context for reference symbols (2026-09-20 fix). A cross-asset signal loads
+# its second symbol via load_data.load_reference; run_screen must supply the era/token it
+# was given so the reference frame lands in the same era as the frame the signal is handed.
+# ---------------------------------------------------------------------------
+
+# reference-following signal: +1 on every bar where the REFERENCE symbol's close rose
+# (intersected with df's own index, so a truncated prefix can never see future ref bars)
+REF_SIGNAL = ("import pandas as pd\nfrom research.swarm.lib import load_data as ld\n"
+              "def signals(df):\n"
+              "    ref = ld.load_reference('ETH', '1h', dataset='mr_edge')\n"
+              "    idx = df.index.intersection(ref.index)\n"
+              "    up = (ref['close'] > ref['close'].shift(1)).reindex(idx).fillna(False)\n"
+              "    return up.astype(int).reindex(df.index).fillna(0).astype(int)\n")
+# the defect as frozen in 2026-09-19-1451/informed_flow_btc_alt_cascade: era hard-coded
+HARDCODED_TRAIN_REF_SIGNAL = REF_SIGNAL.replace(
+    "ld.load_reference('ETH', '1h', dataset='mr_edge')",
+    "ld.load_ohlcv('ETH', '1h', era='train', dataset='mr_edge')")
+
+
+def _two_symbol_loader(frames: dict):
+    """monkeypatch stand-in for load_data.load_ohlcv keyed by symbol; honours era/token
+    through the real split_era so holdout gating is exercised, not bypassed."""
+    def _load(symbol, timeframe, era="train", dataset="mr_edge", token=None, root=None):
+        return sc.ld.split_era(frames[symbol], era, token)
+    return _load
+
+
+def test_run_screen_sets_screen_context_so_load_reference_matches_frame_era(tmp_path: Path, monkeypatch):
+    frames = {"ETH": _frame(800, seed=21), "SOL": _frame(800, seed=22)}
+    monkeypatch.setattr(sc.ld, "load_ohlcv", _two_symbol_loader(frames))
+    frozen = rg.freeze(_thesis(REF_SIGNAL, uni=("SOL",)), tmp_path, "t")
+    hs = sc.ld.holdout_start(frames["SOL"].index.min(), frames["SOL"].index.max())
+
+    train_out = sc.run_screen(frozen, tmp_path)
+    assert train_out["causality"] == "PASS" and train_out["n"] > 0
+    train_trades = pd.read_csv(tmp_path / "screens" / "t_demo" / "trades.csv", parse_dates=["entry_ts"])
+    assert (train_trades["entry_ts"] < hs).all()
+    assert sc.ld.get_screen_context() == ("train", None)  # cleared after the run
+
+    hold_out = sc.run_screen(frozen, tmp_path, era="holdout", token=sc.ld.COMMITTEE_TOKEN)
+    assert hold_out["causality"] == "PASS" and hold_out["n"] > 0   # reference series non-empty in holdout
+    hold_trades = pd.read_csv(tmp_path / "screens" / "t_demo" / "trades.holdout.csv", parse_dates=["entry_ts"])
+    assert (hold_trades["entry_ts"] >= hs).all()
+    assert sc.ld.get_screen_context() == ("train", None)  # cleared after the run
+
+
+def test_run_screen_clears_screen_context_when_signal_raises(tmp_path: Path, monkeypatch):
+    df = _frame(300, seed=23)
+    monkeypatch.setattr(sc.ld, "load_ohlcv", lambda *a, **k: sc.ld.split_era(df, k.get("era", "train"), k.get("token")))
+    frozen = rg.freeze(_thesis(LOOKAHEAD), tmp_path, "t")
+    with pytest.raises(sc.LookaheadError):
+        sc.run_screen(frozen, tmp_path, era="holdout", token=sc.ld.COMMITTEE_TOKEN)
+    assert sc.ld.get_screen_context() == ("train", None)
+
+
+def test_run_screen_hardcoded_train_reference_is_void_in_holdout_regression(tmp_path: Path, monkeypatch):
+    """Documents the 2026-09-19 defect: a signal that loads its reference with era='train'
+    hard-coded gets an empty index intersection in a holdout run (n == 0) even though the
+    same rule produces trades on train. load_reference is the fix, not a screen change."""
+    frames = {"ETH": _frame(800, seed=21), "SOL": _frame(800, seed=22)}
+    monkeypatch.setattr(sc.ld, "load_ohlcv", _two_symbol_loader(frames))
+    frozen = rg.freeze(_thesis(HARDCODED_TRAIN_REF_SIGNAL, uni=("SOL",)), tmp_path, "t")
+    assert sc.run_screen(frozen, tmp_path)["n"] > 0
+    assert sc.run_screen(frozen, tmp_path, era="holdout", token=sc.ld.COMMITTEE_TOKEN)["n"] == 0

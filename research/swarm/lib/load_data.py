@@ -1,9 +1,19 @@
 """Dataset loaders with a hard era split. Screens call era='train'. Holdout rows — for
 every loader, OHLCV and funding alike — are refused without the committee token; the
-token is not a secret, it is a deliberate, greppable act (spec §5 step 4)."""
+token is not a secret, it is a deliberate, greppable act (spec §5 step 4).
+
+Reference symbols (2026-09-20): a signal that needs a SECOND symbol (e.g. BTC as a
+reference for an alt) must load it through `load_reference` / `load_reference_funding`,
+never through `load_ohlcv`/`load_funding` with an era argument. Those helpers take the
+era and token from the screen-era context that `screen.run_screen` sets around every
+signal call (`screen_context(era, token)`), so one frozen signal is valid in both train
+and holdout. Without a context the helpers are plain train loads; the context never
+grants holdout on its own — the token is still required (LESSONS 2026-09-19)."""
 from __future__ import annotations
 
+import contextvars
 import json
+from contextlib import contextmanager
 from pathlib import Path
 
 import pandas as pd
@@ -23,6 +33,40 @@ DATASETS = {
 
 class HoldoutError(PermissionError):
     pass
+
+
+# --- screen-era context for reference symbols -------------------------------------------
+# (era, token) the running screen was given, or None when no screen is running. A
+# ContextVar so nested/threaded use restores cleanly; read only by load_reference*.
+_SCREEN_CONTEXT: contextvars.ContextVar[tuple[str, str | None] | None] = contextvars.ContextVar(
+    "swarm_screen_context", default=None)
+
+
+def get_screen_context() -> tuple[str, str | None]:
+    """(era, token) reference loads will use: the running screen's, else ("train", None)."""
+    ctx = _SCREEN_CONTEXT.get()
+    return ctx if ctx is not None else ("train", None)
+
+
+def set_screen_context(era: str, token: str | None = None) -> contextvars.Token:
+    """Set the screen era/token for reference loads; returns a handle for reset_screen_context.
+    Prefer the `screen_context` context manager, which restores on exit and on exceptions."""
+    return _SCREEN_CONTEXT.set((era, token))
+
+
+def reset_screen_context(handle: contextvars.Token) -> None:
+    _SCREEN_CONTEXT.reset(handle)
+
+
+@contextmanager
+def screen_context(era: str, token: str | None = None):
+    """`with screen_context(era, token):` — every load_reference/load_reference_funding call
+    inside the block loads that era; the previous context is restored on exit."""
+    handle = set_screen_context(era, token)
+    try:
+        yield
+    finally:
+        reset_screen_context(handle)
 
 
 def _cache_name(symbol: str) -> str:
@@ -69,6 +113,15 @@ def load_ohlcv(symbol: str, timeframe: str, era: str = "train", dataset: str = "
     return split_era(df, era, token)
 
 
+def load_reference(symbol: str, timeframe: str, dataset: str = "mr_edge", root: Path = REPO_ROOT) -> pd.DataFrame:
+    """OHLCV for a REFERENCE symbol inside a signal (e.g. BTC while screening an alt). The
+    era and token come from the screen-era context (`screen_context`), so the frozen
+    signal is valid in train and holdout alike; with no context this is a train load.
+    Holdout gating is unchanged — `load_ohlcv` still refuses without the token."""
+    era, token = get_screen_context()
+    return load_ohlcv(symbol, timeframe, era=era, dataset=dataset, token=token, root=root)
+
+
 def _mr_edge_1h_bounds(symbol: str, root: Path = REPO_ROOT) -> tuple[pd.Timestamp, pd.Timestamp]:
     """Index bounds of this symbol's mr_edge 1h OHLCV cache — a metadata read (min/max of
     the index only) used to anchor the funding holdout boundary to the SAME boundary as
@@ -91,6 +144,13 @@ def load_funding(symbol: str, era: str = "train", token: str | None = None, root
     f = f[["ts", "rate"]].sort_values("ts").reset_index(drop=True).set_index("ts")
     bounds = _mr_edge_1h_bounds(symbol, root)
     return split_era(f, era, token, bounds=bounds).reset_index()
+
+
+def load_reference_funding(symbol: str, root: Path = REPO_ROOT) -> pd.DataFrame:
+    """Funding rows for a reference symbol inside a signal; era/token from the screen-era
+    context exactly like `load_reference` (train load when no context is set)."""
+    era, token = get_screen_context()
+    return load_funding(symbol, era=era, token=token, root=root)
 
 
 def fetch_ohlcv_ccxt(symbol: str, timeframe: str, since_ms: int, until_ms: int | None = None,
