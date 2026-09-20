@@ -182,3 +182,10 @@ Read once at 2026-09-20T19:50:35Z by the command: python3 -m research.swarm.lib.
 - Sanity read only (dataset long_1h, STANDARDS #6 overlap caveat above); these numbers change nothing above.
 
 Decision: BUILD — the fixed rule's "otherwise → BUILD" clause applies because ci95 is not null (n = 75 ≥ 2) and its upper bound 98.16793798069588 is not < 0.
+
+## Owner decision (reference feed)
+Appended 2026-09-20T20:30:49Z UTC on resume of run 2026-09-19-1451 (args.resume_after_prereg), args.reference_feed = "exchange_ohlcv". The original IMPLEMENT seat stopped because the frozen signal loads its reference series through research.swarm.lib.load_data and the slot framework hands a slot only its own symbol's OHLCV. Owner decision, verbatim (args.owner_decision), copied character-for-character — the text between the fence lines, nothing added, nothing escaped:
+```text
+Owner decision 2026-09-20 1:16 PM PT (Jonas, in reply to the controller's recommendation): "yes" — the slot MAY fetch BTC 1h closed bars live via self.exchange.get_ohlcv("BTC", "1h", limit=...) as the reference series — one extra request per cycle, closed bars only, intersected on the alt's closed-bar index exactly as the frozen signal does.
+```
+Transcription: the frozen signal's `ld.load_reference("BTC", "1h", dataset="long_1h")` is transcribed as a live reference fetch — `self.exchange.get_ohlcv("BTC/USDT:USDT", "1h", limit=OHLCV_LIMIT)` → `complete_bars(...)` (closed bars only) → intersected on the alt's closed-bar index exactly as the frozen file does. The pure module exposes `signals(df, ref_df)` (reference frame as an explicit second argument; parity against the frozen file is tested on synthetic frames and on the research cache's train frames of ≥3 universe symbols). The bot fetches the reference ONCE per cycle, after the paper_mode guard, and passes the same closed frame to every symbol. Nothing above this section changes; the verdict line, anti-fishing clause and holdout record stand as committed.
