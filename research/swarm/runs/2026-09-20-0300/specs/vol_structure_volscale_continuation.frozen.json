@@ -1,0 +1,48 @@
+{
+  "frozen_at": "2026-09-20T10:00:08Z",
+  "sha256": "75f811696714d97db019b25c0911a495d4ac15cef5be9f7bd735673023d0ab09",
+  "thesis": {
+    "counterparty": "Discretionary/short-term mean-reversion traders on the wrong side of the initial vol-shock direction, who are forced to cover as vol-targeting CTA/trend funds mechanically increase gross exposure in the shock direction (documented average scaling weight 1.14x in crypto vs 0.9x in equities -- Springer/FMPM 2025) rather than de-risking as their equity-market counterparts do.",
+    "evidence": "(1) Springer, Financial Markets and Portfolio Management (2025), 'Cryptocurrency momentum has (not) its moments': crypto momentum lacks the extended momentum-crash regime seen in equities; the average vol-scaling weight applied to momentum portfolios is 1.14x in crypto vs 0.9x in equities, i.e. crypto vol-targeters increase exposure after a vol shift rather than de-risk (link.springer.com/article/10.1007/s11408-025-00474-9, per WebSearch result summary of the paper). (2) ScienceDirect (2025), 'Cryptocurrency market risk-managed momentum strategies': risk-managed (vol-scaled) momentum raises average weekly returns from 3.18% to 3.47% and annualized Sharpe from 1.12 to 1.42 versus plain momentum, with the improvement attributed to augmented returns (not crash mitigation) because crypto lacks equity-style momentum crashes (sciencedirect.com/science/article/abs/pii/S1544612325011377). (3) Zenodo (2025/26), 'Time-Series Momentum in Cryptocurrency Markets: A Pre and Post Spot Bitcoin ETF Analysis': a volatility-scaled TSMOM strategy's annualized return rises from 18.03% pre-ETF to 28.58% post-ETF, Sharpe 0.82 to 1.22 (zenodo.org/records/19671502). All three sources describe the SAME structural mechanism (programmatic, above-1x vol-scaled trend exposure in crypto) from independent angles (cross-sectional momentum, risk-managed momentum, and time-series momentum).",
+    "id": "vol_structure_volscale_continuation",
+    "lens": "vol_structure",
+    "mechanism": "Crypto trend-following/CTA and vol-targeting funds size positions off trailing realized volatility, but unlike equity vol-targeting funds (which de-risk after a vol shock), the documented crypto-market vol-scaling weight AVERAGES 1.14x (i.e. funds INCREASE gross exposure) after a realized-vol regime shift, versus 0.9x (de-risking) in equities (Springer/FMPM 2025, 'Cryptocurrency momentum has (not) its moments'). A separate 2025 ScienceDirect study on crypto risk-managed momentum finds the same asymmetry drives the return improvement (weekly return 3.18%->3.47%, annualized Sharpe 1.12->1.42) because crypto lacks the extended momentum-crash regime that forces equity vol-targeters to cut risk. A third 2025/26 paper on post-spot-ETF crypto TSMOM shows the vol-scaled trend strategy's annualized return rising from 18.03% (pre-ETF) to 28.58% (post-ETF) with Sharpe 0.82->1.22, i.e. the mechanical vol-scaled-momentum flow got materially bigger and more effective after ETF-driven institutional/CTA participation increased. The counterparty is the discretionary/mean-reversion side that faded the initial vol shock (selling into an up-spike or buying into a down-spike, on the standard 'vol expansion should mean-revert' prior) and is then forced to cover over the following days as vol-scaled trend funds mechanically ADD to the position in the direction of the shock -- these funds are not discretionary about the add, the scaling formula is applied programmatically once the realized-vol regime shift registers in their trailing window.",
+    "nearest_dead_rows": [
+      {
+        "row": 3,
+        "why_different": "Row 3 (1h vol-expansion fade) bet on REVERSION after a 1h vol-expansion bar and died to single-split selection bias (full-sample Sharpe -2.45). This thesis bets the opposite direction (CONTINUATION, not fade), on a daily-regime trigger (24h realized vol vs 20-day median) rather than a single 1h bar, and the mechanism is named systematic CTA/vol-scaled-momentum flow (sourced 2025 papers), not an unlabeled 'vol expansion fades' pattern."
+      },
+      {
+        "row": 6,
+        "why_different": "Row 6 (liquidation-cascade reversion) also concluded 'continue, don't revert' but the mechanism was intraday tape/cascade-driven (liquidations forcing forced selling within the same session) with no multi-day rebalancing story. This thesis's continuation driver is a multi-day, programmatic vol-targeting rebalance by CTA/trend funds documented in 2025 academic literature, not a single-session liquidation tape effect, and the hold window (up to 4 days) and trigger (24h realized-vol regime shift vs 20-day median) are structurally different from a single cascade bar."
+      },
+      {
+        "row": 76,
+        "why_different": "Row 76 (multi-day MR / overnight window / vol-scaling-as-rescue) killed a MEAN-REVERSION strategy that tried to use vol-scaling merely as a risk-control 'rescue' bolted onto a dead overnight-MR edge, refuted by a web sweep showing multi-day crypto MR decayed post-2022. This thesis is not mean-reversion and does not use vol-scaling as a rescue for a different base strategy -- vol-scaling IS the primary, directional (continuation) mechanism here, sourced from three independent 2025-2026 academic papers showing crypto-specific vol-scaled momentum/TSMOM outperformance driven by an above-1x scaling weight, the opposite of the equity de-risking logic row 76's overnight-MR rescue borrowed."
+      }
+    ],
+    "prediction": "On BTC/ETH/SOL/XRP 1h bars, when trailing 24h realized volatility (rolling stdev of 1h returns over the last 24 closed bars) exceeds 1.5x its trailing 20-day median AND the prior closed 24h return is positive (negative), price continues higher (lower) over the following multi-day hold (up to 96 1h-bars / 4 days) by more than the 11.5 bps round-trip cost (fee_math.C_BPS), net of realistic maker/taker fills.",
+    "signal_py": "import pandas as pd\nimport numpy as np\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Vol-scaled-momentum continuation signal on closed 1h bars.\n\n    Fires when trailing 24h realized volatility (rolling stdev of 1h\n    returns over the last 24 fully closed bars) expands to >=1.5x its\n    trailing 20-day (480-bar) median, in the direction of the prior\n    closed 24h return. Uses only trailing, fixed-window rolling\n    statistics on closed bars -- no shift(-k), no forming-bar lookups.\n    \"\"\"\n    close = df[\"close\"]\n    ret_1h = close.pct_change()\n\n    # trailing 24h realized-vol proxy, computed on closed bars only\n    daily_vol = ret_1h.rolling(window=24, min_periods=24).std()\n    baseline_vol = daily_vol.rolling(window=24 * 20, min_periods=24 * 20).median()\n\n    # trailing 24h (closed) directional return\n    day_ret = close.pct_change(periods=24)\n\n    vol_ratio = daily_vol / baseline_vol\n    expansion = vol_ratio >= 1.5\n\n    sig = pd.Series(0, index=df.index, dtype=int)\n    sig[expansion & (day_ret > 0)] = 1\n    sig[expansion & (day_ret < 0)] = -1\n    return sig.fillna(0).astype(int)\n",
+    "source_urls": [
+      "https://link.springer.com/article/10.1007/s11408-025-00474-9",
+      "https://www.sciencedirect.com/science/article/abs/pii/S1544612325011377",
+      "https://zenodo.org/records/19671502"
+    ],
+    "spec": {
+      "dataset": "long_1h",
+      "doa_line": "Kill if, at n>=30 fired signals pooled across the 4-symbol universe, bootstrap CI95 (bootstrap_ci.mean_ci) of net bps (after fee_math.C_BPS=11.5bps) includes 0, or observed win rate is below fee_math.p_star(250)=0.523, or the registered +-20% tp_bps robustness variants (STANDARDS #9) flip sign in either direction, or realized expected_trades_per_week over the screen implies fee_math.time_to_verdict_weeks(n=50) > 26 weeks.",
+      "expected_trades_per_week": 1.0,
+      "max_hold_bars": 96,
+      "sl_bps": 180,
+      "timeframe": "1h",
+      "tp_bps": 250,
+      "universe": [
+        "BTC",
+        "ETH",
+        "SOL",
+        "XRP"
+      ]
+    },
+    "thesis_path": "research/swarm/runs/2026-09-20-0300/theses/vol_structure_volscale_continuation.json"
+  }
+}

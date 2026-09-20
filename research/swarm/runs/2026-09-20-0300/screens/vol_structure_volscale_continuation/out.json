@@ -1,0 +1,49 @@
+{
+  "id": "vol_structure_volscale_continuation",
+  "spec_sha256": "75f811696714d97db019b25c0911a495d4ac15cef5be9f7bd735673023d0ab09",
+  "era": "train",
+  "n": 762,
+  "net_bps_mean": -3.8074358879167804,
+  "ci95": [
+    -19.607960822299976,
+    12.214835374449608
+  ],
+  "wr": 0.4356955380577428,
+  "p_star": 0.523,
+  "trades_per_week": 17.784940261183664,
+  "time_to_verdict_weeks": 2.8113673290838643,
+  "lot_check": {
+    "BTC": {
+      "ok": true,
+      "lots": 2,
+      "lot_usd": 77.74
+    },
+    "ETH": {
+      "ok": true,
+      "lots": 8,
+      "lot_usd": 24.9738
+    },
+    "SOL": {
+      "ok": true,
+      "lots": 197,
+      "lot_usd": 1.0143
+    },
+    "XRP": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.0044
+    }
+  },
+  "per_symbol": {
+    "BTC": 106,
+    "ETH": 192,
+    "SOL": 237,
+    "XRP": 227
+  },
+  "train_span": [
+    "2025-06-27 06:00:00+00:00",
+    "2026-04-23 04:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "bdfa2803263c080f41d98ea2d442c911062f2f773f7f826091a9341f67b302a9"
+}

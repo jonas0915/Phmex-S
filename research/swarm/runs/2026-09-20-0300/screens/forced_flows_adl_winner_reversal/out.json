@@ -1,0 +1,55 @@
+{
+  "id": "forced_flows_adl_winner_reversal",
+  "spec_sha256": "ee16de0c085a4c100413259daca184c1e6382eae7b3ae05c39d2c1e37606e207",
+  "era": "train",
+  "n": 65,
+  "net_bps_mean": -10.924806594115369,
+  "ci95": [
+    -33.34000546268926,
+    10.44843071057797
+  ],
+  "wr": 0.46153846153846156,
+  "p_star": 0.5383333333333333,
+  "trades_per_week": 6.4577173270254296,
+  "time_to_verdict_weeks": 7.742673992673992,
+  "lot_check": {
+    "BTC": {
+      "ok": true,
+      "lots": 2,
+      "lot_usd": 77.74
+    },
+    "ETH": {
+      "ok": true,
+      "lots": 8,
+      "lot_usd": 24.9738
+    },
+    "SOL": {
+      "ok": true,
+      "lots": 197,
+      "lot_usd": 1.0143
+    },
+    "XRP": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.0044
+    },
+    "DOGE": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.001
+    }
+  },
+  "per_symbol": {
+    "BTC": 12,
+    "ETH": 13,
+    "SOL": 13,
+    "XRP": 13,
+    "DOGE": 14
+  },
+  "train_span": [
+    "2026-06-01 00:00:00+00:00",
+    "2026-08-10 11:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "b1fe8df071435e9b73312ede7804b2bf0ecf149c77f570d2281841801aa37efa"
+}

@@ -1,0 +1,49 @@
+{
+  "frozen_at": "2026-09-20T10:00:08Z",
+  "sha256": "e3ddb6d1d78441bdfc12949148f461ccc2e530192789ed1a1b0aa61936d33f99",
+  "thesis": {
+    "counterparty": "Leveraged-token product issuers (exchange-run structuring desks for BTC3L/BTC3S, ETH3L/ETH3S-style products) who are mechanically required to trade the underlying daily to maintain a fixed leverage ratio -- they cannot choose price or defer the trade past the reset window; issuer scale is a function of the day's realized move, not their view.",
+    "evidence": "KuCoin's leveraged-tokens explainer (kucoin.com/learn/trading/leveraged-tokens-explained) states BTC3L-style tokens maintain notional exposure to 3x of the daily return of the underlying, and that 'the rebalancing mechanism in leveraged tokens is vital to their operation, involving buying and selling assets daily to maintain the target leverage' -- e.g. after a 5% daily gain a 3x token 'will rebalance by selling a portion of the asset to bring the leverage back to 3x' (and, symmetrically, buying more after a gain in the up direction to restore leverage, per the same mechanism description), i.e. rebalance size scales with the day's realized move. Amun's leveraged-tokens guide (support.amun.com/.../360045035651) documents that these tokens 'are best held for a maximum of one day' because multi-day compounding breaks the fixed ratio, which is the reason issuers must rebalance daily rather than continuously or never. AscendEX's explainer (ascendex.com/.../84410) independently confirms daily rebalancing is standard across leveraged-token issuers, not one exchange's idiosyncrasy. No source quantifies the resulting price-continuation effect for crypto leveraged tokens specifically (the equity leveraged/inverse-ETF rebalancing-amplification literature is the closest analogue but was not fetched this run) -- this thesis is a mechanism inference from documented product structure, to be tested empirically by the screen, not a pre-measured edge.",
+    "id": "forced_flows_daily_relever_flow",
+    "lens": "forced_flows",
+    "mechanism": "3x leveraged tokens (e.g. BTC3L/BTC3S, ETH3L/ETH3S and equivalents offered by Binance, Bybit, KuCoin, AscendEX) must rebalance their underlying futures exposure at a fixed daily reset (documented as occurring near UTC day-close / 00:00 UTC) to restore the target leverage multiple after any intraday price move -- this is a product-structuring hedge, not a discretionary trade. When the underlying has moved up, the issuer must BUY more notional to restore 3x exposure; when it has moved down, the issuer must SELL. This creates forced, price-insensitive flow in the SAME direction as the day's realized move, concentrated in the hours immediately before/at the daily reset, which should show up as directional continuation into and just after UTC day-close on days with a large intraday move (the trigger for a large rebalance notional).",
+    "nearest_dead_rows": [
+      {
+        "row": 7,
+        "why_different": "Row 7 ('Calendar/microstructure: time-of-day, CME gap fill, funding pre-stamp dip, Saturday alt strength') found generic time-of-day seasonality mostly NULL/decaying after FDR correction -- that is a statistical seasonality search with no named counterparty. This thesis names a specific forced counterparty (leveraged-token issuers structurally required to rebalance daily) and a specific mechanical reason flow concentrates at the UTC day-close, not a generic calendar pattern; it is a hedging-flow mechanism, not a seasonality effect."
+      },
+      {
+        "row": 82,
+        "why_different": "Row 82 ('Funding-settlement volatility-regime breakout gate') was refuted as a relabel of the time-of-day gate + taker-entry levers already killed on this account's own data (rows 7/49/67), keyed to the funding-rate settlement itself. This thesis's forced flow is leveraged-TOKEN issuer rebalancing (a distinct product-structuring hedge documented in leveraged-ETF/leveraged-token literature), not the perpetual funding-rate mechanism row 82 traded, even though both cluster near 00:00 UTC."
+      },
+      {
+        "row": 20,
+        "why_different": "Row 20 ('Funding-spike carry playbook') is a carry/harvest strategy on the funding RATE itself, armed but not deployed pending a >15-20% annualized funding threshold. This thesis takes no funding-rate view and does not touch funding data at all -- it trades directional continuation from a forced hedging-rebalance flow, an entirely different causal chain from harvesting funding carry."
+      }
+    ],
+    "prediction": "On days where a symbol's intraday cumulative return (from that UTC day's open through the 22:00 UTC bar close) exceeds 3% in absolute value, the direction of that move continues into the 23:00 UTC bar and the next several hours (through the 00:00 UTC daily reset) often enough to clear net cost (c=11.5bps, fee_math.C_BPS) at a 150bps symmetric TP/SL, because leveraged-token issuer rebalancing adds forced same-direction flow right at the reset rather than absorbing the move.",
+    "signal_py": "\"\"\"Leveraged-token daily-rebalance continuation proxy. Closed-bar only, causal.\n\nTrigger: the UTC hour==22 bar, if the day's cumulative return from that UTC\nday's first (00:00) bar open through the current bar's close exceeds 3% in\nabsolute value. Signal = sign of that cumulative return (continuation bet,\nentered at the next bar's open -- hour 23 -- per screen.simulate), betting\nforced leveraged-token issuer rebalancing extends the move into and past the\n00:00 UTC daily reset.\n\"\"\"\nimport pandas as pd\n\nHOUR_TRIGGER = 22\nTHRESH = 0.03\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    day = df.index.normalize()\n    day_open = df.groupby(day)[\"open\"].transform(\"first\")\n    cum_ret = df[\"close\"] / day_open - 1\n\n    hour = df.index.hour\n    fire = (hour == HOUR_TRIGGER) & (cum_ret.abs() > THRESH)\n\n    sig = pd.Series(0, index=df.index, dtype=int)\n    sig[fire & (cum_ret > 0)] = 1\n    sig[fire & (cum_ret < 0)] = -1\n    return sig\n",
+    "source_urls": [
+      "https://www.kucoin.com/learn/trading/leveraged-tokens-explained",
+      "https://support.amun.com/hc/en-us/articles/360045035651-Leveraged-Tokens-Guide",
+      "https://ascendex.com/en/support/articles/84410-only-5-minutes-to-understand-leveraged-token"
+    ],
+    "spec": {
+      "dataset": "long_1h",
+      "doa_line": "Kill if, at n>=30 train-era trades (combined across the 5-symbol universe; research/swarm/runs/2026-09-20-0300/exploratory/forced_flows/probe_dayclose_relever.py measured a combined ~11.1 fires/week in long_1h train, so n=30 should arrive within ~3 weeks of screened history), the bootstrap CI95 of net bps (research.swarm.lib.bootstrap_ci.mean_ci, after c=11.5bps per fee_math.C_BPS) includes zero, or observed win rate < p*(150bps)=53.83% per fee_math.p_star(150); also kill if the +-20% tp_bps robustness perturbation (STANDARDS #9) flips net_bps_mean sign between the +20% and -20% variants. Funding note (mandate section 4): the 6h hold crosses one 00:00 UTC funding settlement; long_1h has no funding cache to merge, but BTC funding runs ~+0.01%/8h per CONSTRAINTS.md (alt/meme often negative) -- at most ~1bps against a 150bps target, immaterial to the doa_line threshold, but any future re-spec to a longer hold must re-check this against fee_math before trusting net_bps.",
+      "expected_trades_per_week": 11,
+      "max_hold_bars": 6,
+      "sl_bps": 150,
+      "timeframe": "1h",
+      "tp_bps": 150,
+      "universe": [
+        "BTC",
+        "ETH",
+        "SOL",
+        "XRP",
+        "DOGE"
+      ]
+    },
+    "thesis_path": "research/swarm/runs/2026-09-20-0300/theses/forced_flows_daily_relever_flow.json"
+  }
+}

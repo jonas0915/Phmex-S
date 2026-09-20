@@ -1,0 +1,265 @@
+{
+  "_label": "EXPLORATORY PROBE \u2014 not a screen, not evidence for any thesis verdict",
+  "source_file": "/Users/jonaspenaso/Desktop/Phmex-S/research/swarm/kb/owner_trades/api_closed_pnl.json",
+  "n_rows": 819,
+  "date_range": [
+    "2022-03-26T06:11:32.166000",
+    "2023-02-16T00:16:06.711000"
+  ],
+  "equity_path_method": "cumulative_realized_pnl_only",
+  "equity_path_method_reason": "deposit/withdraw files ARE present (api_deposit_list_full.json 112 rows, api_withdraw_list_full.json 68 rows) but deposits/withdrawals are denominated in mixed currencies (see dep_currencies/wd_currencies below) with no USD-value field in the raw rows and no historical price source available in this research stage (fetch_ohlcv_ccxt is committee-token gated, per research/swarm/kb/DATA.md) to convert them to USD without fabricating rates. Falling back to cumulative realized PnL per the task's explicit fallback instruction.",
+  "dep_file_present": true,
+  "wd_file_present": true,
+  "dep_currencies": [
+    "ADA",
+    "AVAX",
+    "BTC",
+    "ETH",
+    "MATIC",
+    "SOL",
+    "TRX",
+    "USDT",
+    "XRP"
+  ],
+  "wd_currencies": [
+    "ADA",
+    "AVAX",
+    "MATIC",
+    "USDT",
+    "XRP"
+  ],
+  "cumulative_realized_pnl_final_usd": 4857.22,
+  "cumulative_realized_pnl_path_sample_every_100th": [
+    [
+      "2022-03-26T06:11:32.166000",
+      -0.54
+    ],
+    [
+      "2022-04-19T17:33:29.932000",
+      -354.38
+    ],
+    [
+      "2022-05-18T16:14:22.632000",
+      -755.21
+    ],
+    [
+      "2022-07-31T04:02:43.298000",
+      -1057.4
+    ],
+    [
+      "2022-09-01T23:00:43.794000",
+      -1297.86
+    ],
+    [
+      "2022-10-03T18:44:27.199000",
+      -1665.67
+    ],
+    [
+      "2022-11-09T05:50:53.387000",
+      -2036.28
+    ],
+    [
+      "2022-12-12T17:49:16.040000",
+      5286.77
+    ],
+    [
+      "2023-02-03T03:55:07.463000",
+      4843.05
+    ],
+    [
+      "2023-02-16T00:16:06.711000",
+      4857.22
+    ]
+  ],
+  "win_rate": {
+    "value": 0.4847,
+    "n_wins": 397,
+    "n_losses": 422,
+    "n_flat": 0,
+    "field": "realizedPnlEv/1e4 > 0, source: api_closed_pnl.json"
+  },
+  "payoff_ratio": {
+    "value": 1.705,
+    "avg_win_usd": 32.49,
+    "avg_loss_usd": -19.06,
+    "field": "realizedPnlEv/1e4, source: api_closed_pnl.json"
+  },
+  "concentration": {
+    "total_positive_pnl_usd": 12899.2,
+    "largest_trade_pnl_usd": 1089.62,
+    "largest_trade_symbol": "u100TRYBUSD",
+    "largest_trade_opened": "2022-11-10T07:53:39.088000",
+    "share_of_total_positive_pnl_from_largest_trade": 0.0845,
+    "top5_pnl_usd": 3805.91,
+    "share_of_total_positive_pnl_from_top5_trades": 0.2951,
+    "field": "realizedPnlEv/1e4, source: api_closed_pnl.json, ranked descending"
+  },
+  "median_hold_seconds": 4939.6,
+  "median_hold_human": "1:22:20",
+  "median_hold_field": "updatedTimeNs - openedTimeNs, source: api_closed_pnl.json",
+  "symbols_by_trade_count_top10": [
+    [
+      "uBTCUSD",
+      306
+    ],
+    [
+      "ADAUSD",
+      105
+    ],
+    [
+      "SOLUSD",
+      73
+    ],
+    [
+      "XRPUSD",
+      73
+    ],
+    [
+      "MATICUSD",
+      67
+    ],
+    [
+      "AVAXUSD",
+      43
+    ],
+    [
+      "APEUSD",
+      35
+    ],
+    [
+      "u100TRYBUSD",
+      33
+    ],
+    [
+      "LUNAOLDUSD",
+      31
+    ],
+    [
+      "ETHUSD",
+      13
+    ]
+  ],
+  "symbols_by_pnl_top10": [
+    [
+      "u100TRYBUSD",
+      8128.0124
+    ],
+    [
+      "XRPUSD",
+      44.387099999999975
+    ],
+    [
+      "STORJUSD",
+      5.7487
+    ],
+    [
+      "BNBUSD",
+      1.5761
+    ],
+    [
+      "u100ANKRUSD",
+      -0.0432
+    ],
+    [
+      "BTCUSD",
+      -0.3106
+    ],
+    [
+      "DOGEUSD",
+      -5.4566
+    ],
+    [
+      "LINKUSD",
+      -11.9157
+    ],
+    [
+      "MASKUSD",
+      -26.110299999999995
+    ],
+    [
+      "LUNAOLDUSD",
+      -38.603699999999996
+    ]
+  ],
+  "side_split": {
+    "counts_by_side_code": {
+      "1": 423,
+      "2": 396
+    },
+    "pnl_by_side_code_usd": {
+      "1": 3158.4,
+      "2": 1698.82
+    },
+    "field": "side (Phemex 1=Buy/Long, 2=Sell/Short), realizedPnlEv/1e4, source: api_closed_pnl.json"
+  },
+  "time_of_day_utc_hour": {
+    "counts": {
+      "0": 54,
+      "1": 50,
+      "2": 45,
+      "3": 36,
+      "4": 37,
+      "5": 30,
+      "6": 21,
+      "7": 19,
+      "8": 4,
+      "9": 3,
+      "10": 2,
+      "11": 6,
+      "12": 14,
+      "13": 30,
+      "14": 43,
+      "15": 42,
+      "16": 41,
+      "17": 46,
+      "18": 46,
+      "19": 42,
+      "20": 57,
+      "21": 53,
+      "22": 50,
+      "23": 48
+    },
+    "pnl_usd": {
+      "0": 46.58,
+      "1": -263.73,
+      "2": -9.89,
+      "3": -160.99,
+      "4": -193.45,
+      "5": 1813.05,
+      "6": 1194.79,
+      "7": 5010.35,
+      "8": -74.93,
+      "9": 4.04,
+      "10": -24.05,
+      "11": -77.26,
+      "12": -203.41,
+      "13": -174.21,
+      "14": -36.35,
+      "15": 39.75,
+      "16": -263.8,
+      "17": -473.73,
+      "18": -301.1,
+      "19": -170.82,
+      "20": -135.75,
+      "21": -245.04,
+      "22": -359.07,
+      "23": -83.74
+    },
+    "field": "openedTimeNs -> UTC hour, source: api_closed_pnl.json"
+  },
+  "behaviour_after_a_loss": {
+    "n_loss_events_with_next_trade": 422,
+    "avg_next_trade_size_after_loss": 251.763,
+    "avg_next_trade_size_after_win": 323.828,
+    "avg_trade_size_all": 286.306,
+    "avg_next_trade_hold_seconds_after_loss": 18596.9,
+    "next_trade_same_side_as_losing_trade_count": 225,
+    "next_trade_diff_side_from_losing_trade_count": 197,
+    "field": "closedSize / side / (updatedTimeNs-openedTimeNs) of the chronologically next row after each losing row, source: api_closed_pnl.json"
+  },
+  "nov_2022_window_note": {
+    "n_trades": 99,
+    "pnl_usd": 7373.25,
+    "note": "SOURCES.md sec 2b flags a qualitative cumulative-PnL jump to +$5405 by Nov 2022 (single large win) coinciding with the Nov 2022 FTX-contagion crash window; this is descriptive only, not a statistical claim."
+  }
+}

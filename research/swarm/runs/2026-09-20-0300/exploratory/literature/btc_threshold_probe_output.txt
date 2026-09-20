@@ -1,0 +1,3 @@
+BTC 1h train rows 1692 2026-06-01 00:00:00+00:00 2026-08-10 11:00:00+00:00
+90th pct abs 1h BTC return (bps): 64.4
+n_fire 170 weeks 10.0 fires/week 17.0

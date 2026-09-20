@@ -1,0 +1,28 @@
+{
+  "verdict": "CONFIRMED",
+  "ci_excludes_zero": false,
+  "findings": [
+    "Frozen spec sha256 verified True via registrar.verify (step 1 pass).",
+    "Rerun into /tmp/audit_2026-09-20-0300_owner_record_liq_cascade_continuation via research.swarm.lib.screen (era=train) produced an out.json byte-for-byte identical to the run's out.json (diff clean): n=136, net_bps_mean=-23.892911451158845, ci95=[-43.7224904694881, -3.846647283421278], wr=0.35294117647058826 (step 2 pass, no RERUN_MISMATCH).",
+    "signal.py review: only pd.Series.rolling(ROLL, min_periods=ROLL) with default center=False on ret/volume computed from df['close']/df['volume']; no .shift(-k) with k>0, no negative-index or future-timestamp access, no center=True, no iloc[-1]-style forming-bar logic, no data source outside df. out.json causality == 'PASS' (step 3 pass, no lookahead).",
+    "trades.csv: spot-checked 10 rows (2 per symbol, all 5 symbols) by recomputing signals(df) on train-era mr_edge data via load_data.load_ohlcv and comparing df['open'] at the bar immediately after each flagged signal bar against trades.csv entry price and side -- all 10 matched exactly (price_match=True, side_match=True for all). No exit_ts after train_span end (2026-08-10 11:00:00+00:00); max exit_ts observed = 2026-08-10 08:00:00+00:00. net_bps == gross_bps - fee_math.C_BPS (11.5) on all 137 trade rows, zero mismatches (step 4 pass).",
+    "Recomputed fee_math.p_star(200) = 0.52875 and fee_math.time_to_verdict_weeks(13.511531638083975) = 3.7005427170868344, both exact matches to out.json's p_star and time_to_verdict_weeks fields (step 5 pass).",
+    "ci_excludes_zero is False by the audit's literal definition (both ci95 bounds > 0): out.json ci95 = [-43.7224904694881, -3.846647283421278] -- both bounds are negative, not positive. Net note (not part of the pass/fail check, for context): the CI is fully below zero, i.e. the screen shows a statistically distinguishable NEGATIVE edge, not an insignificant one.",
+    "Thesis viability (informational, does not change this audit's verdict per the given CONFIRMED/REFUTED/RERUN_MISMATCH criteria which key on lookahead/cost/era/rerun-match, not on sign of result): net_bps_mean is negative (-23.89 bps) after fee_math.C_BPS, observed wr=35.3% is well below p_star=52.875% for the 200bps TP leg, and the DOA line in the frozen spec ('Kill if ... bootstrap_ci.mean_ci on net bps includes zero, OR observed win rate < p_star(200)=52.875% ...') is triggered on both the WR and CI-sign conditions -- this thesis fails CONSTRAINTS.md viability items 1-2 and should be recorded as a killed/DEAD_LIST candidate by the desk, citing dead row 6 and row 80 (already cross-referenced in the frozen spec's nearest_dead_rows) as the mechanism family.",
+    "p_boot (one-sided upper bound on P(mean<=0), ladder resolution via bootstrap_ci.mean_ci, computed per audit instructions) = 1.0 -- at no tested alpha up to 1.0 does the CI lower bound exceed 0, consistent with a mean that is negative, not indistinguishable-from-zero."
+  ],
+  "numbers": {
+    "n": 136,
+    "net_bps_mean": -23.892911451158845,
+    "ci95": [-43.7224904694881, -3.846647283421278],
+    "wr": 0.35294117647058826,
+    "p_star": 0.52875,
+    "time_to_verdict_weeks": 3.7005427170868344,
+    "p_boot": 1.0,
+    "rerun": {
+      "n": 136,
+      "net_bps_mean": -23.892911451158845,
+      "ci95": [-43.7224904694881, -3.846647283421278]
+    }
+  }
+}

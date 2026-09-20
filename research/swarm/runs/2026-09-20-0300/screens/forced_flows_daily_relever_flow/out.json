@@ -1,0 +1,55 @@
+{
+  "id": "forced_flows_daily_relever_flow",
+  "spec_sha256": "e3ddb6d1d78441bdfc12949148f461ccc2e530192789ed1a1b0aa61936d33f99",
+  "era": "train",
+  "n": 477,
+  "net_bps_mean": -34.605118794131904,
+  "ci95": [
+    -45.40469719898698,
+    -23.184164343209346
+  ],
+  "wr": 0.3836477987421384,
+  "p_star": 0.5383333333333333,
+  "trades_per_week": 11.133092525701583,
+  "time_to_verdict_weeks": 4.491115104322652,
+  "lot_check": {
+    "BTC": {
+      "ok": true,
+      "lots": 2,
+      "lot_usd": 77.74
+    },
+    "ETH": {
+      "ok": true,
+      "lots": 8,
+      "lot_usd": 24.9738
+    },
+    "SOL": {
+      "ok": true,
+      "lots": 197,
+      "lot_usd": 1.0143
+    },
+    "XRP": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.0044
+    },
+    "DOGE": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.001
+    }
+  },
+  "per_symbol": {
+    "BTC": 41,
+    "ETH": 105,
+    "SOL": 117,
+    "XRP": 91,
+    "DOGE": 123
+  },
+  "train_span": [
+    "2025-06-27 06:00:00+00:00",
+    "2026-04-23 04:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "a715895c5066f13681a597009525a0868df6001f43bd69976f92c193ddad692e"
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "forced_flows_adl_winner_reversal",
+    "thesis_path": "research/swarm/runs/2026-09-20-0300/theses/forced_flows_adl_winner_reversal.json",
+    "evidence_grade": "A",
+    "reason": "Passed dedup/relabel/sanity (lot_check OK for BTC/ETH/SOL/XRP/DOGE, mr_edge symbols exist, causal 97th-pct rolling trigger, nearest_dead_rows 6/3/80 specific); all 4 source_urls (bluefin.io, cube.exchange, datawallet.com, arxiv 2603.15963) confirmed the exact ADL queue-ranking/bankruptcy-price mechanism verbatim via WebFetch; ranked 1/7 for novelty (ADL forces the profitable opposite side to close, a mechanism no prior dead-list row tests) and specificity."
+  },
+  {
+    "id": "forced_flows_daily_relever_flow",
+    "thesis_path": "research/swarm/runs/2026-09-20-0300/theses/forced_flows_daily_relever_flow.json",
+    "evidence_grade": "B",
+    "reason": "Passed dedup/relabel/sanity (long_1h symbols exist, lot_check OK, probe_dayclose_relever.py used long_1h train only, nearest_dead_rows 7/82/20 specific); kucoin.com source confirmed the exact daily-rebalance/sell-on-gain mechanism verbatim, but support.amun.com is DNS-dead and ascendex.com returned 403 with web.archive.org unreachable in this environment (both unverifiable, not falsified), and the thesis itself discloses no source quantifies the resulting price-continuation effect; ranked 2/7 for novelty (leveraged-token rebalancing untouched by any dead-list row)."
+  },
+  {
+    "id": "informed_flow_btc_alt_lag",
+    "thesis_path": "research/swarm/runs/2026-09-20-0300/theses/informed_flow_btc_alt_lag.json",
+    "evidence_grade": "A",
+    "reason": "Passed dedup (kept over literature_btc_alt_drift as the better-specified BTC-alt-lag thesis: a-priori threshold from cited literature rather than same-train-data-derived threshold, universe rationalized by the paper's own small/mid-cap finding, signal.py already frozen with causality-safe merge_asof), relabel/sanity all clear (long_1h symbols exist, lot_check OK); both source_urls (Springer 10.1007/s10690-026-09589-z, arxiv 2506.08718) confirmed verbatim via WebFetch (delayed small-cap response, unidirectional Granger-causality BTC->ALT, backtest beats buy-and-hold; CEX-leads price discovery); ranked 3/7."
+  },
+  {
+    "id": "owner_record_liq_cascade_continuation",
+    "thesis_path": "research/swarm/runs/2026-09-20-0300/theses/owner_record_liq_cascade_continuation.json",
+    "evidence_grade": "A",
+    "reason": "Passed dedup/relabel/sanity (mr_edge symbols exist, lot_check OK, nearest_dead_rows 6/80/5/13/33 specific and correctly identify this as the untested continuation-direction flip of the reversion bets rows 6/80 already killed); arxiv 2608.03616 confirmed the 87.8%/30min and 96.5%/1h forced-selling front-load exactly, coinchange.io confirmed the Nov-2025 cascade numbers ($1.7-2.0B, 396k traders, 85% long liqs, $126,080->$81,600) exactly, and the local owner_trades/api_closed_pnl.json figures (largest trade +$1,089.62 u100TRYBUSD 2022-11-10, Nov-2022 window $7,373/99 trades) match the pre-computed owner_record_probe.json exactly and are honestly labeled descriptive-only; ranked 4/7."
+  },
+  {
+    "id": "vol_structure_volscale_continuation",
+    "thesis_path": "research/swarm/runs/2026-09-20-0300/theses/vol_structure_volscale_continuation.json",
+    "evidence_grade": "A",
+    "reason": "Passed dedup/relabel/sanity (long_1h symbols exist, lot_check OK, nearest_dead_rows 3/6/76 specific and correctly distinguish this event-triggered vol-regime-shift continuation from unconditional TSM/Donchian trend families); all 3 numeric claims confirmed independently (Springer 10.1007/s11408-025-00474-9: crypto vol-scaling weight 1.14x vs equities 0.9x; ScienceDirect S1544612325011377: weekly return 3.18%->3.47%, Sharpe 1.12->1.42; Zenodo 19671502: TSMOM return 18.03%->28.58%, Sharpe 0.82->1.22, all via WebFetch/WebSearch with matching independent citations); ranked 5/7."
+  }
+]

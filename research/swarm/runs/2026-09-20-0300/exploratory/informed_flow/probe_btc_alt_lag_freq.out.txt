@@ -1,0 +1,16 @@
+1000PEPE: bars=7199 fires=471 fire_rate=0.0654
+1000SHIB: bars=7199 fires=471 fire_rate=0.0654
+AAVE: bars=7199 fires=471 fire_rate=0.0654
+ADA: bars=7199 fires=471 fire_rate=0.0654
+DOGE: bars=7199 fires=471 fire_rate=0.0654
+GIGGLE: bars=3599 fires=231 fire_rate=0.0642
+LINK: bars=7199 fires=471 fire_rate=0.0654
+LTC: bars=7199 fires=471 fire_rate=0.0654
+NEAR: bars=7199 fires=471 fire_rate=0.0654
+ONDO: bars=7199 fires=471 fire_rate=0.0654
+SUI: bars=7199 fires=471 fire_rate=0.0654
+TAO: bars=7199 fires=471 fire_rate=0.0654
+UNI: bars=7199 fires=471 fire_rate=0.0654
+XLM: bars=7199 fires=471 fire_rate=0.0654
+XRP: bars=7199 fires=471 fire_rate=0.0654
+TOTAL: bars/symbol_avg_weeks=41.4 total_fires=6825 raw_fires_per_week=164.77 (raw signal-on bar-count, NOT trade count -- screen.simulate's actual entries depend on signal-change/re-entry rules)

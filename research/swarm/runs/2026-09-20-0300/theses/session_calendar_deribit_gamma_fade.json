@@ -1,0 +1,29 @@
+{
+  "id": "session_calendar_deribit_gamma_fade",
+  "lens": "session_calendar",
+  "mechanism": "Deribit lists the dominant BTC/ETH options open interest and settles weekly and monthly contracts every Friday 08:00 UTC. In the ~24h run-up to settlement, option dealers who are net short gamma near busy strikes must delta-hedge by buying into dips and selling into rallies to stay flat, which mechanically compresses realized moves and pulls spot toward the strike concentration (\"pinning\"); once the position expires and gamma resets, the pinning force disappears. The forced counterparty is the option-selling dealer desk, which is contractually obligated to re-hedge delta continuously regardless of price view -- that hedging flow is what a fade-the-extension strategy harvests.",
+  "counterparty": "Deribit BTC/ETH option market-maker desks that are short gamma near expiry and must mechanically buy dips / sell rallies to stay delta-neutral into the Friday 08:00 UTC settlement -- their hedging flow suppresses/reverts extensions, which is what this thesis fades.",
+  "prediction": "In the 24h window before Friday 08:00 UTC Deribit settlement, BTC and ETH 1h closes that deviate >1% from the trailing 5-day (120h) SMA revert toward that SMA by the time of/shortly after settlement, at a rate that clears p*(150bps)=53.83% (research/swarm/runs/2026-09-20-0300/mandate.md section 3) net of the 11.5bps round-trip cost.",
+  "nearest_dead_rows": [
+    {"row": 7, "why_different": "Row 7 killed generic time-of-day/CME-gap/weekend/Saturday calendar noise -- session liquidity patterns with no forced counterparty. This thesis's mechanism is option-dealer delta-hedging under short gamma into a specific, published settlement instant (Deribit 08:00 UTC Friday), not ambient session timing; the counterparty is a hedging desk with a contractual obligation, not generic liquidity thinness."},
+    {"row": 20, "why_different": "Row 20 (funding-spike carry) is a funding-rate arbitrage mechanism (linear perp funding vs. spot/basis), armed but never deployed. This thesis has nothing to do with funding payments; it trades options-dealer gamma hedging on the underlying spot/perp price, an entirely different derivative and forced-flow source."},
+    {"row": 76, "why_different": "Row 76 (multi-day MR / overnight window / vol-scaling) was refuted as a generic multi-day mean-reversion premium, dead post-2022 and web-verified dead. This thesis is not an unconditional MR premium -- it is gated to a specific externally-documented options-expiry window with a named counterparty (option dealer gamma hedging), which is the distinction STANDARDS #1 requires."}
+  ],
+  "source_urls": [
+    "https://www.sciencedirect.com/science/article/pii/S1544612326008688",
+    "https://menthorq.com/guide/dealer-flow-in-btc-options/"
+  ],
+  "evidence": "ScienceDirect (2026), 'Bitcoin option expiration, gamma exposure, and intraday price reversals': documents a statistically and economically significant return reversal around Deribit BTC option expiration, concentrated on days with elevated at-the-money open interest and strongest when cumulative gamma exposure is negative -- consistent with option market makers hedging net-short gamma exposure -- with an estimated economic significance of about USD 50 million/year in wealth transfer from the expiration effect. MenthorQ's dealer-flow guide (2026) corroborates the mechanism qualitatively: when dealers run net short gamma, hedging reinforces moves into the pin and that pressure reverses once gamma resets post-expiry. I could not access exact effect-size percentages from the paywalled ScienceDirect abstract page (403 on WebFetch); the $50M/yr figure and the negative-gamma/reversal finding are the numbers actually reported in the fetched search summary of that page.",
+  "spec": {
+    "dataset": "long_1h",
+    "universe": ["BTC", "ETH"],
+    "timeframe": "1h",
+    "tp_bps": 150,
+    "sl_bps": 150,
+    "max_hold_bars": 48,
+    "expected_trades_per_week": 1.5,
+    "doa_line": "Kill if bootstrap_ci.mean_ci on net bps (after C_BPS=11.5) includes zero at n>=30, or observed WR < p_star(150)=53.83% (fee_math.p_star), or the +-20% tp_bps robustness pair (120bps / 180bps variants) does not keep net_bps_mean the same sign in both."
+  },
+  "signal_py": "import pandas as pd\nimport numpy as np\n\n\ndef _weekly_expiries_8utc(idx: pd.DatetimeIndex) -> pd.DatetimeIndex:\n    \"\"\"Every Friday 08:00 UTC present within the index's calendar span (Deribit weekly/monthly settlement hour).\"\"\"\n    if len(idx) == 0:\n        return pd.DatetimeIndex([])\n    start = idx.min().normalize() - pd.Timedelta(days=7)\n    end = idx.max().normalize() + pd.Timedelta(days=7)\n    fridays = pd.date_range(start=start, end=end, freq=\"W-FRI\", tz=idx.tz)\n    return fridays + pd.Timedelta(hours=8)\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    idx = df.index\n    close = df[\"close\"]\n    sma = close.rolling(120, min_periods=120).mean()\n    dev = (close - sma) / sma\n\n    out = pd.Series(0, index=idx, dtype=int)\n    for exp in _weekly_expiries_8utc(idx):\n        window_start = exp - pd.Timedelta(hours=24)\n        mask = (idx >= window_start) & (idx < exp)\n        window_idx = idx[mask]\n        if len(window_idx) == 0:\n            continue\n        d = dev.loc[window_idx]\n        sig = pd.Series(0, index=window_idx, dtype=int)\n        sig[d > 0.01] = -1\n        sig[d < -0.01] = 1\n        out.loc[window_idx] = sig\n    return out.fillna(0).astype(int)\n",
+  "thesis_path": "research/swarm/runs/2026-09-20-0300/theses/session_calendar_deribit_gamma_fade.json"
+}

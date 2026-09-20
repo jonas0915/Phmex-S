@@ -1,0 +1,23 @@
+{
+  "verdict": "CONFIRMED",
+  "ci_excludes_zero": false,
+  "findings": [
+    "Thesis fails the CONSTRAINTS.md 'viable' bar on this train-era screen: net_bps_mean = -3.8074358879167804 (negative) and bootstrap ci95 = [-19.607960822299976, 12.214835374449608] straddles zero (does not exclude 0) -- out.json:6-10.",
+    "Observed WR = 0.4356955380577428 (43.57%) is below the spec's required p_star(250) = 0.523 (52.3%) -- out.json:11-12.",
+    "Screen process integrity is intact: frozen sha verified True, independent rerun into /tmp/audit_2026-09-20-0300_vol_structure_volscale_continuation produced byte-identical out.json to the run's out.json (n=762, net_bps_mean, ci95, wr, per_symbol, train_span, causality all match exactly), signal.py contains no lookahead constructs (no shift(-k), no negative-index/future-timestamp use, no center=True rolling, no forming-bar iloc[-1] logic, no data outside df), and out.json causality == 'PASS'."
+  ],
+  "numbers": {
+    "n": 762,
+    "net_bps_mean": -3.8074358879167804,
+    "ci95": [-19.607960822299976, 12.214835374449608],
+    "wr": 0.4356955380577428,
+    "p_star": 0.523,
+    "time_to_verdict_weeks": 2.8113673290838643,
+    "p_boot": 1.0,
+    "rerun": {
+      "n": 762,
+      "net_bps_mean": -3.8074358879167804,
+      "ci95": [-19.607960822299976, 12.214835374449608]
+    }
+  }
+}

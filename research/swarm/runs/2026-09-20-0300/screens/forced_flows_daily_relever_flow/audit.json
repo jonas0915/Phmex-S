@@ -1,0 +1,23 @@
+{
+  "verdict": "CONFIRMED",
+  "ci_excludes_zero": false,
+  "findings": [
+    "Audit integrity checks (sha verify, rerun match, causality/lookahead scan, trades.csv entry/cost/era checks, p_star/time_to_verdict recompute) all pass -- verdict CONFIRMED refers only to these mechanical checks, not to thesis viability.",
+    "Thesis fails CONSTRAINTS.md 'viable' item 1/2 on its own train-era numbers: net_bps_mean = -34.61 bps (out.json) with ci95 = [-45.40, -23.18] -- both bounds negative, so ci_excludes_zero is false under this audit's definition (both bounds > 0); the edge is negative, not merely statistically insignificant.",
+    "Observed win rate 38.36% (out.json wr) is far below p*(150bps) = 53.83% (fee_math.p_star(150)), the spec's own doa_line kill condition -- at n=477 (>> the n>=30 threshold), the thesis's pre-registered doa_line is triggered and it should be killed as refuted-by-data, not relabeled."
+  ],
+  "numbers": {
+    "n": 477,
+    "net_bps_mean": -34.605118794131904,
+    "ci95": [-45.40469719898698, -23.184164343209346],
+    "wr": 0.3836477987421384,
+    "p_star": 0.5383333333333333,
+    "time_to_verdict_weeks": 4.491115104322652,
+    "p_boot": 1.0,
+    "rerun": {
+      "n": 477,
+      "net_bps_mean": -34.605118794131904,
+      "ci95": [-45.40469719898698, -23.184164343209346]
+    }
+  }
+}

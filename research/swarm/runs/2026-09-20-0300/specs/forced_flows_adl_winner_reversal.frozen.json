@@ -1,0 +1,50 @@
+{
+  "frozen_at": "2026-09-20T10:00:08Z",
+  "sha256": "ee16de0c085a4c100413259daca184c1e6382eae7b3ae05c39d2c1e37606e207",
+  "thesis": {
+    "counterparty": "The most profitable, highest-leverage traders positioned on the OPPOSITE side of an extreme cascade, who are forced by the exchange's ADL ranking/queue (ranked by leverage x PnL) to close their winning positions at the current price regardless of their own view -- they did not choose to exit and are capped from further gains, unlike an ordinary liquidated loser who is simply insolvent.",
+    "evidence": "Bluefin's insurance-fund/ADL explainer (bluefin.io/blog/basics-of-insurance-funds) and Cube Exchange's ADL explainer (cube.exchange/what-is/auto-deleveraging-adl) both describe the mechanism used across major perp exchanges: auto-deleveraging triggers 'when extreme market volatility depletes insurance funds, forcing exchanges to automatically close the most profitable, high-leverage opposing positions,' and specifically that 'as an open trade reaches the bankruptcy price, the system will automatically deleverage the positions on the opposite side' -- i.e. the counterparty forced to close is the profitable side, not the insolvent side. Datawallet's ADL explainer (datawallet.com/crypto/auto-deleveraging-explained) confirms accounts are placed in an ADL queue ranked by leverage and PnL, with 'the most profitable, high-leverage traders placed at the front,' meaning ADL risk is concentrated precisely in the tail-magnitude events this thesis targets (ordinary moves do not deplete insurance funds and do not trigger ADL). arxiv 2603.15963 ('Risk-Based Auto-Deleveraging') formalizes the minimax-leverage/'water-filling' ADL policy and validates it against the actual October 10-11 2025 Hyperliquid ADL event, corroborating that real exchanges execute this exact opposite-side forced-closure mechanism at scale during extreme cascades, not merely as a theoretical construct. None of these sources quantify a subsequent price-reversal effect from ADL flow specifically -- that magnitude/existence claim is this thesis's testable prediction, not a pre-measured number, and research/swarm/runs/2026-09-20-0300/exploratory/forced_flows/probe_adl_reversal.py (exploratory only) measured the trigger frequency itself (not any edge) at ~1.3-1.4 fires/week/symbol in mr_edge 1h train data, used only to set expected_trades_per_week below.",
+    "id": "forced_flows_adl_winner_reversal",
+    "lens": "forced_flows",
+    "mechanism": "When a liquidation cascade is severe enough to exhaust the exchange's insurance fund, the exchange auto-deleveraging (ADL) engine force-closes the highest-leverage, most-PROFITABLE positions on the OPPOSITE side of the cascade at the bankruptcy price -- e.g. in a long-liquidation crash, ADL force-closes profitable shorts by buying to cover, injecting forced BUY pressure against the crash. This is a different counterparty and a different direction from the initiating liquidation flow: the losers being liquidated are forced sellers (or buyers) extending the move, but the winners being ADL'd are forced to close AT A PROFIT in the opposite direction, which should show up as a short-term dampening/reversal specifically at the most extreme magnitude tier of moves (where insurance-fund depletion is plausible), distinct from the broader continuation regime documented for ordinary liquidation-flagged bars.",
+    "nearest_dead_rows": [
+      {
+        "row": 6,
+        "why_different": "Row 6 ('Liquidation-cascade reversion') bet reversion on the broad population of high-vol/liquidation-flagged bars and was killed because 'high-vol bars CONTINUE, don't revert' -- a vol-fade bet with no distinct counterparty. This thesis restricts to a much narrower, causally-defined extreme tail (trailing 97th percentile, ~1.3-1.4 fires/week/symbol per this run's probe, vs. row 6's presumably broader trigger) and names a specific, different counterparty -- ADL-forced closure of PROFITABLE opposite-side positions, not the liquidated losers row 6's postmortem was actually describing -- so the two mechanisms are not testing the same population or the same forced-flow direction."
+      },
+      {
+        "row": 3,
+        "why_different": "Row 3 ('1h vol-expansion fade') used a volatility-expansion (Bollinger/ATR-style) trigger on 1h bars and died to single-split selection bias (full-sample -0.187%/trade, Sharpe -2.45, not robust across a train/test split). This thesis uses a causal rolling (shift(1)) trailing-percentile trigger recomputed at every bar rather than a single fixed-window split, is combined-universe (5 symbols) rather than single-symbol, and is graded against fee_math.p_star/bootstrap_ci.mean_ci per the desk's current screen.py rather than the ad hoc method that produced row 3's Sharpe figure."
+      },
+      {
+        "row": 80,
+        "why_different": "Row 80 ('Large-Print Tape Snap-Back') was refuted as economically the same bet as row 6 (continuation, not reversion, on high-vol bars) and separately for misapplying the maker-blend fee rate to a taker entry. This thesis is graded with the correct C_BPS=11.5bps cost via fee_math and, again, targets the narrow ADL-magnitude tail rather than the broad tape-print population row 80 traded."
+      }
+    ],
+    "prediction": "On the subset of 1h bars whose |return| exceeds the trailing 30-day (720-bar), causally-computed 97th percentile of |return| for that symbol -- a proxy for the small tail of moves large enough to plausibly deplete an insurance fund and trigger ADL, distinct from the broader liquidation-flagged-bar population that empirically continues -- the NEXT few bars show partial reversal against the triggering bar's direction often enough to clear net cost (c=11.5bps, fee_math.C_BPS) at a 150bps symmetric TP/SL, because forced ADL closure of profitable counter-side positions injects opposite-direction flow that ordinary liquidation-flagged bars (which do not reach ADL-triggering magnitude) do not have.",
+    "signal_py": "\"\"\"ADL-tier extreme-magnitude reversal proxy. Closed-bar only, causal.\n\nTrigger: a 1h bar whose |return| exceeds the trailing 720-bar (30d) 97th\npercentile of |return| for that symbol, both the rolling window and its\nquantile computed from STRICTLY PRIOR bars (shift(1)) so the current bar\ncannot inform its own threshold. Signal = -sign(triggering bar's return)\n(reversal bet, entered at the next bar's open per screen.simulate), betting\nforced ADL closure of profitable opposite-side positions at this magnitude\ntier dampens/reverses the move rather than extending it.\n\"\"\"\nimport pandas as pd\n\nW = 720   # 30d trailing window at 1h bars\nQ = 0.97  # percentile defining the ADL-plausible magnitude tail\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    ret = df[\"close\"].pct_change()\n    abs_ret = ret.abs()\n\n    thresh = abs_ret.rolling(W, min_periods=W).quantile(Q).shift(1)\n    fire = abs_ret > thresh\n\n    sig = pd.Series(0, index=df.index, dtype=int)\n    sig[fire & (ret > 0)] = -1\n    sig[fire & (ret < 0)] = 1\n    return sig\n",
+    "source_urls": [
+      "https://bluefin.io/blog/basics-of-insurance-funds",
+      "https://www.cube.exchange/what-is/auto-deleveraging-adl",
+      "https://www.datawallet.com/crypto/auto-deleveraging-explained",
+      "https://arxiv.org/abs/2603.15963"
+    ],
+    "spec": {
+      "dataset": "mr_edge",
+      "doa_line": "Kill if, at n>=30 train-era trades (combined across the 5-symbol universe; research/swarm/runs/2026-09-20-0300/exploratory/forced_flows/probe_adl_reversal.py measured a combined ~6.9 fires/week in mr_edge train, so n=30 should arrive within ~5 weeks of screened history, comfortably inside mr_edge's ~10-week train span), the bootstrap CI95 of net bps (research.swarm.lib.bootstrap_ci.mean_ci, after c=11.5bps per fee_math.C_BPS) includes zero, or observed win rate < p*(150bps)=53.83% per fee_math.p_star(150); also kill if the +-20% tp_bps robustness perturbation (STANDARDS #9) flips net_bps_mean sign between the +20% and -20% variants.",
+      "expected_trades_per_week": 6,
+      "max_hold_bars": 4,
+      "sl_bps": 150,
+      "timeframe": "1h",
+      "tp_bps": 150,
+      "universe": [
+        "BTC",
+        "ETH",
+        "SOL",
+        "XRP",
+        "DOGE"
+      ]
+    },
+    "thesis_path": "research/swarm/runs/2026-09-20-0300/theses/forced_flows_adl_winner_reversal.json"
+  }
+}

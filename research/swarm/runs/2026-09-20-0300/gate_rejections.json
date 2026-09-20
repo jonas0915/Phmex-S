@@ -1,0 +1,22 @@
+[
+  {
+    "id": "literature_btc_alt_drift",
+    "dead_row": null,
+    "reason": "duplicate of informed_flow_btc_alt_lag -- both theses trade the identical mechanism (BTC's price move carries information that propagates to lower-attention/lower-liquidity altcoins with a lag; a same-direction alt entry after a large BTC move captures the catch-up), differing only in dataset/universe/threshold/hold parameters. informed_flow_btc_alt_lag is the better-specified of the two: its entry threshold (BTC 3h return >150bps) is fixed a priori from the cited literature rather than derived from a 90th-percentile calculation on the same mr_edge train data the screen will later score (a circularity literature_btc_alt_drift's own signal_py exhibits via BTC_THRESHOLD=0.00644), its 15-symbol universe is rationalized by the cited paper's own small/mid-cap finding, and its two source_urls were confirmed with specific quantified claims (delayed response, Granger-causality direction, outperformance) whereas literature_btc_alt_drift's primary source (Guo/Sang/Tu/Wang) is conceded in its own evidence field to not have yielded an extractable numeric figure (SSRN/ScienceDirect 403)."
+  },
+  {
+    "id": "session_calendar_deribit_gamma_fade",
+    "dead_row": null,
+    "reason": "source verification F: the thesis's key mechanism claim -- that Deribit dealers net short gamma hedge by 'buying into dips and selling into rallies... which mechanically compresses realized moves and pulls spot toward the strike concentration (pinning)' in the 24h before Friday 08:00 UTC settlement, which the fade trade (signal_py) bets reverts by settlement -- is contradicted by its own cited source menthorq.com/guide/dealer-flow-in-btc-options/, confirmed via WebFetch to state the opposite: 'If price rises -> dealer buy BTC... If price falls -> dealer sell BTC... amplifies price movement... dealers are trading WITH the trend.' The same source and a WebSearch-confirmed summary of the second cited source (sciencedirect.com/.../S1544612326008688, paywalled 403 on direct fetch) describe the reversal as occurring AFTER expiry once short-gamma-driven 'positive feedback trading pressure' dissipates and gamma resets -- i.e. the sources support amplification-into-expiry-then-reversal-after, the opposite mechanism and opposite time-window from the pre-expiry dampening/pinning fade this thesis's spec and signal_py actually trade."
+  },
+  {
+    "id": "cross_asset_shock_fade",
+    "dead_row": null,
+    "reason": "over cap: ranked 6 -- passed dedup/relabel/sanity and both source_urls (pmc.ncbi.nlm.nih.gov/articles/PMC11602072/, arxiv.org/html/2608.21888v1) were confirmed via WebFetch with matching quoted numbers (reversal coefficient +0.099 t=6.59; AUC 0.531/0.499, gone by 4 hours), grade B (neither source directly measures the specific cross-asset BTC-shock-triggers-alt-overshoot mechanism -- both are same-asset ambient/daily reversal studies the thesis extrapolates from, honestly caveated as such), but ranked below 5 higher-novelty/higher-specificity survivors this run; not evaluated further."
+  },
+  {
+    "id": "session_calendar_cme_expiry_drift",
+    "dead_row": null,
+    "reason": "over cap: ranked 7 -- passed dedup/relabel/sanity and both source_urls (quantpedia.com CME-expiry summary, pmc.ncbi.nlm.nih.gov/articles/PMC8898600/ 'witching week of herding') were confirmed via WebFetch verbatim, grade A, but its own doa_line pre-registers expected_trades_per_week=0.46 (12 monthly expiries/yr x 2 symbols), which self-flags a high risk of failing CONSTRAINTS.md viability item 3 (time-to-verdict for n=50 <= 26 weeks) on frequency alone before any WR/CI verdict is reachable; ranked below 5 higher-novelty/higher-specificity survivors this run; not evaluated further."
+  }
+]

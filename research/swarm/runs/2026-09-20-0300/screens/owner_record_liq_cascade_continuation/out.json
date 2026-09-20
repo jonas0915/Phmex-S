@@ -1,0 +1,55 @@
+{
+  "id": "owner_record_liq_cascade_continuation",
+  "spec_sha256": "6e8f44b6dd90fbd201bed5178a1a7a9d0b3cc3432c41f1bef068995e1113d95b",
+  "era": "train",
+  "n": 136,
+  "net_bps_mean": -23.892911451158845,
+  "ci95": [
+    -43.7224904694881,
+    -3.846647283421278
+  ],
+  "wr": 0.35294117647058826,
+  "p_star": 0.52875,
+  "trades_per_week": 13.511531638083975,
+  "time_to_verdict_weeks": 3.7005427170868344,
+  "lot_check": {
+    "BTC": {
+      "ok": true,
+      "lots": 2,
+      "lot_usd": 77.74
+    },
+    "ETH": {
+      "ok": true,
+      "lots": 8,
+      "lot_usd": 24.9738
+    },
+    "SOL": {
+      "ok": true,
+      "lots": 197,
+      "lot_usd": 1.0143
+    },
+    "XRP": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.0044
+    },
+    "DOGE": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.001
+    }
+  },
+  "per_symbol": {
+    "BTC": 28,
+    "ETH": 35,
+    "SOL": 34,
+    "XRP": 21,
+    "DOGE": 18
+  },
+  "train_span": [
+    "2026-06-01 00:00:00+00:00",
+    "2026-08-10 11:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "27da02afcc0936084972f2f66d12e0ccabfddf6af877077a5547753ae611d69d"
+}
