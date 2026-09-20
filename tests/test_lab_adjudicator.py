@@ -306,7 +306,7 @@ def test_grade_htf_l2_registered_verdicts():
 
 def test_htf_l2_wired_into_digest():
     digest, results = adj.build_digest(now=1_784_000_000.0)
-    assert len(results) == 14                # + short-side watch lines (8/12 split)
+    assert len(results) == 15                # + informed_flow_btc_alt_cascade_v2 (9/20)
     assert results[4]["experiment"] == "htf_l2"                      # + sr_bounce (7/28)
     assert "[htf_l2]" in digest                                      # + sr_bounce_v2 (7/30)
     assert results[5]["experiment"] == "vwap_cross"
@@ -317,6 +317,8 @@ def test_htf_l2_wired_into_digest():
     assert "[sr_bounce]" in digest
     assert results[8]["experiment"] == "sr_bounce_v2"
     assert "[sr_bounce_v2]" in digest
+    assert results[14]["experiment"] == "informed_flow_btc_alt_cascade_v2"
+    assert "[informed_flow_btc_alt_cascade_v2]" in digest
 
 
 # ── SR_BOUNCE era-1 grader (final since 2026-07-30; reads the archive) ────
@@ -649,3 +651,170 @@ def test_digest_no_paper_banner_without_sentinel(monkeypatch, tmp_path):
     monkeypatch.setattr(adj, "BOT_DIR", tmp_path)
     digest, _ = adj.build_digest(now=1_784_000_000.0)
     assert "[main book]" not in digest
+
+
+# ── informed_flow_btc_alt_cascade_v2 grader (2026-09-20 pre-registration) ──
+# Verdict line (frozen, docs/superpowers/specs/2026-09-20-informed_flow_btc_
+# alt_cascade_v2-prereg.md): KILL n>=50 & net<=0; KILL net<=-10 any n;
+# PASS n>=50 & CI95 lower>0; INCONCLUSIVE n>=50 & net>0 & CI lower<=0 (hard
+# stop n=100: PASS if CI lower>0 else KILL); WATCH n<50 & net>-10. Every
+# KILL touches .kill_informed_flow_btc_alt_cascade_v2; nothing else writes.
+IFC_CFG_KEY = "informed_flow_btc_alt_cascade_v2"
+IFC_KILL = ".kill_informed_flow_btc_alt_cascade_v2"
+
+
+def _ifc_cfg():
+    return adj.EXPERIMENTS[IFC_CFG_KEY]
+
+
+def _ifc_trades(nets, offset=3600):
+    cfg = _ifc_cfg()
+    return [{"net_pnl": v, "fees_usdt": 0.24, "mode": "paper",
+             "opened_at": cfg["registered_ts"] + offset - 60,
+             "closed_at": cfg["registered_ts"] + offset + i}
+            for i, v in enumerate(nets)]
+
+
+def test_ifc_registry_matches_prereg():
+    cfg = _ifc_cfg()
+    assert cfg["registered_ts"] == 1789933835          # 2026-09-20T19:50:35Z
+    assert cfg["verdict_n"] == 50
+    assert cfg["kill_net_usd"] == -10.0
+    assert cfg["inconclusive_hard_n"] == 100
+    assert cfg["prereg"].endswith("2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md")
+    assert os.path.exists(os.path.join(BOT_DIR, cfg["prereg"]))
+    assert adj.INFORMED_FLOW_BTC_ALT_CASCADE_V2_STATE_FILE.name == \
+        "trading_state_informed_flow_btc_alt_cascade_v2.json"
+
+
+def test_ifc_watch_below_n(tmp_path):
+    r = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": _ifc_trades([0.5, -0.3, 0.2])}, _ifc_cfg(), bot_dir=str(tmp_path))
+    assert r["experiment"] == IFC_CFG_KEY
+    assert r["status"] == adj.WATCH
+    assert r["n_trades"] == 3 and r["wins"] == 2
+    assert abs(r["net_usd"] - 0.4) < 1e-9
+    assert r["verdict_n"] == 50
+    assert r["kill_touched"] is False
+    assert list(tmp_path.iterdir()) == []                 # WATCH writes nothing
+
+
+def test_ifc_zero_trades_is_watch(tmp_path):
+    r = adj.grade_informed_flow_btc_alt_cascade_v2({}, _ifc_cfg(), bot_dir=str(tmp_path))
+    assert r["status"] == adj.WATCH and r["n_trades"] == 0
+    assert r["ci95_lower"] is None and r["wr"] is None
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_ifc_kill_at_n50_net_nonpositive_touches_sentinel(tmp_path):
+    trades = _ifc_trades([0.10] * 25 + [-0.10] * 25)      # net == 0 -> KILL
+    r = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": trades}, _ifc_cfg(), bot_dir=str(tmp_path))
+    assert r["status"] == "KILL"
+    assert r["n_trades"] == 50
+    assert abs(r["net_usd"]) < 1e-9
+    assert "net" in r["note"] and "<= 0" in r["note"]
+    assert r["kill_touched"] is True
+    assert "touched " + IFC_KILL in r["note"]
+    assert (tmp_path / IFC_KILL).exists()
+    assert [p.name for p in tmp_path.iterdir()] == [IFC_KILL]
+    # idempotent: an existing sentinel is never overwritten
+    (tmp_path / IFC_KILL).write_text("owner note")
+    adj.grade_informed_flow_btc_alt_cascade_v2({"closed_trades": trades}, _ifc_cfg(), bot_dir=str(tmp_path))
+    assert (tmp_path / IFC_KILL).read_text() == "owner note"
+
+
+def test_ifc_kill_dollar_cap_below_n(tmp_path):
+    trades = _ifc_trades([-2.5] * 4)                       # net -10.00 at n=4
+    r = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": trades}, _ifc_cfg(), bot_dir=str(tmp_path))
+    assert r["status"] == "KILL"
+    assert r["n_trades"] == 4
+    assert abs(r["net_usd"] - (-10.0)) < 1e-9
+    assert "-10.00" in r["note"]
+    assert (tmp_path / IFC_KILL).exists()
+    # -9.99 at n<50 is still WATCH
+    r2 = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": _ifc_trades([-2.5] * 3 + [-2.49])}, _ifc_cfg(), bot_dir=str(tmp_path / "b"))
+    assert r2["status"] == adj.WATCH
+
+
+def test_ifc_pass_at_n50_ci_lower_positive(tmp_path):
+    trades = _ifc_trades([1.0] * 45 + [0.5] * 5)           # clearly positive ledger
+    r = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": trades}, _ifc_cfg(), bot_dir=str(tmp_path))
+    assert r["status"] == adj.PASS
+    assert r["n_trades"] == 50
+    assert r["ci95_lower"] > 0
+    assert "PASS-ELIGIBLE" in r["note"] or "owner" in r["note"]
+    assert r["kill_touched"] is False
+    assert list(tmp_path.iterdir()) == []                 # PASS never writes .promote_*
+    # the CI comes from research.swarm.lib.bootstrap_ci.mean_ci (defaults)
+    sys.path.insert(0, BOT_DIR)
+    from research.swarm.lib.bootstrap_ci import mean_ci
+    lo, _hi = mean_ci([1.0] * 45 + [0.5] * 5)
+    assert abs(r["ci95_lower"] - lo) < 1e-12
+
+
+def test_ifc_inconclusive_at_n50_net_positive_ci_lower_nonpositive(tmp_path):
+    # net > 0 but wildly dispersed: CI95 lower bound <= 0 -> INCONCLUSIVE
+    nets = ([3.0, -2.9] * 25)
+    nets[0] = 3.5                                           # net +0.5 > 0
+    r = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": _ifc_trades(nets)}, _ifc_cfg(), bot_dir=str(tmp_path))
+    assert r["status"] == "INCONCLUSIVE"
+    assert r["n_trades"] == 50 and r["net_usd"] > 0
+    assert r["ci95_lower"] <= 0
+    assert r["kill_touched"] is False
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_ifc_hard_stop_n100_ci_lower_nonpositive_kills(tmp_path):
+    nets = ([3.0, -2.9] * 50)
+    nets[0] = 3.5
+    r = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": _ifc_trades(nets)}, _ifc_cfg(), bot_dir=str(tmp_path))
+    assert r["status"] == "KILL"
+    assert r["n_trades"] == 100 and r["net_usd"] > 0
+    assert r["ci95_lower"] <= 0
+    assert "hard stop" in r["note"]
+    assert r["kill_touched"] is True
+    assert (tmp_path / IFC_KILL).exists()
+    # at n=100 with CI lower > 0 it is PASS, not KILL
+    r2 = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": _ifc_trades([1.0] * 100)}, _ifc_cfg(), bot_dir=str(tmp_path / "p"))
+    assert r2["status"] == adj.PASS and not (tmp_path / "p" / IFC_KILL).exists()
+
+
+def test_ifc_rows_before_registration_ignored(tmp_path):
+    cfg = _ifc_cfg()
+    stale = [{"net_pnl": -5.0, "mode": "paper", "closed_at": cfg["registered_ts"] - 1}
+             for _ in range(10)]                             # would be a -$50 KILL if counted
+    live = _ifc_trades([0.2, 0.3])
+    r = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": stale + live}, cfg, bot_dir=str(tmp_path))
+    assert r["n_trades"] == 2
+    assert abs(r["net_usd"] - 0.5) < 1e-9
+    assert r["status"] == adj.WATCH
+    assert list(tmp_path.iterdir()) == []
+    # boundary inclusive: closed_at == registered_ts counts
+    r2 = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": [{"net_pnl": 0.1, "mode": "paper", "closed_at": cfg["registered_ts"]}]},
+        cfg, bot_dir=str(tmp_path))
+    assert r2["n_trades"] == 1
+
+
+def test_ifc_net_pnl_used_as_is(tmp_path):
+    r = adj.grade_informed_flow_btc_alt_cascade_v2(
+        {"closed_trades": _ifc_trades([0.05])}, _ifc_cfg(), bot_dir=str(tmp_path))
+    assert r["wins"] == 1
+    assert abs(r["net_usd"] - 0.05) < 1e-9                 # fees_usdt NOT re-subtracted
+
+
+def test_ifc_digest_line_format():
+    r = {"experiment": IFC_CFG_KEY, "status": adj.WATCH, "note": "accruing (n=0/50)",
+         "n_trades": 0, "wins": 0, "wr": None, "net_usd": 0.0, "ci95_lower": None,
+         "verdict_n": 50, "kill_touched": False}
+    line = adj._line_informed_flow_btc_alt_cascade_v2(r)
+    assert line.startswith("[informed_flow_btc_alt_cascade_v2] WATCH")
+    assert "0 trades 0W $+0.00" in line and "WR n/a" in line

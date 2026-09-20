@@ -115,6 +115,12 @@ from tsm_slot import (TSM_SLOT_ID, TSM_SYMBOL, TSM_AMOUNT_ETH, TSM_LEVERAGE,
 # _evaluate_donchian). Referenced via the module namespace — the constants are
 # per-coin maps, not scalars like the TSM ones.
 import donchian_slot
+# informed_flow_btc_alt_cascade_v2 paper slot (2026-09-20 build, pre-registered:
+# docs/superpowers/specs/2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md).
+# Frozen-signal transcription, exit rule and sidecar IO live in
+# informed_flow_btc_alt_cascade_v2_slot.py; bot.py only orchestrates (see
+# _evaluate_informed_flow_btc_alt_cascade_v2). Referenced via the module namespace.
+import informed_flow_btc_alt_cascade_v2_slot
 from scanner import scan_top_gainers, volatility_scan, start_background_scan, get_scan_result
 from logger import setup_logger
 from ws_feed import WSDataFeed
@@ -825,6 +831,31 @@ class Phmex2Bot:
                 kelly_min_trades=10**9,   # neg-Kelly auto-demote never arms
                 durable_trail_enabled=False,  # spec: close-only Donchian stop, no trail
             ),
+            # informed_flow_btc_alt_cascade_v2 — pre-registered PAPER slot (2026-09-20):
+            # short-only laggard fade on closed 1h bars (BTC trailing-3h pump > 150 bps,
+            # alt captured < 50% of it), TP 250 / SL 150 bps, time exit 7 bars, 16-alt
+            # universe, $200 notional per position (fee_math.position_notional). Prereg
+            # (verdict line frozen, adjudicator-enforced kill):
+            # docs/superpowers/specs/2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md.
+            # strategy_name is deliberately NOT in STRATEGIES: _evaluate_slots skips
+            # the whole slot (strategy_fn None → continue BEFORE its exit block), so
+            # NO scalper exit (SL/TP/time/flat/adverse/trail/st2_hold) can ever touch
+            # these positions. All entries/exits run in
+            # _evaluate_informed_flow_btc_alt_cascade_v2 on closed bars instead —
+            # same trick as ETH_TSM_28 / DONCHIAN_* above.
+            StrategySlot(
+                slot_id="informed_flow_btc_alt_cascade_v2",
+                strategy_name="informed_flow_btc_alt_cascade_v2",  # not a STRATEGIES key — see note above
+                timeframe="1h",           # frozen spec timeframe
+                max_positions=16,         # one per universe symbol (len(spec.universe))
+                capital_pct=0.0,
+                paper_mode=True,          # paper only; live path NOT implemented (guarded)
+                trade_amount_usdt=None,   # unused — sizing is the fixed NOTIONAL_USDT, no Kelly
+                loss_cap_usdt=-999.0,     # rails opt-out: the prereg verdict line is the
+                                          # only kill (adjudicator touches the .kill_ sentinel)
+                kelly_min_trades=10**9,   # neg-Kelly auto-demote never arms
+                durable_trail_enabled=False,  # exits are exit_check on closed bars — no trail
+            ),
         ]
         # HTF_L2 (2026-07-18, renamed from HTF_L2_PAPER at 7/20 go-live):
         # registered conditionally — builder returns
@@ -878,6 +909,10 @@ class Phmex2Bot:
         # per-day dedup for the not-implemented-live warning.
         self._donchian_state = donchian_slot.load_state()
         self._donchian_live_warned: dict[str, str] = {}
+        # informed_flow_btc_alt_cascade_v2 runtime state: per-symbol persisted
+        # bar stamp / bars_held + one-shot per-day dedup for the live warning.
+        self._informed_flow_btc_alt_cascade_v2_state = informed_flow_btc_alt_cascade_v2_slot.load_state()
+        self._informed_flow_btc_alt_cascade_v2_live_warned: dict[str, str] = {}
 
     @staticmethod
     def _build_htf_l2_slot():
@@ -2948,6 +2983,13 @@ class Phmex2Bot:
             self._evaluate_donchian(prices)
         except Exception as e:
             logger.error(f"[DONCHIAN] evaluation error: {e}", exc_info=True)
+        # informed_flow_btc_alt_cascade_v2 closed-bar evaluator (2026-09-20): one
+        # reference fetch per cycle, then per-symbol exit/entry on the newest
+        # closed 1h bar. ERROR (not debug) on failure: no other evaluation path.
+        try:
+            self._evaluate_informed_flow_btc_alt_cascade_v2(prices)
+        except Exception as e:
+            logger.error(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] evaluation error: {e}", exc_info=True)
 
     def _evaluate_slots(self, active_pairs: list, prices: dict):
         """Evaluate strategy slots — paper slots simulate; live (promoted) slots place real orders."""
@@ -4962,6 +5004,171 @@ class Phmex2Bot:
                     f"| ${notional:.2f} notional (w={w:.4f}, {n_long}/9 long) "
                     f"| px_src={_px_src} px_age={_px_age:.1f}s "
                     f"| no TP, close-only daily stops")
+
+    # ── informed_flow_btc_alt_cascade_v2 (2026-09-20) — paper-only orchestration ──
+    # Pre-registered closed-bar slot. Signal/exit math + sidecar IO live in
+    # informed_flow_btc_alt_cascade_v2_slot.py (pure). Paper-only build: fills
+    # simulate at the fresh price; ALL exits (SL/TP touch on the closed bar's
+    # high/low, time exit at the bar close) are computed by exit_check on
+    # CLOSED bars — no resting orders, and the scalper exit engine never sees
+    # this slot (strategy_fn is None by design). The BTC reference series is
+    # fetched ONCE per cycle (owner-authorised 2026-09-20, prereg doc "Owner
+    # decision (reference feed)"), after the paper_mode guard, and the same
+    # closed frame is handed to every symbol's evaluation.
+
+    def _evaluate_informed_flow_btc_alt_cascade_v2(self, prices: dict):
+        """Per-cycle driver. Order (binding): slot missing → return; killed/
+        disabled → return (kill honoured every cycle; the generic .kill_*
+        sentinel loop already closed the paper book and set_killed); NOT
+        paper → one error per UTC day and return BEFORE any exchange call
+        (_close_slot_position on a non-paper slot places a REAL market order,
+        so the guard sits above every data fetch, exit check and book write);
+        THEN the single reference fetch; THEN the per-symbol loop. A failed
+        reference fetch stamps nothing — everything retries next cycle."""
+        mod = informed_flow_btc_alt_cascade_v2_slot
+        slot = self._donchian_slot(mod.SLOT_ID)
+        if slot is None:
+            return
+        if not slot.enabled:
+            return
+        today = mod.utc_date_str()
+        if not slot.paper_mode:
+            self._informed_flow_btc_alt_cascade_v2_warn_live(slot, today)
+            return
+        ref_df = self.exchange.get_ohlcv(mod.REF_SYMBOL, mod.REF_TIMEFRAME, limit=mod.OHLCV_LIMIT)
+        ref_closed = mod.complete_bars(ref_df)
+        if ref_df is None or len(ref_df) == 0 or ref_closed is None or len(ref_closed) == 0:
+            logger.warning(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] reference {mod.REF_SYMBOL} "
+                           f"fetch empty — retrying next cycle")
+            return
+        for symbol in mod.SYMBOLS:
+            try:
+                self._informed_flow_btc_alt_cascade_v2_eval_symbol(slot, symbol, ref_closed, today, prices)
+            except Exception as e:
+                logger.error(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] {symbol} eval error: {e} — "
+                             f"retrying next cycle", exc_info=True)
+
+    def _informed_flow_btc_alt_cascade_v2_warn_live(self, slot, today: str) -> None:
+        """Live execution is NOT implemented (prereg 'Slot design'): a promoted
+        slot logs one error per UTC day and touches nothing — no fetch, no
+        exit, no order. Same shape as _donchian_adjust_position's guard."""
+        if self._informed_flow_btc_alt_cascade_v2_live_warned.get(slot.slot_id) != today:
+            self._informed_flow_btc_alt_cascade_v2_live_warned[slot.slot_id] = today
+            logger.error(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] {slot.slot_id} is LIVE but live "
+                         f"execution is not implemented — no orders placed, book untouched; "
+                         f"demote with .demote_{slot.slot_id}")
+
+    def _informed_flow_btc_alt_cascade_v2_eval_symbol(self, slot, symbol: str, ref_closed,
+                                                       today: str, prices: dict) -> None:
+        """One symbol, one closed bar: exit check on the open position (SL then
+        TP against the bar's low/high, time exit at its close), then a fresh
+        entry when the bar's signal is non-zero and the book is flat.
+        st['last_bar_ts'] is stamped ONLY once the book matches the bar, so a
+        failed close/open retries next cycle (the Donchian retry shape). The
+        reference is never fetched here — it arrives closed from the driver."""
+        mod = informed_flow_btc_alt_cascade_v2_slot
+        if not slot.paper_mode:  # redundant by construction (driver guards first); kept so
+            self._informed_flow_btc_alt_cascade_v2_warn_live(slot, today)  # the block shape
+            return                                                          # matches the recipe
+        st = self._informed_flow_btc_alt_cascade_v2_state.setdefault(symbol, mod.default_symbol_state())
+        df = self.exchange.get_ohlcv(symbol, mod.TIMEFRAME, limit=mod.OHLCV_LIMIT)
+        closed = mod.complete_bars(df)
+        if closed is None or len(closed) == 0:
+            logger.debug(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] {symbol}: no closed bars — retrying next cycle")
+            return
+        bar_ts = closed.index[-1]
+        bar_key = mod.ts_key(bar_ts)
+        if st.get("last_bar_ts") == bar_key:
+            return  # this closed bar is already synced to the book
+        if ref_closed.index[-1] < bar_ts:
+            # BTC's bar for this hour is not in yet: a fillna(0) at the newest bar
+            # would silently drop a signal — skip, no stamp, retry next cycle.
+            logger.debug(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] {symbol}: reference lags "
+                         f"({mod.ts_key(ref_closed.index[-1])} < {bar_key}) — retrying next cycle")
+            return
+        bar = closed.iloc[-1]
+        bar_high, bar_low, bar_close = float(bar["high"]), float(bar["low"]), float(bar["close"])
+        sig = mod.last_signal(closed, ref_closed)
+        # replica record BEFORE book work (idempotent per bar; fidelity benchmark)
+        mod.append_signal_bars(symbol, [{"ts": bar_key, "signal": sig, "close": bar_close,
+                                         "high": bar_high, "low": bar_low}])
+
+        pos = slot.risk.positions.get(symbol)
+        bars_held = int(st.get("bars_held") or 0)
+        if pos is not None:
+            hit = mod.exit_check(pos.side, pos.entry_price, bar_high, bar_low, bar_close, bars_held)
+            if hit is not None:
+                reason, level = hit
+                if not self._close_slot_position(slot, symbol, pos, level, reason):
+                    return  # book not in line — retry next cycle, bar stays unstamped
+                logger.info(f"[PAPER] {slot.slot_id} EXIT {pos.side.upper()} {symbol} @ {level:.6f} "
+                            f"({reason}, bar {bar_key}, bars_held={bars_held})")
+                pos = None
+                bars_held = 0
+            else:
+                bars_held += 1
+
+        note = "flat" if pos is None else f"holding (bars_held={bars_held})"
+        if pos is None and sig != 0:
+            if not slot.is_active:
+                note = f"signal {sig} but slot disabled/killed — no entry"
+            elif self._slot_entries_blocked():
+                logger.info(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] {symbol} entry deferred — account halt")
+                return  # retry next cycle (bar unstamped); the next bar supersedes it
+            else:
+                price = self._donchian_price(symbol, prices)
+                if price is None:
+                    logger.warning(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] {symbol}: signal {sig} but no "
+                                   f"price — retrying next cycle")
+                    return
+                side = "long" if sig > 0 else "short"
+                self._informed_flow_btc_alt_cascade_v2_open_paper(slot, symbol, price, side)
+                bars_held = 0
+                st["entry_bar_ts"] = bar_key
+                note = f"opened {side}"
+        if pos is None and symbol not in slot.risk.positions:
+            st["entry_bar_ts"] = None
+
+        st["bars_held"] = bars_held
+        st["last_signal"] = int(sig)
+        st["last_bar_ts"] = bar_key
+        mod.save_state(self._informed_flow_btc_alt_cascade_v2_state)
+        if sig != 0 or note != "flat":
+            logger.info(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] {symbol} bar {bar_key}: "
+                        f"signal={sig} close={bar_close:.6f} | {note}")
+
+    def _informed_flow_btc_alt_cascade_v2_open_paper(self, slot, symbol: str, price: float,
+                                                      side: str):
+        """Paper fill at the fresh price. 1x sizing: margin is recorded AS the
+        notional, so ROI% == price move % (Donchian convention). SL/TP are
+        stored on the position for display only — exits are evaluated by
+        exit_check on closed bars, never by the scalper engine."""
+        mod = informed_flow_btc_alt_cascade_v2_slot
+        # Honest paper fill price (2026-08-05 I3 audit): same refresh as the
+        # 5m slot paper path — the cycle-cached price can be minutes stale.
+        price, _px_age, _px_src = _fresh_paper_entry_price(
+            getattr(self, "_ws_feed", None), getattr(self, "exchange", None),
+            symbol, price)
+        notional = mod.NOTIONAL_USDT
+        pos = slot.risk.open_position(symbol, price, notional, side=side,
+                                      atr=0.0, regime="medium",
+                                      cycle=self.cycle_count,
+                                      strategy=mod.SLOT_ID)
+        pos.amount = notional / price
+        pos.margin = notional
+        sl, tp = mod.sl_tp_levels(side, price)
+        pos.stop_loss = sl      # display only — exit_check on closed bars is the exit
+        pos.take_profit = tp    # display only — same
+        slot.risk._save_state()
+        slot.total_entries += 1
+        notifier.notify_paper_entry(symbol, side, price, notional, 1.0,
+                                    f"informed_flow_btc_alt_cascade_v2 laggard fade "
+                                    f"(TP {mod.TP_BPS}/SL {mod.SL_BPS} bps, max {mod.MAX_HOLD_BARS} bars)",
+                                    slot=slot.slot_id)
+        logger.info(f"[PAPER] {slot.slot_id} ENTRY {side.upper()} {symbol} @ {price:.6f} "
+                    f"| ${notional:.2f} notional | SL {sl:.6f} TP {tp:.6f} "
+                    f"| px_src={_px_src} px_age={_px_age:.1f}s "
+                    f"| closed-bar exits (max {mod.MAX_HOLD_BARS} bars)")
 
     def _close_slot_position(self, slot, symbol, pos, price, reason):
         """Close a slot position — simulated for paper, real market order for live.

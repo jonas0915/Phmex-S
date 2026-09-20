@@ -291,6 +291,34 @@ EXPERIMENTS = {
         "era1_per_trade": -0.0158,   # era-1 realized net/trade — the prior to beat
         "breakeven_wr": 0.405,
     },
+    # informed_flow_btc_alt_cascade_v2 — pre-registered PAPER slot (2026-09-20,
+    # edge-swarm run 2026-09-19-1451; prereg docs/superpowers/specs/
+    # 2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md). Verdict line,
+    # verbatim from the prereg doc ("Verdict line (frozen)"):
+    #   - Ledger: closed_trades of trading_state_informed_flow_btc_alt_cascade_v2
+    #     .json with closed_at >= registered_ts (the epoch of 2026-09-20T19:50:35Z);
+    #     net = sum of each row's net_pnl AS-IS (fee-inclusive at the source —
+    #     risk_manager deducts sim fees at close; never re-subtract), via _net(t).
+    #   - verdict_n = 50.
+    #   - KILL: n >= 50 and net <= 0.
+    #   - KILL: net <= -10.00 USD at ANY n (dollar loss cap).
+    #   - PASS: n >= 50 and the lower bound of the bootstrap CI95 of per-trade
+    #     net USD (research.swarm.lib.bootstrap_ci.mean_ci, defaults: 2000 reps,
+    #     alpha 0.05, seed 0) > 0.
+    #   - INCONCLUSIVE: n >= 50, net > 0, CI95 lower bound <= 0 → keep accruing,
+    #     re-grade at every n; hard stop at n = 100: PASS if the CI95 lower
+    #     bound > 0 there, else KILL.
+    #   - WATCH: n < 50 and net > -10.00.
+    #   - ENFORCEMENT: the grader TOUCHES .kill_informed_flow_btc_alt_cascade_v2
+    #     on every KILL clause (paper-only, zero market risk); PASS is never a
+    #     promotion (owner decision; the grader never writes .promote_*).
+    "informed_flow_btc_alt_cascade_v2": {
+        "registered_ts": 1789933835,  # 2026-09-20T19:50:35Z = 2026-09-20 12:50:35 PM PT
+        "verdict_n": 50,
+        "kill_net_usd": -10.0,
+        "inconclusive_hard_n": 100,
+        "prereg": "docs/superpowers/specs/2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md",
+    },
 }
 
 TSM_STATE_FILE = BOT_DIR / "trading_state_ETH_TSM_28.json"
@@ -301,6 +329,7 @@ VWAP_CROSS_STATE_FILE = BOT_DIR / "trading_state_VWAP_CROSS.json"
 VWAP_CROSS_COUNTERS_FILE = BOT_DIR / "trading_state_VWAP_CROSS_blocked.json"
 SR_BOUNCE_STATE_FILE = BOT_DIR / "trading_state_SR_BOUNCE.json"          # v2 era (fresh ledger post-rotation)
 SR_BOUNCE_ERA1_STATE_FILE = BOT_DIR / "trading_state_SR_BOUNCE_era1.json"  # era-1 archive (KILL final)
+INFORMED_FLOW_BTC_ALT_CASCADE_V2_STATE_FILE = BOT_DIR / "trading_state_informed_flow_btc_alt_cascade_v2.json"
 
 
 # ── shared helpers ────────────────────────────────────────────────────────
@@ -1050,6 +1079,96 @@ def grade_sr_bounce_v2(slot_state: dict, cfg: dict) -> dict:
             "net_usd": round(net, 4)}
 
 
+def grade_informed_flow_btc_alt_cascade_v2(slot_state: dict, cfg: dict, bot_dir=None) -> dict:
+    """informed_flow_btc_alt_cascade_v2 grader — the prereg verdict line
+    (docs/superpowers/specs/2026-09-20-informed_flow_btc_alt_cascade_v2-
+    prereg.md, quoted at the EXPERIMENTS entry) implemented numerically.
+    Ledger math as grade_sr_bounce_v2 (net_pnl AS-IS via _net — never
+    re-subtract fees); sentinel write as grade_side_line (open(...,"w"),
+    never overwrite an existing file, warn on OSError). The CI95 comes from
+    research.swarm.lib.bootstrap_ci.mean_ci (defaults) — never a hand-rolled
+    resampler; None when n < 2.
+      KILL          n >= verdict_n and net <= 0
+      KILL          net <= kill_net_usd at ANY n
+      PASS          n >= verdict_n and CI95 lower > 0   (PASS-ELIGIBLE: owner decision,
+                                                         never a promotion, no .promote_*)
+      INCONCLUSIVE  n >= verdict_n, net > 0, CI lower <= 0, n < inconclusive_hard_n
+      KILL          n >= inconclusive_hard_n and CI lower <= 0  (hard stop)
+      WATCH         n < verdict_n and net > kill_net_usd
+    Every KILL touches <bot_dir>/.kill_informed_flow_btc_alt_cascade_v2; the
+    bot's generic .kill_* loop then closes the paper book and persists the
+    kill. WATCH / PASS / INCONCLUSIVE write nothing."""
+    trades = [t for t in (slot_state.get("closed_trades", []) or [])
+              if (t.get("closed_at") or 0) >= cfg["registered_ts"]]
+    nets = [n for t in trades for n in [_net(t)] if n is not None]
+    wins = sum(1 for n in nets if n > 0)
+    wr = (wins / len(nets)) if nets else None
+    net = sum(nets) if nets else 0.0
+    n = len(trades)
+
+    ci_lower = None
+    if len(nets) >= 2:
+        _bot_dir_str = str(BOT_DIR)
+        if _bot_dir_str not in sys.path:
+            sys.path.insert(0, _bot_dir_str)
+        from research.swarm.lib.bootstrap_ci import mean_ci  # lazy: research lib, not a bot import
+        ci_lower, _ci_upper = mean_ci(nets)
+
+    sentinel_name = ".kill_informed_flow_btc_alt_cascade_v2"
+    verdict_n = cfg["verdict_n"]
+    kill_reason = None
+    if net <= cfg["kill_net_usd"]:
+        kill_reason = (f"net ${net:+.2f} <= ${cfg['kill_net_usd']:.2f} dollar loss cap "
+                       f"at n={n}")
+    elif n >= verdict_n and net <= 0:
+        kill_reason = f"n={n} >= {verdict_n} and net ${net:+.2f} <= 0"
+    elif (n >= cfg["inconclusive_hard_n"] and ci_lower is not None and ci_lower <= 0):
+        kill_reason = (f"hard stop n={n} >= {cfg['inconclusive_hard_n']} with CI95 lower "
+                       f"{ci_lower:+.4f} <= 0 (net ${net:+.2f})")
+
+    kill_touched = False
+    if kill_reason is not None:
+        status = "KILL"
+        sentinel = os.path.join(str(bot_dir or BOT_DIR), sentinel_name)
+        if not os.path.exists(sentinel):
+            try:
+                with open(sentinel, "w") as f:
+                    f.write(f"informed_flow_btc_alt_cascade_v2 verdict line "
+                            f"{datetime.now(tz=PT):%Y-%m-%d %I:%M %p PT}: {kill_reason} — "
+                            f"registered KILL (paper-only); rm this file only with a new "
+                            f"pre-registration\n")
+                kill_touched = True
+            except OSError as e:
+                logging.warning("informed_flow_btc_alt_cascade_v2 sentinel write failed: %s", e)
+        else:
+            kill_touched = True  # already present — kill stands, never overwritten
+        note = (f"registered verdict: {kill_reason} — KILL; touched {sentinel_name} "
+                f"(bot's .kill_* loop closes the paper book)")
+    elif n >= verdict_n and ci_lower is not None and ci_lower > 0:
+        status = PASS
+        note = (f"n={n} >= {verdict_n}, net ${net:+.2f}, CI95 lower {ci_lower:+.4f} > 0 — "
+                f"PASS-ELIGIBLE: owner decision required (never a promotion; no "
+                f".promote_* written)")
+    elif n >= verdict_n:
+        status = "INCONCLUSIVE"
+        note = (f"n={n} >= {verdict_n}, net ${net:+.2f} > 0 but CI95 lower "
+                f"{(ci_lower if ci_lower is not None else float('nan')):+.4f} <= 0 — keep accruing, "
+                f"re-graded at every n; hard stop at n={cfg['inconclusive_hard_n']} "
+                f"(PASS if CI lower > 0 there, else KILL)")
+    else:
+        status = WATCH
+        note = (f"accruing (n={n}/{verdict_n}, net ${net:+.2f}; KILL if net <= "
+                f"${cfg['kill_net_usd']:.2f} at any n or net <= 0 at n={verdict_n})")
+
+    return {"experiment": "informed_flow_btc_alt_cascade_v2", "status": status,
+            "note": note, "n_trades": n, "wins": wins,
+            "wr": round(wr, 4) if wr is not None else None,
+            "net_usd": round(net, 4),
+            "ci95_lower": ci_lower,
+            "verdict_n": verdict_n,
+            "kill_touched": kill_touched}
+
+
 # ── digest ────────────────────────────────────────────────────────────────
 def _line_trail(r) -> str:
     avg = (f"avg win ${r['avg_win_usd']:.2f} vs ${r['baseline_avg_win_usd']:.2f} "
@@ -1138,6 +1257,14 @@ def _line_sr_bounce_v2(r) -> str:
             f"{wr} (BE {r['breakeven_wr']:.1%})")
 
 
+def _line_informed_flow_btc_alt_cascade_v2(r) -> str:
+    wr = f"WR {r['wr']*100:.1f}%" if r["wr"] is not None else "WR n/a"
+    ci = (f"CI95 lo {r['ci95_lower']:+.3f}" if r.get("ci95_lower") is not None
+          else "CI95 n/a")
+    return (f"[informed_flow_btc_alt_cascade_v2] {r['status']} — {r['note']} | "
+            f"{r['n_trades']} trades {r['wins']}W ${r['net_usd']:+.2f} | {wr} | {ci}")
+
+
 def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     now = now or time.time()
     trades = load_closed_trades()
@@ -1169,6 +1296,9 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
         grade_side_line(trades, EXPERIMENTS["main_short_side"]),
         grade_side_line(load_json(MR_STATE_FILE, {}).get("closed_trades", []),
                         EXPERIMENTS["mr_short_side"]),
+        grade_informed_flow_btc_alt_cascade_v2(
+            load_json(INFORMED_FLOW_BTC_ALT_CASCADE_V2_STATE_FILE, {}),
+            EXPERIMENTS["informed_flow_btc_alt_cascade_v2"]),
     ]
     stamp = datetime.fromtimestamp(now, tz=PT).strftime("%b %-d %-I:%M %p PT")
     lines = [f"LAB ADJUDICATOR — live forward tests ({stamp})"]
@@ -1194,6 +1324,7 @@ def build_digest(now: float | None = None) -> tuple[str, list[dict]]:
     lines.append(f"[mr_long_side]  {results[11]['status']} — {results[11]['note']}")
     lines.append(f"[main_short_side] {results[12]['status']} — {results[12]['note']}")
     lines.append(f"[mr_short_side] {results[13]['status']} — {results[13]['note']}")
+    lines.append(_line_informed_flow_btc_alt_cascade_v2(results[14]))
     return "\n".join(lines), results
 
 
