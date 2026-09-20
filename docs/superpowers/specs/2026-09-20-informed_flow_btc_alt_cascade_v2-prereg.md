@@ -172,4 +172,13 @@ v1 citation given separately and labelled as such.
   `research/swarm/kb/LESSONS.md` line 25 (2026-09-19 row). No v2 holdout number exists yet.
 
 ## Holdout (read once)
-PENDING — the single registered holdout read happens AFTER this document is committed, by the command: python3 -m research.swarm.lib.screen research/swarm/runs/2026-09-19-1451/specs/informed_flow_btc_alt_cascade_v2.frozen.json research/swarm/runs/2026-09-19-1451 --era holdout --token COMMITTEE-HOLDOUT-READ (writes research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade_v2/out.holdout.json and research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade_v2/trades.holdout.csv; the train out.json is never touched). Decision rule fixed now: ci95 upper bound < 0 → DEAD-AT-HOLDOUT (no build); ci95 null (n < 2) → HOLDOUT-INSUFFICIENT (no build; owner decision); otherwise → BUILD. The holdout numbers are recorded below and never used to change anything above.
+Read once at 2026-09-20T19:50:35Z by the command: python3 -m research.swarm.lib.screen research/swarm/runs/2026-09-19-1451/specs/informed_flow_btc_alt_cascade_v2.frozen.json research/swarm/runs/2026-09-19-1451 --era holdout --token COMMITTEE-HOLDOUT-READ. Out path: research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade_v2/out.holdout.json (trades in research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade_v2/trades.holdout.csv; the train out.json was not touched). Every number below was read from that out.holdout.json by this seat.
+- n = 75 — research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade_v2/out.holdout.json
+- net_bps_mean = 59.198399668922356 — research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade_v2/out.holdout.json
+- ci95 = [20.994210390758322, 98.16793798069588] — research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade_v2/out.holdout.json
+- wr = 0.5733333333333334 (p_star in the same file = 0.523) — research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade_v2/out.holdout.json
+- per_symbol = DOGE 3, ADA 4, XRP 2, LTC 6, LINK 2, UNI 2, NEAR 9, SUI 4, ONDO 5, AAVE 5, TAO 7, XLM 8, 1000PEPE 4, 1000SHIB 4, GIGGLE 4, BNB 6 — research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade_v2/out.holdout.json
+- trades_per_week = 5.226047283284944 — research/swarm/runs/2026-09-19-1451/screens/informed_flow_btc_alt_cascade_v2/out.holdout.json
+- Sanity read only (dataset long_1h, STANDARDS #6 overlap caveat above); these numbers change nothing above.
+
+Decision: BUILD — the fixed rule's "otherwise → BUILD" clause applies because ci95 is not null (n = 75 ≥ 2) and its upper bound 98.16793798069588 is not < 0.
