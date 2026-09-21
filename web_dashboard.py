@@ -819,6 +819,40 @@ def _st2_fill_stats() -> dict:
 # A .demote_<slot_id> flag file always overrides to DEMOTED (rollback latch).
 # (slot_id, title, one-line description of what the strategy does)
 _SIGNAL_BOXES = [
+    # Active books first (owner request 2026-09-20 8:53 PM PT): slots that can still
+    # trade, then the retired/killed ones below them.
+    ("informed_flow_btc_alt_cascade_v2",
+     "BTC&rarr;ALT LAGGARD SHORT (v2) &mdash; PRE-REGISTERED (PAPER)",
+     "Short the alt that failed to follow BTC &mdash; BTC 3h move &gt; 150 bps "
+     "and the alt captured &lt; 50% of it; short at next 1h open; TP 250 / "
+     "SL 150 bps; max hold 7h; 16 alts; paper ($200 notional, 1x). Closed 1h "
+     "bars only; BTC reference = one live BTC/USDT 1h OHLCV fetch per cycle "
+     "(owner decision 2026-09-20 1:16 PM PT). Edge-swarm run 2026-09-19-1451: "
+     "train n=246 +34.1 bps; holdout n=75 +59.2 bps CI [+21.0, +98.2]. PAPER "
+     "since 2026-09-20 12:50 PM PT. Verdict line (frozen, adjudicator-graded "
+     "daily): KILL at n&ge;50 &amp; net &le; $0, or net &le; &minus;$10 at "
+     "any n; hard stop n=100; PASS at n&ge;50 with bootstrap CI95 lower &gt; 0 "
+     "(PASS-eligible only &mdash; never auto-promoted). Kill = "
+     ".kill_informed_flow_btc_alt_cascade_v2 (paper-only). Prereg: "
+     "docs/superpowers/specs/2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md"),
+    ("DONCHIAN_BTC",   "DONCHIAN_BTC &mdash; TREND ENSEMBLE (PAPER)",
+     "BTC-only Donchian-ensemble trend, long/flat (Concretum replica): 9 "
+     "close-only Donchian lookbacks {5&ndash;360}, ratcheting midline stops, 25% "
+     "vol target. Sole survivor of the 2026-07-15 no-barriers search &mdash; own-data "
+     "OOS replay sidestepped the bear (BTC &minus;11.5% vs &minus;44% B&amp;H). "
+     "PAPER since 2026-07-16 7:39 PM PT. Registered lines: |w&minus;replica|&gt;0.10 "
+     "on &gt;3d/14d = bug; paper net &le; &minus;$15 = KILL; 90-day review "
+     "2026-10-14."),
+    ("DONCHIAN_ETH",   "DONCHIAN_ETH &mdash; TREND ENSEMBLE (PAPER)",
+     "ETH-only twin of the BTC Donchian ensemble (same 9 lookbacks, stops, "
+     "vol target; long/flat). OOS replay: ETH &minus;4.9% vs &minus;48% B&amp;H "
+     "through the bear. PAPER since 2026-07-16 7:39 PM PT. Same registered "
+     "lines: paper net &le; &minus;$15 = KILL; 90-day review 2026-10-14."),
+    ("5m_mean_revert", "5M_MEAN_REVERT &mdash; LIVE FORWARD TEST",
+     "Bollinger-Band mean-reversion scalp &mdash; fades lower-BB bounces / upper-BB "
+     "rejections in ranging (low-ADX) markets. LIVE since 2026-06-12; running the "
+     "3-leg fill experiment (RSI&lt;22 long floor + maker re-quote + 45s entry patience)."),
+    # ── Retired / killed — kept for the record ──
     ("5m_scalp",       "MAIN BOOK &mdash; FULL HISTORY",
      "ALL of the main book's htf_l2 trades, including the losing pre-gate "
      "history &mdash; this card answers \"what has this book done overall?\". "
@@ -834,10 +868,6 @@ _SIGNAL_BOXES = [
      "$10; owner sized to $15 (registered ceiling) 8/9. The card keeps "
      "reporting the era live past the verdict. Not a separate trader &mdash; "
      "its trades also appear in FULL HISTORY's counts."),
-    ("5m_mean_revert", "5M_MEAN_REVERT &mdash; LIVE FORWARD TEST",
-     "Bollinger-Band mean-reversion scalp &mdash; fades lower-BB bounces / upper-BB "
-     "rejections in ranging (low-ADX) markets. LIVE since 2026-06-12; running the "
-     "3-leg fill experiment (RSI&lt;22 long floor + maker re-quote + 45s entry patience)."),
     ("ST2.0",          "ST2.0 &mdash; BOOK&times;TAPE ABSORPTION SHORT (DEMOTED)",
      "Shorts a bid-heavy book being aggressively bought into (imbalance &ge; 0.35 &amp; "
      "buy-ratio 0.60&ndash;0.85), cvd/spread filtered. DEMOTED TO PAPER 2026-06-29 "
@@ -868,33 +898,6 @@ _SIGNAL_BOXES = [
      "8/5 fresh-price fix &mdash; pre-fix rows carry phantom stale-px entries); "
      "KILL if net &le; $0 (adjudicator-graded, sr_bounce_v2 line). Fresh I3 "
      "strict-fill pass gates any live path."),
-    ("DONCHIAN_BTC",   "DONCHIAN_BTC &mdash; TREND ENSEMBLE (PAPER)",
-     "BTC-only Donchian-ensemble trend, long/flat (Concretum replica): 9 "
-     "close-only Donchian lookbacks {5&ndash;360}, ratcheting midline stops, 25% "
-     "vol target. Sole survivor of the 2026-07-15 no-barriers search &mdash; own-data "
-     "OOS replay sidestepped the bear (BTC &minus;11.5% vs &minus;44% B&amp;H). "
-     "PAPER since 2026-07-16 7:39 PM PT. Registered lines: |w&minus;replica|&gt;0.10 "
-     "on &gt;3d/14d = bug; paper net &le; &minus;$15 = KILL; 90-day review "
-     "2026-10-14."),
-    ("DONCHIAN_ETH",   "DONCHIAN_ETH &mdash; TREND ENSEMBLE (PAPER)",
-     "ETH-only twin of the BTC Donchian ensemble (same 9 lookbacks, stops, "
-     "vol target; long/flat). OOS replay: ETH &minus;4.9% vs &minus;48% B&amp;H "
-     "through the bear. PAPER since 2026-07-16 7:39 PM PT. Same registered "
-     "lines: paper net &le; &minus;$15 = KILL; 90-day review 2026-10-14."),
-    ("informed_flow_btc_alt_cascade_v2",
-     "BTC&rarr;ALT LAGGARD SHORT (v2) &mdash; PRE-REGISTERED (PAPER)",
-     "Short the alt that failed to follow BTC &mdash; BTC 3h move &gt; 150 bps "
-     "and the alt captured &lt; 50% of it; short at next 1h open; TP 250 / "
-     "SL 150 bps; max hold 7h; 16 alts; paper ($200 notional, 1x). Closed 1h "
-     "bars only; BTC reference = one live BTC/USDT 1h OHLCV fetch per cycle "
-     "(owner decision 2026-09-20 1:16 PM PT). Edge-swarm run 2026-09-19-1451: "
-     "train n=246 +34.1 bps; holdout n=75 +59.2 bps CI [+21.0, +98.2]. PAPER "
-     "since 2026-09-20 12:50 PM PT. Verdict line (frozen, adjudicator-graded "
-     "daily): KILL at n&ge;50 &amp; net &le; $0, or net &le; &minus;$10 at "
-     "any n; hard stop n=100; PASS at n&ge;50 with bootstrap CI95 lower &gt; 0 "
-     "(PASS-eligible only &mdash; never auto-promoted). Kill = "
-     ".kill_informed_flow_btc_alt_cascade_v2 (paper-only). Prereg: "
-     "docs/superpowers/specs/2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md"),
     ("ETH_TSM_28",     "ETH-TSM-28 &mdash; SLOW TREND (PAPER)",
      "Daily-horizon time-series momentum: long 0.01 ETH when the 28-day return is "
      "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "
