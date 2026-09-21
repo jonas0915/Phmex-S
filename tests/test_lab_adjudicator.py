@@ -319,6 +319,12 @@ def test_htf_l2_wired_into_digest():
     assert "[sr_bounce_v2]" in digest
     assert results[14]["experiment"] == "informed_flow_btc_alt_cascade_v2"
     assert "[informed_flow_btc_alt_cascade_v2]" in digest
+    # the digest renders the grader's own line (_line_informed_flow_btc_alt_cascade_v2):
+    # status — note | n trades nW $net | WR | CI95 — as the LAST line of the digest
+    ifc_line = digest.splitlines()[-1]
+    assert ifc_line == adj._line_informed_flow_btc_alt_cascade_v2(results[14])
+    assert ifc_line.startswith("[informed_flow_btc_alt_cascade_v2] ")
+    assert " trades " in ifc_line and "WR" in ifc_line and "CI95" in ifc_line
 
 
 # ── SR_BOUNCE era-1 grader (final since 2026-07-30; reads the archive) ────

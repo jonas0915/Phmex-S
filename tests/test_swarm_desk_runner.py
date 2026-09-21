@@ -735,3 +735,30 @@ def test_maint_state_file_and_halt_sentinel_are_gitignored():
     gi = (BOT_DIR / ".gitignore").read_text()
     assert "research/swarm/kb/.maint_state.json" in gi
     assert "scripts/.halt_swarm_desk" in gi
+
+
+def test_informed_flow_btc_alt_cascade_v2_is_picked_up_generically():
+    """2026-09-20 paper slot: its adjudicator entry has the build.js shape
+    (verdict_n + kill_net_usd + registered_ts + prereg) so kill_lines() lands
+    it under its own id with no ADJ_KEY_TO_SLOT entry, and registered_slot_ids
+    sees the bot.py StrategySlot literal. The digest line key == slot id, so
+    latest_adjudicator_digest maps it 1:1 as well."""
+    from lab_adjudicator import adjudicate
+    sid = "informed_flow_btc_alt_cascade_v2"
+    assert sid not in sd.ADJ_KEY_TO_SLOT          # generic path, no legacy alias
+    lines = sd.kill_lines(adjudicate.EXPERIMENTS)
+    assert lines[sid]["verdict_n"] == 50 and lines[sid]["kill_net_usd"] == -10.0
+    assert lines[sid]["since_ts"] == 1789933835.0 and lines[sid]["inconclusive_hard_n"] == 100
+    assert lines[sid]["source"].endswith("2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md")
+    assert "n>=50" in lines[sid]["rule"] and "$-10.00" in lines[sid]["rule"] and "n=100" in lines[sid]["rule"]
+    assert sid in sd.registered_slot_ids(BOT_DIR / "bot.py")
+
+
+def test_digest_line_for_informed_flow_maps_to_its_slot_id(ctx):
+    ctx.adjudicator_log.write_text(
+        "2026-09-21 06:00:03,307 [ADJUDICATOR] digest:\n"
+        "LAB ADJUDICATOR — live forward tests (Sep 21 6:00 AM PT)\n"
+        "[informed_flow_btc_alt_cascade_v2] WATCH — accruing (n=2/50, net $+1.52; KILL if net <= $-10.00 at any n or net <= 0 at n=50) | 2 trades 1W $+1.52 | WR 50.0% | CI95 lo -6.480\n"
+        "2026-09-21 06:00:14,417 [ADJUDICATOR] telegram send: ok\n")
+    digest = sd.latest_adjudicator_digest(ctx.adjudicator_log)
+    assert digest["grades"]["informed_flow_btc_alt_cascade_v2"].startswith("WATCH — accruing (n=2/50")

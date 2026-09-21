@@ -143,6 +143,73 @@ def live_slot_summaries(date_str):
     return summaries
 
 
+# Pre-registered PAPER forward tests with a live adjudicator verdict line.
+# Explicit registry (NOT a glob): dead paper sims were pulled from this report
+# 2026-07-03 because they headlined over the live experiment; a slot earns a
+# section here only while its verdict line is being graded. Every number the
+# section prints is SIMULATED and lives outside every real-money total.
+# Constants mirror scripts/lab_adjudicator/adjudicate.py EXPERIMENTS[slot_id]
+# (tests/test_daily_report_paper.py pins the two in sync).
+PAPER_FORWARD_TESTS = [
+    {
+        "slot_id": "informed_flow_btc_alt_cascade_v2",
+        "name": "BTC→alt laggard short (v2)",
+        "desc": ("Short the alt that failed to follow BTC — BTC 3h move > 150 bps and the "
+                 "alt captured < 50% of it; short at next 1h open; TP 250 / SL 150 bps; "
+                 "max hold 7h; 16 alts; paper. BTC reference = live 1h OHLCV (owner "
+                 "decision 9/20). Train n=246 +34.1 bps; holdout n=75 +59.2 bps "
+                 "CI [+21.0, +98.2]."),
+        "registered_ts": 1789933835,   # 2026-09-20T19:50:35Z = 12:50:35 PM PT
+        "verdict_n": 50,
+        "kill_net_usd": -10.0,
+        "inconclusive_hard_n": 100,
+        "verdict": ("KILL at n>=50 & net<=$0, or net<=-$10 at any n; hard stop n=100; "
+                    "PASS at n>=50 with bootstrap CI lower > 0 (PASS-eligible only, "
+                    "never auto-promoted)"),
+        "prereg": "docs/superpowers/specs/2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md",
+    },
+]
+
+
+def paper_slot_summaries(date_str):
+    """Per-registry paper forward test: today's SIM closes, the ledger since
+    registration (the adjudicator's population: closed_at >= registered_ts,
+    net_pnl as-is — fee-inclusive at the source, never re-subtracted), open
+    paper positions, and whether the .kill_<slot> sentinel is present. A row
+    is a sim unless it carries mode="live" (risk_manager paper closes write
+    no mode key). A missing state file renders as zero, never as absent —
+    the section must still say the test exists."""
+    out = []
+    for e in PAPER_FORWARD_TESTS:
+        slot_id = e["slot_id"]
+        try:
+            with open(os.path.join(BOT_DIR, f"trading_state_{slot_id}.json")) as f:
+                st = json.load(f) or {}
+        except (FileNotFoundError, json.JSONDecodeError, IOError):
+            st = {}
+        sims = [t for t in st.get("closed_trades", []) or [] if t.get("mode") != "live"]
+        today = []
+        for t in sims:
+            closed_at = t.get("closed_at", 0)
+            if closed_at and datetime.fromtimestamp(closed_at, tz=CA_TZ).strftime("%Y-%m-%d") == date_str:
+                today.append(t)
+        since = [t for t in sims if (t.get("closed_at") or 0) >= e["registered_ts"]]
+        wins = sum(1 for t in today if _net(t) > 0)
+        out.append({
+            **e,
+            "trades": len(today),
+            "wins": wins,
+            "losses": len(today) - wins,
+            "wr": (wins / len(today) * 100) if today else 0,
+            "pnl_today": sum(_net(t) for t in today),
+            "n_since_reg": len(since),
+            "net_since_reg": sum(_net(t) for t in since),
+            "open": len(st.get("positions", {}) or {}),
+            "killed": os.path.exists(os.path.join(BOT_DIR, f".kill_{slot_id}")),
+        })
+    return out
+
+
 def generate_report():
     today = datetime.now(CA_TZ)
     date_str = today.strftime("%Y-%m-%d")
@@ -354,6 +421,20 @@ Generated: {today.strftime("%Y-%m-%d %H:%M:%S")}
                        + " ".join(f"{k}={v}" for k, v in sorted(ls["blocked"].items()))
                        + "\n")
 
+    # Pre-registered paper forward tests (registry above) — SIM numbers only,
+    # rendered after the real-money sections and labeled as such.
+    for ps in paper_slot_summaries(date_str):
+        report += f"\n## Paper Forward Test: {ps['name']} (simulated — excluded from all real-money totals)\n"
+        report += f"- slot `{ps['slot_id']}` — {ps['desc']}\n"
+        if ps["killed"]:
+            report += f"- STATUS: KILLED — .kill_{ps['slot_id']} present (registered verdict line tripped)\n"
+        report += f"- Sim trades today: {ps['trades']} ({ps['wins']}W / {ps['losses']}L)\n"
+        report += f"- Sim Net PnL today: ${ps['pnl_today']:.2f} (NOT real money)\n"
+        report += (f"- Since registration: n={ps['n_since_reg']} / {ps['verdict_n']}, "
+                   f"net ${ps['net_since_reg']:.2f}; open paper positions: {ps['open']}\n")
+        report += f"- Verdict line (frozen): {ps['verdict']}\n"
+        report += f"- Prereg: {ps['prereg']}\n"
+
     # Save
     report_path = os.path.join(REPORT_DIR, f"{date_str}.md")
     with open(report_path, "w") as f:
@@ -461,6 +542,23 @@ def send_telegram(report, date_str, balance, today_trades, today_pnl, today_wr,
             msg += ("Counters: "
                     + " ".join(f"{k}={v}" for k, v in sorted(ls["blocked"].items()))
                     + "\n")
+
+    # Pre-registered paper forward tests — SIM only, never in the totals above.
+    # parse_mode=HTML: the verdict text carries raw '<' / '>' / '&' (n>=50 &
+    # net<=$0) which Telegram rejects unescaped (same trap as adjudicate.py's
+    # digest send) — html.escape the registry strings.
+    import html as _html
+    for ps in paper_slot_summaries(date_str):
+        t_sign = "+" if ps["pnl_today"] >= 0 else ""
+        r_sign = "+" if ps["net_since_reg"] >= 0 else ""
+        killed = " — KILLED (sentinel present)" if ps["killed"] else ""
+        msg += (
+            f"\n📄 <b>PAPER Forward Test: {_html.escape(ps['name'])}</b>{killed}\n"
+            f"{ps['trades']} sim trades | {ps['wr']:.0f}% WR | {t_sign}${ps['pnl_today']:.2f} (NOT real money)\n"
+            f"Since registration: n={ps['n_since_reg']}/{ps['verdict_n']}, "
+            f"{r_sign}${ps['net_since_reg']:.2f} | open: {ps['open']}\n"
+            f"Verdict: {_html.escape(ps['verdict'])}\n"
+        )
 
     try:
         import requests

@@ -115,3 +115,29 @@ def test_bot_no_hardcoded_shadow_hour_set():
         src = f.read()
     assert "{0, 1, 2, 17, 18, 19, 20}" not in src
     assert "Config.TRADING_BLOCKED_HOURS_UTC" in src
+
+
+# --- informed_flow_btc_alt_cascade_v2 paper slot (2026-09-20) ---------------
+# The bot's _informed_flow_btc_alt_cascade_v2_open_paper / _close_slot_position
+# call the GENERIC notify_paper_entry/exit(..., slot=slot_id) — no slot-specific
+# notifier branch exists or is wanted. Pin that the slot tag + the bot's reason
+# string render verbatim so a Telegram reader can tell this book from the rest.
+
+def test_informed_flow_paper_entry_renders_slot_tag_and_geometry(sent):
+    notifier.notify_paper_entry(
+        "DOGE/USDT:USDT", "short", 0.1, 200.0, 1.0,
+        "informed_flow_btc_alt_cascade_v2 laggard fade (TP 250/SL 150 bps, max 7 bars)",
+        slot="informed_flow_btc_alt_cascade_v2")
+    msg = sent[0]
+    assert "[PAPER] [informed_flow_btc_alt_cascade_v2] SHORT ENTRY — DOGE/USDT:USDT" in msg
+    assert "$200.00 USDT (simulated)" in msg
+    assert "TP 250/SL 150 bps, max 7 bars" in msg
+
+
+def test_informed_flow_paper_exit_renders_slot_tag(sent):
+    notifier.notify_paper_exit("DOGE/USDT:USDT", "short", 0.1, 0.0975, 4.76, 2.38,
+                               "take_profit", slot="informed_flow_btc_alt_cascade_v2")
+    msg = sent[0]
+    assert "[PAPER] [informed_flow_btc_alt_cascade_v2] EXIT — DOGE/USDT:USDT" in msg
+    assert "+$4.76 USDT (+2.4%)" in msg
+    assert "Reason: take_profit" in msg

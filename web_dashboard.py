@@ -881,6 +881,20 @@ _SIGNAL_BOXES = [
      "vol target; long/flat). OOS replay: ETH &minus;4.9% vs &minus;48% B&amp;H "
      "through the bear. PAPER since 2026-07-16 7:39 PM PT. Same registered "
      "lines: paper net &le; &minus;$15 = KILL; 90-day review 2026-10-14."),
+    ("informed_flow_btc_alt_cascade_v2",
+     "BTC&rarr;ALT LAGGARD SHORT (v2) &mdash; PRE-REGISTERED (PAPER)",
+     "Short the alt that failed to follow BTC &mdash; BTC 3h move &gt; 150 bps "
+     "and the alt captured &lt; 50% of it; short at next 1h open; TP 250 / "
+     "SL 150 bps; max hold 7h; 16 alts; paper ($200 notional, 1x). Closed 1h "
+     "bars only; BTC reference = one live BTC/USDT 1h OHLCV fetch per cycle "
+     "(owner decision 2026-09-20 1:16 PM PT). Edge-swarm run 2026-09-19-1451: "
+     "train n=246 +34.1 bps; holdout n=75 +59.2 bps CI [+21.0, +98.2]. PAPER "
+     "since 2026-09-20 12:50 PM PT. Verdict line (frozen, adjudicator-graded "
+     "daily): KILL at n&ge;50 &amp; net &le; $0, or net &le; &minus;$10 at "
+     "any n; hard stop n=100; PASS at n&ge;50 with bootstrap CI95 lower &gt; 0 "
+     "(PASS-eligible only &mdash; never auto-promoted). Kill = "
+     ".kill_informed_flow_btc_alt_cascade_v2 (paper-only). Prereg: "
+     "docs/superpowers/specs/2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md"),
     ("ETH_TSM_28",     "ETH-TSM-28 &mdash; SLOW TREND (PAPER)",
      "Daily-horizon time-series momentum: long 0.01 ETH when the 28-day return is "
      "in the top tercile of its own history; min 5-day hold, exit on tercile exit, "
@@ -1906,6 +1920,18 @@ _STRAT_DISPLAY = {
         "orphan scanner (SL/TP placed, Telegram alert). In practice these are "
         "leftover partial-TP runner slivers from main-book trades, closed for "
         "pennies — bookkeeping recapture, not a strategy."),
+    # informed_flow_btc_alt_cascade_v2 paper slot (2026-09-20): rows carry the
+    # slot id as their strategy tag (bot.py open_paper strategy=SLOT_ID) —
+    # 32 chars, which the 16-char chip would truncate to "informed_flow_bt".
+    "informed_flow_btc_alt_cascade_v2": (
+        "BTC→alt laggard",
+        "informed_flow_btc_alt_cascade_v2 — BTC→alt laggard short (v2), "
+        "pre-registered PAPER slot. Short the alt that failed to follow BTC "
+        "(BTC 3h move > 150 bps, alt captured < 50% of it); short at next 1h "
+        "open; TP 250 / SL 150 bps; max hold 7h; 16 alts. Verdict: KILL at "
+        "n>=50 & net<=0, or net<=-$10 any n, hard stop n=100; PASS at n>=50 "
+        "with CI lower > 0. Prereg: docs/superpowers/specs/"
+        "2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md"),
 }
 
 
