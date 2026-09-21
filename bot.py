@@ -5041,9 +5041,10 @@ class Phmex2Bot:
             logger.warning(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] reference {mod.REF_SYMBOL} "
                            f"fetch empty — retrying next cycle")
             return
+        ref_bar_key = mod.ts_key(ref_closed.index[-1])
         for symbol in mod.SYMBOLS:
             try:
-                self._informed_flow_btc_alt_cascade_v2_eval_symbol(slot, symbol, ref_closed, today, prices)
+                self._informed_flow_btc_alt_cascade_v2_eval_symbol(slot, symbol, ref_closed, today, prices, ref_bar_key)
             except Exception as e:
                 logger.error(f"[INFORMED_FLOW_BTC_ALT_CASCADE_V2] {symbol} eval error: {e} — "
                              f"retrying next cycle", exc_info=True)
@@ -5059,18 +5060,27 @@ class Phmex2Bot:
                          f"demote with .demote_{slot.slot_id}")
 
     def _informed_flow_btc_alt_cascade_v2_eval_symbol(self, slot, symbol: str, ref_closed,
-                                                       today: str, prices: dict) -> None:
+                                                       today: str, prices: dict,
+                                                       ref_bar_key: str) -> None:
         """One symbol, one closed bar: exit check on the open position (SL then
         TP against the bar's low/high, time exit at its close), then a fresh
         entry when the bar's signal is non-zero and the book is flat.
         st['last_bar_ts'] is stamped ONLY once the book matches the bar, so a
         failed close/open retries next cycle (the Donchian retry shape). The
-        reference is never fetched here — it arrives closed from the driver."""
+        reference is never fetched here — it arrives closed from the driver.
+        Perf gate (2026-09-20): the alt trades the same 1h grid as the
+        reference, so until the reference rolls to a new closed bar this
+        symbol cannot have a new closed bar either — skip the alt fetch
+        entirely and retry next cycle. Cheap and stateless (driver-computed
+        key vs. the stamp already written), so it sits before every exchange
+        call, same placement as the Donchian daily-eval date-stamp check."""
         mod = informed_flow_btc_alt_cascade_v2_slot
         if not slot.paper_mode:  # redundant by construction (driver guards first); kept so
             self._informed_flow_btc_alt_cascade_v2_warn_live(slot, today)  # the block shape
             return                                                          # matches the recipe
         st = self._informed_flow_btc_alt_cascade_v2_state.setdefault(symbol, mod.default_symbol_state())
+        if st.get("last_bar_ts") == ref_bar_key:
+            return  # no new closed reference bar yet — this symbol is already synced
         df = self.exchange.get_ohlcv(symbol, mod.TIMEFRAME, limit=mod.OHLCV_LIMIT)
         closed = mod.complete_bars(df)
         if closed is None or len(closed) == 0:

@@ -502,14 +502,15 @@ def test_same_closed_bar_not_evaluated_twice(sandbox, small_universe):
     b._evaluate_informed_flow_btc_alt_cascade_v2(prices)
     assert slot.total_entries == 1
     n_calls = len(b.exchange.calls)
-    # second cycle, same bars: nothing re-evaluated, no new entry, no ticker
+    # second cycle, same bars: nothing re-evaluated, no new entry, no ticker.
+    # Perf gate (2026-09-20): every symbol is already stamped to the
+    # reference's newest closed bar, so the alt fetch is skipped entirely —
+    # only the once-per-cycle reference fetch is added, zero alt fetches.
     b._evaluate_informed_flow_btc_alt_cascade_v2(prices)
     assert slot.total_entries == 1
     assert len(slot.risk.positions) == 1
-    # only the once-per-cycle reference fetch + one alt fetch per symbol were added
     added = b.exchange.calls[n_calls:]
-    assert all(c[0] == "get_ohlcv" for c in added)
-    assert len(added) == 1 + len(small_universe)
+    assert added == [("get_ohlcv", mod.REF_SYMBOL, mod.REF_TIMEFRAME, mod.OHLCV_LIMIT)]
 
 
 def test_later_bar_touching_sl_closes_stop_loss_at_level(sandbox, small_universe):
@@ -658,6 +659,59 @@ def test_reference_fetched_exactly_once_per_cycle(sandbox, small_universe):
     first_alt = min(b.exchange.calls.index(b.exchange.ohlcv_calls(s)[0]) for s in small_universe)
     assert b.exchange.calls.index(b.exchange.ohlcv_calls(BTC)[0]) < first_alt
     assert slot.risk.positions == {}                           # flat BTC: no signal
+
+
+def test_alt_fetch_skipped_when_already_synced_to_reference_bar(sandbox, small_universe):
+    """Perf gate (2026-09-20): the alt fetch happens only after
+    `self.exchange.get_ohlcv(symbol, ...)` in the OLD code; the new gate
+    checks the stored stamp against the reference's newest closed bar
+    BEFORE that fetch. When every symbol is already synced to that bar,
+    two consecutive cycles must each make exactly ONE get_ohlcv call (the
+    reference) and ZERO alt fetches."""
+    slot = _make_slot()
+    ref, doge = _pump_frames(fire=False)
+    ref_bar_key = mod.ts_key(mod.complete_bars(ref).index[-1])
+    state = {sym: mod.default_symbol_state() for sym in small_universe}
+    for sym in small_universe:
+        state[sym]["last_bar_ts"] = ref_bar_key
+    b = _bare_bot([slot], state=state)
+    frames = {BTC: ref, DOGE: doge, ADA: _pace_frames(), XRP: _pace_frames()}
+    b.exchange = FakeExchange(frames=frames, ticker_price=50.0)
+    prices = {DOGE: 50.0, ADA: 50.0, XRP: 50.0}
+    for _ in range(2):
+        n = len(b.exchange.calls)
+        b._evaluate_informed_flow_btc_alt_cascade_v2(prices)
+        added = b.exchange.calls[n:]
+        assert added == [("get_ohlcv", mod.REF_SYMBOL, mod.REF_TIMEFRAME, mod.OHLCV_LIMIT)]
+    for sym in small_universe:
+        assert b.exchange.ohlcv_calls(sym) == []
+    assert slot.risk.positions == {}
+
+
+def test_alt_fetch_resumes_once_reference_rolls_to_new_closed_bar(sandbox, small_universe):
+    """Once the reference advances to a new closed bar, the stale stamp no
+    longer matches ref_bar_key, so the gate lets the fetch through again for
+    every symbol."""
+    slot = _make_slot()
+    ref, doge = _pump_frames(fire=False)
+    ref_bar_key = mod.ts_key(mod.complete_bars(ref).index[-1])
+    state = {sym: mod.default_symbol_state() for sym in small_universe}
+    for sym in small_universe:
+        state[sym]["last_bar_ts"] = ref_bar_key
+    b = _bare_bot([slot], state=state)
+    frames = {BTC: ref, DOGE: doge, ADA: _pace_frames(), XRP: _pace_frames()}
+    b.exchange = FakeExchange(frames=frames, ticker_price=50.0)
+    prices = {DOGE: 50.0, ADA: 50.0, XRP: 50.0}
+    b._evaluate_informed_flow_btc_alt_cascade_v2(prices)
+    for sym in small_universe:
+        assert b.exchange.ohlcv_calls(sym) == []                # steady state: still gated
+    n = len(b.exchange.calls)
+    frames[BTC] = _append_bar(ref, 102.0)                        # reference rolls one closed bar
+    b._evaluate_informed_flow_btc_alt_cascade_v2(prices)
+    added = b.exchange.calls[n:]
+    assert added[0] == ("get_ohlcv", mod.REF_SYMBOL, mod.REF_TIMEFRAME, mod.OHLCV_LIMIT)
+    for sym in small_universe:
+        assert len(b.exchange.ohlcv_calls(sym)) == 1             # all 3 alts fetched this cycle
 
 
 def test_forming_reference_bar_pump_does_not_fire_but_closed_does(sandbox, small_universe):
