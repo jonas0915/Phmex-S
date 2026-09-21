@@ -3468,6 +3468,18 @@ class Phmex2Bot:
                     _block_label = f" [WOULD BLOCK: {_tag_str}]" if _would_block else ""
                     _px_age = _px_src = None  # set on the paper path only
 
+                    # Side-line kill applies to PAPER too (owner order 2026-09-20
+                    # 9:02 PM PT, 5m_mean_revert shorts-only paper re-test): a
+                    # registered long-side kill must silence longs in the paper
+                    # ledger as well, or the forward test measures a book the
+                    # owner has switched off. The live-path check below stays as
+                    # defence in depth. Dormant unless .block_longs_<slot> exists.
+                    if direction == "long" and _longs_blocked(slot.slot_id):
+                        slot.bump_blocked("side_line_long")
+                        logger.info(f"[SIDE BLOCK] {slot.slot_id} {symbol} LONG skipped — "
+                                    f".block_longs_{slot.slot_id} (registered side-line kill)")
+                        continue
+
                     if slot.paper_mode:
                         # F1: global pause blocks ALL entries, paper included —
                         # the sentinel's own log line says "skipping all

@@ -124,3 +124,31 @@ def test_bot_longs_blocked_helper(tmp_path):
     (tmp_path / ".block_longs_main").write_text("x\n")
     assert _longs_blocked("main", bot_dir=str(tmp_path)) is True
     assert _longs_blocked("5m_mean_revert", bot_dir=str(tmp_path)) is False
+
+
+def test_paper_slot_long_entry_blocked_by_side_sentinel(tmp_path, monkeypatch):
+    """Owner order 2026-09-20 9:02 PM PT: a registered long-side kill must block
+    PAPER entries too, not just live ones — the shorts-only paper re-test of
+    5m_mean_revert depends on it. Guards the check that sits above the
+    paper/live split in bot._evaluate_slots."""
+    import bot as botmod
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".block_longs_5m_mean_revert").write_text("test")
+    assert botmod._longs_blocked("5m_mean_revert", str(tmp_path)) is True
+    assert botmod._longs_blocked("some_other_slot", str(tmp_path)) is False
+
+
+def test_side_block_check_precedes_the_paper_branch():
+    """The long-side kill must be evaluated BEFORE `if slot.paper_mode:` in the
+    slot entry path, otherwise paper longs slip through (the defect fixed on
+    2026-09-20). Asserts source ordering, which is what the runtime depends on."""
+    import re, pathlib
+    src = pathlib.Path(__file__).resolve().parent.parent.joinpath("bot.py").read_text()
+    m = re.search(r"\n    def _evaluate_slots\(.*?\n    def ", src, re.S)
+    src = m.group(0)
+    # Anchor on the entry path's own marker — the function has earlier,
+    # unrelated `slot.paper_mode` reads (tagging/display).
+    anchor = src.index('_px_age = _px_src = None')
+    entry_paper = src.index('if slot.paper_mode:', anchor)
+    guard = src.index('_longs_blocked(slot.slot_id)', anchor)
+    assert guard < entry_paper, "side-line long block must come before the paper entry branch"
