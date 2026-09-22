@@ -5,6 +5,7 @@ files. Covers the giveback counter, CI computation, revert-trip logic, the
 n=0 honesty rule, MR log parsing, and the drift watchdog thresholds.
 """
 import json
+import pytest
 import os
 import sys
 
@@ -13,6 +14,18 @@ sys.path.insert(0, os.path.join(BOT_DIR, "scripts"))
 
 from lab_adjudicator import adjudicate as adj  # noqa: E402
 from lab_adjudicator import drift_watchdog as dw  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _sentinels_never_touch_the_live_repo(monkeypatch, tmp_path):
+    """Every grader writes its sentinel (.kill_*, .block_longs_*, .halt_main_entries)
+    under `bot_dir or BOT_DIR`. build_digest() grades the REAL state files with no
+    bot_dir, so an un-patched BOT_DIR makes a test run write REAL sentinels: on
+    2026-09-21 the 7:30 AM code-health pytest touched the live
+    .kill_informed_flow_btc_alt_cascade_v2 (bot consumed it 7:31:04 AM). Point
+    BOT_DIR at tmp_path for every test in this module; state-file constants keep
+    their real paths (reads are harmless)."""
+    monkeypatch.setattr(adj, "BOT_DIR", tmp_path)
 
 DEP = 1_783_310_460.0  # trail_arm_8 deploy epoch (2026-07-05 9:01 PM PT)
 

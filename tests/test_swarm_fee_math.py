@@ -55,3 +55,39 @@ def test_lot_check_btc_fails_below_one_lot():
 def test_lot_check_unknown_symbol_uses_min_order_value():
     r = fm.lot_check("ZZZ", 5.0)
     assert r["ok"] is True and r["lot_usd"] is None
+
+
+# ---------------------------------------------------------------------------
+# max_concurrent (2026-09-21, after the cascade_v2 paper kill): the portfolio cap that
+# guarantees one simultaneous cluster of stops cannot alone breach the dollar kill cap.
+# ---------------------------------------------------------------------------
+
+def test_max_concurrent_sl150_at_200_notional_is_3():
+    # stop_loss_usd = 200 * (150 + 11.5) / 1e4 = 3.23; floor(10 / 3.23) = 3
+    assert fm.max_concurrent(150) == 3
+    assert isinstance(fm.max_concurrent(150), int)
+
+
+def test_max_concurrent_cluster_of_stops_never_breaches_cap():
+    for sl in (25, 60, 100, 150, 300):
+        k = fm.max_concurrent(sl)
+        stop_usd = fm.position_notional() * (sl + fm.C_BPS) / 1e4
+        assert k >= 1 and k * stop_usd <= 10.0 < (k + 1) * stop_usd
+
+
+def test_max_concurrent_floors_at_one_when_a_single_stop_exceeds_the_cap():
+    assert fm.max_concurrent(1000) == 1          # one $202 stop already > $10
+    assert fm.max_concurrent(150, notional_usd=2000.0) == 1
+
+
+def test_max_concurrent_scales_with_cap_and_cost():
+    assert fm.max_concurrent(150, kill_net_usd=20.0) == 6
+    assert fm.max_concurrent(150, cost_bps=0.0) == 3       # 10 / 3.00 = 3.33 -> 3
+    assert fm.max_concurrent(100, cost_bps=0.0) == 5       # 10 / 2.00 = 5
+
+
+def test_max_concurrent_rejects_nonpositive_inputs():
+    with pytest.raises(ValueError):
+        fm.max_concurrent(0)
+    with pytest.raises(ValueError):
+        fm.max_concurrent(150, kill_net_usd=0)

@@ -166,7 +166,13 @@ def check_imports() -> CheckResult:
 def check_compile() -> CheckResult:
     """compileall every root .py — complements overwatch's py_compile of the 11
     core files by covering scripts/helpers too. Cheap, stdlib."""
-    r = subprocess.run([sys.executable, "-m", "compileall", "-q", BOT_DIR],
+    # research/swarm/runs/ (analyst-written signal.py copies, frozen specs) and
+    # docs/ (archived research probes, e.g. docs/2026-09-16-edge-swarm-v1/) hold
+    # committed RECORDS, not code the bot or the desk imports. An analyst's
+    # malformed paste (run 2026-09-20-0300) CRITICAL'd this check every morning;
+    # exclude those trees so the check reports on code that actually runs.
+    r = subprocess.run([sys.executable, "-m", "compileall", "-q",
+                        "-x", r"(research[/\\]swarm[/\\]runs|docs)[/\\]", BOT_DIR],
                        cwd=BOT_DIR, capture_output=True, text=True, timeout=120)
     if r.returncode == 0:
         return CheckResult("compile", "OK", "all .py compile")

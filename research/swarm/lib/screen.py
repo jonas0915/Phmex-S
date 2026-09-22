@@ -7,6 +7,14 @@ filenames (out.json, trades.csv) only for era=="train"; any other era (e.g. "hol
 writes era-suffixed files (out.<era>.json, trades.<era>.csv) in the same screens/<id>/
 folder so a later holdout run never clobbers the train-era artifacts that the audit,
 committee, and knowledge base cite by path.
+
+Portfolio admission (2026-09-21, STANDARDS #17): when the frozen spec carries
+`max_concurrent`, the per-symbol trades are admitted in (entry_ts, universe order) and a
+trade is dropped when that many admitted trades are still open at its entry; every stat
+in out.json and every row of trades.csv comes from the admitted set, and out.json gains a
+`portfolio` block. A frozen spec WITHOUT the key (every run before that date) takes the
+unchanged code path and produces byte-identical outputs — audits re-run old screens and
+diff them, so nothing may change there.
 """
 from __future__ import annotations
 
@@ -119,6 +127,31 @@ def simulate(df: pd.DataFrame, sig: pd.Series, tp_bps: float, sl_bps: float, max
     return pd.DataFrame(rows, columns=["entry_ts", "exit_ts", "side", "entry", "exit", "gross_bps", "net_bps", "exit_reason"])
 
 
+def admit_trades(trades: pd.DataFrame, max_concurrent: int, universe: list[str]) -> pd.DataFrame:
+    """Portfolio admission under a concurrency cap (STANDARDS #17). Trades are visited in
+    (entry_ts, universe order of the symbol) — ties at the same bar go to the symbol that
+    comes first in the frozen universe — and a trade is admitted only if fewer than
+    `max_concurrent` already-admitted trades are still open at its entry. "Still open" is
+    exit_ts >= entry_ts: a position that exits during bar j (SL/TP intrabar or TIME at its
+    close) was still open when a new one entered at bar j's open. A dropped trade is
+    dropped, not deferred — the same rule the slot applies live (an entry skipped for
+    max_concurrent is never retried on a later bar). Returns the admitted trades in
+    admission order with a fresh RangeIndex."""
+    if trades.empty:
+        return trades.copy()
+    rank = {sym: i for i, sym in enumerate(universe)}
+    ordered = trades.assign(_rank=trades["symbol"].map(rank)).sort_values(["entry_ts", "_rank"], kind="mergesort")
+    open_exits: list = []
+    keep = []
+    for entry_ts, exit_ts in zip(ordered["entry_ts"], ordered["exit_ts"]):
+        open_exits = [x for x in open_exits if x >= entry_ts]
+        admitted = len(open_exits) < max_concurrent
+        keep.append(admitted)
+        if admitted:
+            open_exits.append(exit_ts)
+    return ordered[keep].drop(columns="_rank").reset_index(drop=True)
+
+
 def run_screen(frozen_path: Path, run_dir: Path, era: str = "train", token: str | None = None) -> dict:
     frozen_path, run_dir = Path(frozen_path), Path(run_dir)
     if not rg.verify(frozen_path):
@@ -157,6 +190,16 @@ def run_screen(frozen_path: Path, run_dir: Path, era: str = "train", token: str 
         per_symbol[sym] = int(len(tr))
         all_trades.append(tr)
     trades = pd.concat(all_trades, ignore_index=True) if all_trades else pd.DataFrame()
+    # Portfolio admission (STANDARDS #17) ONLY when the frozen spec carries the key; a
+    # legacy spec skips this block entirely so its outputs stay byte-identical.
+    portfolio = None
+    if "max_concurrent" in spec:
+        k = int(spec["max_concurrent"])
+        n_unconstrained = int(len(trades))
+        trades = admit_trades(trades, k, spec["universe"])
+        per_symbol = {sym: int((trades["symbol"] == sym).sum()) if len(trades) else 0 for sym in spec["universe"]}
+        portfolio = {"max_concurrent": k, "n_unconstrained": n_unconstrained,
+                     "n_admitted": int(len(trades)), "n_dropped": n_unconstrained - int(len(trades))}
     n = int(len(trades))
     span_start = min(df.index.min() for df in frames.values()); span_end = max(df.index.max() for df in frames.values())
     weeks = max((span_end - span_start).total_seconds() / (7 * 86400), 1e-9)
@@ -177,6 +220,8 @@ def run_screen(frozen_path: Path, run_dir: Path, era: str = "train", token: str 
         "causality": "PASS",
         "signal_sha256": hashlib.sha256(th["signal_py"].encode()).hexdigest(),
     }
+    if portfolio is not None:                 # key added only for specs that carry max_concurrent
+        out["portfolio"] = portfolio
     sdir.mkdir(parents=True, exist_ok=True)
     # Controller ruling: only era=="train" gets the plain filenames the audit/committee/kb
     # cite by path; any other era is written era-suffixed so it never clobbers train.

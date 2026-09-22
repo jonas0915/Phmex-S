@@ -74,3 +74,60 @@ def test_verify_handles_missing_thesis_key(tmp_path: Path):
     bad_file = tmp_path / "missing_thesis.json"
     bad_file.write_text(json.dumps({"sha256": "abc123", "frozen_at": "t"}))
     assert rg.verify(bad_file) is False
+
+
+# ---------------------------------------------------------------------------
+# max_concurrent at freeze time (2026-09-21, STANDARDS #17): a spec without the key gets
+# fee_math.max_concurrent(sl_bps) filled in BEFORE canonicalising/hashing, so the frozen
+# file carries it and verify() recomputes the same sha.
+# ---------------------------------------------------------------------------
+from research.swarm.lib import fee_math as fm
+
+
+def test_freeze_fills_max_concurrent_from_fee_math_and_verifies(tmp_path: Path):
+    assert "max_concurrent" not in GOOD["spec"]
+    p = rg.freeze(GOOD, tmp_path, "t")
+    frozen = json.loads(p.read_text())
+    assert frozen["thesis"]["spec"]["max_concurrent"] == fm.max_concurrent(GOOD["spec"]["sl_bps"])
+    assert isinstance(frozen["thesis"]["spec"]["max_concurrent"], int)
+    assert rg.verify(p) is True
+    # the sha covers the filled key: stripping it must break verification
+    d = json.loads(p.read_text()); del d["thesis"]["spec"]["max_concurrent"]
+    p.write_text(json.dumps(d))
+    assert rg.verify(p) is False
+
+
+def test_freeze_does_not_mutate_the_caller_thesis(tmp_path: Path):
+    thesis = json.loads(json.dumps(GOOD))
+    rg.freeze(thesis, tmp_path, "t")
+    assert "max_concurrent" not in thesis["spec"]
+
+
+def test_freeze_keeps_an_explicit_max_concurrent(tmp_path: Path):
+    thesis = {**GOOD, "spec": {**GOOD["spec"], "max_concurrent": 1}}
+    p = rg.freeze(thesis, tmp_path, "t")
+    assert json.loads(p.read_text())["thesis"]["spec"]["max_concurrent"] == 1
+    assert rg.verify(p) is True
+
+
+def test_legacy_frozen_spec_without_max_concurrent_still_verifies(tmp_path: Path):
+    """Frozen files under research/swarm/runs/ predate the key; verify() must still be True."""
+    import hashlib
+    run = tmp_path; (run / "specs").mkdir(); (run / "screens" / GOOD["id"]).mkdir(parents=True)
+    (run / "screens" / GOOD["id"] / "signal.py").write_text(GOOD["signal_py"])
+    sha = hashlib.sha256(rg._canonical(GOOD).encode()).hexdigest()
+    p = run / "specs" / f"{GOOD['id']}.frozen.json"
+    p.write_text(json.dumps({"thesis": GOOD, "sha256": sha, "frozen_at": "t"}, indent=2, sort_keys=True))
+    assert rg.verify(p) is True
+    assert rg.validate(GOOD) == []                       # absent key is valid (legacy)
+
+
+@pytest.mark.parametrize("bad", [0, -1, "3", 1.5, True, None])
+def test_validate_rejects_non_positive_int_max_concurrent(bad):
+    thesis = {**GOOD, "spec": {**GOOD["spec"], "max_concurrent": bad}}
+    assert any("max_concurrent" in e for e in rg.validate(thesis))
+
+
+def test_validate_accepts_positive_int_max_concurrent():
+    thesis = {**GOOD, "spec": {**GOOD["spec"], "max_concurrent": 1}}
+    assert rg.validate(thesis) == []

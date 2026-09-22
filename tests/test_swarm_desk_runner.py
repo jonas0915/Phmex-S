@@ -214,8 +214,10 @@ def test_maint_writes_paper_status_for_fixture_slots(ctx):
     assert "no paper slots running" not in txt
     # first run = baseline: state written, LESSONS untouched, Telegram silent
     st = json.loads(ctx.maint_state_path.read_text())
-    assert set(st["slots"]) == {"ALPHA", "BETA"}
-    assert st["slots"]["ALPHA"] == {"crossed": False, "verdict_reached": False}
+    assert st["schema"] == sd.MAINT_SCHEMA
+    assert set(st["slots"]) == {"ALPHA", "BETA", "GAMMA"}          # killed slots are tracked too (killed flag)
+    assert st["slots"]["ALPHA"] == {"crossed": False, "verdict_reached": False, "killed": False}
+    assert st["slots"]["GAMMA"]["killed"] is True
     assert ctx.lessons_path.read_text().count("\n- ") == 1
     assert ctx.telegram.calls == []
 
@@ -762,3 +764,267 @@ def test_digest_line_for_informed_flow_maps_to_its_slot_id(ctx):
         "2026-09-21 06:00:14,417 [ADJUDICATOR] telegram send: ok\n")
     digest = sd.latest_adjudicator_digest(ctx.adjudicator_log)
     assert digest["grades"]["informed_flow_btc_alt_cascade_v2"].startswith("WATCH — accruing (n=2/50")
+
+
+# ── maint: kill events + same-day kb reconciliation ───────────────────────────
+KB_REAL = BOT_DIR / "research" / "swarm" / "kb"
+V2 = "informed_flow_btc_alt_cascade_v2"
+V2_KILL_GRADE = ("KILL — registered verdict: net $-16.20 <= $-10.00 dollar loss cap at n=5 — KILL; touched "
+                 ".kill_informed_flow_btc_alt_cascade_v2 (bot's .kill_* loop closes the paper book) | 5 trades 0W "
+                 "$-16.20 | WR 0.0% | CI95 lo -3.240")
+
+
+def _digest(ctx, grades: dict, stamp="Sep 21 6:00 AM PT", ts="2026-09-21 06:00:02,354"):
+    body = "".join(f"[{k}] {v}\n" for k, v in grades.items())
+    ctx.adjudicator_log.write_text(f"{ts} [ADJUDICATOR] digest:\nLAB ADJUDICATOR — live forward tests ({stamp})\n"
+                                   f"{body}2026-09-21 06:00:03,079 [ADJUDICATOR] telegram send: ok\n")
+
+
+def _swarm_kb(ctx, ids=("ALPHA", "DELTA"), dead_rows=3):
+    """SURVIVORS.md with one row per id (ALPHA carries a prereg doc) + a DEAD_LIST.md with `dead_rows` rows."""
+    head = ("# SURVIVORS — theses that passed the risk committee (append-only)\n\n"
+            "| run | id | train n | net bps | CI95 | WR | p* | prereg doc | status |\n|---|---|---|---|---|---|---|---|---|\n")
+    rows = "".join(f"| 2026-09-19-1451 | {i} | 246 | +34.07 | [12.27, 56.30] | 52.44% | 52.3% | docs/{i}-prereg.md | "
+                   f"committee pass — built + papered 2026-09-20 |\n" for i in ids)
+    (ctx.kb_dir / "SURVIVORS.md").write_text(head + rows)
+    dl = ("# DEAD_LIST — killed / null / do-not-build (append-only, cite by row)\n\n"
+          "| n | family | one-line why dead | source | date |\n|---|---|---|---|---|\n")
+    dl += "".join(f"| {k} | family_{k} | dead because {k} | memory/x.md | 2026-09-0{k} |\n" for k in range(1, dead_rows + 1))
+    dl += "\nProse after the table.\n"
+    (ctx.kb_dir / "DEAD_LIST.md").write_text(dl)
+
+
+def _killed(ctx, sid, nets, killed_at, start=NOW_TS - 9 * DAY):
+    _write_state(ctx.bot_dir, sid, nets, start, mode={"paper_mode": True, "killed_at": killed_at, "loss_cap_usdt": -999.0})
+
+
+def _new_lessons(ctx, before):
+    return [l for l in ctx.lessons_path.read_text()[len(before):].splitlines() if l.strip()]
+
+
+def test_none_to_killed_fires_one_event_once_across_runs(ctx):
+    ctx.registered_ids = ["ALPHA"]
+    _write_state(ctx.bot_dir, "ALPHA", [0.5, -6.0], NOW_TS - 9 * DAY)
+    sd.main(["--mode", "maint"], ctx=ctx)                                    # baseline: alive
+    st = json.loads(ctx.maint_state_path.read_text())
+    assert st["schema"] == sd.MAINT_SCHEMA and st["slots"]["ALPHA"]["killed"] is False
+    before = ctx.lessons_path.read_text()
+    _digest(ctx, {"ALPHA": "KILL — registered verdict: net $-11.50 <= $-10.00 dollar loss cap at n=3 — KILL; "
+                           "touched .kill_ALPHA | 3 trades 1W $-11.50 | WR 33.3% | CI95 lo -9.100"})
+    _killed(ctx, "ALPHA", [0.5, -6.0, -6.0], NOW_TS - 3600)
+    sd.main(["--mode", "maint"], ctx=ctx)                                    # None→killed
+    new = _new_lessons(ctx, before)
+    assert len(new) == 1
+    assert new[0].startswith("- 2026-09-09 — maint: ALPHA KILLED 2026-09-09 (KILL — registered verdict: net $-11.50 <= "
+                             "$-10.00 dollar loss cap at n=3 — KILL; touched .kill_ALPHA; n=3, net $-11.50)"), new[0]
+    assert "Rule: maint writes the DEAD_LIST/SURVIVORS rows the same day; the desk reconciler never duplicates them; " \
+           "maint promotes, kills and restarts nothing." in new[0]
+    assert "next desk run's reconciler" not in new[0]
+    assert len(ctx.telegram.calls) == 1 and "ALPHA KILLED 2026-09-09" in ctx.telegram.calls[0][0][0]
+    assert json.loads(ctx.maint_state_path.read_text())["slots"]["ALPHA"]["killed"] is True
+    after = ctx.lessons_path.read_text()
+    sd.main(["--mode", "maint"], ctx=ctx)                                    # still killed → silent
+    assert ctx.lessons_path.read_text() == after and len(ctx.telegram.calls) == 1
+
+
+def test_killed_without_a_kill_grade_cites_the_sidecar(ctx):
+    ctx.registered_ids = ["ALPHA"]
+    _write_state(ctx.bot_dir, "ALPHA", [0.5], NOW_TS - 9 * DAY)
+    sd.main(["--mode", "maint"], ctx=ctx)
+    _digest(ctx, {"ALPHA": "WATCH — accruing (n=1/50, net $+0.50) | 1 trades 1W $+0.50"})   # stale, not a KILL
+    _killed(ctx, "ALPHA", [0.5], NOW_TS - 2 * DAY)
+    alerts = sd.run_maint(ctx)
+    assert alerts == ["ALPHA KILLED 2026-09-07 (sidecar killed_at; n=1, net $+0.50)"]
+
+
+def test_crossed_and_killed_in_the_same_interval_is_one_event_killed_wins(ctx):
+    ctx.registered_ids = ["ALPHA"]
+    _write_state(ctx.bot_dir, "ALPHA", [0.5], NOW_TS - 9 * DAY)
+    sd.main(["--mode", "maint"], ctx=ctx)
+    before = ctx.lessons_path.read_text()
+    _killed(ctx, "ALPHA", [0.5, -11.0], NOW_TS - 60)                         # crossed the −$10 line AND killed
+    alerts = sd.run_maint(ctx)
+    assert len(alerts) == 1 and alerts[0].startswith("ALPHA KILLED 2026-09-09")
+    assert "crossed" not in alerts[0]
+    assert len(_new_lessons(ctx, before)) == 1 and len(ctx.telegram.calls) == 1
+    st = json.loads(ctx.maint_state_path.read_text())["slots"]["ALPHA"]
+    assert st == {"crossed": True, "verdict_reached": False, "killed": True}
+    # the crossing was recorded with the kill: a later run never re-fires it
+    assert sd.run_maint(ctx) == []
+
+
+def test_first_run_and_old_schema_state_baseline_killed_slots_silently(ctx):
+    ctx.registered_ids = ["ALPHA", "GAMMA"]
+    _write_state(ctx.bot_dir, "ALPHA", [0.5], NOW_TS - 9 * DAY)
+    _killed(ctx, "GAMMA", [-1.0], NOW_TS - 20 * DAY, start=NOW_TS - 40 * DAY)
+    assert sd.run_maint(ctx) == []                                           # first run: baseline
+    assert json.loads(ctx.maint_state_path.read_text())["slots"]["GAMMA"]["killed"] is True
+    # a pre-schema state file (today's real .maint_state.json shape: killed slots absent) upgrades silently —
+    # the legacy killed slots (SR_BOUNCE, ETH_TSM_28, ...) must not all fire on the first run after the upgrade
+    ctx.maint_state_path.write_text(json.dumps({"last_run": "x", "slots": {"ALPHA": {"crossed": False, "verdict_reached": False}}}))
+    assert sd.run_maint(ctx) == []
+    assert json.loads(ctx.maint_state_path.read_text())["schema"] == sd.MAINT_SCHEMA
+    assert ctx.telegram.calls == []
+    # …but crossed/verdict transitions still compare across the upgrade
+    ctx.maint_state_path.write_text(json.dumps({"last_run": "x", "slots": {"ALPHA": {"crossed": False, "verdict_reached": False}}}))
+    _write_state(ctx.bot_dir, "ALPHA", [0.5, -11.0], NOW_TS - 9 * DAY)
+    alerts = sd.run_maint(ctx)
+    assert len(alerts) == 1 and alerts[0].startswith("ALPHA crossed its registered kill line")
+
+
+def test_survivors_rows_parses_the_real_file():
+    rows = sd.survivors_rows((KB_REAL / "SURVIVORS.md").read_text())
+    assert [r["id"] for r in rows] == ["informed_flow_btc_alt_cascade", V2]
+    v2 = rows[1]
+    assert v2["run"] == "2026-09-19-1451" and v2["train n"] == "246"
+    assert v2["prereg doc"].endswith(f"specs/{V2}.frozen.json")
+    assert "PAPER KILLED 2026-09-21" in v2["status"] and "DEAD_LIST row 112" in v2["status"]
+    assert sd.survivors_rows("# nothing\n\nprose only\n") == []
+
+
+def test_swarm_kill_appends_dead_row_and_marks_the_one_survivors_row(ctx):
+    from research.swarm.lib import kb_check
+    ctx.registered_ids = ["ALPHA"]
+    _swarm_kb(ctx)
+    _write_state(ctx.bot_dir, "ALPHA", [0.5], NOW_TS - 9 * DAY)
+    sd.main(["--mode", "maint"], ctx=ctx)
+    surv_before = (ctx.kb_dir / "SURVIVORS.md").read_text()
+    _digest(ctx, {"ALPHA": "KILL — registered verdict: net $-11.50 <= $-10.00 dollar loss cap at n=3 — KILL; "
+                           "touched .kill_ALPHA | 3 trades 1W $-11.50 | WR 33.3% | CI95 lo -9.100"})
+    _killed(ctx, "ALPHA", [0.5, -6.0, -6.0], NOW_TS - 3600)
+    ctx.git.calls.clear()
+    alerts = sd.run_maint(ctx)
+    # DEAD_LIST: one new row, n = max + 1, five cells, machine-checkable
+    dl = ctx.kb_dir / "DEAD_LIST.md"
+    rows = kb_check.dead_rows(dl)
+    assert [r[0] for r in rows] == [1, 2, 3, 4]
+    assert kb_check.malformed_dead_rows(dl) == []
+    n, family, why, source, date = rows[-1]
+    assert family == "ALPHA" and date == "2026-09-09"
+    assert why.startswith("PAPER KILL 2026-09-09 ")
+    assert ("PT on the registered line: n=3 1W net $-11.50 (KILL — registered verdict: net $-11.50 <= $-10.00 dollar "
+            "loss cap at n=3 — KILL; touched .kill_ALPHA)") in why
+    assert why.endswith("Paper only, $0 real. Do not re-propose without a new mechanism.")
+    assert source == ("trading_state_ALPHA.json closed_trades; ~/Library/Logs/Phmex-S/lab_adjudicator.log; "
+                      "docs/ALPHA-prereg.md")
+    assert dl.read_text().count("| ALPHA |") == 1
+    # SURVIVORS: only ALPHA's status cell changed, DELTA's row byte-identical, header/separator intact
+    surv = (ctx.kb_dir / "SURVIVORS.md").read_text()
+    b, a = surv_before.splitlines(), surv.splitlines()
+    assert len(a) == len(b)
+    diff = [i for i in range(len(a)) if a[i] != b[i]]
+    assert len(diff) == 1 and a[diff[0]].startswith("| 2026-09-19-1451 | ALPHA |")
+    row = next(r for r in sd.survivors_rows(surv) if r["id"] == "ALPHA")
+    assert row["status"] == ("committee pass — built + papered 2026-09-20 — PAPER KILLED 2026-09-09 "
+                             "(n=3, net $-11.50) — DEAD_LIST row 4")
+    assert row["prereg doc"] == "docs/ALPHA-prereg.md"
+    assert alerts[0].startswith("ALPHA KILLED 2026-09-09") and "DEAD_LIST row 4" in alerts[0]
+    # committed by pathspec with the kb files, still no push
+    commit = next(c[0][0] for c in ctx.git.calls if c[0][0][0] == "commit")
+    assert set(commit[commit.index("--") + 1:]) >= {"research/swarm/kb/LESSONS.md", "research/swarm/kb/DEAD_LIST.md",
+                                                    "research/swarm/kb/SURVIVORS.md"}
+    assert ["push"] not in [c[0][0] for c in ctx.git.calls]
+    # kb_check ran on the temp kb (its dataset paths are absent here) and was logged, never raised
+    assert "kb_check" in _log_text(ctx)
+    # rerun: nothing duplicated
+    dl_txt, surv_txt = dl.read_text(), surv
+    sd.run_maint(ctx)
+    assert dl.read_text() == dl_txt and (ctx.kb_dir / "SURVIVORS.md").read_text() == surv_txt
+
+
+def test_pass_grade_marks_the_survivors_row_once_and_alerts(ctx):
+    ctx.registered_ids = ["ALPHA"]
+    _swarm_kb(ctx)
+    _write_state(ctx.bot_dir, "ALPHA", [0.2] * 50, NOW_TS - 9 * DAY)
+    _digest(ctx, {"ALPHA": "PASS — n=50 >= 50, net $+10.00, CI95 lower +0.1234 > 0 — PASS-ELIGIBLE: owner decision "
+                           "required (never a promotion; no .promote_* written) | 50 trades 50W $+10.00 | WR 100.0% | CI95 lo +0.123"})
+    before = ctx.lessons_path.read_text()
+    alerts = sd.run_maint(ctx)                     # first run: verdict flags baseline, but the PASS mark is a kb fact
+    row = next(r for r in sd.survivors_rows((ctx.kb_dir / "SURVIVORS.md").read_text()) if r["id"] == "ALPHA")
+    assert row["status"].endswith("— PAPER PASS 2026-09-09 (n=50, net $+10.00, CI95 lo +0.1234) — awaiting owner "
+                                  "decision (never auto-promoted)")
+    assert row["status"].count("PAPER PASS") == 1
+    assert len(alerts) == 1 and "ALPHA PAPER PASS" in alerts[0] and "never auto-promoted" in alerts[0]
+    assert len(_new_lessons(ctx, before)) == 1 and len(ctx.telegram.calls) == 1
+    assert not (ctx.kb_dir / "DEAD_LIST.md").read_text().count("| ALPHA |")
+    surv = (ctx.kb_dir / "SURVIVORS.md").read_text()
+    assert sd.run_maint(ctx) == []
+    assert (ctx.kb_dir / "SURVIVORS.md").read_text() == surv and len(ctx.telegram.calls) == 1
+
+
+def test_reconciliation_is_idempotent_against_the_real_hand_written_rows(ctx):
+    """Copies of the real DEAD_LIST.md (row 112) and SURVIVORS.md (status already 'PAPER KILLED … DEAD_LIST row 112')
+    go into the temp kb; the v2 slot is killed with the real 9/21 digest line; a schema-2 state says it was alive
+    last run, so the KILLED event fires — and the two files must come back byte-identical."""
+    import shutil
+    from research.swarm.lib import kb_check
+    for name in ("DEAD_LIST.md", "SURVIVORS.md"):
+        shutil.copy(KB_REAL / name, ctx.kb_dir / name)
+    dl_before = (ctx.kb_dir / "DEAD_LIST.md").read_text()
+    surv_before = (ctx.kb_dir / "SURVIVORS.md").read_text()
+    assert "| 112 | informed_flow_btc_alt_cascade_v2 | PAPER KILL 2026-09-21" in dl_before
+    ctx.registered_ids = [V2]
+    ctx.experiments = {V2: {"registered_ts": NOW_TS - 2 * DAY, "verdict_n": 50, "kill_net_usd": -10.0,
+                            "inconclusive_hard_n": 100, "prereg": "docs/superpowers/specs/2026-09-20-informed_flow_btc_alt_cascade_v2-prereg.md"}}
+    _killed(ctx, V2, [-3.24] * 5 + [4.76], NOW_TS - 3600, start=NOW_TS - DAY)
+    _digest(ctx, {V2: V2_KILL_GRADE})
+    ctx.maint_state_path.write_text(json.dumps({"schema": sd.MAINT_SCHEMA, "last_run": "x",
+                                                "slots": {V2: {"crossed": False, "verdict_reached": False, "killed": False}}}))
+    before = ctx.lessons_path.read_text()
+    alerts = sd.run_maint(ctx)
+    assert len(alerts) == 1 and alerts[0].startswith(f"{V2} KILLED 2026-09-09 (KILL — registered verdict: net $-16.20")
+    assert "DEAD_LIST row 112" in alerts[0]
+    assert (ctx.kb_dir / "DEAD_LIST.md").read_text() == dl_before
+    assert (ctx.kb_dir / "SURVIVORS.md").read_text() == surv_before
+    assert len(_new_lessons(ctx, before)) == 1 and len(ctx.telegram.calls) == 1
+    assert kb_check.malformed_dead_rows(ctx.kb_dir / "DEAD_LIST.md") == []
+    commit = next(c[0][0] for c in ctx.git.calls if c[0][0][0] == "commit")
+    paths = commit[commit.index("--") + 1:]
+    assert "research/swarm/kb/LESSONS.md" in paths
+    assert "research/swarm/kb/DEAD_LIST.md" not in paths and "research/swarm/kb/SURVIVORS.md" not in paths
+
+
+def test_non_swarm_slot_kill_writes_no_kb_rows(ctx):
+    ctx.registered_ids = ["ALPHA"]
+    _swarm_kb(ctx, ids=("DELTA",))                                 # ALPHA has no SURVIVORS row → legacy slot
+    _write_state(ctx.bot_dir, "ALPHA", [0.5], NOW_TS - 9 * DAY)
+    sd.main(["--mode", "maint"], ctx=ctx)
+    dl, surv = (ctx.kb_dir / "DEAD_LIST.md").read_text(), (ctx.kb_dir / "SURVIVORS.md").read_text()
+    before = ctx.lessons_path.read_text()
+    _killed(ctx, "ALPHA", [0.5, -11.0], NOW_TS - 60)
+    ctx.git.calls.clear()
+    alerts = sd.run_maint(ctx)
+    assert len(alerts) == 1 and alerts[0].startswith("ALPHA KILLED") and "DEAD_LIST" not in alerts[0]
+    assert (ctx.kb_dir / "DEAD_LIST.md").read_text() == dl and (ctx.kb_dir / "SURVIVORS.md").read_text() == surv
+    assert len(_new_lessons(ctx, before)) == 1 and len(ctx.telegram.calls) == 1
+    commit = next(c[0][0] for c in ctx.git.calls if c[0][0][0] == "commit")
+    assert commit[commit.index("--") + 1:] == ["research/swarm/kb/PAPER_STATUS.md", "research/swarm/kb/LESSONS.md"]
+    # no SURVIVORS.md at all → same outcome, no crash
+    (ctx.kb_dir / "SURVIVORS.md").unlink()
+    ctx.maint_state_path.write_text(json.dumps({"schema": sd.MAINT_SCHEMA, "last_run": "x",
+                                                "slots": {"ALPHA": {"crossed": False, "verdict_reached": False, "killed": False}}}))
+    assert len(sd.run_maint(ctx)) == 1
+
+
+def test_dead_row_cells_are_pipe_sanitised(ctx):
+    from research.swarm.lib import kb_check
+    ctx.registered_ids = ["ALPHA"]
+    _swarm_kb(ctx)
+    _write_state(ctx.bot_dir, "ALPHA", [0.5], NOW_TS - 9 * DAY)
+    sd.main(["--mode", "maint"], ctx=ctx)
+    _digest(ctx, {"ALPHA": "KILL — net<=cap|hard stop | 3 trades 1W $-11.50"})     # a pipe INSIDE the note
+    _killed(ctx, "ALPHA", [0.5, -6.0, -6.0], NOW_TS - 3600)
+    sd.run_maint(ctx)
+    dl = ctx.kb_dir / "DEAD_LIST.md"
+    assert kb_check.malformed_dead_rows(dl) == []
+    n, family, why, source, date = kb_check.dead_rows(dl)[-1]
+    assert n == 4 and "|" not in why and "|" not in source
+    assert "(KILL — net<=cap/hard stop)" in why
+    # the row writer itself scrubs pipes and newlines in every cell it is handed
+    n2, appended = sd.append_dead_row(dl, "ZETA|x", "why|with\npipes", "src|a\nb", "2026-09-09")
+    assert (n2, appended) == (5, True)
+    assert kb_check.malformed_dead_rows(dl) == []
+    assert kb_check.dead_rows(dl)[-1] == (5, "ZETA/x", "why/with pipes", "src/a b", "2026-09-09")
+    assert sd._cell("a|b\nc") == "a/b c"
+    lessons = ctx.lessons_path.read_text().splitlines()[-1]
+    assert lessons.startswith("- 2026-09-09 — maint: ALPHA KILLED") and "net<=cap/hard stop" in lessons

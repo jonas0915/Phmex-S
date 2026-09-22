@@ -109,9 +109,14 @@ Step 3 — keep at most ${MAX_SCREENS}, ranked by novelty of mechanism then spec
 Write ${RUN_DIR}/gate_rejections.json as a JSON list of every rejection {id, dead_row, reason} and ${RUN_DIR}/gate_kept.json as the kept list. Return kept (id, thesis_path, evidence_grade, reason = one line on why it passed) and rejected, and rejections_path.`
 
 const registrarPrompt = (k) => `${RULES}
-REGISTRAR (mechanical, low effort). Run exactly this one command and nothing else that writes:
-python3 -m research.swarm.lib.registrar ${k.thesis_path} ${RUN_DIR} ${NOW}
-Do NOT edit the thesis, do NOT retry with modifications, do NOT "fix" validation errors. If the command fails, return ok=false with the error text verbatim in error. If it succeeds it prints the frozen path: return ok=true, frozen_path = that printed path, and sha256 = the "sha256" field read from that frozen file (python3 -c "import json; print(json.load(open('<frozen_path>'))['sha256'])").`
+REGISTRAR (mechanical, low effort). Two commands, in this order, and nothing else that writes.
+Step 1 — UNIVERSE CHECK (this seat is the ONE seat allowed to use the network: it asks Phemex which universe symbols are live markets — a delisted symbol in a research cache is invisible to the screen; GIGGLE, 2026-09-21). Run exactly:
+mkdir -p ${RUN_DIR}/register/${k.id} && python3 -m research.swarm.lib.universe_check --json --thesis ${k.thesis_path} --prune-to ${RUN_DIR}/register/${k.id}/thesis.json | tee ${RUN_DIR}/register/${k.id}/universe_check.json
+It prints a JSON dict: "dropped_symbols" = every symbol of spec.universe that is not an active Phemex market ([{symbol, status}], status Delisted / NOT_FOUND / ...), "tradeable" = the symbols that remain, "pruned_path" = a COPY of the thesis with the dropped symbols removed from spec.universe (null when nothing tradeable remains). The original thesis file is never edited. Copy dropped_symbols verbatim into your return (an empty list when nothing was dropped).
+If "tradeable" is empty (pruned_path null): return ok=false, status="UNIVERSE_UNTRADEABLE", dropped_symbols, error="universe untradeable: <the symbols with status>" — and do NOT run step 2; nothing is frozen. If the command itself fails (network timeout, traceback): return ok=false, status="ERROR", dropped_symbols=[], error = the text verbatim — do not retry, do not skip the check.
+Step 2 — FREEZE the checked copy. Run exactly:
+python3 -m research.swarm.lib.registrar ${RUN_DIR}/register/${k.id}/thesis.json ${RUN_DIR} ${NOW}
+Do NOT edit the thesis or the copy, do NOT retry with modifications, do NOT "fix" validation errors. If the command fails, return ok=false, status="ERROR", dropped_symbols, and the error text verbatim in error. If it succeeds it prints the frozen path: return ok=true, status="FROZEN", dropped_symbols, frozen_path = that printed path, and sha256 = the "sha256" field read from that frozen file (python3 -c "import json; print(json.load(open('<frozen_path>'))['sha256'])").`
 
 const screenPrompt = (k, reg) => `${RULES}
 SCREENER for thesis ${k.id}. Frozen spec: ${reg.frozen_path} (sha ${reg.sha256}). Run exactly:
@@ -158,14 +163,15 @@ SYNTHESIS seat: write ${RUN_DIR}/REPORT.md. Run context (from the orchestrator):
 Verdict first (one sentence: how many theses, how many screened, how many passed committee). Then one paragraph per thesis in this run — gate-rejected ones (from ${RUN_DIR}/gate_rejections.json) in one line each with the dead row (or "source verification F" / "not screenable" / "duplicate" / "over cap" as recorded); screened ones with n, net bps, CI95, WR vs p*, evidence grade, audit verdict, committee votes (economics, statistics, BH table, tp±20% read) — EVERY number followed by the file path it came from (out.json, audit.json, committee/*.json, out.robust_*.json). Then "What was not done": every analyst lens that returned no thesis (with its exploratory_notes), every lens whose web_budget_exhausted is true in the run context (its sourcing was cut short), every registrar/screen/audit that errored (with the error text), any source that could not be fetched. Then "Next run should": 3 bullets, process not strategy. Plain English, verdict first, no tables wider than 6 columns, no daily-ROI targets. Numbers only from files you read this turn; if a file is missing say "not run". Return the report text.`
 
 const criticPrompt = `${RULES}
-COMPLETENESS CRITIC. Read ${RUN_DIR}/REPORT.md, then list the run dir recursively (find ${RUN_DIR} -type f | sort). Find and list, each with the concrete file/line: (a) any screens/<id>/ or exploratory/ or committee/ artifact not cited in the report; (b) any number in the report without a file path next to it; (c) contradictions between gate_rejections.json, theses/*.json, out.json, audit.json, committee/*.json, out.robust_*.json and the report (re-open the files; do not trust the report); (d) any thesis whose nearest_dead_rows is empty or whose why_different is generic, or whose evidence field has no number; (e) holdout access — grep -rn "COMMITTEE-HOLDOUT-READ\\|era=\\"holdout\\"\\|era='holdout'\\|era=\\"all\\"\\|--era holdout\\|--era all" ${RUN_DIR} (any hit is a process failure); (f) any frozen spec or signal.py whose sha no longer verifies (python3 -c "from research.swarm.lib import registrar as r; import glob; print({p: r.verify(p) for p in glob.glob('${RUN_DIR}/specs/*.frozen.json')})"); (g) any daily-ROI target or hand-computed statistic in the report. Write ${RUN_DIR}/CRITIC.md (a numbered list under headings a-g, "none" where nothing was found) and return it.`
+COMPLETENESS CRITIC. Read ${RUN_DIR}/REPORT.md, then list the run dir recursively (find ${RUN_DIR} -type f | sort). Find and list, each with the concrete file/line: (a) any screens/<id>/ or exploratory/ or committee/ artifact not cited in the report; (b) any number in the report without a file path next to it; (c) contradictions between gate_rejections.json, theses/*.json, out.json, audit.json, (a frozen universe SMALLER than the thesis file's is expected, not a contradiction, when register/<id>/universe_check.json lists those symbols as dropped_symbols — cite it), committee/*.json, out.robust_*.json and the report (re-open the files; do not trust the report); (d) any thesis whose nearest_dead_rows is empty or whose why_different is generic, or whose evidence field has no number; (e) holdout access — grep -rn "COMMITTEE-HOLDOUT-READ\\|era=\\"holdout\\"\\|era='holdout'\\|era=\\"all\\"\\|--era holdout\\|--era all" ${RUN_DIR} (any hit is a process failure); (f) any frozen spec or signal.py whose sha no longer verifies (python3 -c "from research.swarm.lib import registrar as r; import glob; print({p: r.verify(p) for p in glob.glob('${RUN_DIR}/specs/*.frozen.json')})"); (g) any daily-ROI target or hand-computed statistic in the report. Write ${RUN_DIR}/CRITIC.md (a numbered list under headings a-g, "none" where nothing was found) and return it.`
 
-const reconcilePrompt = (screenedIds, passed) => `${RULES}
+const reconcilePrompt = (screenedIds, passed, registers) => `${RULES}
 RECONCILER. Rows go to the knowledge base ONLY for SCREENED theses — those with ${RUN_DIR}/screens/<id>/out.json (STANDARDS #15, spec §5 step 8). Screened this run: ${screenedIds.length ? screenedIds.join(', ') : 'none'}. Gate-rejected theses and theses whose registrar/screen errored get NO row anywhere — they live in ${RUN_DIR}/REPORT.md and ${RUN_DIR}/gate_rejections.json only. ${RUN_DIR}/theses/owner_record_probe.json is an exploratory probe, never a thesis.
 For each screened thesis:
 - If it did NOT pass committee (audit REFUTED/RERUN_MISMATCH, CI including zero, or a failed committee vote): append ONE row to ${KB}/DEAD_LIST.md. The row format is EXACTLY, verbatim: | n | family | why | source | date | — five cells, one line, no pipe characters inside any cell, where n = (max existing n in the file) + 1 (compute it by reading the file: python3 -c "from research.swarm.lib import kb_check as k; from pathlib import Path; print(max(r[0] for r in k.dead_rows(Path('${KB}/DEAD_LIST.md'))))"), family = the thesis id, why = the decisive reason in one line citing the numbers with their paths (out.json n / net_bps_mean / ci95, audit.json verdict, committee/*.json vote), source = ${RUN_DIR}/REPORT.md, date = ${TODAY}.
 - If it passed committee (${passed.length ? passed.join(', ') : 'none this run'}): append a row to ${KB}/SURVIVORS.md instead, in that file's existing column format (run, id, train n, net bps, CI95, WR, p*, prereg doc = the frozen spec path, status = "committee pass — awaiting owner go"), numbers from out.json.
-Then append dated lines ("- ${TODAY} — <what failed>. Rule: <process rule>") to ${KB}/LESSONS.md for every PROCESS failure the critic found in ${RUN_DIR}/CRITIC.md (not strategy lessons — process; if the critic found nothing, append one line recording that this run's critic was clean).${DRY ? (screenedIds.length ? ' This is a DRY RUN with screened theses: write their DEAD_LIST/SURVIVORS rows normally and one LESSONS line noting it was a dry run.' : ' This is a DRY RUN: nothing was screened, so the LESSONS entry (what the plumbing test showed) is the ONLY kb write.') : ''}
+Then append dated lines ("- ${TODAY} — <what failed>. Rule: <process rule>") to ${KB}/LESSONS.md for every PROCESS failure the critic found in ${RUN_DIR}/CRITIC.md (not strategy lessons — process; if the critic found nothing, append one line recording that this run's critic was clean).
+UNIVERSE DROPS (register seat, universe_check): ${registers.filter(r => r.dropped_symbols.length).length ? `for EACH of these theses append exactly ONE more line to ${KB}/LESSONS.md, verbatim except the placeholders — "- ${TODAY} — <id>: dropped untradeable symbols <list with status> at register (universe_check). Rule: universe_check runs before every freeze." — where <list with status> is the thesis's dropped_symbols rendered as "SYM/USDT:USDT (Status), ..." (status is the recorded Delisted / NOT_FOUND / ... value). Theses and their dropped_symbols, from the orchestrator: ${JSON.stringify(registers.filter(r => r.dropped_symbols.length))}. A thesis whose register status is UNIVERSE_UNTRADEABLE (every symbol dropped, nothing frozen, not screened) gets this LESSONS line and NO DEAD_LIST/SURVIVORS row.` : 'none this run — no universe line to write.'}${DRY ? (screenedIds.length ? ' This is a DRY RUN with screened theses: write their DEAD_LIST/SURVIVORS rows normally and one LESSONS line noting it was a dry run.' : ' This is a DRY RUN: nothing was screened, so the LESSONS entry (what the plumbing test showed) is the ONLY kb write.') : ''}
 Never edit or delete existing rows or lines in any kb file; append only. Never edit ${KB}/CONSTRAINTS.md, STANDARDS.md, DATA.md or anything under ${KB}/owner_trades/.
 Finally run exactly: python3 -m research.swarm.lib.kb_check — if it does not print KB OK, fix ONLY the row(s) you just wrote (never other rows) and re-run until it prints KB OK. Return the kb_check output verbatim plus every row/line you added, each with its file path.`
 
@@ -210,7 +216,13 @@ const GATE_SCHEMA = { type: 'object', properties: {
     required: ['id', 'dead_row', 'reason'] } },
   rejections_path: { type: 'string' } }, required: ['kept', 'rejected', 'rejections_path'] }
 
-const REGISTER_SCHEMA = { type: 'object', properties: { frozen_path: { type: 'string' }, sha256: { type: 'string' }, ok: { type: 'boolean' }, error: { type: 'string' } }, required: ['ok'] }
+// status: FROZEN (ok=true) | UNIVERSE_UNTRADEABLE (every universe symbol inactive/missing on Phemex — nothing frozen) | ERROR.
+// dropped_symbols: what universe_check removed from spec.universe before the freeze (may be empty; the reconciler writes a LESSONS line when it is not).
+const REGISTER_SCHEMA = { type: 'object', properties: {
+  frozen_path: { type: 'string' }, sha256: { type: 'string' }, ok: { type: 'boolean' }, error: { type: 'string' },
+  status: { type: 'string', enum: ['FROZEN', 'UNIVERSE_UNTRADEABLE', 'ERROR'] },
+  dropped_symbols: { type: 'array', items: { type: 'object', properties: { symbol: { type: 'string' }, status: { type: 'string' } }, required: ['symbol', 'status'] } } },
+  required: ['ok', 'status', 'dropped_symbols'] }
 const SCREEN_SCHEMA = { type: 'object', properties: { ok: { type: 'boolean' }, out_path: { type: 'string' }, n: { type: 'integer' }, net_bps_mean: { type: 'number' }, ci95: { type: 'array', items: { type: 'number' } }, wr: { type: 'number' }, p_star: { type: 'number' }, error: { type: 'string' } }, required: ['ok'] }
 const AUDIT_SCHEMA = { type: 'object', properties: { verdict: { type: 'string', enum: ['CONFIRMED', 'REFUTED', 'RERUN_MISMATCH'] }, audit_path: { type: 'string' }, ci_excludes_zero: { type: 'boolean' }, findings: { type: 'array', items: { type: 'string' } } }, required: ['verdict', 'audit_path', 'ci_excludes_zero'] }
 const COMMITTEE_SCHEMA = { type: 'object', properties: { votes: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, pass: { type: 'boolean' }, reasons: { type: 'array', items: { type: 'string' } } }, required: ['id', 'pass', 'reasons'] } }, path: { type: 'string' } }, required: ['votes', 'path'] }
@@ -270,17 +282,24 @@ if (!kept.length) {
 }
 
 // ---------- Phases 4–6: per-thesis pipeline (register → screen → audit), no barrier ----------
+// The register result rides along on the screen result (screen.register) so the closing seats
+// see universe_check's dropped_symbols / UNIVERSE_UNTRADEABLE without a second lookup.
 const chains = await pipeline(kept,
   k => agent(registrarPrompt(k), { label: `register:${k.id}`, phase: 'Register', schema: REGISTER_SCHEMA, effort: 'low' }),
-  (reg, k) => (reg?.ok && reg.frozen_path)
-    ? agent(screenPrompt(k, reg), { label: `screen:${k.id}`, phase: 'Screen', schema: SCREEN_SCHEMA, effort: 'high' })
-    : { ok: false, error: reg?.error ?? (reg ? 'registrar returned ok without frozen_path' : 'registrar returned null') },
+  (reg, k) => Promise.resolve((reg?.ok && reg.frozen_path)
+      ? agent(screenPrompt(k, reg), { label: `screen:${k.id}`, phase: 'Screen', schema: SCREEN_SCHEMA, effort: 'high' })
+      : { ok: false, error: reg?.error ?? (reg ? 'registrar returned ok without frozen_path' : 'registrar returned null') })
+    .then(scr => ({ ...(scr ?? { ok: false, error: 'screen returned null' }), register: reg ?? null })),
   (scr, k) => scr?.ok
     ? agent(auditPrompt(k), { label: `audit:${k.id}`, phase: 'Audit', schema: AUDIT_SCHEMA, effort: 'high' })
         .then(a => a ? { ...a, screened: true, screen: scr } : { verdict: 'REFUTED', audit_path: '', ci_excludes_zero: false, findings: ['auditor returned null'], screened: true, screen: scr })
     : { verdict: 'REFUTED', audit_path: '', ci_excludes_zero: false, findings: [scr?.error ?? 'screen returned null'], screened: false, screen: scr },
 )
-const results = kept.map((k, i) => ({ id: k.id, evidence_grade: k.evidence_grade, audit: chains[i] }))
+const results = kept.map((k, i) => ({ id: k.id, evidence_grade: k.evidence_grade, audit: chains[i], register: chains[i]?.screen?.register ?? null }))
+const untradeable = results.filter(r => r.register?.status === 'UNIVERSE_UNTRADEABLE').map(r => r.id)
+if (untradeable.length) log(`register: universe untradeable (nothing frozen) — ${untradeable.join(', ')}`)
+const dropped = results.filter(r => r.register?.dropped_symbols?.length)
+if (dropped.length) log(`register: universe_check dropped symbols — ${dropped.map(r => `${r.id}: ${r.register.dropped_symbols.map(d => `${d.symbol} (${d.status})`).join(', ')}`).join('; ')}`)
 const screenedIds = results.filter(r => r.audit?.screened).map(r => r.id)
 const eligible = results.filter(r => r.audit?.verdict === 'CONFIRMED' && r.audit.ci_excludes_zero)
 log(`audits: ${results.map(r => `${r.id}=${r.audit?.verdict ?? 'null'}`).join(', ')}; screened ${screenedIds.length}; committee-eligible: ${eligible.length}`)
@@ -315,13 +334,14 @@ async function closeOut(results, passed, gate, lensSummary) {
     lenses: lensSummary,
     gate_kept: (gate?.kept ?? []).map(k => ({ id: k.id, evidence_grade: k.evidence_grade })),
     gate_rejected: gate?.rejected ?? [],
-    screened: results.map(r => ({ id: r.id, screened: !!r.audit?.screened, audit_verdict: r.audit?.verdict ?? null, ci_excludes_zero: !!r.audit?.ci_excludes_zero, screen_error: r.audit?.screen?.error ?? null })),
+    screened: results.map(r => ({ id: r.id, screened: !!r.audit?.screened, audit_verdict: r.audit?.verdict ?? null, ci_excludes_zero: !!r.audit?.ci_excludes_zero, screen_error: r.audit?.screen?.error ?? null, register_status: r.register?.status ?? null, dropped_symbols: r.register?.dropped_symbols ?? [] })),
     committee_passed: passed,
   }
   const report = await agent(synthesisPrompt(ctx), judge({ label: 'synthesis', phase: 'Close', effort: 'high' }))
   const critic = await agent(criticPrompt, judge({ label: 'critic', phase: 'Close', effort: 'high' }))
   const screenedIds = results.filter(r => r.audit?.screened).map(r => r.id)
-  const reconcile = await agent(reconcilePrompt(screenedIds, passed), { label: 'reconcile', phase: 'Close', effort: 'high' })
+  const registers = results.map(r => ({ id: r.id, status: r.register?.status ?? null, dropped_symbols: r.register?.dropped_symbols ?? [] }))
+  const reconcile = await agent(reconcilePrompt(screenedIds, passed, registers), { label: 'reconcile', phase: 'Close', effort: 'high' })
   if (!report || !critic || !reconcile) log(`closing seat returned null: report=${!!report} critic=${!!critic} reconcile=${!!reconcile}`)
   return { report, critic, reconcile }
 }

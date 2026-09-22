@@ -14,12 +14,35 @@ run continues on the local copy).
 maint (no LLM): reads every registered paper slot's trading_state_<id>.json plus
 the adjudicator's latest digest (parsed from ~/Library/Logs/Phmex-S/lab_adjudicator.log
 — adjudicate.py writes its grades only there, to stdout and to Telegram; there is
-no JSON grades file) and rewrites research/swarm/kb/PAPER_STATUS.md. Appends ONE
-dated LESSONS line only when a slot crossed its registered kill line or reached
-verdict_n since the previous maint run (tracked in kb/.maint_state.json, gitignored;
-the first run is a baseline and announces nothing). Telegram only on such an alert.
-Commits (pathspec, no push) PAPER_STATUS.md / LESSONS.md when they changed so the
-daily pull never conflicts on them.
+no JSON grades file) and rewrites research/swarm/kb/PAPER_STATUS.md. Per slot it
+tracks three flags in kb/.maint_state.json (gitignored; schema MAINT_SCHEMA):
+crossed (registered kill line), verdict_reached (n >= verdict_n with net > 0) and
+killed (.kill_<id> sentinel, sidecar killed_at, or the bot's negative-Kelly switch).
+An event fires only on a False→True transition since the previous run; the first
+run — and the first run after a schema upgrade, for the killed flag — is a silent
+baseline. A slot that is killed wins over its own crossing in the same interval
+(one event). Event text: "<id> KILLED <date> (<adjudicator KILL note, else sidecar
+killed_at>; n=<n>, net $<net>)".
+
+Same-day kb reconciliation, deterministic and idempotent, for SWARM-REGISTERED
+slots only (the id appears as the `id` cell of a research/swarm/kb/SURVIVORS.md
+row; legacy adjudicator slots such as 5m_mean_revert or DONCHIAN_* get the event,
+the LESSONS line and the Telegram alert but no kb row):
+  * KILLED → append one DEAD_LIST.md row `| n | <id> | PAPER KILL <date PT> on the
+    registered line: n=<n> <W>W net $<net> (<adjudicator note or rule text>). Paper
+    only, $0 real. Do not re-propose without a new mechanism. | <sources incl. the
+    SURVIVORS prereg doc> | <YYYY-MM-DD> |` with n = max existing row + 1, no pipes
+    inside cells; then append ` — PAPER KILLED <date> (n=<n>, net $<net>) —
+    DEAD_LIST row <n>` to that id's SURVIVORS status cell (the only edit the file
+    ever gets). Skipped when a row for the id whose why-cell starts "PAPER KILL"
+    already exists / when the status cell already says "PAPER KILLED".
+  * adjudicator digest grade PASS for an alive swarm slot → append ` — PAPER PASS
+    <date> (n=<n>, net $<net>, CI95 lo <x>) — awaiting owner decision (never
+    auto-promoted)` to its SURVIVORS status cell, once; this is also an event.
+Every event = ONE dated LESSONS line + one Telegram. After a kb write maint runs
+research.swarm.lib.kb_check.check and logs problems as ERROR (never loops), then
+commits (pathspec, no push) PAPER_STATUS.md / LESSONS.md / DEAD_LIST.md /
+SURVIVORS.md when they changed so the daily pull never conflicts on them.
 
 Branch: desk/test refuse (Telegram + exit 1) unless HEAD == env SWARM_BRANCH
 (default "main"; both plists set it); maint only logs the branch.
@@ -88,6 +111,8 @@ MANUAL_LAUNCH_ONE_LINER = (
     'file contents; then python3 -m research.swarm.lib.kb_check && git add research/swarm && git commit && git push."')
 
 EXIT_OK, EXIT_FAIL, EXIT_BUSY = 0, 1, 3
+MAINT_SCHEMA = 2                 # .maint_state.json: 1 = crossed/verdict_reached only; 2 adds the killed flag
+KB_REL = "research/swarm/kb"
 
 # The main book's label in bot.py's slot list ("5m_scalp" is NOT an independent
 # trader — bot.py:677-687); it is never a paper slot for PAPER_STATUS.
@@ -172,6 +197,14 @@ class Ctx:
     @property
     def lessons_path(self) -> Path:
         return self.kb_dir / "LESSONS.md"
+
+    @property
+    def dead_list_path(self) -> Path:
+        return self.kb_dir / "DEAD_LIST.md"
+
+    @property
+    def survivors_path(self) -> Path:
+        return self.kb_dir / "SURVIVORS.md"
 
     @classmethod
     def real(cls) -> "Ctx":
@@ -578,27 +611,215 @@ def _status_body(text: str) -> str:
     return _AGE_TOKEN.sub("(<age> d old)", _STAMP_TOKEN.sub("Written <stamp>.", text))
 
 
+@dataclass
+class Event:
+    kind: str            # "killed" | "crossed" | "verdict" | "pass"
+    slot_id: str
+    text: str
+
+
+def _kill_grade(s: SlotStatus) -> Optional[str]:
+    """The adjudicator's KILL note for this slot from the latest digest (the part
+    before the ` | n trades …` tail), or None when the digest has no KILL for it."""
+    g = (s.adjudicator or "").strip()
+    return g.split(" | ")[0].strip() if g.startswith("KILL") else None
+
+
+def _kill_reason(s: SlotStatus) -> str:
+    return _kill_grade(s) or ("sidecar killed_at" if "(sidecar killed_at)" in (s.killed or "") else (s.killed or "killed"))
+
+
 def detect_events(prev: Optional[dict], slots: list) -> tuple:
     """(events, new_state). Events fire only on a False→True transition since the
     previous maint run; with no previous state (first run) the flags are recorded
-    silently as the baseline."""
-    new = {"slots": {}}
+    silently as the baseline. The killed flag is new in schema 2: a schema-1 state
+    file (killed slots absent) baselines it silently as well, so the long-dead
+    legacy slots never fire on the upgrade run. A killed slot never also fires its
+    crossing/verdict in the same interval (killed wins)."""
+    new = {"schema": MAINT_SCHEMA, "slots": {}}
     events = []
+    killed_tracked = prev is not None and int(prev.get("schema") or 1) >= MAINT_SCHEMA
     for s in slots:
-        if s.killed is not None or s.line is None:
-            continue
-        flags = {"crossed": s.crossed, "verdict_reached": s.verdict_reached}
+        flags = {"crossed": s.crossed, "verdict_reached": s.verdict_reached, "killed": s.killed is not None}
         new["slots"][s.slot_id] = flags
         if prev is None:
             continue
-        old = (prev.get("slots") or {}).get(s.slot_id) or {"crossed": False, "verdict_reached": False}
+        old = (prev.get("slots") or {}).get(s.slot_id) or {}
+        if flags["killed"]:
+            if killed_tracked and not old.get("killed"):
+                events.append(Event("killed", s.slot_id,
+                                    f"{s.slot_id} KILLED {_fmt_day(s.end_ts)} ({_kill_reason(s)}; n={s.n}, net ${s.net:+.2f})"))
+            continue
+        if s.line is None:
+            continue
         if flags["crossed"] and not old.get("crossed"):
-            events.append(f"{s.slot_id} crossed its registered kill line (n={s.n}, net ${s.net:+.2f}; "
-                          f"line: {s.line['rule']}; source {s.line['source']})")
+            events.append(Event("crossed", s.slot_id,
+                                f"{s.slot_id} crossed its registered kill line (n={s.n}, net ${s.net:+.2f}; "
+                                f"line: {s.line['rule']}; source {s.line['source']})"))
         elif flags["verdict_reached"] and not old.get("verdict_reached"):
-            events.append(f"{s.slot_id} reached verdict_n ({s.progress()}, net ${s.net:+.2f}) — PASS is never a promotion; "
-                          f"the adjudicator's CI95 read decides PASS/INCONCLUSIVE and the owner decides anything further")
+            events.append(Event("verdict", s.slot_id,
+                                f"{s.slot_id} reached verdict_n ({s.progress()}, net ${s.net:+.2f}) — PASS is never a promotion; "
+                                f"the adjudicator's CI95 read decides PASS/INCONCLUSIVE and the owner decides anything further"))
     return events, new
+
+
+# ── maint: kb reconciliation (SURVIVORS / DEAD_LIST rows) ─────────────────────
+_PIPE_OR_NL = re.compile(r"[|\r\n]+")
+_SEP_CELL = re.compile(r"^:?-+:?$")
+# same shape kb_check._ROW accepts: `| n | family | why | source | YYYY-MM-DD |`
+_DEAD_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d{4}-\d{2}-\d{2})\s*\|\s*$")
+_CI_LO = re.compile(r"CI95 lo(?:wer)?\s+([+-]?\d+(?:\.\d+)?)")
+
+
+def _cell(text) -> str:
+    """One markdown table cell: pipes → '/', newlines → space (kb_check's row regex
+    counts pipes, so a stray one would make the row malformed)."""
+    return re.sub(r"\s+", " ", _PIPE_OR_NL.sub(lambda m: "/" if "|" in m.group(0) else " ", str(text))).strip()
+
+
+def _fmt_pt(ts: Optional[float]) -> str:
+    """'2026-09-21 6:00 AM PT' (12-hour, no zero pad — the hand-written row 112 style)."""
+    if not ts:
+        return "—"
+    d = datetime.fromtimestamp(ts, tz=PT)
+    return f"{d:%Y-%m-%d} {d.strftime('%I:%M %p PT').lstrip('0')}"
+
+
+def _table_cells(line: str) -> list:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def survivors_rows(text: str) -> list:
+    """Pure: the SURVIVORS.md table → one dict per data row keyed by the header cells
+    (`run`, `id`, `train n`, …, `prereg doc`, `status`) plus `_lineno` (0-based line
+    index, for the status-cell edit). Header = the first table line that has an
+    `id` cell; separator rows and rows with a different cell count are skipped."""
+    rows, header = [], None
+    for i, line in enumerate(text.splitlines()):
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = _table_cells(line)
+        if header is None:
+            if "id" in cells:
+                header = cells
+            continue
+        if all(_SEP_CELL.match(c) for c in cells) or len(cells) != len(header):
+            continue
+        row = dict(zip(header, cells))
+        row["_lineno"] = i
+        rows.append(row)
+    return rows
+
+
+def append_dead_row(path: Path, family: str, why: str, source: str, date: str) -> tuple:
+    """Append `| n | family | why | source | date |` with n = max existing row + 1.
+    Idempotent: when a row whose family cell == family and whose why cell starts
+    with "PAPER KILL" already exists, nothing is written and ITS n is returned.
+    Returns (row_n, appended)."""
+    text = path.read_text()
+    rows = [m for m in (_DEAD_ROW.match(l) for l in text.splitlines()) if m]
+    for m in rows:
+        if m.group(2).strip() == family and m.group(3).strip().startswith("PAPER KILL"):
+            return int(m.group(1)), False
+    n = max((int(m.group(1)) for m in rows), default=0) + 1
+    row = f"| {n} | {_cell(family)} | {_cell(why)} | {_cell(source)} | {date} |"
+    if not _DEAD_ROW.match(row):                     # cannot happen after _cell(); refuse rather than corrupt the table
+        raise ValueError(f"DEAD_LIST row would not parse: {row[:120]}")
+    with path.open("a") as f:
+        if text and not text.endswith("\n"):
+            f.write("\n")
+        f.write(row + "\n")
+    return n, True
+
+
+def mark_survivor(path: Path, slot_id: str, marker: str, suffix: str) -> Optional[bool]:
+    """Append ` <suffix>` to the status cell of THE row whose id == slot_id (the only
+    edit SURVIVORS.md ever receives; every other byte is preserved). Returns True
+    when edited, False when the status cell already contains `marker` (idempotent),
+    None when the id has no row."""
+    text = path.read_text()
+    hits = [r for r in survivors_rows(text) if r["id"] == slot_id]
+    if not hits:
+        return None
+    row = hits[0]
+    if marker in row["status"]:
+        return False
+    lines = text.splitlines(keepends=True)
+    raw = lines[row["_lineno"]]
+    body = raw.rstrip("\r\n")
+    tail = raw[len(body):]
+    body = body.rstrip()
+    if not body.endswith("|"):
+        return None
+    lines[row["_lineno"]] = body[:-1].rstrip() + " " + _cell(suffix) + " |" + tail
+    path.write_text("".join(lines))
+    return True
+
+
+def reconcile_kb(ctx: Ctx, slots: list, events: list, today: str) -> list:
+    """Deterministic kb rows for SWARM-REGISTERED slots (id cell of a SURVIVORS.md
+    row). KILLED events → DEAD_LIST row + SURVIVORS status; an adjudicator PASS on an
+    alive swarm slot → SURVIVORS status (+ a "pass" event). Returns the repo-relative
+    kb paths that changed. Never raises past a single slot: a failure is logged and
+    the rest of maint (LESSONS line, Telegram, commit) still happens."""
+    if not ctx.survivors_path.exists():
+        return []
+    rows = {r["id"]: r for r in survivors_rows(ctx.survivors_path.read_text())}
+    by_id = {s.slot_id: s for s in slots}
+    changed = []
+    for e in [e for e in events if e.kind == "killed" and e.slot_id in rows]:
+        s = by_id[e.slot_id]
+        try:
+            if not ctx.dead_list_path.exists():
+                log.error("reconcile: %s missing — DEAD_LIST row for %s NOT written", ctx.dead_list_path, s.slot_id)
+                continue
+            reason = _kill_grade(s) or ((s.line or {}).get("rule") or s.killed or "killed")
+            why = (f"PAPER KILL {_fmt_pt(s.end_ts)} on the registered line: n={s.n} {s.wins}W net ${s.net:+.2f} ({reason}). "
+                   f"Paper only, $0 real. Do not re-propose without a new mechanism.")
+            prereg = rows[s.slot_id].get("prereg doc") or ""
+            source = (f"trading_state_{s.slot_id}.json closed_trades; ~/Library/Logs/Phmex-S/lab_adjudicator.log"
+                      + (f"; {prereg}" if prereg else ""))
+            n, appended = append_dead_row(ctx.dead_list_path, s.slot_id, why, source, today)
+            if appended:
+                changed.append(f"{KB_REL}/DEAD_LIST.md")
+            log.info("reconcile: %s DEAD_LIST row %d %s", s.slot_id, n, "appended" if appended else "already present")
+            marked = mark_survivor(ctx.survivors_path, s.slot_id, "PAPER KILLED",
+                                   f"— PAPER KILLED {_fmt_day(s.end_ts)} (n={s.n}, net ${s.net:+.2f}) — DEAD_LIST row {n}")
+            if marked:
+                changed.append(f"{KB_REL}/SURVIVORS.md")
+            log.info("reconcile: %s SURVIVORS status %s", s.slot_id, "updated" if marked else "already marked")
+            e.text += f" — DEAD_LIST row {n}, SURVIVORS status {'updated' if marked else 'already marked'}"
+        except Exception:
+            log.error("reconcile: %s kb rows failed: %s", s.slot_id, traceback.format_exc())
+    for s in slots:
+        if s.killed is not None or s.slot_id not in rows or not re.match(r"PASS\b", (s.adjudicator or "").strip()):
+            continue
+        try:
+            m = _CI_LO.search(s.adjudicator or "")
+            ci = m.group(1) if m else "n/a"
+            marked = mark_survivor(ctx.survivors_path, s.slot_id, "PAPER PASS",
+                                   f"— PAPER PASS {today} (n={s.n}, net ${s.net:+.2f}, CI95 lo {ci}) — "
+                                   f"awaiting owner decision (never auto-promoted)")
+            if marked:
+                changed.append(f"{KB_REL}/SURVIVORS.md")
+                events.append(Event("pass", s.slot_id,
+                                    f"{s.slot_id} PAPER PASS per the adjudicator digest (n={s.n}, net ${s.net:+.2f}, CI95 lo {ci}) — "
+                                    f"SURVIVORS status updated; awaiting owner decision (never auto-promoted)"))
+        except Exception:
+            log.error("reconcile: %s PASS mark failed: %s", s.slot_id, traceback.format_exc())
+    return sorted(set(changed))
+
+
+def _kb_check(ctx: Ctx) -> list:
+    """research.swarm.lib.kb_check.check on the kb maint just wrote; problems are
+    returned for logging, never raised, never acted on (no loop, no rewrite)."""
+    try:
+        if str(BOT_DIR) not in sys.path:
+            sys.path.insert(0, str(BOT_DIR))
+        from research.swarm.lib import kb_check
+        return kb_check.check(ctx.kb_dir, ctx.bot_dir)
+    except Exception as e:
+        return [f"kb_check unavailable: {e}"]
 
 
 def run_maint(ctx: Ctx) -> list:
@@ -623,28 +844,35 @@ def run_maint(ctx: Ctx) -> list:
     events, new_state = detect_events(prev, slots)
     if prev is None:
         log.info("maint: first run — baseline recorded, nothing announced")
+    elif int(prev.get("schema") or 1) < MAINT_SCHEMA:
+        log.info("maint: state schema %s → %d — killed flags baselined silently", prev.get("schema") or 1, MAINT_SCHEMA)
     new_state["last_run"] = datetime.fromtimestamp(now, tz=timezone.utc).isoformat()
     ctx.maint_state_path.write_text(json.dumps(new_state, indent=1, sort_keys=True) + "\n")
+    today = datetime.fromtimestamp(now, tz=PT).strftime("%Y-%m-%d")
+    kb_changed = reconcile_kb(ctx, slots, events, today)
+    if kb_changed:
+        for p in _kb_check(ctx):
+            log.error("maint: kb_check after reconciliation: %s", p)
     if events:
-        today = datetime.fromtimestamp(now, tz=PT).strftime("%Y-%m-%d")
-        line = (f"- {today} — maint: " + "; ".join(events) +
-                ". Rule: a crossed or decided paper line is evidence, not an action — the next desk run's reconciler "
-                "writes the kb row; maint promotes, kills and restarts nothing.")
+        line = (f"- {today} — maint: " + "; ".join(_cell(e.text) for e in events) +
+                ". Rule: maint writes the DEAD_LIST/SURVIVORS rows the same day; the desk reconciler never "
+                "duplicates them; maint promotes, kills and restarts nothing.")
         with ctx.lessons_path.open("a") as f:
             if not ctx.lessons_path.read_text().endswith("\n"):
                 f.write("\n")
             f.write(line + "\n")
         log.info("maint: LESSONS line appended: %s", line[:200])
-        ctx.telegram(f"🧪 swarm maint {today}\n" + "\n".join(events) + "\nsee research/swarm/kb/PAPER_STATUS.md")
+        ctx.telegram(f"🧪 swarm maint {today}\n" + "\n".join(e.text for e in events) + "\nsee research/swarm/kb/PAPER_STATUS.md")
     # Commit (pathspec, NO push) what maint wrote so the daily `pull --ff-only` never
-    # trips on a dirty PAPER_STATUS.md / LESSONS.md; the weekly desk run pushes.
-    paths = (["research/swarm/kb/PAPER_STATUS.md"] if status_changed else []) + \
-            (["research/swarm/kb/LESSONS.md"] if events else [])
+    # trips on a dirty kb file; the weekly desk run pushes.
+    paths = ([f"{KB_REL}/PAPER_STATUS.md"] if status_changed else []) + \
+            ([f"{KB_REL}/LESSONS.md"] if events else []) + kb_changed
     if paths:
         stamp = datetime.fromtimestamp(now, tz=PT).strftime("%Y-%m-%d %I:%M %p PT")
-        rc, out = git_commit_paths(ctx, f"swarm: maint {stamp} — PAPER_STATUS{' + LESSONS' if events else ''}\n\n{COMMIT_TRAILER}", paths)
+        what = " + ".join(Path(p).stem for p in paths)
+        rc, out = git_commit_paths(ctx, f"swarm: maint {stamp} — {what}\n\n{COMMIT_TRAILER}", paths)
         log.info("maint: commit %s → rc=%s %s", paths, rc, (out.strip().splitlines() or [""])[-1][:120])
-    return events
+    return [e.text for e in events]
 
 
 # ── desk: args, command line, result ──────────────────────────────────────────

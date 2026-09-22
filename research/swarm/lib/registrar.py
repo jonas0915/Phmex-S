@@ -1,12 +1,21 @@
 """Freeze a thesis (spec + signal code) with a sha256 BEFORE any data is read (spec §5 step 4).
-Deterministic: canonical JSON, sorted keys. Tamper-evident: verify() recomputes the hash."""
+Deterministic: canonical JSON, sorted keys. Tamper-evident: verify() recomputes the hash.
+
+max_concurrent (2026-09-21, STANDARDS #17): if the incoming spec has no `max_concurrent`,
+freeze() fills it deterministically with fee_math.max_concurrent(spec.sl_bps) BEFORE
+canonicalising/hashing, so the frozen file carries the cap and verify() recomputes the
+same sha. Frozen files written before this date (no key) still verify — verify() only
+recomputes the hash of the thesis as stored."""
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import re
 import sys
 from pathlib import Path
+
+from . import fee_math as fm
 
 REQUIRED_SPEC_KEYS = ("id", "lens", "mechanism", "counterparty", "prediction", "nearest_dead_rows", "spec", "signal_py")
 SPEC_KEYS_INNER = ("dataset", "universe", "timeframe", "tp_bps", "sl_bps", "max_hold_bars", "expected_trades_per_week", "doa_line")
@@ -23,7 +32,22 @@ def validate(thesis: dict) -> list[str]:
         errs.append("signal_py must define signals(df)")
     if isinstance(spec.get("universe"), list) and not spec["universe"]:
         errs.append("spec.universe is empty")
+    if "max_concurrent" in spec:
+        mc = spec["max_concurrent"]
+        if isinstance(mc, bool) or not isinstance(mc, int) or mc < 1:
+            errs.append("spec.max_concurrent must be an int >= 1")
     return errs
+
+
+def fill_max_concurrent(thesis: dict) -> dict:
+    """Return a deep copy of `thesis` whose spec carries max_concurrent (STANDARDS #17):
+    an existing value is kept; an absent one becomes fee_math.max_concurrent(spec.sl_bps).
+    The caller's dict is never mutated."""
+    thesis = copy.deepcopy(thesis)
+    spec = thesis.get("spec")
+    if isinstance(spec, dict) and "max_concurrent" not in spec and "sl_bps" in spec:
+        spec["max_concurrent"] = fm.max_concurrent(spec["sl_bps"])
+    return thesis
 
 
 def _canonical(thesis: dict) -> str:
@@ -34,6 +58,7 @@ def freeze(thesis: dict, run_dir: Path, frozen_at: str) -> Path:
     errs = validate(thesis)
     if errs:
         raise ValueError("; ".join(errs))
+    thesis = fill_max_concurrent(thesis)      # before canonicalising: the sha covers the cap
     run_dir = Path(run_dir)
     sha = hashlib.sha256(_canonical(thesis).encode()).hexdigest()
     specs, screen = run_dir / "specs", run_dir / "screens" / thesis["id"]

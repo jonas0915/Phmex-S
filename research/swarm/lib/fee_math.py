@@ -46,3 +46,27 @@ def lot_check(symbol: str, notional_usd: float) -> dict:
         return {"ok": notional_usd >= MIN_ORDER_VALUE_USD, "lots": int(notional_usd // MIN_ORDER_VALUE_USD), "lot_usd": None}
     lots = int(notional_usd // lot_usd)
     return {"ok": lots >= 1, "lots": lots, "lot_usd": lot_usd}
+
+
+def max_concurrent(sl_bps: float, notional_usd: float | None = None, kill_net_usd: float = 10.0,
+                   cost_bps: float = C_BPS) -> int:
+    """Portfolio concurrency cap: the most positions that may be open at once so that ONE
+    simultaneous cluster of stops (every open position hitting its SL together, cost
+    included) cannot alone breach the paper dollar kill cap.
+
+        stop_loss_usd  = notional_usd * (sl_bps + cost_bps) / 1e4
+        max_concurrent = max(1, floor(kill_net_usd / stop_loss_usd))
+
+    Defaults: notional_usd = position_notional() ($200), kill_net_usd = 10.0 (build.js
+    KILL_NET_USD magnitude), cost_bps = C_BPS. Added 2026-09-21 after the
+    informed_flow_btc_alt_cascade_v2 paper kill: 5 concurrent $200 shorts (sl 150 bps) all
+    stopped on one BTC pump for -$16.20 against a -$10 cap that had been sized to a single
+    position. registrar.freeze fills spec.max_concurrent from this; screen.run_screen admits
+    trades under it; the slot enforces it live (STANDARDS #17).
+    """
+    if notional_usd is None:
+        notional_usd = position_notional()
+    if sl_bps <= 0 or notional_usd <= 0 or kill_net_usd <= 0:
+        raise ValueError("sl_bps, notional_usd and kill_net_usd must be > 0")
+    stop_loss_usd = notional_usd * (sl_bps + cost_bps) / 1e4
+    return max(1, int(math.floor(kill_net_usd / stop_loss_usd)))

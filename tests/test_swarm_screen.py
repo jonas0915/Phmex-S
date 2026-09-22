@@ -297,3 +297,127 @@ def test_causality_check_clips_reference_to_each_prefix_end(tmp_path: Path, monk
         sc.causality_check(sc.load_signal_fn(_write(tmp_path, "ref_ok.py", REF_SIGNAL)), df)
         with pytest.raises(sc.LookaheadError):
             sc.causality_check(sc.load_signal_fn(_write(tmp_path, "ref_bad.py", REF_LOOKAHEAD_SIGNAL)), df)
+
+
+# ---------------------------------------------------------------------------
+# Portfolio admission under spec.max_concurrent (2026-09-21, STANDARDS #17). After the
+# per-symbol simulate, trades are admitted in (entry_ts, universe order) and a trade is
+# dropped when max_concurrent admitted trades are still open at its entry. A frozen spec
+# WITHOUT the key (every file under research/swarm/runs/ before this date) must produce
+# byte-identical outputs to before — audits re-run old screens and diff them.
+# ---------------------------------------------------------------------------
+
+# signal fires wherever volume > 0; the per-symbol frames decide WHEN (hour 0 or hour 1)
+VOLUME_SIGNAL = "import pandas as pd\ndef signals(df):\n    return (df.volume > 0).astype(int)\n"
+LEGACY_OUT_KEYS = {"id", "spec_sha256", "era", "n", "net_bps_mean", "ci95", "wr", "p_star", "trades_per_week",
+                   "time_to_verdict_weeks", "lot_check", "per_symbol", "train_span", "causality", "signal_sha256"}
+
+
+def _overlap_frames():
+    """A and B fire at hour 1 (enter 02:00), C fires at hour 0 (enter 01:00); hold 6 bars with
+    TP/SL far away so every trade is a TIME exit — all three overlap every day."""
+    frames = {}
+    for sym, hour, seed in (("A", 1, 31), ("B", 1, 32), ("C", 0, 33)):
+        df = _frame(600, seed=seed)
+        df["volume"] = (df.index.hour == hour).astype(float)
+        frames[sym] = df
+    return frames
+
+
+def _legacy_freeze(thesis: dict, run: Path) -> Path:
+    """Write a frozen file the way registrar did BEFORE max_concurrent existed (no key)."""
+    import hashlib
+    (run / "specs").mkdir(parents=True, exist_ok=True); (run / "screens" / thesis["id"]).mkdir(parents=True, exist_ok=True)
+    (run / "screens" / thesis["id"] / "signal.py").write_text(thesis["signal_py"])
+    sha = hashlib.sha256(rg._canonical(thesis).encode()).hexdigest()
+    p = run / "specs" / f"{thesis['id']}.frozen.json"
+    p.write_text(json.dumps({"thesis": thesis, "sha256": sha, "frozen_at": "t"}, indent=2, sort_keys=True))
+    return p
+
+
+def _capped_thesis(k):
+    th = _thesis(VOLUME_SIGNAL, tp=5000, sl=5000, hold=6, uni=("A", "B", "C"))
+    th["spec"]["max_concurrent"] = k
+    return th
+
+
+def test_admit_trades_cap_one_keeps_first_in_time_and_breaks_ties_by_universe_order():
+    ts = pd.date_range("2026-01-01", periods=10, freq="1h", tz="UTC")
+    trades = pd.DataFrame([
+        {"symbol": "A", "entry_ts": ts[2], "exit_ts": ts[5], "net_bps": 1.0},   # ties with B at ts[2]; A first in universe
+        {"symbol": "B", "entry_ts": ts[2], "exit_ts": ts[5], "net_bps": 2.0},
+        {"symbol": "C", "entry_ts": ts[1], "exit_ts": ts[4], "net_bps": 3.0},   # earliest — admitted first
+        {"symbol": "B", "entry_ts": ts[6], "exit_ts": ts[8], "net_bps": 4.0},   # nothing open at ts[6]
+        {"symbol": "A", "entry_ts": ts[8], "exit_ts": ts[9], "net_bps": 5.0},   # B still open AT ts[8] (exit_ts == entry_ts) → dropped
+    ])
+    got = sc.admit_trades(trades, 1, ["A", "B", "C"])
+    assert list(got["net_bps"]) == [3.0, 4.0]
+    got2 = sc.admit_trades(trades, 2, ["A", "B", "C"])
+    assert list(got2["net_bps"]) == [3.0, 1.0, 4.0, 5.0]          # C, then A (tie → universe order), B dropped
+    got3 = sc.admit_trades(trades, 3, ["A", "B", "C"])
+    assert sorted(got3["net_bps"]) == [1.0, 2.0, 3.0, 4.0, 5.0]
+
+
+def test_admit_trades_empty_frame_is_a_noop():
+    empty = pd.DataFrame(columns=["symbol", "entry_ts", "exit_ts", "net_bps"])
+    assert sc.admit_trades(empty, 1, ["A"]).empty
+
+
+def test_run_screen_cap_one_admits_only_the_first_in_time_trade_per_overlap(tmp_path: Path, monkeypatch):
+    frames = _overlap_frames()
+    monkeypatch.setattr(sc.ld, "load_ohlcv", _two_symbol_loader(frames))
+    frozen = rg.freeze(_capped_thesis(1), tmp_path, "t")
+    out = sc.run_screen(frozen, tmp_path)
+    trades = pd.read_csv(tmp_path / "screens" / "t_demo" / "trades.csv")
+    assert out["portfolio"]["max_concurrent"] == 1
+    n0 = out["portfolio"]["n_unconstrained"]
+    assert n0 > 0 and n0 == out["portfolio"]["n_admitted"] + out["portfolio"]["n_dropped"]
+    assert out["n"] == out["portfolio"]["n_admitted"] == len(trades)
+    assert set(trades["symbol"]) == {"C"}                    # C enters at 01:00, before A/B at 02:00
+    assert out["per_symbol"] == {"A": 0, "B": 0, "C": len(trades)}
+    assert out["net_bps_mean"] == pytest.approx(trades["net_bps"].mean())
+    assert out["wr"] == pytest.approx((trades["net_bps"] > 0).mean())
+    assert out["trades_per_week"] == pytest.approx(out["n"] / ((pd.Timestamp(out["train_span"][1]) - pd.Timestamp(out["train_span"][0])).total_seconds() / (7 * 86400)))
+
+
+def test_run_screen_cap_two_breaks_ties_by_universe_order(tmp_path: Path, monkeypatch):
+    frames = _overlap_frames()
+    monkeypatch.setattr(sc.ld, "load_ohlcv", _two_symbol_loader(frames))
+    frozen = rg.freeze(_capped_thesis(2), tmp_path, "t")
+    out = sc.run_screen(frozen, tmp_path)
+    trades = pd.read_csv(tmp_path / "screens" / "t_demo" / "trades.csv")
+    assert set(trades["symbol"]) == {"A", "C"}                # A and B tie at 02:00; A is first in the universe
+    assert out["per_symbol"]["B"] == 0 and out["per_symbol"]["A"] > 0 and out["per_symbol"]["C"] > 0
+    assert out["portfolio"]["n_dropped"] == out["portfolio"]["n_unconstrained"] - out["n"] > 0
+
+
+def test_run_screen_cap_three_admits_everything_and_matches_the_unconstrained_run(tmp_path: Path, monkeypatch):
+    frames = _overlap_frames()
+    monkeypatch.setattr(sc.ld, "load_ohlcv", _two_symbol_loader(frames))
+    capped = sc.run_screen(rg.freeze(_capped_thesis(3), tmp_path / "capped", "t"), tmp_path / "capped")
+    legacy = sc.run_screen(_legacy_freeze(_thesis(VOLUME_SIGNAL, tp=5000, sl=5000, hold=6, uni=("A", "B", "C")), tmp_path / "legacy"), tmp_path / "legacy")
+    assert capped["portfolio"] == {"max_concurrent": 3, "n_unconstrained": legacy["n"], "n_admitted": legacy["n"], "n_dropped": 0}
+    for k in ("n", "per_symbol"):
+        assert capped[k] == legacy[k], k
+    for k in ("net_bps_mean", "wr", "trades_per_week"):       # same trades, chronological order → fp rounding only
+        assert capped[k] == pytest.approx(legacy[k]), k
+    assert capped["ci95"] == pytest.approx(legacy["ci95"], rel=0.05)   # bootstrap resamples a differently ordered array
+    ct = pd.read_csv(tmp_path / "capped" / "screens" / "t_demo" / "trades.csv")
+    lt = pd.read_csv(tmp_path / "legacy" / "screens" / "t_demo" / "trades.csv")
+    assert len(ct) == len(lt) and sorted(ct["net_bps"]) == sorted(lt["net_bps"])
+
+
+def test_run_screen_legacy_spec_without_max_concurrent_keeps_todays_out_json_keys(tmp_path: Path, monkeypatch):
+    """Old frozen specs (no key) must produce exactly today's out.json key set — no 'portfolio'
+    key, no other addition — so audits that re-run old screens still diff clean."""
+    frames = _overlap_frames()
+    monkeypatch.setattr(sc.ld, "load_ohlcv", _two_symbol_loader(frames))
+    th = _thesis(VOLUME_SIGNAL, tp=5000, sl=5000, hold=6, uni=("A", "B", "C"))
+    assert "max_concurrent" not in th["spec"]
+    out = sc.run_screen(_legacy_freeze(th, tmp_path), tmp_path)
+    saved = json.loads((tmp_path / "screens" / "t_demo" / "out.json").read_text())
+    assert set(out.keys()) == LEGACY_OUT_KEYS and set(saved.keys()) == LEGACY_OUT_KEYS
+    k = out["per_symbol"]["A"]
+    assert k > 0 and out["per_symbol"] == {"A": k, "B": k, "C": k} and out["n"] == 3 * k   # nothing dropped
+    trades = pd.read_csv(tmp_path / "screens" / "t_demo" / "trades.csv")
+    assert list(trades["symbol"]) == ["A"] * k + ["B"] * k + ["C"] * k   # unchanged symbol-grouped order
