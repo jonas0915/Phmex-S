@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import plistlib
+import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -595,6 +597,72 @@ def test_desk_mode_requires_report_and_critic_else_no_artifacts(ctx, report, cri
     tg = ctx.telegram.calls[0][0][0]
     assert "result: NO_ARTIFACTS" in tg and sd.MANUAL_LAUNCH_ONE_LINER in tg
     assert "NO_ARTIFACTS" in _log_text(ctx)
+
+
+def test_desk_mode_saves_returned_report_text_when_synthesis_could_not_write_it(ctx):
+    # The harness blocks subagents from writing report files ("Subagents should return findings
+    # as text"), so the synthesis seat returns REPORT.md as text in closing.report — the runner saves it.
+    text = "# REPORT — returned as text\n\n## Verdict\nNothing survived.\n"
+    _desk_ok(ctx, result_code="NO_SURVIVORS", report=False, critic=True, extra={"closing": {"report": text}})
+    rc = sd.main(["--mode", "desk"], ctx=ctx)
+    assert rc == 0
+    run_id = json.loads(next(ctx.runs_dir.glob("*/launch_args.json")).read_text())["run_id"]
+    assert (ctx.runs_dir / run_id / "REPORT.md").read_text() == text
+    tg = ctx.telegram.calls[0][0][0]
+    assert "result: NO_SURVIVORS" in tg and "# REPORT — returned as text" in tg
+    assert "saved REPORT.md from the synthesis seat's returned text" in _log_text(ctx)
+
+
+def test_desk_mode_never_overwrites_a_report_already_on_disk(ctx):
+    _desk_ok(ctx, result_code="NO_SURVIVORS", report=True, critic=True, extra={"closing": {"report": "OTHER"}})
+    sd.main(["--mode", "desk"], ctx=ctx)
+    run_id = json.loads(next(ctx.runs_dir.glob("*/launch_args.json")).read_text())["run_id"]
+    assert "Written now." in (ctx.runs_dir / run_id / "REPORT.md").read_text()
+
+
+@pytest.mark.parametrize("closing", [{"report": ""}, {"report": None}, {"report": 5}, "x", None])
+def test_desk_mode_blank_or_bad_returned_report_is_still_no_artifacts(ctx, closing):
+    _desk_ok(ctx, result_code="NO_SURVIVORS", report=False, critic=True, extra={"closing": closing})
+    rc = sd.main(["--mode", "desk"], ctx=ctx)
+    assert rc != 0
+    assert "result: NO_ARTIFACTS" in ctx.telegram.calls[0][0][0]
+
+
+def test_desk_prompt_waits_for_the_notification_not_for_files():
+    # CRITIC.md appears before the reconciler runs; a file-based wait lets the headless session
+    # exit mid-reconcile, killing the workflow and losing the returned REPORT.md text.
+    p = sd.desk_prompt("research/swarm/runs/r/launch_args.json", "r")
+    assert "REPORT.md ]" not in p and "CRITIC.md ]" not in p
+    assert "`sleep 480`" in p and "task-notification" in p
+
+
+def test_desk_mode_report_write_failure_is_no_artifacts_not_a_crash(ctx, monkeypatch):
+    _desk_ok(ctx, result_code="NO_SURVIVORS", report=False, critic=True,
+             extra={"closing": {"report": "# REPORT\n"}})
+    real = Path.write_text
+
+    def boom(self, *a, **k):
+        if self.name == "REPORT.md":
+            raise OSError("disk full")
+        return real(self, *a, **k)
+    monkeypatch.setattr(Path, "write_text", boom)
+    rc = sd.main(["--mode", "desk"], ctx=ctx)
+    assert rc != 0
+    assert "result: NO_ARTIFACTS" in ctx.telegram.calls[0][0][0]
+    assert "could not save REPORT.md" in _log_text(ctx)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+@pytest.mark.parametrize("script", ["desk.js", "build.js"])
+def test_workflow_script_parses_as_a_module(script):
+    # The Workflow harness wraps the body in an async function; a stray backtick inside a prompt
+    # template (desk.js line 75, 9/20) made the harness reject the whole script at launch.
+    src = (Path(sd.__file__).resolve().parent.parent / "research/swarm/workflows" / script).read_text()
+    end = src.index("\n}\n", src.index("export const meta")) + 3
+    wrapped = src[:end] + "\nasync function __body() {\n" + src[end:] + "\n}\n"
+    r = subprocess.run(["node", "--input-type=module", "--check"], input=wrapped,
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr[-1500:]
 
 
 def test_pass_through_fidelity_warning_on_mismatch_or_missing(ctx):

@@ -108,7 +108,7 @@ MANUAL_LAUNCH_ONE_LINER = (
     '(Running the desk): confirm /workflows shows nothing live, Read kb/CONSTRAINTS.md + kb/STANDARDS.md, '
     'and invoke Workflow research/swarm/workflows/desk.js with run_id <YYYY-MM-DD-HHMM PT>, now <ISO UTC>, '
     'judge_model null, max_analysts 8, max_screens 5, dry_run false, constraints_md/standards_md = those '
-    'file contents; then python3 -m research.swarm.lib.kb_check && git add research/swarm && git commit && git push."')
+    'file contents; when it returns, Write result.closing.report verbatim to research/swarm/runs/<run_id>/REPORT.md; then python3 -m research.swarm.lib.kb_check && git add research/swarm && git commit && git push."')
 
 EXIT_OK, EXIT_FAIL, EXIT_BUSY = 0, 1, 3
 MAINT_SCHEMA = 2                 # .maint_state.json: 1 = crossed/verdict_reached only; 2 adds the killed flag
@@ -904,13 +904,13 @@ def desk_prompt(launch_args_rel: str, run_id: str) -> str:
         f"nothing added, nothing changed> }}). Run it alone — do not start any other workflow or agent.\n"
         f"3. The Workflow tool returns IMMEDIATELY with a task id and runs in the background; the result arrives later as a "
         f"task-notification. You are a headless session: if you end your turn before that notification arrives, the process "
-        f"exits and the workflow is KILLED. So after launching you MUST keep the turn alive by waiting in bounded Bash loops: "
-        f"run `until [ -f research/swarm/runs/{run_id}/REPORT.md ] && [ -f research/swarm/runs/{run_id}/CRITIC.md ]; do sleep 30; done` "
-        f"with a 540000 ms timeout, and repeat that same command as many times as needed (up to 70 minutes total) until either "
-        f"the files exist or the workflow's task-notification has arrived. Do not reply with any text in between. Do not use "
-        f"run_in_background for the wait.\n"
-        f"4. Only when the workflow result is in hand (the task-notification, or the two files exist and the notification has "
-        f"arrived), reply with exactly one line: `{RESULT_MARKER} <the returned object as compact JSON, "
+        f"exits and the workflow is KILLED. So after launching you MUST keep the turn alive by running `sleep 480` in Bash "
+        f"(a 540000 ms timeout), and repeat that same command as many times as needed (up to 70 minutes total) until the "
+        f"workflow's task-notification has arrived. Files appearing in the run dir do NOT mean it is done — the closing seats "
+        f"keep working after CRITIC.md exists, and the report reaches disk only through your reply. Do not reply with any text "
+        f"in between. Do not use run_in_background for the wait.\n"
+        f"4. Only when the workflow result is in hand (the task-notification has arrived), "
+        f"reply with exactly one line: `{RESULT_MARKER} <the returned object as compact JSON, "
         f"plus two extra top-level fields constraints_len and standards_len = the character lengths (.length) of the "
         f"constraints_md and standards_md strings you actually passed to Workflow>` and nothing else. If the workflow "
         f"throws, reply `{RESULT_MARKER} {{\"run_id\": \"{run_id}\", \"result\": \"WORKFLOW_ERROR\", "
@@ -1000,6 +1000,23 @@ def missing_artifacts(run_dir: Path) -> list:
     return [a for a in DESK_ARTIFACTS if not (run_dir / a).exists()]
 
 
+def _save_returned_report(res: dict, run_dir: Path, tag: str = "") -> None:
+    """The harness refuses report-file writes from subagents ("Subagents should return findings
+    as text"), so desk.js's synthesis seat returns REPORT.md as text in closing.report and the
+    runner saves it verbatim. A report already on disk is never overwritten."""
+    closing = res.get("closing")
+    text = closing.get("report") if isinstance(closing, dict) else None
+    path = run_dir / "REPORT.md"
+    if path.exists() or not isinstance(text, str) or not text.strip():
+        return
+    try:
+        path.write_text(text if text.endswith("\n") else text + "\n")
+    except (OSError, UnicodeError) as e:     # never raise: this runs before the commit/Telegram
+        log.error("desk%s: could not save REPORT.md from the returned text: %s", tag, e)
+        return
+    log.info("desk%s: saved REPORT.md from the synthesis seat's returned text (%d chars)", tag, len(text))
+
+
 def run_desk(ctx: Ctx, test: bool = False) -> int:
     tag = " [TEST — dry-run args]" if test else ""
     try:
@@ -1047,6 +1064,7 @@ def run_desk(ctx: Ctx, test: bool = False) -> int:
             res = parsed
             code = str(parsed.get("result") or "NO_RESULT")
             check_passthrough(res, args)
+            _save_returned_report(res, run_dir, tag)
             if code in DESK_CODES and code != "WEB_BUDGET_EXHAUSTED" and missing_artifacts(run_dir):
                 log.error("desk%s: result %s but %s missing in %s — treating as NO_ARTIFACTS",
                           tag, code, ", ".join(missing_artifacts(run_dir)), run_dir)
