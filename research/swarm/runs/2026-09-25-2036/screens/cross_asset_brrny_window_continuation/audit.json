@@ -1,0 +1,35 @@
+{
+  "verdict": "CONFIRMED",
+  "ci_excludes_zero": false,
+  "findings": [
+    "registrar.verify on the frozen spec printed True (sha c03a00ac...db55 intact).",
+    "Re-run into /tmp/audit_2026-09-25-2036_cross_asset_brrny_window_continuation reproduced out.json exactly (n=167, net_bps_mean, ci95, wr, p_star, time_to_verdict_weeks, portfolio, signal_sha256) and trades.csv is byte-identical (cmp).",
+    "signal.py lookahead review clean: no shift(-k), no center=True, no forming-bar iloc[-1], no reference/funding loads; rolling std over prior NY-15:00 bars is shifted by 1 so it excludes the current bar; out.json causality == PASS.",
+    "Entry check on all 167 trades.csv rows (not just 5): signals(df) on load_ohlcv(sym,1h,train,long_1h) fires with the trade side on the bar before entry_ts, and entry == df.open at entry_ts on every row; 0 mismatches.",
+    "No exit_ts after train_span end 2026-04-23 04:00 UTC (max exit_ts 2026-04-22 02:00 UTC); net_bps == gross_bps - fee_math.C_BPS (11.5) on all 167 rows.",
+    "fee_math.p_star(150)=0.5383333333333333 and fee_math.time_to_verdict_weeks(3.8977493748263408)=12.827915597376675 match out.json.",
+    "Screen result (not an audit defect): ci95 [-37.55, 4.00] straddles 0, net_bps_mean -16.14, wr 0.4551 < p_star 0.5383, p_boot 1.0 - fails CONSTRAINTS viable criteria 1 and 2 (source: out.json).",
+    "Informational: out.json lot_check reports lot_usd null (lots 200) for 13 of 18 symbols (LINK LTC ADA BNB AAVE UNI SUI NEAR XLM TAO ONDO 1000PEPE 1000SHIB) - they are not in fee_math.LOT_MIN_USD, so lot minimums for them are unverified rather than confirmed.",
+    "Informational: portfolio cap max_concurrent=3 admitted 167 of 393 unconstrained trades (226 dropped); all stats are on the admitted set."
+  ],
+  "numbers": {
+    "n": 167,
+    "net_bps_mean": -16.141136404264746,
+    "ci95": [
+      -37.551384049781916,
+      3.9963538916703234
+    ],
+    "wr": 0.4550898203592814,
+    "p_star": 0.5383333333333333,
+    "time_to_verdict_weeks": 12.827915597376675,
+    "p_boot": 1.0,
+    "rerun": {
+      "n": 167,
+      "net_bps_mean": -16.141136404264746,
+      "ci95": [
+        -37.551384049781916,
+        3.9963538916703234
+      ]
+    }
+  }
+}

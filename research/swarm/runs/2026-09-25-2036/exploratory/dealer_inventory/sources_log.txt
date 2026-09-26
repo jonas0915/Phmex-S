@@ -1,0 +1,10 @@
+EXPLORATORY — dealer_inventory lens, run 2026-09-25-2036. Web sourcing log (14 WebSearch, 14 WebFetch attempts; 6 opened, 8 HTTP 403).
+OPENED:
+- https://arxiv.org/abs/2601.08974 (Christensen, Oomen, Reno, "The drift burst hypothesis", Jan 2026): drift bursts ~once a week across equities/FI/FX/commodities; majority followed by reversion; reversal stronger for negative bursts with large volume. No crypto data in paper.
+- http://wp.lancs.ac.uk/fofi2024/files/2024/04/FoFI-2024-112-Aleksey-Kolokolov.pdf (Kolokolov, "Criptocrashes", Dec 2023, FoFI 2024): Kraken BTC tick 2017-01-01..2022-04-19; Table 2: 400 negative drift bursts, mean 30-min pre return -0.032, post +0.006 (sd 0.023); 428 positive, pre +0.024, post -0.003; ~83% of positive / 75% of negative bursts show NO significant reversal.
+- https://arxiv.org/html/2608.21888v1 (Kitron, Wengrowicz, Aug 2026): 15-min reversal in 90% of 183 Binance pairs; gross edge peaks ~1.3 bp/trade vs 5 bp round trip; signal gone by 4h; no conditioning on basis/funding/vol/session.
+- https://cryptoslate.com/cme-bitcoins-weekend-gap-dead-clearing-monday/ : CME crypto futures/options 24/7 from May 29, 2026.
+- https://cryptoslate.com/bitcoin-faces-16-billion-options-expiry-friday-then-two-more-tests-hit-the-rally/ : cites a 2026 Finance Research Letters study — intraday BTC reversals around Deribit expiries, strongest with high ATM OI and negative gamma; no magnitude given.
+- https://www.cerge-ei.cz/pdf/wp/Wp730.pdf (Bianchi/Babiak/Dickerson 2022): liquidity-provision (reversal) returns concentrated in low-activity pairs; cross-sectional daily, 2017-2022.
+- https://menthorq.com/guide/dealer-flow-in-btc-options/ : qualitative only, no numbers.
+403 (not cited): mdpi 1911-8074/19/9/692 (x2), medium coinmonks (x2), sciencedirect S1544612326008688, sciencedirect S0378426625000317, ssrn 4663313.

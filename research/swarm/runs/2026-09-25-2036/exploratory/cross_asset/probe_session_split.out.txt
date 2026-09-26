@@ -1,0 +1,10 @@
+BTC   n=212 corr(us->post)=-0.045 post|usTop=-25.3bps post|usBot=-28.7bps | corr(pre->us)=+0.056 us|preTop=-0.9 us|preBot=-5.1  span 2025-06-30..2026-04-21
+ETH   n=212 corr(us->post)=-0.101 post|usTop=-37.1bps post|usBot=+38.2bps | corr(pre->us)=+0.105 us|preTop=+11.6 us|preBot=-84.4  span 2025-06-30..2026-04-21
+SOL   n=212 corr(us->post)=-0.077 post|usTop=-47.8bps post|usBot=+57.7bps | corr(pre->us)=+0.057 us|preTop=+13.2 us|preBot=-90.6  span 2025-06-30..2026-04-21
+XRP   n=212 corr(us->post)=-0.208 post|usTop=-88.8bps post|usBot=+27.2bps | corr(pre->us)=+0.178 us|preTop=-0.4 us|preBot=-86.9  span 2025-06-30..2026-04-21
+DOGE  n=212 corr(us->post)=-0.077 post|usTop=-53.7bps post|usBot=+72.3bps | corr(pre->us)=+0.057 us|preTop=+75.3 us|preBot=-80.8  span 2025-06-30..2026-04-21
+LINK  n=212 corr(us->post)=-0.059 post|usTop=-76.4bps post|usBot=+23.5bps | corr(pre->us)=+0.046 us|preTop=-84.2 us|preBot=-91.1  span 2025-06-30..2026-04-21
+ADA   n=212 corr(us->post)=-0.043 post|usTop=-63.4bps post|usBot=+1.2bps | corr(pre->us)=+0.044 us|preTop=-2.0 us|preBot=-48.9  span 2025-06-30..2026-04-21
+BNB   n=212 corr(us->post)=-0.030 post|usTop=-18.2bps post|usBot=-28.7bps | corr(pre->us)=-0.003 us|preTop=-10.9 us|preBot=-12.1  span 2025-06-30..2026-04-21
+SUI   n=212 corr(us->post)=+0.009 post|usTop=+17.6bps post|usBot=+31.6bps | corr(pre->us)=+0.035 us|preTop=-15.4 us|preBot=-57.8  span 2025-06-30..2026-04-21
+AAVE  n=212 corr(us->post)=-0.028 post|usTop=-39.0bps post|usBot=+19.3bps | corr(pre->us)=+0.059 us|preTop=-61.9 us|preBot=-111.1  span 2025-06-30..2026-04-21

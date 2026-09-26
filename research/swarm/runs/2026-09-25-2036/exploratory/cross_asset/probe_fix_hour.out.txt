@@ -1,0 +1,55 @@
+  g = t.groupby(["k","h"]).apply(lambda x: pd.Series({"n": x.n.sum(), "wmean_fade_bps": (x.n*x.fade_bps).sum()/x.n.sum()}))
+  g = t.groupby(["k","h"]).apply(lambda x: pd.Series({"n": x.n.sum(), "wmean_fade_bps": (x.n*x.fade_bps).sum()/x.n.sum()}))
+  g = t.groupby(["k","h"]).apply(lambda x: pd.Series({"n": x.n.sum(), "wmean_fade_bps": (x.n*x.fade_bps).sum()/x.n.sum()}))
+  g = t.groupby(["k","h"]).apply(lambda x: pd.Series({"n": x.n.sum(), "wmean_fade_bps": (x.n*x.fade_bps).sum()/x.n.sum()}))
+  g = t.groupby(["k","h"]).apply(lambda x: pd.Series({"n": x.n.sum(), "wmean_fade_bps": (x.n*x.fade_bps).sum()/x.n.sum()}))
+NY hour 15:
+            n  wmean_fade_bps
+k   h                        
+1.5 3   208.0           -69.0
+    6   208.0           -34.7
+    12  208.0           -73.8
+2.0 3   121.0           -81.1
+    6   121.0           -32.7
+    12  121.0           -58.9
+
+NY hour 10:
+            n  wmean_fade_bps
+k   h                        
+1.5 3   231.0           -19.9
+    6   231.0           -23.3
+    12  231.0            31.4
+2.0 3   115.0           -33.9
+    6   115.0           -56.1
+    12  115.0            37.8
+
+NY hour 13:
+            n  wmean_fade_bps
+k   h                        
+1.5 3   245.0             4.0
+    6   245.0            15.3
+    12  245.0            -5.0
+2.0 3    96.0            54.4
+    6    96.0            58.9
+    12   96.0            35.5
+
+NY hour 14:
+            n  wmean_fade_bps
+k   h                        
+1.5 3   211.0            35.7
+    6   211.0            23.5
+    12  211.0            79.7
+2.0 3   114.0            47.3
+    6   114.0            25.3
+    12  114.0            98.8
+
+NY hour 17:
+            n  wmean_fade_bps
+k   h                        
+1.5 3   137.0             7.4
+    6   137.0            23.7
+    12  137.0            52.8
+2.0 3    76.0             2.4
+    6    76.0            26.8
+    12   76.0            59.4
+

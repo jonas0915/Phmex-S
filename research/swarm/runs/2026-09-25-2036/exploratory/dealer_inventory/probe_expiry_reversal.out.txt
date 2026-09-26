@@ -1,0 +1,16 @@
+BTC 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00 7199
+ETH 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00 7199
+SOL 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00 7199
+XRP 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00 7199
+all_days      |pre|>  0: n=1194 corr=-0.017 mean_fade_post_bps=-6.7 fade_win=0.477
+all_days      |pre|> 50: n= 591 corr=-0.025 mean_fade_post_bps=-12.1 fade_win=0.474
+all_days      |pre|>100: n= 269 corr=-0.065 mean_fade_post_bps=-12.5 fade_win=0.491
+fridays       |pre|>  0: n= 168 corr=+0.034 mean_fade_post_bps=-5.7 fade_win=0.524
+fridays       |pre|> 50: n=  81 corr=+0.061 mean_fade_post_bps=-3.5 fade_win=0.519
+fridays       |pre|>100: n=  42 corr=+0.198 mean_fade_post_bps=-39.0 fade_win=0.476
+last_fridays  |pre|>  0: n=  36 corr=+0.119 mean_fade_post_bps=-18.3 fade_win=0.528
+last_fridays  |pre|> 50: n=  13 corr=+0.107 mean_fade_post_bps=-43.4 fade_win=0.462
+last_fridays  |pre|>100: n=   6 corr=+0.586 mean_fade_post_bps=-77.7 fade_win=0.333
+non_fri       |pre|>  0: n=1026 corr=-0.030 mean_fade_post_bps=-6.9 fade_win=0.469
+non_fri       |pre|> 50: n= 510 corr=-0.039 mean_fade_post_bps=-13.4 fade_win=0.467
+non_fri       |pre|>100: n= 227 corr=-0.116 mean_fade_post_bps=-7.6 fade_win=0.493

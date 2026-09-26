@@ -1,0 +1,3 @@
+BTC values [np.int64(-1), np.int64(0), np.int64(1)] fires 19 prefix mismatches 0
+ETH values [np.int64(-1), np.int64(0), np.int64(1)] fires 15 prefix mismatches 0
+1000PEPE values [np.int64(-1), np.int64(0), np.int64(1)] fires 20 prefix mismatches 0

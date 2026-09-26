@@ -1,0 +1,8 @@
+[
+  {
+    "id": "cross_asset_brrny_window_continuation",
+    "thesis_path": "research/swarm/runs/2026-09-25-2036/theses/cross_asset_brrny_window_continuation.json",
+    "evidence_grade": "B",
+    "reason": "Novel forced party (ETF sponsors/APs time-locked to the BRRNY 3-4 PM ET window) distinct from dead rows 3/7/18/67/106/109/110 with row-specific why_different; sanity OK (valid id, 18 active long_1h symbols all in list_symbols('long_1h'), 1h tf, TP/SL 150 bps over 6 bars, numpy/pandas only, no reference symbol, signal outputs {-1,0,1} on train, probes long_1h train only with no mr_edge data). Sources: SEC 34-102440 PDF confirms $58B/ETF list, 3-4 PM ET window, 5-min partitions and Y/K replication text; Bitwise 424B3 confirms sponsor buys/sells as close to BRRNY as practical; FalconX confirms 0.533 / 0.027 / F=8.4767 p=0.00406 / days 3-4 ~1.2%; CryptoSlate (secondary on MDPI study) confirms 87,672 obs, 50.6% vs 38.4%, ETH 41.8->48.2, XRP 37.2->46.2. Grade B not A: the tradeable link (window-bar move continues intraday after 4 PM) is the thesis's own inference with no external source, CryptoSlate/MDPI says the US-hours variance shift broke in Nov 2021 and found ETF launch statistically insignificant, and the Bitwise BRRNY-trading sentence is conditional ('Under such circumstances', cash orders). Watch: continuation-of-outlier-bar is the family of dead rows 110/111 and hour-conditioning of row 7 - the screen must beat that on the frozen DOA line."
+  }
+]

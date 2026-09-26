@@ -1,0 +1,10 @@
+EXPLORATORY — literature seat, run 2026-09-25-2036. Not evidence.
+emoji_paper.txt (Zuo/Chen/Hardle 2024): emoji-sentiment (GPT-4/BERT on tweets) -> next-day BTC; counterparty none named; NOT usable (no tweet feed in bot data; daily n tiny).
+garcia_schweitzer.txt (RSOS 2015): Twitter polarization/valence + exchange volume precede BTC rises; counterparty none; NOT usable (social data absent; 2012-2014 era; row 18 on-chain/intraday-signal family).
+hansen_periodicity.txt (arXiv 2109.12142): day/hour/within-hour periodicity in vol & volume, not returns; counterparty none; NOT usable (magnitude not direction; row 7).
+petukhina_hft.txt (arXiv 2009.04200): descriptive intraday HFT patterns/volume/vol periodicity vs CRIX; counterparty none; NOT usable (descriptive; row 7).
+academic/ssrn_6932998.html: file is an Elsevier/Cloudflare "Content Blocked" page (372 chars of text); no paper content; NOT usable.
+local_check.py: copied unmodified -> local_check_copy.py, output local_check_output.txt (pooled signed next-5m alt OC +1.71 bps, hit 0.475) — fee-trapped vs c=11.5 bps; lead-lag family dead row 106.
+Web: Kim & Hansen arXiv 2607.09426v2 quarter-hour effect — 4-12h imbalance effect 'less than one basis point at four hours to 9.8 and 16.9 basis points at eight and twelve hours' (interquartile), needs signed 10s trade flow -> NOT usable.
+Web: Kitron & Wengrowicz arXiv 2608.21888 — 15m reversal 'gross edge peaks near 1.3bp per trade against a 5bp round-trip cost' -> fee-trapped (kitron_2608.21888.txt).
+Web: Osler NY Fed SR150 — stop-loss cascades after round numbers; excess move e.g. 'dollar-yen moves by 0.0130 percent more after crossing a round number' (osler_sr150.txt line ~521) -> ~1 bp, fee-trapped.

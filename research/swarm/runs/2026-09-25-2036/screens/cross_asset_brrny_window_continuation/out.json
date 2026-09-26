@@ -1,0 +1,139 @@
+{
+  "id": "cross_asset_brrny_window_continuation",
+  "spec_sha256": "c03a00ac4ea6ab2e9eaea9fbebaebb8ae7494331f079ac587fdf4f7a99aedb55",
+  "era": "train",
+  "n": 167,
+  "net_bps_mean": -16.141136404264746,
+  "ci95": [
+    -37.551384049781916,
+    3.9963538916703234
+  ],
+  "wr": 0.4550898203592814,
+  "p_star": 0.5383333333333333,
+  "trades_per_week": 3.8977493748263408,
+  "time_to_verdict_weeks": 12.827915597376675,
+  "lot_check": {
+    "BTC": {
+      "ok": true,
+      "lots": 2,
+      "lot_usd": 77.74
+    },
+    "ETH": {
+      "ok": true,
+      "lots": 8,
+      "lot_usd": 24.9738
+    },
+    "SOL": {
+      "ok": true,
+      "lots": 197,
+      "lot_usd": 1.0143
+    },
+    "XRP": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.0044
+    },
+    "DOGE": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.001
+    },
+    "LINK": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "LTC": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "ADA": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "BNB": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "AAVE": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "UNI": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "SUI": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "NEAR": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "XLM": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "TAO": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "ONDO": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "1000PEPE": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    },
+    "1000SHIB": {
+      "ok": true,
+      "lots": 200,
+      "lot_usd": null
+    }
+  },
+  "per_symbol": {
+    "BTC": 19,
+    "ETH": 15,
+    "SOL": 24,
+    "XRP": 17,
+    "DOGE": 7,
+    "LINK": 9,
+    "LTC": 9,
+    "ADA": 7,
+    "BNB": 11,
+    "AAVE": 7,
+    "UNI": 7,
+    "SUI": 6,
+    "NEAR": 6,
+    "XLM": 4,
+    "TAO": 5,
+    "ONDO": 6,
+    "1000PEPE": 4,
+    "1000SHIB": 4
+  },
+  "train_span": [
+    "2025-06-27 06:00:00+00:00",
+    "2026-04-23 04:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "56759c5ad10380c280a8408315abacaa16bd89f96596370a54c5cb81a069a4b2",
+  "portfolio": {
+    "max_concurrent": 3,
+    "n_unconstrained": 393,
+    "n_admitted": 167,
+    "n_dropped": 226
+  }
+}

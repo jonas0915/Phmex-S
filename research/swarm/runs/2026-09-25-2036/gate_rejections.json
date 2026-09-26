@@ -1,0 +1,7 @@
+[
+  {
+    "id": "owner_record_delist_peg_dislocation_fade",
+    "dead_row": null,
+    "reason": "not screenable: universe is a single inverse TRYB-pegged perp inside a delisting window that exists in neither mr_edge nor long_1h (spec.universe entry is a placeholder, not a list_symbols('mr_edge') symbol), the bot has no inverse path, delisting-announcement feed or anchor-price input; thesis itself states NOT SCREENABLE and time_to_verdict_weeks 70.73 > 26 at its own 0.707/week (fails CONSTRAINTS viable item 3). Record as not screenable, not as a screened death."
+  }
+]

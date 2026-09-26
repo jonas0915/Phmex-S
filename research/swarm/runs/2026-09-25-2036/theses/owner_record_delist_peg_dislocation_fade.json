@@ -1,0 +1,51 @@
+{
+ "id": "owner_record_delist_peg_dislocation_fade",
+ "lens": "owner-record",
+ "mechanism": "The owner's entire 2022-23 net profit came from ONE 4-hour episode: 33 round trips on Phemex's u100TRYBUSD (Turkish-lira stablecoin) inverse perp between 04:47 and 08:44 UTC on 2022-11-10 (+$8,128.01, WR 0.8182, n=33, research/swarm/runs/2026-09-25-2036/theses/owner_record_probe.json:u100TRYBUSD_episode), the same morning Phemex delisted that contract (reduce-only from 09:30 UTC, force-settled at 10:00 UTC at the 30-min average mark price, per the Phemex announcement). Every other trade (n=786) lost -$3,270.79 with bootstrap mean CI95 [-5.878, -2.531] USD/trade (research/swarm/runs/2026-09-25-2036/theses/owner_record_probe.json:ex_TRYB). The owner bought when the contract printed ~0.0435-0.050 and sold at ~0.055-0.087 around a fiat anchor near 0.0535 (open_price_Ep_range [43550, 85270], research/swarm/runs/2026-09-25-2036/theses/owner_record_probe.json). Mechanism: in a delisting wind-down, market makers withdraw (spreads widen 5-10x in the final hours, arbitron.app) while every remaining holder is FORCED to close before a hard deadline at any price; in a contract whose fair value is pinned to an external anchor that cannot move (a fiat peg; the settlement itself is an average mark price), price-insensitive forced closes print far from the anchor and a liquidity provider who fades the dislocation back toward the anchor is paid the forced sellers' impact.",
+ "counterparty": "Holders of the delisting contract forced to exit before the reduce-only/forced-settlement deadline (and the positions liquidated by the resulting wicks at up to 20x on this contract, leverage field in api_closed_pnl.json), who must cross an empty book because market makers have already withdrawn; they pay the dislocation from the pegged anchor to whoever supplies liquidity against them.",
+ "prediction": "NOT SCREENABLE ON THIS DESK: neither mr_edge nor long_1h contains a pegged-asset contract or any bars inside a delisting wind-down (GIGGLE's cache ends 2026-08-01, before its 2026-08-07 delisting, DATA.md), and the bot has no delisting-announcement feed and no index/anchor-price input; bot has no inverse path yet. Falsifiable form for a future forward record: on a pegged-asset perp inside the final 24h before a Phemex delisting, fading closes > 500 bps from the trailing anchor with TP 300 / SL 300 bps nets positive after c=11.5 bps with WR >= p*(300)=0.5191666666666667 (fee_math.p_star). Even at the owner's own frequency (33 trades in 46.68 weeks = 0.707/week) fee_math.time_to_verdict_weeks gives 70.73 weeks > 26, so it also fails CONSTRAINTS viability item 3 \u2014 record as not screenable / not viable, not as a screened death.",
+ "nearest_dead_rows": [
+  {
+   "row": 2,
+   "why_different": "Row 2 faded short-horizon alt-vs-ETH moves on free-floating assets whose fair value moves; this bets only on reversion to an external anchor that cannot move (a fiat peg) while forced closers cross an empty book under a delisting deadline \u2014 the payer is a deadline-forced holder, not a statistical overshoot."
+  },
+  {
+   "row": 76,
+   "why_different": "Row 76 is unconditional multi-day MR on free-floating coins; here reversion is guaranteed by the anchor and by settlement at an average mark price, and the edge exists only in the hours before a scheduled forced settlement."
+  },
+  {
+   "row": 6,
+   "why_different": "Row 6 faded liquidation cascades in free-floating perps and found continuation; with no anchor there is nothing to revert to. This thesis requires a pegged fair value; without it the signal is exactly row 6/row 3 and must not be run."
+  },
+  {
+   "row": 110,
+   "why_different": "Row 110 (the previous owner-record thesis) read the owner's record as liquidation-cascade continuation on BTC/ETH/SOL/XRP/DOGE; this run's probe shows the profitable subset is not cascades on majors at all but one pegged contract on its delisting morning, and the ex-TRYB book is negative with CI fully below zero."
+  },
+  {
+   "row": 19,
+   "why_different": "Row 19 is a directional short into a scheduled supply event with unbounded drift risk; this is two-sided liquidity provision against forced closers around a fixed anchor, flat before the settlement deadline."
+  }
+ ],
+ "source_urls": [
+  "https://phemex.com/announcements/phemex-is-delisting-tryb-contract-trading-pair",
+  "https://arbitron.app/learn/delist-detection",
+  "https://arxiv.org/pdf/2601.18991",
+  "research/swarm/kb/owner_trades/api_closed_pnl.json",
+  "research/swarm/runs/2026-09-25-2036/theses/owner_record_probe.json"
+ ],
+ "evidence": "phemex.com/announcements/phemex-is-delisting-tryb-contract-trading-pair: '9:30 UTC on Nov. 10, 2022 \u2013 Phemex will only support ReduceOnly orders for 100TRYB/USD'; '10:00 UTC ... gets delisted'; open positions 'closed based on the asset's average mark price in the 30-minute time period from 9:30 UTC to 10:00 UTC'. arbitron.app/learn/delist-detection: spreads 'widen 5-10x in the final hours', market makers withdraw, funding 'often spikes to \u00b11-2% per 8h'. arxiv.org/pdf/2601.18991 (Mohanty & Krishnamachari, Jan 2026, 'Who Restores the Peg?'): models peg restoration as arbitrageurs buying below peg from panic sellers (I could not extract the paper's numeric half-life tables from the PDF, so no number is cited from it). Local: research/swarm/runs/2026-09-25-2036/theses/owner_record_probe.json \u2014 all 819 trades sum +$4,857.22; u100TRYBUSD n=33 +$8,128.01 WR 0.8182 on 2022-11-10 04:47-08:44 UTC; ex-TRYB n=786 -$3,270.79, mean CI95 [-5.878,-2.531] (bootstrap_ci.mean_ci); ex-TRYB fees $915.15 (exchangeFeeEv).",
+ "spec": {
+  "dataset": "mr_edge",
+  "universe": [
+   "TRYB-pegged-perp-in-delisting-window (inverse; not present in mr_edge or long_1h \u2014 NOT SCREENABLE)"
+  ],
+  "timeframe": "5m",
+  "tp_bps": 300,
+  "sl_bps": 300,
+  "max_hold_bars": 12,
+  "expected_trades_per_week": 0.707,
+  "doa_line": "Not screenable: record in the gate as NOT SCREENABLE (no pegged/delisting-window data, no inverse path); if ever forward-recorded, dead if net bps CI95 after c includes zero at n>=30 or WR < p*(300)=0.5191666666666667."
+ },
+ "signal_py": "import numpy as np\nimport pandas as pd\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Anchor-dislocation fade for a PEGGED contract in its pre-delisting wind-down.\n    Anchor = median close of the prior day excluding the most recent hour (bars t-288..t-13),\n    a trailing proxy for the fiat peg. Fade closes that sit > 500 bps from the anchor.\n    Closed bars only: every input is at or before bar t. Meaningful ONLY on a pegged\n    instrument inside a delisting window; on a free-floating perp it is generic MR (dead rows 2/3/76).\"\"\"\n    close = df[\"close\"].astype(float)\n    anchor = close.shift(12).rolling(276, min_periods=200).median()\n    dev = close / anchor - 1.0\n    sig = pd.Series(0, index=df.index, dtype=int)\n    sig[dev < -0.05] = 1\n    sig[dev > 0.05] = -1\n    return sig.fillna(0).astype(int)\n",
+ "thesis_path": "research/swarm/runs/2026-09-25-2036/theses/owner_record_delist_peg_dislocation_fade.json"
+}

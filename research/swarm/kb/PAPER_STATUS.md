@@ -1,6 +1,6 @@
 # PAPER_STATUS — paper-slot forward tests (auto-written by `scripts/swarm_desk.py --mode maint`; do not edit — regenerated daily)
 
-Written 2026-09-25 08:32 PM PT. Bot process: RUNNING. Adjudicator digest: Sep 25 6:00 AM PT (0.6 d old).
+Written 2026-09-25 08:36 PM PT. Bot process: RUNNING. Adjudicator digest: Sep 25 6:00 AM PT (0.6 d old).
 
 Per slot: n and net USD are the registered era's closed trades (no registered era → every closed trade in the file; net_pnl as-is, fee-inclusive at the source); WR = share of era trades with net > 0; days = era start (registration, else first trade) → now, or → kill. Distance = USD above the kill line. Nothing here promotes or restarts anything.
 

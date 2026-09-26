@@ -1,0 +1,154 @@
+{
+  "symbols": [
+    {
+      "input": "BTC",
+      "symbol": "BTC/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "ETH",
+      "symbol": "ETH/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "SOL",
+      "symbol": "SOL/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "XRP",
+      "symbol": "XRP/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "DOGE",
+      "symbol": "DOGE/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "LINK",
+      "symbol": "LINK/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "LTC",
+      "symbol": "LTC/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "ADA",
+      "symbol": "ADA/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "BNB",
+      "symbol": "BNB/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "AAVE",
+      "symbol": "AAVE/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "UNI",
+      "symbol": "UNI/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "SUI",
+      "symbol": "SUI/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "NEAR",
+      "symbol": "NEAR/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "XLM",
+      "symbol": "XLM/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "TAO",
+      "symbol": "TAO/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "ONDO",
+      "symbol": "ONDO/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "1000PEPE",
+      "symbol": "1000PEPE/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "1000SHIB",
+      "symbol": "1000SHIB/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    }
+  ],
+  "tradeable": [
+    "BTC",
+    "ETH",
+    "SOL",
+    "XRP",
+    "DOGE",
+    "LINK",
+    "LTC",
+    "ADA",
+    "BNB",
+    "AAVE",
+    "UNI",
+    "SUI",
+    "NEAR",
+    "XLM",
+    "TAO",
+    "ONDO",
+    "1000PEPE",
+    "1000SHIB"
+  ],
+  "untradeable": [],
+  "all_tradeable": true,
+  "dropped_symbols": [],
+  "pruned_path": "research/swarm/runs/2026-09-25-2036/register/cross_asset_brrny_window_continuation/thesis.json"
+}

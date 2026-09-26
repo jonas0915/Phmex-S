@@ -1,0 +1,71 @@
+{
+  "id": "cross_asset_brrny_window_continuation",
+  "lens": "cross_asset",
+  "mechanism": "US spot crypto ETFs (IBIT, FBTC, GBTC, ARKB, BITB, HODL, BRRR, ...) are valued at the CME CF Bitcoin Reference Rate - New York Variant (BRRNY), which aggregates constituent-exchange trades over a fixed 3:00-4:00 p.m. ET observation window split into equal 5-minute partitions; the benchmark methodology itself states that a trader wanting to transact at the rate does so by splitting the order evenly across the partitions, and the issuer prospectus states the sponsor seeks to buy/sell bitcoin 'as close to the BRRNY as practical'. So the equity-market (TradFi) investor flow into and out of the ETFs is converted into price-insensitive, time-locked spot execution inside that one NY hour. A statistically outsized move in the NY 15:00 1h bar is therefore a real-time read of an unusually large one-sided creation/redemption imbalance (not a stop cascade or random vol spike). Because ETF flows are strongly persistent day to day (FalconX: flow persistence coefficient 0.533, flows Granger-cause returns, impulse response peaks days 3-4) and cash-order execution/hedging of that imbalance does not finish exactly at 4:00 p.m., the window move is repriced late by the crypto-native evening/Asia session and continues over the next hours. Alts carry the same TradFi-session flow through beta (US hours now carry ~half of daily variance for BTC, ETH, XRP), so each symbol's own window move is the trigger - no cross-symbol lead is used. Trade: continuation in the direction of the window bar, entered at the next bar's open.",
+  "counterparty": "(1) Price-insensitive benchmark-tracking ETF flow - issuers/authorized participants whose creations and redemptions must be executed at or near the 4 p.m. BRRNY regardless of price, and whose next-session flow is autocorrelated with today's, so they keep buying (selling) into a market we are already long (short); (2) crypto-native evening/Asia-session liquidity providers and mean-reversion traders who treat a sharp late-US-session bar like any other hourly spike and fade it - the same fade that is profitable at non-benchmark hours - and are run over when the move is flow-driven.",
+  "prediction": "On the long_1h TRAIN era, continuation trades entered at the open after a |z|>1.5 NY-15:00 weekday bar, with symmetric TP/SL 150 bps and a 6-bar max hold, have mean net bps > 0 after c=11.5 bps with bootstrap CI95 excluding 0, WR >= p*(150)=0.5383 (fee_math.p_star), and the +/-20% tp_bps robustness variants (120 / 180 bps) keep a positive net_bps_mean. Falsified if the CI includes 0 or is negative, or WR < p*.",
+  "nearest_dead_rows": [
+    {
+      "row": 3,
+      "why_different": "Row 3 fades any 1h vol-expansion bar at any hour (and died on single-split selection). This thesis trades CONTINUATION, and only of the one hour in which ETF benchmark execution is time-locked by the BRRNY methodology; the premise is that a window move is flow-driven information rather than a noise spike, which is the opposite bet from row 3."
+    },
+    {
+      "row": 7,
+      "why_different": "Row 7 (and 67) tested unconditional mean return by hour of day / weekday. This thesis has no directional hour bias: direction comes from the sign of the benchmark-window move itself, long or short, and it fires only on outlier window bars (~81 event days in 42.7 train weeks per exploratory/cross_asset/probe_frequency.out.txt)."
+    },
+    {
+      "row": 18,
+      "why_different": "Row 18 killed ETF-flow TIMING from published daily flow prints (adj-R2 <= 0.002, reported after the fact). This thesis never uses the published flow series; it reads the price footprint of the flow inside the fixed execution window in real time on closed bars and trades the intraday hours right after it."
+    },
+    {
+      "row": 110,
+      "why_different": "Row 110 bought continuation after any |z|>2.5 return + volume-z>2 bar as a forced-liquidation proxy at any hour. The forced party here is a benchmark-tracking TWAP executor, not liquidated leverage, and the trigger is confined to the benchmark window; a cascade at any other hour does not fire."
+    },
+    {
+      "row": 106,
+      "why_different": "Rows 106/107/112 traded an alt on a BTC (or ETH/BTC) reference move - a cross-symbol lead-lag. This thesis uses no reference symbol: every symbol's signal is its own window bar, and the lag being exploited is session-to-session (TradFi window -> crypto-native evening), not BTC -> alt."
+    },
+    {
+      "row": 109,
+      "why_different": "Row 109 traded leveraged-token issuers' daily rebalance near the UTC day close on alts. Different forced party (spot ETF sponsors/APs vs leveraged-token rebalancers), different clock (BRRNY 3-4 p.m. ET window vs 00:00 UTC), different flow sign logic (persistent investor flow vs mechanical leverage reset)."
+    }
+  ],
+  "source_urls": [
+    "https://www.sec.gov/files/rules/sro/phlx/2025/34-102440.pdf",
+    "https://www.sec.gov/Archives/edgar/data/1763415/000121390025070105/ea024820902-424b3_bitwise.htm",
+    "https://www.falconx.io/newsroom/what-can-spot-etf-flows-tell-us-about-the-trajectory-of-bitcoin-prices-a-preliminary-statistical-investigation",
+    "https://cryptoslate.com/crypto-never-closes-but-bitcoin-ethereum-xrp-and-solana-now-move-on-wall-street-time/"
+  ],
+  "evidence": "SEC SR-Phlx-2025-08 filing (https://www.sec.gov/files/rules/sro/phlx/2025/34-102440.pdf, opened and text-extracted): the CF Benchmarks Index (BRRNY) 'constitutes the index for the following exchange-listed ETF products comprising $58 billion of assets as of July 18, 2024: iShares Bitcoin Trust (IBIT), Grayscale Bitcoin Trust (GBTC), Fidelity Wise Origin Bitcoin Fund (FBTC), ARK 21Shares ...'; it 'aggregates the trade flow of several bitcoin platforms, during an observation window between 3:00 p.m. and 4:00 p.m. ET'; the list is 'partitioned into a number of equally-sized time intervals, of 5 minutes'; and 'a trader aiming to transact Y units ... at the CME CF Cryptocurrency Reference Rates can do so with little tracking error by transacting Y/K units ... during each partition'. Bitwise Bitcoin ETF 424B3 FY2025 (https://www.sec.gov/Archives/edgar/data/1763415/000121390025070105/ea024820902-424b3_bitwise.htm, opened): 'the Sponsor, on behalf of the Trust, typically seeks to buy and sell bitcoin at a price as close to the BRRNY as practical' and 'The Trust values its bitcoin holdings, net assets and the Shares daily based on the BRRNY'. FalconX research, Oct 11 2024 (https://www.falconx.io/newsroom/..., opened): 'ETF flows also show persistence (coefficient: 0.533)'; 'Previous day's ETF inflows positively impact today's price changes (coefficient: 0.027)'; Granger test f-statistic 8.4767, p-value 0.00406; a positive flow shock peaks 'around days 3-4 with approximately a 1.2% price increase'. CryptoSlate on the MDPI 'Wall Street time' study (opened): Kraken XBT/USD 87,672 hourly obs 2016-2025; US hours 13:00-21:59 UTC carried 50.6% of daily realized variance in 2022-2025 vs 38.4% in 2016-2018; ETH 41.8% -> 48.2%, XRP 37.2% -> 46.2%. Exploratory only, not evidence (long_1h TRAIN, no mr_edge data): research/swarm/runs/2026-09-25-2036/exploratory/cross_asset/probe_fix_hour.out.txt shows NY-15:00 outlier bars continued while placebo NY hours 13/14/17 reverted; probe_fix_hour_bysym.out.txt shows the effect weaker in the Dec-2025..Apr-2026 half and month-lumpy (2026-02/03 negative) - a registered risk. Frequency/fee numbers from probe_frequency.out.txt via fee_math: max_concurrent(150)=3, p_star(150)=0.5383, admitted-trade upper bound 3.91/week, time_to_verdict_weeks=12.79, every universe symbol passes lot_check at position_notional()=200.",
+  "spec": {
+    "dataset": "long_1h",
+    "universe": [
+      "BTC",
+      "ETH",
+      "SOL",
+      "XRP",
+      "DOGE",
+      "LINK",
+      "LTC",
+      "ADA",
+      "BNB",
+      "AAVE",
+      "UNI",
+      "SUI",
+      "NEAR",
+      "XLM",
+      "TAO",
+      "ONDO",
+      "1000PEPE",
+      "1000SHIB"
+    ],
+    "timeframe": "1h",
+    "tp_bps": 150,
+    "sl_bps": 150,
+    "max_hold_bars": 6,
+    "expected_trades_per_week": 3.9,
+    "doa_line": "Kill if the frozen long_1h train screen (out.json, admitted set under max_concurrent) shows n < 30, or bootstrap_ci.mean_ci CI95 of net bps (after fee_math.C_BPS=11.5) includes or lies below 0, or WR < fee_math.p_star(150)=0.5383, or time_to_verdict_weeks(n=50) at the realized frequency > 26, or the registered +/-20% tp_bps robustness read (120 bps and 180 bps variants) does not keep net_bps_mean positive in both."
+  },
+  "signal_py": "\"\"\"cross_asset_brrny_window_continuation \u2014 signal (closed 1h bars only).\nFires on the 1h bar whose New-York-local open hour is 15:00 (the CME CF BRRNY 3:00-4:00 p.m. ET\nbenchmark observation window) on NY weekdays, when that bar's open->close log return is a\n|z| > 1.5 outlier versus the trailing 40 prior NY-15:00 bars of the same symbol (std excludes\nthe current bar). Direction = continuation (sign of the window move). All inputs are the bar\nitself and earlier bars; no reference symbol, no funding.\"\"\"\nimport numpy as np\nimport pandas as pd\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    idx = df.index\n    idx_utc = idx.tz_localize(\"UTC\") if idx.tz is None else idx.tz_convert(\"UTC\")\n    ny = idx_utc.tz_convert(\"America/New_York\")\n    r = np.log(df[\"close\"].astype(float) / df[\"open\"].astype(float))\n    mask = np.asarray((ny.hour == 15) & (ny.dayofweek < 5))\n    rr = r[mask]\n    sd = rr.rolling(40, min_periods=20).std().shift(1)\n    z = rr / sd\n    out = pd.Series(0, index=df.index, dtype=int)\n    out.loc[z.index[(z > 1.5).to_numpy()]] = 1\n    out.loc[z.index[(z < -1.5).to_numpy()]] = -1\n    return out\n",
+  "thesis_path": "research/swarm/runs/2026-09-25-2036/theses/cross_asset_brrny_window_continuation.json"
+}
