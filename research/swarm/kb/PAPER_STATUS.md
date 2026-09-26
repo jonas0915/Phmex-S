@@ -1,6 +1,6 @@
 # PAPER_STATUS — paper-slot forward tests (auto-written by `scripts/swarm_desk.py --mode maint`; do not edit — regenerated daily)
 
-Written 2026-09-25 06:30 AM PT. Bot process: RUNNING. Adjudicator digest: Sep 25 6:00 AM PT (0.0 d old).
+Written 2026-09-25 08:32 PM PT. Bot process: RUNNING. Adjudicator digest: Sep 25 6:00 AM PT (0.6 d old).
 
 Per slot: n and net USD are the registered era's closed trades (no registered era → every closed trade in the file; net_pnl as-is, fee-inclusive at the source); WR = share of era trades with net > 0; days = era start (registration, else first trade) → now, or → kill. Distance = USD above the kill line. Nothing here promotes or restarts anything.
 
@@ -8,8 +8,8 @@ Per slot: n and net USD are the registered era's closed trades (no registered er
 
 | slot | mode | n | net USD | WR | days | last close | kill line | distance | verdict_n | adjudicator (latest digest) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| DONCHIAN_BTC | paper | 14 | +7.81 | 57% | 70 | 2026-09-21 | KILL if paper net <= $-15.00 (spec; fidelity line graded separately) (docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md) | 22.81 above $-15.00 | — | — |
-| DONCHIAN_ETH | paper | 20 | +6.83 | 70% | 70 | 2026-09-23 | KILL if paper net <= $-15.00 (spec; fidelity line graded separately) (docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md) | 21.83 above $-15.00 | — | — |
+| DONCHIAN_BTC | paper | 14 | +7.81 | 57% | 71 | 2026-09-21 | KILL if paper net <= $-15.00 (spec; fidelity line graded separately) (docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md) | 22.81 above $-15.00 | — | — |
+| DONCHIAN_ETH | paper | 20 | +6.83 | 70% | 71 | 2026-09-23 | KILL if paper net <= $-15.00 (spec; fidelity line graded separately) (docs/superpowers/specs/2026-07-16-donchian-ensemble-slot-design.md) | 21.83 above $-15.00 | — | — |
 
 ## Killed / retired
 
