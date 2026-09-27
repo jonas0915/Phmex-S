@@ -1,0 +1,13 @@
+/Users/jonaspenaso/Desktop/Phmex-S/research/swarm/runs/2026-09-27-0300/exploratory/vol_structure/probe_lottery_jump.py:34: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+  t = pd.concat(allt)
+BTC train span 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00 7199
+jump k=3.0 floor=0.08 tp300/sl300/h168: n=27 mean_net=66.28 ci=[-44.83,177.39] WR=0.630 p*=0.5192 span=2025-08-19 01:00:00+00:00..2026-03-04 01:00:00+00:00
+{'1000PEPE': 3, 'AAVE': 1, 'BNB': 2, 'BTC': 1, 'DOGE': 2, 'ETH': 2, 'LINK': 3, 'LTC': 1, 'NEAR': 4, 'SOL': 1, 'SUI': 1, 'TAO': 2, 'UNI': 2, 'XRP': 2}
+{'TP': 17, 'SL': 10}
+jump k=2.5 floor=0.06 tp300/sl300/h168: n=57 mean_net=88.50 ci=[14.82,151.92] WR=0.667 p*=0.5192 span=2025-08-14 01:00:00+00:00..2026-04-15 01:00:00+00:00
+{'1000PEPE': 4, '1000SHIB': 2, 'AAVE': 3, 'ADA': 3, 'BNB': 5, 'BTC': 1, 'DOGE': 3, 'ETH': 5, 'LINK': 3, 'LTC': 6, 'NEAR': 5, 'ONDO': 2, 'SOL': 4, 'SUI': 3, 'TAO': 3, 'UNI': 2, 'XLM': 1, 'XRP': 2}
+{'TP': 38, 'SL': 19}
+jump k=2.0 floor=0.05 tp300/sl300/h168: n=135 mean_net=92.94 ci=[43.94,137.39] WR=0.674 p*=0.5192 span=2025-08-06 01:00:00+00:00..2026-04-18 01:00:00+00:00
+{'1000PEPE': 10, '1000SHIB': 7, 'AAVE': 7, 'ADA': 7, 'BNB': 9, 'BTC': 5, 'DOGE': 7, 'ETH': 8, 'LINK': 11, 'LTC': 7, 'NEAR': 8, 'ONDO': 7, 'SOL': 5, 'SUI': 9, 'TAO': 8, 'UNI': 7, 'XLM': 7, 'XRP': 6}
+{'TP': 91, 'SL': 44}
+BASELINE unconditional 00UTC short tp300/sl300/h168: n=3951 mean_net=-1.91 ci=[-11.44,7.03] WR=0.518 p*=0.5192 span=2025-06-28 01:00:00+00:00..2026-04-23 01:00:00+00:00

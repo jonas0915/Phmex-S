@@ -1,0 +1,6 @@
+BTC causality PASS values [np.int64(-1), np.int64(0), np.int64(1)] bars 7199
+ETH causality PASS values [np.int64(-1), np.int64(0), np.int64(1)] bars 7199
+SOL causality PASS values [np.int64(-1), np.int64(0), np.int64(1)] bars 7199
+XRP causality PASS values [np.int64(-1), np.int64(0), np.int64(1)] bars 7199
+DOGE causality PASS values [np.int64(-1), np.int64(0), np.int64(1)] bars 7199
+fire weekdays/hours [(0, 12)]

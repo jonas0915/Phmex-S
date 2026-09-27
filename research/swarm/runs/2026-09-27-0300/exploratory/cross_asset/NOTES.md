@@ -1,0 +1,4 @@
+# cross_asset lens exploratory notes (run 2026-09-27-0300) — EXPLORATORY, not evidence
+Web work: 7 WebSearch calls, 11 WebFetch attempts (cryptonews.net, cryptoslate, falconx, arxiv 2405.12768, arxiv 2506.08718, yahoo CME 24/7 opened; sciencedirect S1544612325019154, beincrypto, bitcoinethereumnews returned 403; cmegroup article and press release timed out — none of those are cited).
+No equity/DXY/rates series exist in either dataset, so equity->crypto spillover could not be signalled directly; the lens produced one thesis (cross-venue ETF weekend catch-up) and no second.
+Probes: probe_weekend_etf_catchup.py (+ .out.txt draft |z|>=1.0, _final.out.txt |z|>=0.5), probe_frequency_capped.py(.out.txt), causality_sanity.out.txt, fee_math_outputs.txt. All long_1h train only; no mr_edge data read.

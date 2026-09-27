@@ -1,0 +1,68 @@
+{
+  "id": "vol_structure_lottery_jump_fade",
+  "lens": "vol_structure",
+  "mechanism": "Upside-jump (positive semivariance / MAX) lottery overpricing, traded in time series per coin. When an alt prints an extreme, coin-specific (BTC-relative) upside 24h jump, retail lottery-seekers extrapolate the jump and bid the coin above value; the published cross-sectional evidence is that coins with high positive-jump variance (Lee & Wang 2024) or a high max daily return in the prior week (Grobys & Junttila 2021) earn materially lower returns over the following week, strongest in small, retail-heavy, sentiment-driven coins. The overpricing unwinds over days as the lottery demand fades. The signal waits one full day after the jump day (the skip-a-day construction both papers use to separate the effect from 1-day microstructure reversal) and then shorts for up to 7 days. The trigger is idiosyncratic (alt return minus BTC return) because the lottery mechanism is a coin-specific demand shock; a market-wide rally day is a different event and is excluded by construction.",
+  "counterparty": "Retail lottery-seeking longs (and the perp longs that chase them) who buy an alt after a coin-specific upside jump, paying a premium for right-skewed payoffs. They are not forced by a margin rule; they pay through a documented behavioral preference (Barberis-style skewness preference / extrapolation) that the cited papers tie to high retail-trading share and positive sentiment. Crowded perp longs after a pump also typically pay positive funding to shorts at each 8h settlement across the 7-day hold.",
+  "prediction": "On the long_1h train era, shorting the 17 non-BTC long_1h alts at the 00:00 UTC bar one day after a BTC-relative 24h excess return >= 2.0x its trailing 60-day std and >= 4%, with TP 200 / SL 200 bps and max hold 168 1h bars, admitted under fee_math.max_concurrent(200), yields n >= 30, per-trade net bps (after fee_math.C_BPS) > 0 with a bootstrap_ci.mean_ci CI95 that excludes 0, and WR >= fee_math.p_star(200). Falsified if any of these fails.",
+  "nearest_dead_rows": [
+    {
+      "row": 76,
+      "why_different": "Row 76 is generic multi-day mean reversion of price displacement. This thesis does not fade displacement: it conditions on a single-day, coin-specific (BTC-relative) upside jump, trades only the short side, skips a day, and relies on a lottery-demand counterparty; a large cumulative multi-day move without a jump day never fires, and a market-wide rally day never fires."
+    },
+    {
+      "row": 3,
+      "why_different": "Row 3 fades any 1h vol-expansion bar in either direction within hours. This thesis is signed (upside only), measured on a 24h BTC-relative return, entered a full day after the jump, and held up to a week; its counterparty is retail lottery demand, not an intrabar overshoot."
+    },
+    {
+      "row": 6,
+      "why_different": "Row 6 fades liquidation cascades (high-vol bars that continue). The trigger here is an idiosyncratic upside jump relative to BTC, not a market-wide forced-liquidation bar, and the entry is delayed by a day so the cascade window itself is not faded."
+    },
+    {
+      "row": 110,
+      "why_different": "Row 110 bet that cascade bars CONTINUE; this thesis bets on a slow multi-day drift AGAINST a coin-specific upside jump caused by retail lottery demand, a different counterparty and horizon."
+    },
+    {
+      "row": 111,
+      "why_different": "Row 111 bet vol-scaled continuation after a realized-vol shift driven by CTA/vol-targeting sizing; this thesis is the opposite sign, conditioned on the signed positive-jump component only, with a retail lottery counterparty instead of systematic funds."
+    },
+    {
+      "row": 19,
+      "why_different": "Row 19 shorts scheduled token unlocks (supply event, calendar-known). This thesis shorts after an observed price-jump demand shock with no supply calendar and a capped per-event concurrency (max_concurrent) against the drawdown failure that row recorded."
+    }
+  ],
+  "source_urls": [
+    "https://www.scheller.gatech.edu/directory/research/finance/lee/pdf/crypto_variance_leewang_5feb2024.pdf",
+    "https://jyx.jyu.fi/bitstream/handle/123456789/74624/1/1-s2.0-S1042443121000081-main.pdf"
+  ],
+  "evidence": "Lee & Wang, 'Variance Decomposition and Cryptocurrency Return Prediction' (Jan 2024), https://www.scheller.gatech.edu/directory/research/finance/lee/pdf/crypto_variance_leewang_5feb2024.pdf : sample October 2015 to June 2023, 15-minute returns; 'High positive jump variance portfolios have 3.6% (2.3%) lower excess returns for EW (VW) portfolios than do Low positive jump variance portfolios' in subsequent weeks; lowest vs highest total-variance coins earn 0.1% vs -3.6% next week; 'The negative pricing effect is more pronounced for smaller cryptocurrencies with lower prices, less liquidity, more retail trading activities, and more positive sentiment.' Grobys & Junttila, 'Speculation and lottery-like demand in cryptocurrency markets', JIFMIM 71 (2021), https://jyx.jyu.fi/bitstream/handle/123456789/74624/1/1-s2.0-S1042443121000081-main.pdf : weekly MAX (max daily log-return of the prior week) sorts, sample January 2016 to December 2019; 'average raw and risk-adjusted return differences between cryptocurrencies in the lowest and highest MAX quintiles exceed 1.50% per week'; the high-minus-low MAX zero-cost portfolio 'generates -1.54% weekly'. CAVEAT: both results are cross-sectional portfolio sorts on pre-2023 samples; this thesis is a time-series, single-position adaptation and the sources do not report a time-series result. Exploratory train probe (NOT evidence): research/swarm/runs/2026-09-27-0300/exploratory/vol_structure/probe_idio_h168.out.txt reads admitted n=84, mean net -2.0 bps, CI [-44.8, 40.9], WR 0.524 vs p*(200) 0.52875 \u2014 the probe already reads null.",
+  "spec": {
+    "dataset": "long_1h",
+    "universe": [
+      "1000PEPE",
+      "1000SHIB",
+      "AAVE",
+      "ADA",
+      "BNB",
+      "DOGE",
+      "ETH",
+      "LINK",
+      "LTC",
+      "NEAR",
+      "ONDO",
+      "SOL",
+      "SUI",
+      "TAO",
+      "UNI",
+      "XLM",
+      "XRP"
+    ],
+    "timeframe": "1h",
+    "tp_bps": 200,
+    "sl_bps": 200,
+    "max_hold_bars": 168,
+    "expected_trades_per_week": 1.97,
+    "doa_line": "Kill if the train-era long_1h screen (admitted under max_concurrent) shows n < 30, or net_bps_mean <= 0 after fee_math.C_BPS, or a bootstrap_ci.mean_ci CI95 that includes 0, or observed WR < fee_math.p_star(200), or fee_math.time_to_verdict_weeks at the observed frequency > 26, or the registered +/-20% tp_bps variants (160 / 240) do not keep net_bps_mean the same sign."
+  },
+  "signal_py": "import numpy as np\nimport pandas as pd\nfrom research.swarm.lib import load_data\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Short an alt perp at the 00:00 UTC closed bar ONE day after an idiosyncratic\n    (BTC-relative) upside 24h jump: excess 24h log return (alt minus BTC, measured at the\n    00:00 UTC bar) >= 2.0 x its trailing 60-day std (prior days only, min 30 obs) AND >= 4%.\n    Closed bars only; BTC reference via load_reference (STANDARDS #16).\"\"\"\n    out = pd.Series(0, index=df.index, dtype=int)\n    if len(df) < 50:\n        return out\n    ref = load_data.load_reference(\"BTC\", \"1h\", \"long_1h\")[\"close\"]\n    ref = ref.reindex(df.index).ffill()\n    c = df[\"close\"]\n    ex = np.log(c / c.shift(24)) - np.log(ref / ref.shift(24))\n    daily = ex[df.index.hour == 0]\n    sd = daily.rolling(60, min_periods=30).std().shift(1)\n    jump = ((daily >= 2.0 * sd) & (daily >= 0.04)).fillna(False)\n    fire = jump.shift(1, fill_value=False).astype(bool)\n    out.loc[fire[fire].index] = -1\n    return out\n",
+  "thesis_path": "research/swarm/runs/2026-09-27-0300/theses/vol_structure_lottery_jump_fade.json"
+}

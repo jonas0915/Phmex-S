@@ -1,0 +1,10 @@
+k=2.5: fire-days=25 fires=57 max fires/day=13 top days={Timestamp('2026-02-08 00:00:00+0000', tz='UTC'): 13, Timestamp('2026-02-27 00:00:00+0000', tz='UTC'): 7, Timestamp('2025-10-14 00:00:00+0000', tz='UTC'): 5, Timestamp('2026-01-15 00:00:00+0000', tz='UTC'): 3, Timestamp('2025-08-24 00:00:00+0000', tz='UTC'): 3}
+  tp200/sl200/h72 mc=2: raw n=57 mean=34.1 | admitted n=35 mean=17.1 ci=[-51.5,85.6] WR=0.571 p*=0.5288 tpw=0.82 ttv=61.0
+  tp200/sl200/h168 mc=2: raw n=57 mean=34.1 | admitted n=35 mean=17.1 ci=[-51.5,85.6] WR=0.571 p*=0.5288 tpw=0.82 ttv=61.0
+  tp300/sl300/h168 mc=1: raw n=57 mean=88.5 | admitted n=25 mean=48.5 ci=[-71.5,168.5] WR=0.600 p*=0.5192 tpw=0.59 ttv=85.4
+  tp300/sl300/h72 mc=1: raw n=57 mean=84.8 | admitted n=25 mean=48.5 ci=[-71.5,168.5] WR=0.600 p*=0.5192 tpw=0.59 ttv=85.4
+k=2.0: fire-days=48 fires=135 max fires/day=16 top days={Timestamp('2026-02-08 00:00:00+0000', tz='UTC'): 16, Timestamp('2025-10-14 00:00:00+0000', tz='UTC'): 14, Timestamp('2026-02-27 00:00:00+0000', tz='UTC'): 13, Timestamp('2025-08-24 00:00:00+0000', tz='UTC'): 9, Timestamp('2025-12-04 00:00:00+0000', tz='UTC'): 7}
+  tp200/sl200/h72 mc=2: raw n=135 mean=46.3 | admitted n=68 mean=23.8 ci=[-23.3,70.9] WR=0.588 p*=0.5288 tpw=1.59 ttv=31.4
+  tp200/sl200/h168 mc=2: raw n=135 mean=46.3 | admitted n=68 mean=23.8 ci=[-23.3,70.9] WR=0.588 p*=0.5288 tpw=1.59 ttv=31.4
+  tp300/sl300/h168 mc=1: raw n=135 mean=92.9 | admitted n=47 mean=7.6 ci=[-81.7,97.0] WR=0.532 p*=0.5192 tpw=1.10 ttv=45.4
+  tp300/sl300/h72 mc=1: raw n=135 mean=91.4 | admitted n=47 mean=7.6 ci=[-81.7,97.0] WR=0.532 p*=0.5192 tpw=1.10 ttv=45.4

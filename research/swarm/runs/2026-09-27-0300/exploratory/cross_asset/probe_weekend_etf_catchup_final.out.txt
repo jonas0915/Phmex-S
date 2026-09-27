@@ -1,0 +1,6 @@
+BTC span 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00 events 25 long 14 short 11 mean_signed_fwd30_bps(descriptive) -41.14
+ETH span 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00 events 23 long 13 short 10 mean_signed_fwd30_bps(descriptive) 113.76
+SOL span 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00 events 21 long 12 short 9 mean_signed_fwd30_bps(descriptive) 69.9
+XRP span 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00 events 24 long 14 short 10 mean_signed_fwd30_bps(descriptive) 50.43
+DOGE span 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00 events 20 long 10 short 10 mean_signed_fwd30_bps(descriptive) 52.61
+total_events 113 train_weeks 42.85

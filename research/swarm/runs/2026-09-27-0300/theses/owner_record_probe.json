@@ -1,0 +1,810 @@
+{
+ "_label": "EXPLORATORY PROBE - not a screen, not evidence for any thesis verdict",
+ "source_file": "research/swarm/kb/owner_trades/api_closed_pnl.json",
+ "n_rows": 819,
+ "time_field_note": "openedTimeNs/updatedTimeNs are millisecond epochs (value 1648275092166 -> 2022-03-26)",
+ "date_range_utc": [
+  "2022-03-26 06:11:32.166000+00:00",
+  "2023-02-16 15:44:55.384000+00:00"
+ ],
+ "equity_path": {
+  "method": "cumulative realized PnL (realizedPnlEv/1e4); deposit/withdraw files present but mixed-currency with no USD value field and no in-stage 2022 price source, so a USD equity line cannot be built without inventing rates",
+  "deposit_file_rows": 112,
+  "withdraw_file_rows": 68,
+  "deposit_currencies_counts": {
+   "USDT": 64,
+   "ETH": 1,
+   "BTC": 1,
+   "SOL": 1,
+   "ADA": 17,
+   "XRP": 17,
+   "MATIC": 3,
+   "TRX": 7,
+   "AVAX": 1
+  },
+  "withdraw_currencies_counts": {
+   "AVAX": 2,
+   "USDT": 12,
+   "XRP": 18,
+   "MATIC": 6,
+   "ADA": 30
+  },
+  "final_cum_realized_usd": 4857.22,
+  "min_cum_realized_usd": -2036.28,
+  "min_at": "2022-11-09 10:07:28.585000+00:00",
+  "max_cum_realized_usd": 6335.62,
+  "max_at": "2022-11-10 07:55:25.822000+00:00",
+  "monthly_realized_usd": {
+   "2022-03": -110.44,
+   "2022-04": -256.89,
+   "2022-05": -455.31,
+   "2022-06": -170.12,
+   "2022-07": -64.63,
+   "2022-08": -288.76,
+   "2022-09": -295.41,
+   "2022-10": -310.15,
+   "2022-11": 7431.1,
+   "2022-12": -290.96,
+   "2023-01": -331.66,
+   "2023-02": 0.47
+  },
+  "field": "realizedPnlEv/1e4, updatedTimeNs",
+  "flows_in_window_native_units_amountEv_div_1e8": {
+   "deposits": {
+    "ADA": 3002.6207,
+    "XRP": 1542.323,
+    "USDT": 2233.9124,
+    "MATIC": 507.9418,
+    "TRX": 0.0112,
+    "AVAX": 1.0784
+   },
+   "withdrawals": {
+    "ADA": 21157.9382,
+    "USDT": 267.2885,
+    "XRP": 3899.8907,
+    "MATIC": 1172.41
+   },
+   "note": "native coin units, NOT USD; window = first open minus 7d .. last close"
+  }
+ },
+ "concentration": {
+  "total_positive_pnl_usd": 12899.2,
+  "largest_trade_usd": 1089.62,
+  "largest_trade_symbol": "u100TRYBUSD",
+  "largest_trade_opened": "2022-11-10 07:53:39.088000+00:00",
+  "share_largest": 0.0845,
+  "top5_usd": 3805.91,
+  "share_top5": 0.2951,
+  "top5_symbols": [
+   "u100TRYBUSD",
+   "u100TRYBUSD",
+   "u100TRYBUSD",
+   "u100TRYBUSD",
+   "u100TRYBUSD"
+  ],
+  "field": "realizedPnlEv/1e4"
+ },
+ "win_rate": {
+  "value": 0.4847,
+  "n_wins": 397,
+  "n_losses": 422,
+  "field": "realizedPnlEv>0"
+ },
+ "payoff_ratio": {
+  "value": 1.705,
+  "avg_win_usd": 32.49,
+  "avg_loss_usd": -19.06,
+  "field": "realizedPnlEv/1e4"
+ },
+ "median_hold_seconds": 4939.551,
+ "fees_total_usd": 999.82,
+ "funding_total_usd": 37.89,
+ "gross_total_usd": 5894.93,
+ "symbols": {
+  "uBTCUSD": {
+   "n": 306,
+   "pnl_usd": -1249.71,
+   "wr": 0.4641
+  },
+  "ADAUSD": {
+   "n": 105,
+   "pnl_usd": -84.31,
+   "wr": 0.6
+  },
+  "XRPUSD": {
+   "n": 73,
+   "pnl_usd": 44.39,
+   "wr": 0.5205
+  },
+  "SOLUSD": {
+   "n": 73,
+   "pnl_usd": -475.56,
+   "wr": 0.3699
+  },
+  "MATICUSD": {
+   "n": 67,
+   "pnl_usd": -462.63,
+   "wr": 0.4925
+  },
+  "AVAXUSD": {
+   "n": 43,
+   "pnl_usd": -393.93,
+   "wr": 0.5116
+  },
+  "APEUSD": {
+   "n": 35,
+   "pnl_usd": -81.5,
+   "wr": 0.4571
+  },
+  "u100TRYBUSD": {
+   "n": 33,
+   "pnl_usd": 8128.01,
+   "wr": 0.8182
+  },
+  "LUNAOLDUSD": {
+   "n": 31,
+   "pnl_usd": -38.6,
+   "wr": 0.3871
+  },
+  "ETHUSD": {
+   "n": 13,
+   "pnl_usd": -149.16,
+   "wr": 0.2308
+  },
+  "AAVEUSD": {
+   "n": 11,
+   "pnl_usd": -117.52,
+   "wr": 0.2727
+  },
+  "APTUSD": {
+   "n": 8,
+   "pnl_usd": -59.25,
+   "wr": 0.125
+  },
+  "MASKUSD": {
+   "n": 6,
+   "pnl_usd": -26.11,
+   "wr": 0.6667
+  },
+  "GALAUSD": {
+   "n": 3,
+   "pnl_usd": -57.08,
+   "wr": 0.3333
+  },
+  "DOGEUSD": {
+   "n": 3,
+   "pnl_usd": -5.46,
+   "wr": 0.3333
+  },
+  "MANAUSD": {
+   "n": 2,
+   "pnl_usd": -54.41,
+   "wr": 0.5
+  },
+  "DASHUSD": {
+   "n": 2,
+   "pnl_usd": -55.01,
+   "wr": 0.5
+  },
+  "BTCUSD": {
+   "n": 1,
+   "pnl_usd": -0.31,
+   "wr": 0.0
+  },
+  "STORJUSD": {
+   "n": 1,
+   "pnl_usd": 5.75,
+   "wr": 1.0
+  },
+  "BNBUSD": {
+   "n": 1,
+   "pnl_usd": 1.58,
+   "wr": 1.0
+  },
+  "u100ANKRUSD": {
+   "n": 1,
+   "pnl_usd": -0.04,
+   "wr": 0.0
+  },
+  "LINKUSD": {
+   "n": 1,
+   "pnl_usd": -11.92,
+   "wr": 0.0
+  }
+ },
+ "side_split": {
+  "1": {
+   "n": 423,
+   "pnl_usd": 3158.4,
+   "wr": 0.4728
+  },
+  "2": {
+   "n": 396,
+   "pnl_usd": 1698.82,
+   "wr": 0.4975
+  }
+ },
+ "side_code_note": "Phemex side 1=Buy(long) 2=Sell(short)",
+ "time_of_day_utc": {
+  "0": {
+   "n": 54,
+   "pnl_usd": 46.58
+  },
+  "1": {
+   "n": 50,
+   "pnl_usd": -263.73
+  },
+  "2": {
+   "n": 45,
+   "pnl_usd": -9.89
+  },
+  "3": {
+   "n": 36,
+   "pnl_usd": -160.99
+  },
+  "4": {
+   "n": 37,
+   "pnl_usd": -193.45
+  },
+  "5": {
+   "n": 30,
+   "pnl_usd": 1813.05
+  },
+  "6": {
+   "n": 21,
+   "pnl_usd": 1194.79
+  },
+  "7": {
+   "n": 19,
+   "pnl_usd": 5010.35
+  },
+  "8": {
+   "n": 4,
+   "pnl_usd": -74.93
+  },
+  "9": {
+   "n": 3,
+   "pnl_usd": 4.04
+  },
+  "10": {
+   "n": 2,
+   "pnl_usd": -24.05
+  },
+  "11": {
+   "n": 6,
+   "pnl_usd": -77.26
+  },
+  "12": {
+   "n": 14,
+   "pnl_usd": -203.41
+  },
+  "13": {
+   "n": 30,
+   "pnl_usd": -174.21
+  },
+  "14": {
+   "n": 43,
+   "pnl_usd": -36.35
+  },
+  "15": {
+   "n": 42,
+   "pnl_usd": 39.75
+  },
+  "16": {
+   "n": 41,
+   "pnl_usd": -263.8
+  },
+  "17": {
+   "n": 46,
+   "pnl_usd": -473.73
+  },
+  "18": {
+   "n": 46,
+   "pnl_usd": -301.1
+  },
+  "19": {
+   "n": 42,
+   "pnl_usd": -170.82
+  },
+  "20": {
+   "n": 57,
+   "pnl_usd": -135.75
+  },
+  "21": {
+   "n": 53,
+   "pnl_usd": -245.04
+  },
+  "22": {
+   "n": 50,
+   "pnl_usd": -359.07
+  },
+  "23": {
+   "n": 48,
+   "pnl_usd": -83.74
+  }
+ },
+ "behaviour_after_loss": {
+  "after_loss": {
+   "n": 422,
+   "next_closedSize_mean": 247.964,
+   "next_hold_s_median": 5417.409,
+   "next_same_side_share": 0.5308,
+   "next_same_symbol_share": 0.5948,
+   "next_pnl_mean_usd": -2.035,
+   "next_wr": 0.4431,
+   "gap_to_next_open_s_median": 2441.3715
+  },
+  "after_win": {
+   "n": 396,
+   "next_closedSize_mean": 327.876,
+   "next_hold_s_median": 4833.5835,
+   "next_same_side_share": 0.6187,
+   "next_same_symbol_share": 0.6742,
+   "next_pnl_mean_usd": 14.436,
+   "next_wr": 0.5303,
+   "gap_to_next_open_s_median": 2243.301
+  }
+ },
+ "behaviour_field": "chronologically next row by updatedTimeNs: closedSize, side, symbol, hold, realizedPnlEv",
+ "tryb_vs_rest": {
+  "tryb_n": 33,
+  "tryb_pnl_usd": 8128.01,
+  "tryb_first_open": "2022-11-10 04:47:28.336000+00:00",
+  "tryb_last_close": "2022-11-10 08:44:09.340000+00:00",
+  "ex_tryb_n": 786,
+  "ex_tryb_pnl_usd": -3270.79,
+  "ex_tryb_mean_usd_ci95_bootstrap": [
+   -5.96,
+   -2.491
+  ],
+  "ex_tryb_wr": 0.4707,
+  "ex_tryb_gross_usd": -2318.27,
+  "ex_tryb_fee_usd": 915.15,
+  "ex_tryb_funding_usd": 37.37,
+  "ci_source": "research.swarm.lib.bootstrap_ci.mean_ci on realizedPnlEv/1e4 per trade"
+ },
+ "ex_tryb_by_hold": {
+  "<10m": {
+   "n": 120,
+   "pnl_usd": -675.65,
+   "wr_pnl": 0.2417,
+   "dir_move_bps_mean": -17.16,
+   "dir_move_bps_ci95": [
+    -34.65,
+    -0.63
+   ]
+  },
+  "10m-1h": {
+   "n": 197,
+   "pnl_usd": -942.86,
+   "wr_pnl": 0.3858,
+   "dir_move_bps_mean": -28.77,
+   "dir_move_bps_ci95": [
+    -47.69,
+    -10.63
+   ]
+  },
+  "1-4h": {
+   "n": 218,
+   "pnl_usd": -281.26,
+   "wr_pnl": 0.5688,
+   "dir_move_bps_mean": 9.57,
+   "dir_move_bps_ci95": [
+    -17.55,
+    36.91
+   ]
+  },
+  "4-24h": {
+   "n": 215,
+   "pnl_usd": -621.86,
+   "wr_pnl": 0.5767,
+   "dir_move_bps_mean": -3.56,
+   "dir_move_bps_ci95": [
+    -40.31,
+    31.08
+   ]
+  },
+  ">24h": {
+   "n": 35,
+   "pnl_usd": -726.77,
+   "wr_pnl": 0.4857,
+   "dir_move_bps_mean": -114.73,
+   "dir_move_bps_ci95": [
+    -252.85,
+    -1.18
+   ]
+  }
+ },
+ "ex_tryb_by_side": {
+  "1": {
+   "n": 401,
+   "pnl_usd": -1801.7,
+   "wr_pnl": 0.4564,
+   "dir_move_bps_mean": -17.93,
+   "dir_move_bps_ci95": [
+    -39.21,
+    2.79
+   ]
+  },
+  "2": {
+   "n": 385,
+   "pnl_usd": -1469.09,
+   "wr_pnl": 0.4857,
+   "dir_move_bps_mean": -10.11,
+   "dir_move_bps_ci95": [
+    -31.92,
+    11.03
+   ]
+  }
+ },
+ "ex_tryb_by_leverage": {
+  "0(cross)": {
+   "n": 8,
+   "pnl_usd": -70.39,
+   "wr_pnl": 0.375,
+   "dir_move_bps_mean": 0.55
+  },
+  "1-10": {
+   "n": 217,
+   "pnl_usd": -419.87,
+   "wr_pnl": 0.5622,
+   "dir_move_bps_mean": -10.58,
+   "dir_move_bps_ci95": [
+    -44.34,
+    20.29
+   ]
+  },
+  "11-25": {
+   "n": 417,
+   "pnl_usd": -1608.99,
+   "wr_pnl": 0.4652,
+   "dir_move_bps_mean": -14.14,
+   "dir_move_bps_ci95": [
+    -36.96,
+    6.88
+   ]
+  },
+  "26-50": {
+   "n": 95,
+   "pnl_usd": -974.07,
+   "wr_pnl": 0.3474,
+   "dir_move_bps_mean": -33.07,
+   "dir_move_bps_ci95": [
+    -57.27,
+    -9.88
+   ]
+  },
+  ">50": {
+   "n": 46,
+   "pnl_usd": -202.84,
+   "wr_pnl": 0.3696,
+   "dir_move_bps_mean": 3.99,
+   "dir_move_bps_ci95": [
+    -13.46,
+    22.83
+   ]
+  }
+ },
+ "ex_tryb_by_month": {
+  "2022-03": {
+   "n": 66,
+   "pnl_usd": -136.23,
+   "wr_pnl": 0.3333,
+   "dir_move_bps_mean": -5.39,
+   "dir_move_bps_ci95": [
+    -36.79,
+    27.54
+   ]
+  },
+  "2022-04": {
+   "n": 72,
+   "pnl_usd": -231.11,
+   "wr_pnl": 0.4167,
+   "dir_move_bps_mean": -0.61,
+   "dir_move_bps_ci95": [
+    -55.05,
+    56.45
+   ]
+  },
+  "2022-05": {
+   "n": 84,
+   "pnl_usd": -455.31,
+   "wr_pnl": 0.4048,
+   "dir_move_bps_mean": -53.36,
+   "dir_move_bps_ci95": [
+    -107.2,
+    1.16
+   ]
+  },
+  "2022-06": {
+   "n": 35,
+   "pnl_usd": -170.12,
+   "wr_pnl": 0.5429,
+   "dir_move_bps_mean": -19.97,
+   "dir_move_bps_ci95": [
+    -83.34,
+    38.83
+   ]
+  },
+  "2022-07": {
+   "n": 44,
+   "pnl_usd": -64.63,
+   "wr_pnl": 0.4545,
+   "dir_move_bps_mean": -9.7,
+   "dir_move_bps_ci95": [
+    -52.08,
+    30.4
+   ]
+  },
+  "2022-08": {
+   "n": 94,
+   "pnl_usd": -236.21,
+   "wr_pnl": 0.5957,
+   "dir_move_bps_mean": -19.77,
+   "dir_move_bps_ci95": [
+    -71.6,
+    19.76
+   ]
+  },
+  "2022-09": {
+   "n": 104,
+   "pnl_usd": -369.72,
+   "wr_pnl": 0.5096,
+   "dir_move_bps_mean": -12.97,
+   "dir_move_bps_ci95": [
+    -60.17,
+    33.66
+   ]
+  },
+  "2022-10": {
+   "n": 77,
+   "pnl_usd": -304.67,
+   "wr_pnl": 0.4156,
+   "dir_move_bps_mean": -23.68,
+   "dir_move_bps_ci95": [
+    -61.66,
+    15.47
+   ]
+  },
+  "2022-11": {
+   "n": 66,
+   "pnl_usd": -754.77,
+   "wr_pnl": 0.4545,
+   "dir_move_bps_mean": -5.86,
+   "dir_move_bps_ci95": [
+    -68.1,
+    62.17
+   ]
+  },
+  "2022-12": {
+   "n": 54,
+   "pnl_usd": -233.42,
+   "wr_pnl": 0.4444,
+   "dir_move_bps_mean": -4.13,
+   "dir_move_bps_ci95": [
+    -33.81,
+    22.89
+   ]
+  },
+  "2023-01": {
+   "n": 68,
+   "pnl_usd": -315.06,
+   "wr_pnl": 0.5,
+   "dir_move_bps_mean": -12.56,
+   "dir_move_bps_ci95": [
+    -57.08,
+    26.02
+   ]
+  },
+  "2023-02": {
+   "n": 22,
+   "pnl_usd": 0.47,
+   "wr_pnl": 0.7273,
+   "dir_move_bps_mean": 64.55,
+   "dir_move_bps_ci95": [
+    -70.35,
+    179.1
+   ]
+  }
+ },
+ "ex_tryb_stress_windows": {
+  "luna_2022-05-07_05-13": {
+   "n": 41,
+   "pnl_usd": -132.03,
+   "wr_pnl": 0.3902,
+   "dir_move_bps_mean": 6.63,
+   "dir_move_bps_ci95": [
+    -59.03,
+    72.04
+   ]
+  },
+  "celsius_3ac_2022-06-12_06-19": {
+   "n": 7,
+   "pnl_usd": -63.67,
+   "wr_pnl": 0.4286,
+   "dir_move_bps_mean": -61.55
+  },
+  "ftx_2022-11-06_11-14": {
+   "n": 15,
+   "pnl_usd": -94.47,
+   "wr_pnl": 0.6,
+   "dir_move_bps_mean": 10.04,
+   "dir_move_bps_ci95": [
+    -83.42,
+    94.15
+   ]
+  },
+  "all_other_days": {
+   "n": 723,
+   "pnl_usd": -2980.62,
+   "wr_pnl": 0.473,
+   "dir_move_bps_mean": -15.32,
+   "dir_move_bps_ci95": [
+    -31.09,
+    0.02
+   ]
+  },
+  "stress_long": {
+   "n": 30,
+   "pnl_usd": -314.62,
+   "wr_pnl": 0.3,
+   "dir_move_bps_mean": -50.13,
+   "dir_move_bps_ci95": [
+    -94.8,
+    -6.04
+   ]
+  },
+  "stress_short": {
+   "n": 33,
+   "pnl_usd": 24.44,
+   "wr_pnl": 0.5758,
+   "dir_move_bps_mean": 45.32,
+   "dir_move_bps_ci95": [
+    -33.55,
+    124.59
+   ]
+  }
+ },
+ "ex_tryb_top15_winners": [
+  {
+   "symbol": "XRPUSD",
+   "side": 2,
+   "opened": "2022-09-18 17:51:17.169000+00:00",
+   "hold_h": 6.23,
+   "pnl_usd": 74.96,
+   "dir_move_bps": 757.0,
+   "leverage": 20.0
+  },
+  {
+   "symbol": "uBTCUSD",
+   "side": 2,
+   "opened": "2022-05-12 04:20:04.755000+00:00",
+   "hold_h": 2.93,
+   "pnl_usd": 71.69,
+   "dir_move_bps": 730.0,
+   "leverage": 10.0
+  },
+  {
+   "symbol": "XRPUSD",
+   "side": 1,
+   "opened": "2022-09-22 19:03:49.404000+00:00",
+   "hold_h": 2.21,
+   "pnl_usd": 67.4,
+   "dir_move_bps": 551.2,
+   "leverage": 15.0
+  },
+  {
+   "symbol": "SOLUSD",
+   "side": 2,
+   "opened": "2022-05-23 15:04:33.937000+00:00",
+   "hold_h": 4.36,
+   "pnl_usd": 64.7,
+   "dir_move_bps": 509.4,
+   "leverage": 10.0
+  },
+  {
+   "symbol": "XRPUSD",
+   "side": 1,
+   "opened": "2022-09-20 14:03:34.179000+00:00",
+   "hold_h": 1.22,
+   "pnl_usd": 60.94,
+   "dir_move_bps": 782.6,
+   "leverage": 15.0
+  },
+  {
+   "symbol": "XRPUSD",
+   "side": 1,
+   "opened": "2022-09-21 15:52:44.114000+00:00",
+   "hold_h": 2.83,
+   "pnl_usd": 52.76,
+   "dir_move_bps": 535.3,
+   "leverage": 15.0
+  },
+  {
+   "symbol": "ADAUSD",
+   "side": 1,
+   "opened": "2022-08-31 23:19:48.344000+00:00",
+   "hold_h": 13.66,
+   "pnl_usd": 52.54,
+   "dir_move_bps": 276.3,
+   "leverage": 12.0
+  },
+  {
+   "symbol": "uBTCUSD",
+   "side": 2,
+   "opened": "2022-12-06 18:47:56.024000+00:00",
+   "hold_h": 13.29,
+   "pnl_usd": 51.3,
+   "dir_move_bps": 153.9,
+   "leverage": 35.0
+  },
+  {
+   "symbol": "uBTCUSD",
+   "side": 1,
+   "opened": "2022-12-19 19:03:40.634000+00:00",
+   "hold_h": 7.66,
+   "pnl_usd": 47.31,
+   "dir_move_bps": 146.7,
+   "leverage": 35.0
+  },
+  {
+   "symbol": "APEUSD",
+   "side": 2,
+   "opened": "2022-04-30 19:49:47.250000+00:00",
+   "hold_h": 1.21,
+   "pnl_usd": 45.42,
+   "dir_move_bps": 345.5,
+   "leverage": 12.0
+  },
+  {
+   "symbol": "uBTCUSD",
+   "side": 2,
+   "opened": "2022-12-15 05:43:13.724000+00:00",
+   "hold_h": 9.22,
+   "pnl_usd": 44.23,
+   "dir_move_bps": 161.0,
+   "leverage": 30.0
+  },
+  {
+   "symbol": "uBTCUSD",
+   "side": 1,
+   "opened": "2022-10-25 15:57:25.250000+00:00",
+   "hold_h": 1.19,
+   "pnl_usd": 41.91,
+   "dir_move_bps": 202.9,
+   "leverage": 25.0
+  },
+  {
+   "symbol": "uBTCUSD",
+   "side": 1,
+   "opened": "2022-10-26 14:03:14.804000+00:00",
+   "hold_h": 0.25,
+   "pnl_usd": 41.24,
+   "dir_move_bps": 162.6,
+   "leverage": 30.0
+  },
+  {
+   "symbol": "uBTCUSD",
+   "side": 2,
+   "opened": "2022-05-20 03:55:26.856000+00:00",
+   "hold_h": 15.78,
+   "pnl_usd": 40.78,
+   "dir_move_bps": 306.0,
+   "leverage": 10.0
+  },
+  {
+   "symbol": "uBTCUSD",
+   "side": 1,
+   "opened": "2022-09-07 20:03:12.083000+00:00",
+   "hold_h": 0.54,
+   "pnl_usd": 40.5,
+   "dir_move_bps": 149.2,
+   "leverage": 25.0
+  }
+ ],
+ "ex_tryb_top15_share_of_ex_tryb_positive": 0.1768,
+ "fee_math_ref": {
+  "C_BPS": 11.5,
+  "p_star_200": 0.52875
+ }
+}

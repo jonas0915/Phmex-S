@@ -1,0 +1,10 @@
+train weekends: 43 symbols: 18 first 2025-06-29 23:00:00+00:00 last 2026-04-19 23:00:00+00:00
+sl=100 cap=4 thr=0.02: weekends firing=28/43, raw sym-weekends=243, admitted(upper bound)=96, per-week=2.23, ttv_weeks=22.4
+sl=100 cap=4 thr=0.03: weekends firing=27/43, raw sym-weekends=169, admitted(upper bound)=80, per-week=1.86, ttv_weeks=26.9
+sl=100 cap=4 thr=0.05: weekends firing=17/43, raw sym-weekends=71, admitted(upper bound)=40, per-week=0.93, ttv_weeks=53.8
+sl=150 cap=3 thr=0.02: weekends firing=28/43, raw sym-weekends=243, admitted(upper bound)=76, per-week=1.77, ttv_weeks=28.3
+sl=150 cap=3 thr=0.03: weekends firing=27/43, raw sym-weekends=169, admitted(upper bound)=66, per-week=1.53, ttv_weeks=32.6
+sl=150 cap=3 thr=0.05: weekends firing=17/43, raw sym-weekends=71, admitted(upper bound)=34, per-week=0.79, ttv_weeks=63.2
+sl=200 cap=2 thr=0.02: weekends firing=28/43, raw sym-weekends=243, admitted(upper bound)=53, per-week=1.23, ttv_weeks=40.6
+sl=200 cap=2 thr=0.03: weekends firing=27/43, raw sym-weekends=169, admitted(upper bound)=49, per-week=1.14, ttv_weeks=43.9
+sl=200 cap=2 thr=0.05: weekends firing=17/43, raw sym-weekends=71, admitted(upper bound)=27, per-week=0.63, ttv_weeks=79.6

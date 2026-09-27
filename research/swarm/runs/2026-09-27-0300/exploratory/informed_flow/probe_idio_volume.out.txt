@@ -1,0 +1,11 @@
+BTC train range 2025-06-27 06:00:00+00:00 2026-04-23 04:00:00+00:00
+n obs 4539 symbols 17
+|idio|>0.03 rv<0.8   n=  71 12h cont_bps=-19.4 24h cont_bps=12.9 48h cont_bps=-57.1
+|idio|>0.03 0.8-1.5  n= 691 12h cont_bps=3.3 24h cont_bps=-12.2 48h cont_bps=-56.9
+|idio|>0.03 rv>=1.5  n= 120 12h cont_bps=74.1 24h cont_bps=-29.3 48h cont_bps=-153.5
+|idio|>0.05 rv<0.8   n=  19 12h cont_bps=-37.1 24h cont_bps=-72.1 48h cont_bps=-199.7
+|idio|>0.05 0.8-1.5  n= 239 12h cont_bps=10.1 24h cont_bps=25.7 48h cont_bps=-30.0
+|idio|>0.05 rv>=1.5  n=  65 12h cont_bps=32.4 24h cont_bps=-58.7 48h cont_bps=-254.0
+|idio|>0.08 rv<0.8   n=   5 12h cont_bps=-170.5 24h cont_bps=-327.2 48h cont_bps=-526.1
+|idio|>0.08 0.8-1.5  n=  64 12h cont_bps=-84.9 24h cont_bps=-22.4 48h cont_bps=-61.0
+|idio|>0.08 rv>=1.5  n=  26 12h cont_bps=96.6 24h cont_bps=-16.1 48h cont_bps=-371.5

@@ -1,0 +1,5 @@
+p_star(200)= 0.52875
+max_concurrent(200)= 2
+ttv(1.5/wk)= 33.333333333333336
+ttv(2.0/wk)= 25.0
+{'BTC': {'ok': True, 'lots': 2, 'lot_usd': 77.74}, 'ETH': {'ok': True, 'lots': 8, 'lot_usd': 24.9738}, 'SOL': {'ok': True, 'lots': 197, 'lot_usd': 1.0143}, 'XRP': {'ok': True, 'lots': 199, 'lot_usd': 1.0044}, 'DOGE': {'ok': True, 'lots': 199, 'lot_usd': 1.001}}

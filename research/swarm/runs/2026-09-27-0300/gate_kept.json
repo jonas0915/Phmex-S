@@ -1,0 +1,8 @@
+[
+  {
+    "id": "forced_flows_stop_sweep_exhaustion_fade",
+    "thesis_path": "research/swarm/runs/2026-09-27-0300/theses/forced_flows_stop_sweep_exhaustion_fade.json",
+    "evidence_grade": "B",
+    "reason": "The mechanism is a fade of a failed stop/liquidation sweep beyond the prior 72-bar extreme (penetration plus close back inside). That is a new level construction with a named forced-flow counterparty, and the record lists prior-session levels as an explicitly untested part of the S/R family. It is not the row 25 zone bounce, the row 6/110 vol-bar selection, or the row 33 Donchian breakout. The cited rows are real and the why_different text is specific. Sanity checks pass: mr_edge 1h has BTC/ETH/SOL/XRP/DOGE; the signal imports only numpy/pandas and uses a shift(1) rolling extreme; the probes used long_1h train before 2026-04-24, which does not overlap mr_edge. Sources: Osler SR150 numbers (43/45%, 14.3 vs 6.9%, 0.061 vs 0.054%, 59.3 vs 54.8%, the hours-not-days sentence) confirmed in the PDF text; the Han 2024 abstract is confirmed; the Glassnode 16%/~90%/cluster quotes are confirmed. Graded B, not A, because no source supports the fade (exhaustion) payoff itself, and Osler's cascades point toward continuation. The thesis says this openly."
+  }
+]

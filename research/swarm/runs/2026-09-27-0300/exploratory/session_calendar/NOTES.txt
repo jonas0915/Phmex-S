@@ -1,0 +1,19 @@
+EXPLORATORY — session_calendar lens, run 2026-09-27-0300. Result: 0 theses. Not evidence.
+
+Web sourcing (WebSearch x8, WebFetch/API opens listed):
+OPENED
+- https://paperswithbacktest.com/strategies/is-the-turn-of-the-month-an-anomaly-on-which-an-investment-strategy-could-be-based-evidence-from-bitcoin-and-ethereum — Vasileiou (2022) TOM: best 4-day windows span month-end/start; page reports annual return 7.84%, Sharpe 0.53, max DD -29.68% (aggregate only).
+- https://ideas.repec.org/a/eee/finlet/v86y2025ipes1544612325019154.html — Mourey/Shahrour/Soiman, FRL v86 2025: negative weekend crypto returns predict Monday equity declines; positive weekend returns no effect.
+- https://www.falconx.io/newsroom/what-can-spot-etf-flows-tell-us-about-the-trajectory-of-bitcoin-prices-a-preliminary-statistical-investigation — prior-day ETF inflow coefficient 0.027 on today's price change; Granger F=8.4767 p=0.00406; impulse peaks days 3-4 ~+1.2%; price increases "temporarily dampen ETF inflows".
+- https://www.fxstreet.com/cryptocurrencies/news/bitcoin-weekly-forecast-quarter-end-rebalancing-might-fuel-btc-next-bullish-move-202607031130 — K33: 9 of past 18 months saw month-end 6-day-window ETF flows diverge from the month's trend; remaining 9 did not ("not a persistent driver").
+- https://cryptoslate.com/crypto-never-closes-but-bitcoin-ethereum-xrp-and-solana-now-move-on-wall-street-time/ — Kraken XBT/USD 87,672 hourly obs 2016-2025: weekend/weekday vol ratio 0.60 (2024) 0.64 (2025); volume ratio 0.43 (2024) 0.46 (2025).
+- https://cryptoslate.com/cme-bitcoins-weekend-gap-dead-clearing-monday/ — no data; CME 24/7 crypto futures from 2026-05-29 (regime change AFTER long_1h train end).
+- OpenAlex abstract for doi 10.1016/j.frl.2026.110340 (Weiss/Gaudiosi/Zhou/Webb 2026) — Deribit expiry reversal is INTRADAY around DAILY expiries (out of this lens's >=8h scope; intraday calendar = dead rows).
+NOT OPENED (403): SSRN 6592830 (Lim, ETF flow price impact), ScienceDirect S1062940825000816, ResearchGate weekend-effect PDF, CME 24/7 article (timeout). Not cited.
+
+Candidates considered and why none was registered:
+1. Month-end / quarter-end rebalancing (K33) and turn-of-month (Vasileiou): 12 events/yr; with max_concurrent<=3 (fee_math.max_concurrent) ~10 train month-ends -> n<=30 and time-to-verdict far > 26 wk; also K33 itself says the pattern held in only 9/18 months. Same frequency failure as row 84 and the 2026-09-20 cme_expiry_drift (0.46/wk).
+2. Deribit expiry reversal (Weiss et al. 2026): intraday effect on daily expiries; stretching to a 24-48h hold is unsourced extrapolation; also near row 105 / 2026-09-20 deribit_gamma_fade gate rejection.
+3. Weekend-dump -> Monday institutional absorption, long-only (K33 contrarian rebalancing + FalconX flow->return lag + thin weekend book): probe_weekend_freq.out.txt shows the frequency/effect trade-off is fatal. Only sl=100/thr=2% reaches ttv<=26 wk (per-week 2.23, ttv 22.4 wk, UPPER bound); sl=150 thr=2% already 28.3 wk; thr=5% (the only bucket where the 2026-09-17-0732 probe saw any sign-adjusted drift, probe_weekend_gap.out.txt) gives 0.79-0.93/wk, ttv 53.8-63.2 wk. At thr=2% the 2026-09-17 probe's [2,3%) bucket was -11.8 bps sign-adj with CI spanning 0 — no effect. Also, choosing the long side after reading that probe's side split would be selection on train data; and the 2026-09-17 weekend_thinbook_fade already covers this mechanism (not re-proposed).
+4. Friday de-risk / Monday re-risk, unconditional weekend/day-of-week: relabel of rows 7, 18, 67.
+Structural finding: under STANDARDS #17 caps (max_concurrent 2-4 at sl 100-200) a once-per-week calendar event must fire ~2+ admitted names on most weekends to meet item 3, which pushes the trigger toward the unconditional weekend effect already dead (rows 7/18/67); monthly/quarterly events cannot meet item 3 at all.

@@ -1,0 +1,8 @@
+A1 weekends total rows 774 big(|move|>300) n 320 mean fade fwd bps 54.29 median 154.73 share>0 0.619
+A2 lowvol n 140 mean fade 106.13 share>0 0.657
+A2 highvol n 180 mean fade 13.97 share>0 0.589
+A weekly counts: weeks 43 big per week 7.44
+B1 all n 754 mean fade fwd24 bps -18.95 share>0 0.485
+B1 vr<1 n 186 mean fade fwd24 bps -37.02 share>0 0.478
+B1 vr>=1 n 568 mean fade fwd24 bps -13.04 share>0 0.488
+B1 vr<0.8 n 48 mean fade fwd24 bps 60.91 share>0 0.458

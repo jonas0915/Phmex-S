@@ -1,0 +1,15 @@
+max_concurrent(150) = 3
+BTC long_1h train signals nonzero: 324 trades: 199 causality OK
+ETH long_1h train signals nonzero: 348 trades: 243 causality OK
+SOL long_1h train signals nonzero: 318 trades: 238 causality OK
+XRP long_1h train signals nonzero: 324 trades: 224 causality OK
+DOGE long_1h train signals nonzero: 324 trades: 245 causality OK
+raw trades 1149 admitted 999 weeks 42.14 admitted/week 23.71
+time_to_verdict_weeks(admitted/week) = 2.1092521092521093
+mr_edge train BTC 2026-06-01 00:00:00+00:00 2026-08-10 11:00:00+00:00 1692 bars
+mr_edge train ETH 2026-06-01 00:00:00+00:00 2026-08-10 11:00:00+00:00 1692 bars
+mr_edge train SOL 2026-06-01 00:00:00+00:00 2026-08-10 11:00:00+00:00 1692 bars
+mr_edge train XRP 2026-06-01 00:00:00+00:00 2026-08-10 11:00:00+00:00 1692 bars
+mr_edge train DOGE 2026-06-01 00:00:00+00:00 2026-08-10 11:00:00+00:00 1692 bars
+p_star(150) = 0.5383333333333333 p_star(120) = 0.5479166666666667 p_star(180) = 0.5319444444444444
+lot_check: {'BTC': {'ok': True, 'lots': 2, 'lot_usd': 77.74}, 'ETH': {'ok': True, 'lots': 8, 'lot_usd': 24.9738}, 'SOL': {'ok': True, 'lots': 197, 'lot_usd': 1.0143}, 'XRP': {'ok': True, 'lots': 199, 'lot_usd': 1.0044}, 'DOGE': {'ok': True, 'lots': 199, 'lot_usd': 1.001}}

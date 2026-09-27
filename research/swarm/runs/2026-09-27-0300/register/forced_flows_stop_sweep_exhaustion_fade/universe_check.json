@@ -1,0 +1,50 @@
+{
+  "symbols": [
+    {
+      "input": "BTC",
+      "symbol": "BTC/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "ETH",
+      "symbol": "ETH/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "SOL",
+      "symbol": "SOL/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "XRP",
+      "symbol": "XRP/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    },
+    {
+      "input": "DOGE",
+      "symbol": "DOGE/USDT:USDT",
+      "found": true,
+      "active": true,
+      "status": "Listed"
+    }
+  ],
+  "tradeable": [
+    "BTC",
+    "ETH",
+    "SOL",
+    "XRP",
+    "DOGE"
+  ],
+  "untradeable": [],
+  "all_tradeable": true,
+  "dropped_symbols": [],
+  "pruned_path": "research/swarm/runs/2026-09-27-0300/register/forced_flows_stop_sweep_exhaustion_fade/thesis.json"
+}

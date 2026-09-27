@@ -1,0 +1,12 @@
+[
+  {
+    "id": "vol_structure_lottery_jump_fade",
+    "dead_row": 76,
+    "reason": "relabel of DEAD_LIST row 76 (multi-day mean reversion, dead post-2022): shorting a coin after a large (BTC-relative) up-day and holding up to 7 days for the move to unwind is conditional multi-day reversal; BTC-relative conditioning, short-only and skip-a-day are filter/parameter changes, and 'retail overreaction' is the generic reversal counterparty (the idiosyncratic alt-relative reversion angle is also row 2). The cited sources are cross-sectional portfolio sorts, which the thesis itself says do not report a time-series result. Its own train-era probe of the exact registered spec already reads null on the data the screen would use: exploratory/vol_structure/probe_idio_h168.out.txt admitted n=84, mean -2.0 bps, CI [-44.8,40.9], WR 0.524 < p*(200) 0.52875."
+  },
+  {
+    "id": "cross_asset_weekend_etf_catchup",
+    "dead_row": 7,
+    "reason": "relabel of DEAD_LIST row 7 (CME weekend-gap): the row's source scripts/research/microstructure-2026-06-13/VERDICT.md TEST 4 (lines 54-58) measured exactly this weekend-move-then-TradFi-reopen bet and found gaps CONTINUE (corr(gap,fwd) +0.09 to +0.15) but 'Not tradeable either direction net of fees. KILLED', with 2025-2026 flipped to weak reversion. The thesis's why_different says row 7 was a fade only and that betting continuation is new; the record already tested continuation. Moving the reopen anchor from CME Sunday to ETF Monday 13:00 UTC, adding vol-scaling, and widening to 5 symbols are parameter/universe changes. Row 18 (ETF-flow timing and weekend seasonality null) also applies."
+  }
+]

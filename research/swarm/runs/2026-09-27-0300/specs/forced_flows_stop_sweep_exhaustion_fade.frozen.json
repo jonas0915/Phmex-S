@@ -1,0 +1,66 @@
+{
+  "frozen_at": "2026-09-27T10:00:07Z",
+  "sha256": "3124d39095731cfead72f2bd078fde29f49948f167728e1f207dad98b47586e7",
+  "thesis": {
+    "counterparty": "(1) Stopped-out shorts and liquidated high-leverage shorts (longs on the downside) whose buy-stops / liquidation prices sat just beyond the prior 3-day extreme: they are forced to buy at market at the local worst price by their own contingent orders or by the exchange liquidation engine, and that liquidity is sold to them by resting limit sellers; (2) breakout-chasers who bought the new high and are trapped when the bar closes back inside the range, whose protective stops just below the old level become the next forced flow the fade position profits from.",
+    "evidence": "EXTERNAL: (a) Osler, 'Stop-loss orders and price cascades in currency markets', NY Fed Staff Report 150 (https://www.newyorkfed.org/medialibrary/media/research/staff_reports/sr150.pdf, text read from the fetched PDF): stop-loss orders are 43 percent of all orders by volume and 45 percent by value; 14.3 percent of executed stop-loss buy orders have requested rates ending in [01,10] (just above the level) versus 6.9 percent in [90,99] (just below) - i.e. stops cluster just BEYOND salient levels; after crossing round numbers dollar-mark moves 0.061 percent in 15 minutes vs 0.054 percent after arbitrary numbers; reversal frequency at round numbers is 59.3 percent vs 54.8 percent at arbitrary numbers; 'Most results are statistically significant for hours, although not for days.' The magnitudes are FX-sized (hundredths of a percent), so the paper supports the order-placement mechanism, not a crypto payoff size. (b) Han (2024), 'Price clustering on cryptocurrency order books at a US-based exchange', J. Behavioral and Experimental Finance 41 (https://ideas.repec.org/a/eee/beexfi/v41y2024ics221463502400008x.html, abstract): 10-minute snapshots of five USD crypto order books over 35 weeks (Jan-Aug 2020) show orders cluster at salient price levels (00, 50 cent components) and that clustering strengthens with cumulative depth - salient-level order clustering exists in crypto books. (c) Glassnode Research 'Pressure Points: Liquidation Heatmaps & Market Bias' (https://research.glassnode.com/liquidation-heatmaps/): Hyperliquid carries roughly 16% of global open interest; tracked positions cover ~90% of liquidable BTC OI there; mapped liquidation clusters 'tend to align closely with the spikes in aggregate market liquidations' on Binance/BitMEX/Bybit/OKX, and 'as BTC rallies into this zone, the cluster is liquidated, triggering a sharp squeeze'. The page gives NO quantitative reversal/continuation statistics - cited only for the existence of forced liquidation flow at mapped price clusters. No external source reports a crypto failed-sweep fade payoff; that is what the screen tests. EXPLORATORY (long_1h TRAIN only, not evidence; all variants listed): research/swarm/runs/2026-09-27-0300/exploratory/forced_flows/probe_sweep_reclaim.py -> probe_sweep_reclaim.out.txt: 18 symbols, N=72 sweep-fade n=6078, mean signed fwd bps h6 12.16, h12 16.99, h24 32.94; breakout-hold control (close beyond extreme) N=72 continues at h3 16.72 / h6 16.16 and reverses by h24 (-30.13), so the sweep and the breakout carry opposite short-horizon information; N=24 variant weaker (h24 7.31). research/swarm/runs/2026-09-27-0300/exploratory/forced_flows/probe_sweep_breakdown.py -> probe_sweep_breakdown.out.txt: de-overlapped (one per symbol per 24 bars) n=2263, h24 mean 21.27 bps, but LONG side only 4.01 vs SHORT 39.94 (bear-regime dependence), month means swing from -159.3 (2026-01) to +163.1 (2026-04), and 6 of 18 symbols are negative at h24 (ETH -14.8, LINK -8.5, NEAR -3.2, TAO -30.3, XLM -7.0, XRP -14.0) - the effect is noisy and regime-exposed. research/swarm/runs/2026-09-27-0300/exploratory/forced_flows/probe_sweep_frequency.py -> probe_sweep_frequency.out.txt (trade COUNTS only, PnL not printed): on the 5 lot-verified symbols, long_1h train gives 999 admitted trades under fee_math.max_concurrent(150)=3 over 42.14 weeks = 23.71/week (printed), fee_math.time_to_verdict_weeks = 2.109 weeks (printed); screen.causality_check passed on all 5; p_star(150)=0.5383333, p_star(120)=0.5479167, p_star(180)=0.5319444 (printed); lot_check ok for all 5 with verified lot_usd (BTC 2 lots at 77.74, ETH 8 at 24.9738, SOL 197, XRP 199, DOGE 199). CONTRARY probes (reported per LESSONS 2026-09-25): round-number crossing continuation (Osler's primary result) is NOT present in crypto 1h data - research/swarm/runs/2026-09-27-0300/exploratory/forced_flows/probe_round_cross.out.txt (2-sig-fig grid n=26647, h12 1.38 bps vs placebo grid 0.45) and research/swarm/runs/2026-09-27-0300/exploratory/forced_flows/probe_round_cross_1sf.out.txt (1-sig-fig grid h12 -6.12 vs placebo +5.82); no round-number thesis was registered. DATASET CHOICE: registered on mr_edge, not long_1h, because probe_sweep_breakdown.py called load_funding(era='train'), which is anchored to mr_edge bounds and so read Phemex funding dated 2026-06..08 (inside the long_1h holdout window) - STANDARDS #6 forbids that for a long_1h thesis. The screen period (mr_edge train 2026-06-01 to 2026-08-10, 1692 1h bars per symbol per probe_sweep_frequency.out.txt) was not used to shape the signal (only its index bounds were read). FUNDING: holds up to 24h cross up to 3 settlements; mr_edge-train mean funding per settlement (probe_sweep_breakdown.out.txt) BTC 0.393, ETH 0.163, SOL 0.094, XRP 0.293, DOGE 0.687 bps - the signal is two-sided so funding is paid on longs and received on shorts; screen net bps excludes funding and the slot must log it.",
+    "id": "forced_flows_stop_sweep_exhaustion_fade",
+    "lens": "forced_flows",
+    "mechanism": "Stop-loss orders and exchange liquidation prices are positive-feedback, price-contingent market orders that rest just BEYOND salient levels (Osler, NY Fed SR150: stop-loss buy orders cluster just above levels, stop-loss sells just below). The most salient level on a 1h chart is the prior 3-day (72 closed 1h bars) extreme: shorts who sold the range put their buy-stops, and their liquidation prices, just above it. When a 1h bar trades through that extreme, those orders fire as forced market buys (a stop/liquidation sweep). If the forced flow is the only thing driving the break, it is absorbed by resting limit sellers and the bar CLOSES back inside the prior range: the fuel is spent (the stops that were resting there no longer exist), and the traders who chased the new high are now long above a failed level with their own stops just below it, which become the next forced flow in the opposite direction. The signal fades the sweep: short after an upside sweep that closes back below the prior 72-bar high, long after a downside sweep that closes back above the prior 72-bar low, held up to 24 hours. It differs from a breakout (close beyond the extreme), which the probe shows continues for ~12h instead.",
+    "nearest_dead_rows": [
+      {
+        "row": 25,
+        "why_different": "S/R bounce fades price AT a 2-touch pivot zone before it breaks (zone as support, betting nobody pushes through). This thesis requires price to trade THROUGH the level (the stops beyond it are consumed) and then close back inside; the trade is on exhaustion of the triggered contingent-order flow, not on the level holding. A bar that touches but does not exceed the prior extreme is never a signal."
+      },
+      {
+        "row": 6,
+        "why_different": "Liquidation-cascade reversion is triggered by an abnormal-volatility/volume bar anywhere and bets it reverts; it died because high-vol bars continue. This trigger has no volatility or volume condition; it is defined by WHERE the bar trades (beyond the 72-bar extreme, where stops sit) and by the close failing back inside. Bars that close beyond the extreme (the continuing cascade) are excluded by construction; the probe shows those continue for ~12h (probe_sweep_reclaim.out.txt breakout_hold)."
+      },
+      {
+        "row": 110,
+        "why_different": "Liq-cascade continuation bets that abnormal vol+volume bars continue; this bets on the opposite case, a failed sweep, selected by level geometry, not by bar size."
+      },
+      {
+        "row": 3,
+        "why_different": "1h vol-expansion fade selects on range expansion; this selects on penetration of a prior extreme plus a close back inside, regardless of range; no volatility filter at all."
+      },
+      {
+        "row": 76,
+        "why_different": "Multi-day mean reversion fades multi-day returns over multi-day holds; this is a single-bar event (failed sweep of stops) with a <=24h hold, and ordinary closes beyond the extreme are not faded."
+      },
+      {
+        "row": 33,
+        "why_different": "Donchian trend follows closes beyond N-period extremes (a demoted book, not re-proposed). This trades only the complementary event: the extreme is pierced intrabar but the close fails back inside; a Donchian breakout bar can never be a signal here."
+      },
+      {
+        "row": 77,
+        "why_different": "Prior-day value-area edge breakout was a breakout (continuation) off volume-profile edges with no backtest; this is a fade of a failed penetration of the 72-bar price extreme, pre-registered with a DOA line."
+      }
+    ],
+    "prediction": "On mr_edge TRAIN (2026-06-01 to ~2026-08-10, 1h bars, BTC/ETH/SOL/XRP/DOGE), fading a closed 1h bar that pierces the prior 72-bar high (low) but closes back inside it, with tp=sl=150 bps and a 24-bar max hold, yields n >= 30 admitted trades whose mean net bps (after c=11.5) is > 0 with bootstrap CI95 excluding 0, and win rate >= fee_math.p_star(150) = 0.5383. Falsified if the CI includes 0, the mean is <= 0, or WR < 0.5383.",
+    "signal_py": "import numpy as np\nimport pandas as pd\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Stop-sweep exhaustion fade (closed 1h bars only).\n    Upside sweep: this closed bar's high trades ABOVE the highest high of the prior 72 closed bars\n    (where buy-stops / short-liquidation orders rest) but the bar CLOSES back below that prior high\n    -> -1 (short). Downside sweep mirror -> +1 (long). A bar that sweeps both sides -> 0.\"\"\"\n    n = 72\n    prior_high = df[\"high\"].rolling(n, min_periods=n).max().shift(1)\n    prior_low = df[\"low\"].rolling(n, min_periods=n).min().shift(1)\n    up = (df[\"high\"] > prior_high) & (df[\"close\"] < prior_high)\n    dn = (df[\"low\"] < prior_low) & (df[\"close\"] > prior_low)\n    out = pd.Series(0, index=df.index, dtype=int)\n    out[up & ~dn] = -1\n    out[dn & ~up] = 1\n    return out\n",
+    "source_urls": [
+      "https://www.newyorkfed.org/medialibrary/media/research/staff_reports/sr150.pdf",
+      "https://ideas.repec.org/a/eee/beexfi/v41y2024ics221463502400008x.html",
+      "https://research.glassnode.com/liquidation-heatmaps/"
+    ],
+    "spec": {
+      "dataset": "mr_edge",
+      "doa_line": "Dead if the mr_edge train-era screen has n < 30, or its bootstrap CI95 of net bps (after c=11.5) includes 0 or its mean is <= 0, or its win rate is below fee_math.p_star(150)=0.5383, or the registered tp +/-20% robustness read (tp 120 and 180) does not keep the same positive sign of net_bps_mean in both variants.",
+      "expected_trades_per_week": 23.7,
+      "max_concurrent": 3,
+      "max_hold_bars": 24,
+      "sl_bps": 150,
+      "timeframe": "1h",
+      "tp_bps": 150,
+      "universe": [
+        "BTC",
+        "ETH",
+        "SOL",
+        "XRP",
+        "DOGE"
+      ]
+    },
+    "thesis_path": "research/swarm/runs/2026-09-27-0300/theses/forced_flows_stop_sweep_exhaustion_fade.json"
+  }
+}

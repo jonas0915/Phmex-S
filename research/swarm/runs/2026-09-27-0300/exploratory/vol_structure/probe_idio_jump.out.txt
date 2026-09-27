@@ -1,0 +1,12 @@
+k=2.5 fl=0.05: fires=69 fire-days=36 max/day=7 top={Timestamp('2026-01-04 00:00:00+0000', tz='UTC'): 7, Timestamp('2026-02-16 00:00:00+0000', tz='UTC'): 6, Timestamp('2026-02-27 00:00:00+0000', tz='UTC'): 5, Timestamp('2025-10-14 00:00:00+0000', tz='UTC'): 5}
+  tp200/sl200/h72 mc=2: raw n=69 mean=3.0 | adm n=49 mean=8.9 ci=[-48.2,57.9] WR=0.551 p*=0.5288 tpw=1.15 ttv=43.6 exits={'TP': 27, 'SL': 22}
+  tp150/sl150/h48 mc=3: raw n=69 mean=-13.7 | adm n=56 mean=-11.5 ci=[-49.0,26.0] WR=0.500 p*=0.5383 tpw=1.31 ttv=38.1 exits={'TP': 28, 'SL': 28}
+  tp300/sl300/h168 mc=1: raw n=69 mean=36.3 | adm n=35 mean=31.4 ci=[-71.5,134.2] WR=0.571 p*=0.5192 tpw=0.82 ttv=61.0 exits={'TP': 20, 'SL': 15}
+k=2.0 fl=0.04: fires=126 fire-days=60 max/day=9 top={Timestamp('2026-01-04 00:00:00+0000', tz='UTC'): 9, Timestamp('2026-04-18 00:00:00+0000', tz='UTC'): 8, Timestamp('2025-10-14 00:00:00+0000', tz='UTC'): 8, Timestamp('2025-11-09 00:00:00+0000', tz='UTC'): 7}
+  tp200/sl200/h72 mc=2: raw n=126 mean=17.1 | adm n=84 mean=-2.0 ci=[-44.8,40.9] WR=0.524 p*=0.5288 tpw=1.97 ttv=25.4 exits={'TP': 44, 'SL': 40}
+  tp150/sl150/h48 mc=3: raw n=126 mean=-2.0 | adm n=95 mean=-3.6 ci=[-32.0,28.0] WR=0.526 p*=0.5383 tpw=2.22 ttv=22.5 exits={'TP': 50, 'SL': 45}
+  tp300/sl300/h168 mc=1: raw n=126 mean=31.4 | adm n=59 mean=-16.6 ci=[-87.8,64.8] WR=0.492 p*=0.5192 tpw=1.38 ttv=36.2 exits={'SL': 30, 'TP': 29}
+k=2.0 fl=0.05: fires=108 fire-days=52 max/day=9 top={Timestamp('2026-01-04 00:00:00+0000', tz='UTC'): 9, Timestamp('2025-10-14 00:00:00+0000', tz='UTC'): 8, Timestamp('2025-11-09 00:00:00+0000', tz='UTC'): 7, Timestamp('2026-02-16 00:00:00+0000', tz='UTC'): 6}
+  tp200/sl200/h72 mc=2: raw n=108 mean=3.3 | adm n=73 mean=-19.7 ci=[-63.6,24.1] WR=0.479 p*=0.5288 tpw=1.71 ttv=29.3 exits={'SL': 38, 'TP': 35}
+  tp150/sl150/h48 mc=3: raw n=108 mean=-8.7 | adm n=83 mean=-2.5 ci=[-35.0,30.1] WR=0.530 p*=0.5383 tpw=1.94 ttv=25.7 exits={'TP': 44, 'SL': 39}
+  tp300/sl300/h168 mc=1: raw n=108 mean=16.3 | adm n=51 mean=-17.4 ci=[-99.7,65.0] WR=0.490 p*=0.5192 tpw=1.19 ttv=41.9 exits={'SL': 26, 'TP': 25}

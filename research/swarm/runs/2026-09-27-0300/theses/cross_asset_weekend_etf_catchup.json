@@ -1,0 +1,58 @@
+{
+  "id": "cross_asset_weekend_etf_catchup",
+  "lens": "cross_asset",
+  "mechanism": "US spot crypto ETFs trade only in Wall Street hours, so from the Friday 4 p.m. ET close to the Monday open the ETF creation/redemption arbitrage and the TradFi investor base behind it are offline while the coin keeps trading 24/7 in thinner books (weekday activity ~2x weekend per CryptoSlate). The weekend move is therefore set by crypto-native flow alone, and the TradFi holder base reprices LATE: at the Monday US open market makers mark the ETF to the accumulated weekend move and, because ETF investors chase recent returns (flow persistence 0.533; flows Granger-cause next-day price; impulse response peaks days 3-4 at ~1.2%), Monday-Tuesday creations/redemptions arrive in the SAME direction as the weekend move and must be executed as spot buying/selling in the coin. The signal reads the size of the weekend move on the last closed bar before the US open (Monday 12:00 UTC bar, closes 13:00 UTC) relative to the coin's own trailing hourly vol, and trades continuation in the weekend's direction for up to 30 hours (through the Tuesday US session). No reference symbol and no equity data are used: each coin's own weekend move is the trigger (the ETF channel is sourced for BTC; for ETH/SOL/XRP/DOGE the thesis relies on the same TradFi-hours flow reaching them through wrappers and beta, which is an assumption the screen tests, not a sourced fact); the cross-asset lag exploited is TradFi-venue (ETF) repricing of a crypto-venue move.",
+  "counterparty": "(1) Return-chasing ETF investors and the authorized participants who must execute their Monday/Tuesday creations (redemptions) as price-insensitive spot purchases (sales) after the weekend move has already happened; they buy after up-weekends and sell after down-weekends because their venue was closed when the information arrived. (2) Monday-morning crypto-native mean-reversion traders / 'CME-gap fill' faders who short up-weekends (buy down-weekends) expecting the weekend move to be undone when depth returns, and are run over by the delayed TradFi flow.",
+  "prediction": "On the long_1h TRAIN era, continuation trades entered at the open of the Monday 13:00 UTC bar after a weekend move with |z| >= 0.5 (log(close Mon 12:00 bar / close Fri 20:00 bar) / (168-bar 1h return std at the Friday anchor * sqrt(hours))), symmetric TP/SL 150 bps, 30-bar max hold, admitted under max_concurrent=3, have mean net bps > 0 after c=11.5 with bootstrap CI95 excluding 0 and WR >= p*(150)=0.5383 (fee_math.p_star, exploratory/cross_asset/probe_frequency_capped.out.txt), and the +/-20% tp variants (120/180 bps) keep a positive net_bps_mean. Falsified if the CI includes 0 or is negative, or WR < p*(150).",
+  "nearest_dead_rows": [
+    {
+      "row": 7,
+      "why_different": "Row 7's CME-gap-fill is a FADE of the weekend move (bet that Monday depth undoes it) and its other items are unconditional hour/weekday mean returns. This thesis has no directional day bias (long after up-weekends, short after down-weekends) and bets the opposite of gap-fill: that the TradFi ETF holder base, which could not trade the weekend, adds flow in the weekend's direction Monday-Tuesday. The counterparty named here is exactly the gap-fill fader."
+    },
+    {
+      "row": 18,
+      "why_different": "Row 18 killed ETF-flow timing from published daily flow prints and weekend seasonality as unconditional calendar effects. This thesis never reads published flows and has no unconditional weekend sign; it is conditional on the size and sign of each coin's own weekend move, measured on closed bars before the ETF venue reopens."
+    },
+    {
+      "row": 113,
+      "why_different": "Row 113 traded continuation of the NY 15:00 BRRNY benchmark-window bar every weekday (a same-session intraday execution footprint). This thesis trades the one weekly window when the ETF venue is CLOSED: the forced flow is the delayed Monday/Tuesday catch-up of an investor base that could not act on the weekend, not TWAP benchmark execution inside an open session; trigger clock (Fri close -> Mon pre-open), horizon (30h) and frequency (once a week) all differ."
+    },
+    {
+      "row": 106,
+      "why_different": "Rows 106/107/112 traded an alt on a BTC or ETH/BTC reference move (cross-symbol lead-lag at 1-3h). No reference symbol is used here; the lag is cross-VENUE (24/7 crypto venues -> weekday-only ETF venue) on the same coin."
+    },
+    {
+      "row": 110,
+      "why_different": "Row 110 bought continuation of any outsized return+volume bar at any hour as a forced-liquidation proxy. This thesis fires only once a week on a 64-hour cumulative weekend move scaled by trailing vol, with a named TradFi counterparty that arrives after the move, not a liquidation cascade."
+    },
+    {
+      "row": 76,
+      "why_different": "Row 76 is multi-day MEAN REVERSION; this is a ~1-day continuation bet tied to venue hours."
+    }
+  ],
+  "source_urls": [
+    "https://cryptoslate.com/how-thin-weekend-liquidity-turns-minor-geopolitical-news-into-massive-monday-price-gaps-for-etf-holders/",
+    "https://www.falconx.io/newsroom/what-can-spot-etf-flows-tell-us-about-the-trajectory-of-bitcoin-prices-a-preliminary-statistical-investigation",
+    "https://arxiv.org/abs/2405.12768",
+    "https://finance.yahoo.com/news/cme-launches-24-7-crypto-122916335.html"
+  ],
+  "evidence": "(a) CryptoSlate (https://cryptoslate.com/how-thin-weekend-liquidity-turns-minor-geopolitical-news-into-massive-monday-price-gaps-for-etf-holders/, fetched 2026-09-27): 'institutional participation had pushed around 47% of Bitcoin volume into US weekday hours'; 'Weekday activity had grown to roughly twice weekend levels'; spot BTC ETFs 'trade only during Wall Street hours'; at resumption 'market makers incorporate the accumulated Bitcoin move into the ETF price'. (The 0.012% vs 0.028% weekday/weekend BTC-USDT spread figure appeared only in a WebSearch result summary attributing Kaiko, not on a page I opened - treat as unverified.) (b) FalconX (https://www.falconx.io/newsroom/what-can-spot-etf-flows-tell-us-about-the-trajectory-of-bitcoin-prices-a-preliminary-statistical-investigation, sample 2024-01-11 to 2024-10-11): ETF flow persistence coefficient 0.533; flows Granger-cause price (F=8.4767, p=0.00406); VAR coefficient of prior-day inflows on price 0.027; impulse response peaks ~1.2% at days 3-4; rolling flow-price correlation 0.10 to ~0.50. (c) van der Beck, Bouchaud, Villamaina 'Ponzi Funds' (https://arxiv.org/abs/2405.12768, 2024-05-21) abstract: 'investors chase self-inflated fund returns at a high frequency' - ETF flows respond to recent returns. (d) Regime caveat: CME launched 24/7 crypto futures on 2026-05-29 (https://finance.yahoo.com/news/cme-launches-24-7-crypto-122916335.html), after the long_1h train era; ETFs remain weekday-only, but institutions can now hedge on weekends, which may shrink the effect in the forward test. Exploratory only (not evidence, long_1h train, no mr_edge data read): research/swarm/runs/2026-09-27-0300/exploratory/cross_asset/probe_frequency_capped.out.txt - 33 Mondays with an event, 87 events after the max_concurrent(150)=3 cap, capped rate 2.0306/week, fee_math.time_to_verdict_weeks = 24.62; causality_sanity.out.txt - causality_check PASS on all 5 symbols, values {-1,0,1}, fires only Monday 12:00 UTC. probe_weekend_etf_catchup.out.txt / _final.out.txt record descriptive per-symbol signed 30-bar forward means for the draft |z|>=1.0 (39 events, too rare) and final |z|>=0.5 thresholds; the threshold was lowered for frequency only, and those descriptive means are not evidence. lot_check at $200 passes for all 5 symbols with non-null lot_usd (fee_math_outputs.txt). Funding: holds up to 30h cross ~4 settlements; the screen does not model funding (longs pay roughly +0.01%/8h on BTC per CONSTRAINTS).",
+  "spec": {
+    "dataset": "long_1h",
+    "universe": [
+      "BTC",
+      "ETH",
+      "SOL",
+      "XRP",
+      "DOGE"
+    ],
+    "timeframe": "1h",
+    "tp_bps": 150,
+    "sl_bps": 150,
+    "max_hold_bars": 30,
+    "expected_trades_per_week": 2.03,
+    "doa_line": "Dead on arrival if the train-era screen's bootstrap CI95 of net bps includes 0 or is negative, OR WR < p*(150)=0.5383, OR either +/-20% tp variant (120/180 bps) flips net_bps_mean negative, OR admitted n < 30."
+  },
+  "signal_py": "import numpy as np\nimport pandas as pd\n\n\ndef signals(df: pd.DataFrame) -> pd.Series:\n    \"\"\"Weekend TradFi catch-up. Fires only on the CLOSED Monday 12:00-UTC 1h bar (closes\n    13:00 UTC, before the US cash/ETF open). Weekend move = that close vs the close of the\n    last Friday bar at or before 20:00 UTC (bar closing 21:00 UTC, after the 4 p.m. ET ETF\n    close in both DST regimes). Scaled by trailing 1h return std (168 bars, ending at the\n    Friday anchor) * sqrt(hours elapsed). |z| >= 0.5 -> trade in the weekend's direction.\"\"\"\n    idx = df.index\n    close = df[\"close\"].astype(float)\n    r = np.log(close).diff()\n    vol = r.rolling(168, min_periods=120).std()\n    out = pd.Series(0, index=idx, dtype=int)\n    is_fri_anchor = (idx.dayofweek == 4) & (idx.hour == 20)\n    anchor_close = close.where(is_fri_anchor).ffill()\n    anchor_vol = vol.where(is_fri_anchor).ffill()\n    anchor_time = pd.Series(idx.where(is_fri_anchor), index=idx).ffill()\n    is_fire = (idx.dayofweek == 0) & (idx.hour == 12)\n    hours = (pd.Series(idx, index=idx) - anchor_time).dt.total_seconds() / 3600.0\n    ok = is_fire & (hours > 60) & (hours < 72) & anchor_vol.gt(0)\n    z = np.log(close / anchor_close) / (anchor_vol * np.sqrt(hours))\n    out[ok & (z >= 0.5)] = 1\n    out[ok & (z <= -0.5)] = -1\n    return out\n",
+  "thesis_path": "research/swarm/runs/2026-09-27-0300/theses/cross_asset_weekend_etf_catchup.json"
+}

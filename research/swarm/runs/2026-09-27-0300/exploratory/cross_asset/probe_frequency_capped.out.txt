@@ -1,0 +1,3 @@
+max_concurrent(150)= 3 p_star(150)= 0.5383333333333333
+mondays_with_event 33 events_per_monday_distribution {1.0: 3, 2.0: 6, 3.0: 8, 4.0: 6, 5.0: 10}
+capped_events 87 train_weeks 42.845238095238095 capped_rate_per_week 2.0305640455682132 time_to_verdict_weeks 24.623700054734538

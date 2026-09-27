@@ -1,0 +1,61 @@
+all n 6078 mean h12 16.99 h24 32.94
+de-overlapped n 2263 mean h12 9.52 h24 21.27 long h24 4.01 short h24 39.94
+weeks in train: 42.14 de-overlapped events/week: 53.7
+
+by symbol (de-overlapped): n, mean h24
+          count   mean
+sym                   
+1000PEPE    124  100.6
+1000SHIB    128   23.5
+AAVE        133   15.9
+ADA         129   36.1
+BNB         114    8.3
+BTC         135   15.1
+DOGE        124   41.1
+ETH         127  -14.8
+LINK        124   -8.5
+LTC         123   71.0
+NEAR        132   -3.2
+ONDO        126   24.1
+SOL         126   66.7
+SUI         132   30.3
+TAO         125  -30.3
+UNI         114   28.7
+XLM         132   -7.0
+XRP         115  -14.0
+
+by month (de-overlapped): n, mean h12, mean h24
+           n    h12    h24
+ts                        
+2025-06    2  262.0  397.8
+2025-07  248  -16.9   -3.2
+2025-08  261   39.4  109.7
+2025-09  209    6.4  -42.6
+2025-10  230   -8.1   50.6
+2025-11  239   40.6  -50.2
+2025-12  259   33.7   75.2
+2026-01  214 -103.7 -159.3
+2026-02  197   10.1   76.9
+2026-03  257   30.0   16.6
+2026-04  147   64.5  163.1
+
+funding (train) per-settlement mean, bps:
+         sym    n  mean_bps
+0   1000PEPE  212    -0.199
+1   1000SHIB  212    -0.012
+2       AAVE  212     0.566
+3        ADA  212    -0.133
+4        BNB  212     0.432
+5        BTC  212     0.393
+6       DOGE  212     0.687
+7        ETH  212     0.163
+8       LINK  212     0.689
+9        LTC  212     0.676
+10      NEAR    0       NaN
+11      ONDO  423    -0.387
+12       SOL  212     0.094
+13       SUI  212    -0.067
+14       TAO  308    -0.540
+15       UNI  212     0.701
+16       XLM  212    -0.945
+17       XRP  212     0.293

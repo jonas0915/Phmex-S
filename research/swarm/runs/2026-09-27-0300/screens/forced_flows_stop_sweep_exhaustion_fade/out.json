@@ -1,0 +1,61 @@
+{
+  "id": "forced_flows_stop_sweep_exhaustion_fade",
+  "spec_sha256": "3124d39095731cfead72f2bd078fde29f49948f167728e1f207dad98b47586e7",
+  "era": "train",
+  "n": 182,
+  "net_bps_mean": -3.843812932804567,
+  "ci95": [
+    -24.86903305201303,
+    16.207261398979114
+  ],
+  "wr": 0.5439560439560439,
+  "p_star": 0.5383333333333333,
+  "trades_per_week": 18.081608515671203,
+  "time_to_verdict_weeks": 2.7652407116692825,
+  "lot_check": {
+    "BTC": {
+      "ok": true,
+      "lots": 2,
+      "lot_usd": 77.74
+    },
+    "ETH": {
+      "ok": true,
+      "lots": 8,
+      "lot_usd": 24.9738
+    },
+    "SOL": {
+      "ok": true,
+      "lots": 197,
+      "lot_usd": 1.0143
+    },
+    "XRP": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.0044
+    },
+    "DOGE": {
+      "ok": true,
+      "lots": 199,
+      "lot_usd": 1.001
+    }
+  },
+  "per_symbol": {
+    "BTC": 38,
+    "ETH": 31,
+    "SOL": 38,
+    "XRP": 39,
+    "DOGE": 36
+  },
+  "train_span": [
+    "2026-06-01 00:00:00+00:00",
+    "2026-08-10 11:00:00+00:00"
+  ],
+  "causality": "PASS",
+  "signal_sha256": "5cac80afcc7c0ddf8add3f20f67143b3a84e0d72af3e90122e3cca1c173fdd25",
+  "portfolio": {
+    "max_concurrent": 3,
+    "n_unconstrained": 208,
+    "n_admitted": 182,
+    "n_dropped": 26
+  }
+}

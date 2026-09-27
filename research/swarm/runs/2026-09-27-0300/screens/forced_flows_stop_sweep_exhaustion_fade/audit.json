@@ -1,0 +1,37 @@
+{
+  "id": "forced_flows_stop_sweep_exhaustion_fade",
+  "verdict": "CONFIRMED",
+  "ci_excludes_zero": false,
+  "findings": [
+    "step1 PASS: registrar.verify(specs/forced_flows_stop_sweep_exhaustion_fade.frozen.json) printed True; screens/<id>/signal.py is byte-identical to spec.thesis.signal_py (sha256 5cac80afcc7c0ddf8add3f20f67143b3a84e0d72af3e90122e3cca1c173fdd25 = out.json signal_sha256)",
+    "step2 PASS: rerun into /tmp/audit_2026-09-27-0300_forced_flows_stop_sweep_exhaustion_fade --era train reproduced n=182, net_bps_mean=-3.843812932804567, ci95=[-24.86903305201303, 16.207261398979114], wr=0.5439560439560439 exactly; rerun trades.csv is byte-identical (cmp) to the run's trades.csv",
+    "step3 PASS: signal.py uses only df; rolling(72).max()/min() followed by .shift(1) (positive shift = past bars only); no shift(-k), no center=True, no iloc[-1], no reference/funding loads; out.json causality == PASS; signal values on all 5 symbols are exactly {-1,0,1}",
+    "step4 PASS: all 182 trades.csv rows (not just 5) checked against signals(load_data.load_ohlcv(sym,'1h',era='train',dataset='mr_edge')): signal at bar before entry_ts equals trade side and entry equals df.open at entry_ts, 0 mismatches; max exit_ts 2026-08-10 11:00 UTC = train_span end, 0 rows after it; net_bps == gross_bps - fee_math.C_BPS (11.5) on every row",
+    "step5 PASS: fee_math.p_star(150)=0.5383333333333333 and fee_math.time_to_verdict_weeks(18.081608515671203)=2.7652407116692825 both equal out.json; fee_math.max_concurrent(150)=3 equals spec max_concurrent",
+    "screen result (not an audit defect): net_bps_mean is negative (-3.84 bps per out.json) and ci95 straddles 0, so CONSTRAINTS viable #1 and the spec doa_line fail; wr 0.5440 >= p_star 0.5383 per out.json but TP/SL/TIME mix (84/78/20 from trades.csv exit_reason) still nets negative after c",
+    "informational: 2 trades (SOL 2026-08-09 17:00, BTC 2026-08-09 23:00 entries) exit TIME at the train_span end bar 2026-08-10 11:00 before the 24-bar max hold, i.e. truncated by end of train data",
+    "informational: 20 of 182 trades have entry_ts == exit_ts (TP/SL hit within the entry bar); intrabar TP/SL ordering is screening-grade (STANDARDS #10)",
+    "informational: realized trades_per_week 18.08 (out.json) vs spec expected_trades_per_week 23.7 (exploratory used long_1h over 42.14 weeks; the screen ran mr_edge train)"
+  ],
+  "numbers": {
+    "n": 182,
+    "net_bps_mean": -3.843812932804567,
+    "ci95": [-24.86903305201303, 16.207261398979114],
+    "wr": 0.5439560439560439,
+    "p_star": 0.5383333333333333,
+    "time_to_verdict_weeks": 2.7652407116692825,
+    "p_boot": 1.0,
+    "rerun": {
+      "n": 182,
+      "net_bps_mean": -3.843812932804567,
+      "ci95": [-24.86903305201303, 16.207261398979114]
+    }
+  },
+  "sources": {
+    "out_json": "research/swarm/runs/2026-09-27-0300/screens/forced_flows_stop_sweep_exhaustion_fade/out.json",
+    "trades_csv": "research/swarm/runs/2026-09-27-0300/screens/forced_flows_stop_sweep_exhaustion_fade/trades.csv",
+    "rerun_out_json": "/tmp/audit_2026-09-27-0300_forced_flows_stop_sweep_exhaustion_fade/screens/forced_flows_stop_sweep_exhaustion_fade/out.json",
+    "frozen_spec": "research/swarm/runs/2026-09-27-0300/specs/forced_flows_stop_sweep_exhaustion_fade.frozen.json",
+    "p_boot_method": "bootstrap_ci.mean_ci alpha ladder [0.0005..1.0] on trades.csv net_bps; no alpha gave lower bound > 0 -> 1.0"
+  }
+}

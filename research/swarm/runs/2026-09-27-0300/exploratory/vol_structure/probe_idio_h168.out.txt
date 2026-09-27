@@ -1,0 +1,2 @@
+k2.0 fl0.04 tp200/sl200/h168 mc=2 adm n=84 mean=-2.0 ci=[-44.8,40.9] WR=0.524 tpw=1.97 ttv=25.4 exits={'TP': 44, 'SL': 40}
+p*(200)= 0.52875 lot_check: {'1000PEPE': True, '1000SHIB': True, 'AAVE': True, 'ADA': True, 'BNB': True, 'DOGE': True, 'ETH': True, 'LINK': True, 'LTC': True, 'NEAR': True, 'ONDO': True, 'SOL': True, 'SUI': True, 'TAO': True, 'UNI': True, 'XLM': True, 'XRP': True}
