@@ -444,3 +444,37 @@ def test_leverage_restore_not_blocked_by_a_paper_position(live):
     live.slot.set_paper()
     live.slot.risk.positions[ETH] = SimpleNamespace(side="long", amount=0.01)   # paper book re-entered
     assert live.bot._donchian_restore_leverage(ETH) is True
+
+
+# ── third review (9/28) ───────────────────────────────────────────────────
+def test_a_stale_prev_stop_above_the_fill_is_never_used(live):
+    live.bot._donchian_state.setdefault(ETH, donchian_slot.default_coin_state())["live_prev_stop"] = 3000.0
+    live.bot._donchian_adjust_position(live.slot, ETH, 0.30, 2600.0, False, _today())
+    assert live.slot.risk.positions[ETH].stop_loss == pytest.approx(2210.0)   # 2600*0.85, not 3000
+
+
+def test_promotion_clears_a_leftover_prev_stop(sandbox):
+    b = _bare_bot([_make_donchian_slot("DONCHIAN_ETH")])
+    b._donchian_state.setdefault(ETH, donchian_slot.default_coin_state())["live_prev_stop"] = 3000.0
+    b._donchian_on_promote("DONCHIAN_ETH")
+    assert "live_prev_stop" not in b._donchian_state[ETH]
+
+
+def test_live_donchian_close_happens_before_cancelling_protection(live):
+    _open(live)
+    live.bot._donchian_adjust_position(live.slot, ETH, 0.0, 2500.0, False, _today())
+    n = live.ex.names()
+    assert n.index("close_long") < n.index("cancel_open_orders")
+
+
+def test_failed_live_close_keeps_the_resting_stop(live):
+    _open(live)
+    live.ex.close_long = lambda *a, **k: None
+    assert live.bot._donchian_adjust_position(live.slot, ETH, 0.0, 2500.0, False, _today()) is None
+    assert "cancel_open_orders" not in live.ex.names()
+
+
+def test_entry_sweeps_stale_orders_before_buying(live):
+    live.bot._donchian_adjust_position(live.slot, ETH, 0.30, 2600.0, False, _today())
+    n = live.ex.names()
+    assert n.index("cancel_open_orders") < n.index("open_long_market")

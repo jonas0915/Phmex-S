@@ -297,3 +297,13 @@ def test_live_trades_row_counts_only_this_promotion():
     html = tv.build_trend_content({"ETH": st}, {"ETH": days}, today=date(2026, 9, 28),
                                   live_ids={"DONCHIAN_ETH"}, promoted_at={"ETH": 200})
     assert "1 closed" in html and "+$2.00" in html
+
+
+def test_badge_says_demote_pending_while_the_slot_is_still_live(tmp_path, monkeypatch):
+    import web_dashboard as wd
+    monkeypatch.setattr(wd, "PROJECT_DIR", str(tmp_path))
+    (tmp_path / ".demote_DONCHIAN_ETH").write_text("{}")
+    html = wd._slot_status_html("DONCHIAN_ETH", [], {"DONCHIAN_ETH"}, {"DONCHIAN_ETH": {"paper_mode": False}})
+    assert "DEMOTE PENDING" in html
+    html = wd._slot_status_html("DONCHIAN_ETH", [], set(), {"DONCHIAN_ETH": {"paper_mode": True}})
+    assert "DEMOTED" in html and "PENDING" not in html

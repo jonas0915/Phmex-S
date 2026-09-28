@@ -5136,6 +5136,7 @@ class Phmex2Bot:
         for symbol, sid in donchian_slot.SLOT_IDS.items():
             if sid == slot_id and symbol in self._donchian_state:
                 self._donchian_state[symbol]["last_eval_utc_date"] = None
+                self._donchian_state[symbol].pop("live_prev_stop", None)
                 donchian_slot.save_state(self._donchian_state)
 
     def _donchian_live_equity(self):
@@ -5177,6 +5178,8 @@ class Phmex2Bot:
 
         if target_lots == cur_lots:
             if pos is None:
+                if st.pop("live_prev_stop", None) is not None:
+                    donchian_slot.save_state(self._donchian_state)
                 return (f"flat — target 0 lots ({donchian_slot.LIVE_EXPOSURE_MULT:g}x w={w:.3f} "
                         f"on ${equity:.2f} equity < 1 lot)")
             if st.get("live_w") != w:            # rule rebalanced inside the same lot count
@@ -5198,6 +5201,9 @@ class Phmex2Bot:
                 st.pop("live_prev_stop", None)
                 donchian_slot.save_state(self._donchian_state)
                 return f"closed ({reason})"
+        if os.path.exists(f".demote_{slot.slot_id}") or slot.paper_mode or not slot.is_active:
+            st.pop("live_prev_stop", None)
+            donchian_slot.save_state(self._donchian_state)
         if os.path.exists(f".demote_{slot.slot_id}"):
             return f"target {target_lots} lots but demote pending — no entry"
         if slot.paper_mode or not slot.is_active:
@@ -5223,6 +5229,7 @@ class Phmex2Bot:
                 f"⚠️ <b>{slot.slot_id}</b>: an {symbol} position already exists on the exchange "
                 f"that this slot does not own — no entry (retrying each cycle)")
             return False
+        self.exchange.cancel_open_orders(symbol)         # no position here: sweep any stale SL/TP
         st = self._donchian_state.setdefault(symbol, donchian_slot.default_coin_state())
         st["leverage_2x_set"] = True                     # flag BEFORE the flip (TSM pattern)
         donchian_slot.save_state(self._donchian_state)
@@ -5243,7 +5250,9 @@ class Phmex2Bot:
                                       cycle=self.cycle_count, strategy="donchian_ensemble")
         pos.amount = filled
         pos.margin = margin
-        pos.stop_loss = donchian_slot.ratchet_stop(prev_stop, fill)   # a resize never lowers the stop
+        # a resize never lowers the stop — but a leftover stop at/above the fill is never used
+        _prev = prev_stop if (prev_stop is not None and prev_stop < fill) else None
+        pos.stop_loss = donchian_slot.ratchet_stop(_prev, fill)
         pos.take_profit = fill * (1 + donchian_slot.LIVE_TP_PCT / 100.0)
         pos.sl_order_id = "software"
         pos.tp_order_id = None
@@ -5510,8 +5519,12 @@ class Phmex2Bot:
             slot.risk.close_position(symbol, price, reason)
             notifier.notify_paper_exit(symbol, pos.side, pos.entry_price, price, pnl, pnl_pct, reason, slot=slot.slot_id)
             return True
+        # Live Donchian keeps its resting SL/TP until the close has actually
+        # filled (a failed market close must never leave the position naked).
+        _cancel_after = slot.strategy_name == "donchian_ensemble"
         try:
-            self.exchange.cancel_open_orders(symbol)
+            if not _cancel_after:
+                self.exchange.cancel_open_orders(symbol)
             # ST2.0's edge is maker-only — close patiently (maker) so the round trip
             # stays maker-maker. Other slots close urgently (taker) as before.
             # ETH_TSM_28 signal exits are also maker-first (spec §7.3): patient limit
@@ -5539,6 +5552,8 @@ class Phmex2Bot:
                     return False
                 logger.error(f"[SLOT LIVE] {slot.slot_id} {symbol} {reason} close FAILED — retry next cycle")
                 return False
+            if _cancel_after:
+                self.exchange.cancel_open_orders(symbol)
             fill = self._extract_fill_price(order, price, is_exit=True)
             slot.risk.close_position(symbol, fill, reason, mode="live",
                                      fees_usdt=self.exchange.extract_order_fee(order, symbol))

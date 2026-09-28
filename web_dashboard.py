@@ -930,6 +930,9 @@ def _slot_status_html(slot_id: str, trades: list, live_ids: set, modes: dict) ->
     if os.path.exists(os.path.join(PROJECT_DIR, ".max_dd_halt")):
         return "<span class='neg'>&#9679; MAX-DD HALT (entries)</span>"
     if os.path.exists(os.path.join(PROJECT_DIR, f".demote_{slot_id}")):
+        if not ((modes or {}).get(slot_id) or {}).get("paper_mode", True):
+            # the .demote_ file is also the retry record of a blocked demote
+            return "<span class='neg'>&#9679; LIVE &mdash; DEMOTE PENDING (close failed)</span>"
         return "<span class='neg'>&#9679; DEMOTED</span>"
     # Main book on PAPER (.paper_main sentinel, owner demotion 2026-08-26):
     # fills are simulated — the badge must never read LIVE. Checked before
