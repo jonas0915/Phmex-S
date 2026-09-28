@@ -827,7 +827,7 @@ class Phmex2Bot:
                 capital_pct=0.0,
                 paper_mode=True,          # ships paper-safe; promote via .promote_DONCHIAN_ETH
                 trade_amount_usdt=None,   # unused — sizing is BASE_NOTIONAL × w, no Kelly
-                loss_cap_usdt=-999.0,     # rails opt-out (same as DONCHIAN_BTC)
+                loss_cap_usdt=donchian_slot.LIVE_LOSS_CAP_USDT,  # owner kill line 9/28: ~30% of $87 → demote to paper
                 kelly_min_trades=10**9,   # neg-Kelly auto-demote never arms
                 durable_trail_enabled=False,  # spec: close-only Donchian stop, no trail
             ),
@@ -909,6 +909,8 @@ class Phmex2Bot:
         # per-day dedup for the not-implemented-live warning.
         self._donchian_state = donchian_slot.load_state()
         self._donchian_live_warned: dict[str, str] = {}
+        self._donchian_ownership_notified: dict[str, str] = {}   # live notify dedup, kind -> UTC date
+        self._donchian_heal_at: dict[str, float] = {}            # symbol -> last protection check
         # informed_flow_btc_alt_cascade_v2 runtime state: per-symbol persisted
         # bar stamp / bars_held + one-shot per-day dedup for the live warning.
         self._informed_flow_btc_alt_cascade_v2_state = informed_flow_btc_alt_cascade_v2_slot.load_state()
@@ -1614,6 +1616,7 @@ class Phmex2Bot:
                             logger.warning(f"[SENTINEL] {slot_id} paper position {_psym} "
                                            f"closed at promote (promote_reset @ {_ppx})")
                     slot.set_live(capital_pct=capital_pct)
+                    self._donchian_on_promote(slot_id)
                     logger.warning(f"[SENTINEL] Slot '{slot_id}' PROMOTED to live at {capital_pct*100:.0f}%")
                     notifier.send(f"🚀 Slot <b>{slot_id}</b> promoted to live ({capital_pct*100:.0f}% capital)")
                     break
@@ -2244,6 +2247,9 @@ class Phmex2Bot:
             if _tsm_lock:
                 self._tsm_notify_ownership(
                     "main_skip", f"main-bot ETH entry skipped ({_tsm_lock})")
+                continue
+            if self._donchian_locks_symbol(symbol):
+                logger.info(f"[CROSS-BOOK] main {symbol} entry skipped — {self._donchian_locks_symbol(symbol)}")
                 continue
             # U2a (2026-07-23): cross-book ownership — the LIVE HTF_L2 slot
             # owns this symbol; a main fill would merge into its position
@@ -3566,6 +3572,10 @@ class Phmex2Bot:
                                 f"slot_skip_{slot.slot_id}",
                                 f"slot {slot.slot_id} ETH entry skipped ({_tsm_lock})")
                             continue
+                        if self._donchian_locks_symbol(symbol):
+                            logger.info(f"[CROSS-BOOK] slot {slot.slot_id} {symbol} entry skipped — "
+                                        f"{self._donchian_locks_symbol(symbol)}")
+                            continue
                         # Stale levels (2026-07-28 review fix): same check as the paper
                         # site, run BEFORE spending a real order attempt — against the
                         # same pre-fill `price` used for the entry decision (fill_price
@@ -4862,6 +4872,13 @@ class Phmex2Bot:
             slot = self._donchian_slot(donchian_slot.SLOT_IDS[symbol])
             if slot is None:
                 continue
+            if not slot.paper_mode:
+                # Live protection heal runs every cycle, even if the slot is
+                # disabled — a resting SL/TP must never silently go missing.
+                try:
+                    self._donchian_heal_protection(slot, symbol)
+                except Exception as e:
+                    logger.error(f"[DONCHIAN] {slot.slot_id} protection heal error: {e}", exc_info=True)
             # Kill/disable gate (2026-07-28): same latent gap as ETH_TSM_28 —
             # this evaluator never checked enabled, so a killed Donchian slot
             # would resurrect at the next daily roll. Dormant today (both
@@ -4938,15 +4955,14 @@ class Phmex2Bot:
         Returns a status note on success, None when the book could not be
         brought in line (caller retries next cycle)."""
         if not slot.paper_mode:
-            # Live sizing is decided AT promotion (spec non-goal: not in this
-            # build) — never place real orders from this path. One warning per
-            # UTC day per slot; the signal series keeps accruing regardless.
-            if self._donchian_live_warned.get(slot.slot_id) != today:
-                self._donchian_live_warned[slot.slot_id] = today
-                logger.error(f"[DONCHIAN] {slot.slot_id} is LIVE but live execution is "
-                             f"not implemented — no orders placed; demote with "
-                             f".demote_{slot.slot_id}")
-            return "LIVE mode unsupported — book untouched"
+            if symbol not in donchian_slot.LIVE_SYMBOLS:
+                # Owner scope 9/28: ETH only (one BTC lot ~ the whole account).
+                if self._donchian_live_warned.get(slot.slot_id) != today:
+                    self._donchian_live_warned[slot.slot_id] = today
+                    logger.error(f"[DONCHIAN] {slot.slot_id} is LIVE but {symbol} is not "
+                                 f"enabled for live — no orders; demote with .demote_{slot.slot_id}")
+                return f"{symbol} not enabled for live — book untouched"
+            return self._donchian_adjust_live(slot, symbol, w, price, stop_fired, today)
 
         target = donchian_slot.BASE_NOTIONAL_USDT * w
         pos = slot.risk.positions.get(symbol)
@@ -5016,6 +5032,207 @@ class Phmex2Bot:
                     f"| ${notional:.2f} notional (w={w:.4f}, {n_long}/9 long) "
                     f"| px_src={_px_src} px_age={_px_age:.1f}s "
                     f"| no TP, close-only daily stops")
+
+    # ── DONCHIAN LIVE (owner go-live 2026-09-28; TASKS.md) ─────────────────────
+    def _donchian_notify_once(self, kind: str, msg: str):
+        today = donchian_slot.utc_date_str()
+        seen = getattr(self, "_donchian_ownership_notified", None)
+        if seen is None:
+            seen = self._donchian_ownership_notified = {}
+        if seen.get(kind) == today:
+            return
+        seen[kind] = today
+        notifier.send(msg)
+
+    def _donchian_locks_symbol(self, symbol: str):
+        """Reason-string while a LIVE Donchian slot owns `symbol` (one-way mode
+        merges same-symbol positions, and the symbol runs at the slot's 2x
+        isolated leverage), else None."""
+        if symbol not in donchian_slot.LIVE_SYMBOLS:
+            return None
+        slot = self._donchian_slot(donchian_slot.SLOT_IDS[symbol])
+        if slot is None or slot.paper_mode:
+            return None
+        return f"{slot.slot_id} is LIVE on {symbol}"
+
+    def _donchian_on_promote(self, slot_id: str):
+        """On promotion clear the day stamp so the live book is built on the
+        next cycle instead of waiting for the next UTC close."""
+        for symbol, sid in donchian_slot.SLOT_IDS.items():
+            if sid == slot_id and symbol in self._donchian_state:
+                self._donchian_state[symbol]["last_eval_utc_date"] = None
+                donchian_slot.save_state(self._donchian_state)
+
+    def _donchian_live_equity(self):
+        try:
+            eq = float(self.exchange.get_equity("USDT") or 0.0)
+            if eq <= 0:
+                self.exchange.get_balance("USDT")          # refreshes the equity cache
+                eq = float(self.exchange.get_equity("USDT") or 0.0)
+            return eq if eq > 0 else None
+        except Exception as e:
+            logger.warning(f"[DONCHIAN LIVE] equity read failed: {e}")
+            return None
+
+    def _donchian_adjust_live(self, slot, symbol: str, w: float, price: float,
+                              stop_fired: bool, today: str):
+        """Express notional = LIVE_EXPOSURE_MULT x w x equity as whole lots.
+        Same lot count → hold and ratchet the disaster stop; different → close
+        the whole position and reopen at the new lot count (at ~$27/lot a
+        resize is at most a couple of lots; fees ~$0.02). None = retry."""
+        lot = donchian_slot.LIVE_LOT[symbol]
+        equity = self._donchian_live_equity()
+        if equity is None:
+            logger.warning(f"[DONCHIAN LIVE] {slot.slot_id} equity unknown — retrying next cycle")
+            return None
+        target_lots = donchian_slot.live_target_lots(w, equity, price, lot)
+        pos = slot.risk.positions.get(symbol)
+        cur_lots = int(round(pos.amount / lot)) if pos is not None else 0
+
+        if self._slot_entries_blocked() and target_lots > cur_lots:
+            logger.info(f"[DONCHIAN LIVE] {slot.slot_id} up-size deferred — account halt")
+            return None
+
+        st = self._donchian_state.setdefault(symbol, donchian_slot.default_coin_state())
+        # Resize only when the RULE rebalanced (w changed) — like the paper book.
+        # Price/equity drift alone must not churn the position across lot edges.
+        if (pos is not None and target_lots > 0 and st.get("live_w") is not None
+                and abs(w - float(st["live_w"])) <= 1e-12):
+            target_lots = cur_lots
+        if target_lots == cur_lots:
+            if pos is None:
+                return (f"flat — target 0 lots ({donchian_slot.LIVE_EXPOSURE_MULT:g}x w={w:.3f} "
+                        f"on ${equity:.2f} equity < 1 lot)")
+            self._donchian_ratchet_live_stop(slot, symbol, pos, price)
+            return f"holding {cur_lots} lots ({pos.amount:.2f} {symbol.split('/')[0]}), stop {pos.stop_loss:.2f}"
+
+        if pos is not None:
+            reason = (("donchian_stop" if stop_fired else "signal_exit") if target_lots == 0
+                      else "donchian_rebalance")
+            if not self._close_slot_position(slot, symbol, pos, price, reason):
+                return None
+            if target_lots == 0:
+                return f"closed ({reason})"
+        if slot.paper_mode or not slot.is_active:
+            return f"target {target_lots} lots but slot demoted/disabled — no entry"
+        if not self._donchian_open_live(slot, symbol, target_lots, price, w, equity):
+            return None
+        return (f"rebalanced {cur_lots} → {target_lots} lots" if cur_lots
+                else f"opened {target_lots} lots")
+
+    def _donchian_open_live(self, slot, symbol: str, lots: int, price: float,
+                            w: float, equity: float) -> bool:
+        lot = donchian_slot.LIVE_LOT[symbol]
+        lev = donchian_slot.LIVE_EXCHANGE_LEVERAGE
+        # Merge guard: one-way mode would merge into any ETH position already there.
+        open_pos = self.exchange.get_open_positions()
+        if open_pos is None:
+            logger.warning(f"[DONCHIAN LIVE] {slot.slot_id} positions unreadable — no order, retrying")
+            return False
+        if any(p.get("symbol") == symbol for p in open_pos):
+            self._donchian_notify_once(
+                f"foreign_{symbol}",
+                f"⚠️ <b>{slot.slot_id}</b>: an {symbol} position already exists on the exchange "
+                f"that this slot does not own — no entry (retrying each cycle)")
+            return False
+        try:
+            self.exchange.set_symbol_leverage(symbol, lev)   # raises on failure → no order
+        except Exception as e:
+            logger.error(f"[DONCHIAN LIVE] {slot.slot_id} leverage {lev}x failed: {e} — no order")
+            return False
+        amount = round(lots * lot, 8)
+        order = self.exchange.open_long_market(symbol, amount)
+        if not order:
+            logger.error(f"[DONCHIAN LIVE] {slot.slot_id} market entry failed — retrying next cycle")
+            return False
+        fill = self._extract_fill_price(order, price)
+        filled = self._extract_fill_amount(order, amount)
+        margin = filled * fill / lev
+        pos = slot.risk.open_position(symbol, fill, margin, side="long", atr=0.0, regime="medium",
+                                      cycle=self.cycle_count, strategy="donchian_ensemble")
+        pos.amount = filled
+        pos.margin = margin
+        pos.stop_loss = donchian_slot.ratchet_stop(None, fill)
+        pos.take_profit = fill * (1 + donchian_slot.LIVE_TP_PCT / 100.0)
+        pos.sl_order_id = "software"
+        pos.tp_order_id = None
+        slot.risk._save_state()   # persist ownership BEFORE the protective orders (no orphan adoption)
+        res = self.exchange.place_sl_tp(symbol, "long", filled, pos.stop_loss, pos.take_profit) or {}
+        pos.sl_order_id = res.get("sl_order_id") or "software"
+        pos.tp_order_id = res.get("tp_order_id")
+        slot.risk._save_state()
+        slot.total_entries += 1
+        self._last_entry_time = time.time()
+        self._donchian_state.setdefault(symbol, donchian_slot.default_coin_state())["live_w"] = w
+        donchian_slot.save_state(self._donchian_state)
+        if pos.sl_order_id == "software":
+            notifier.send(f"🚨 <b>{slot.slot_id}</b> LIVE {symbol}: NO resting stop placed — "
+                          f"healing next cycle")
+        notifier.send(
+            f"🟢 <b>{slot.slot_id} LIVE ENTRY</b> {symbol} LONG {filled:.2f} @ {fill:.2f}\n"
+            f"Notional ${filled * fill:.2f} ({donchian_slot.LIVE_EXPOSURE_MULT:g}x w={w:.3f} on "
+            f"${equity:.2f} equity) · {lev}x isolated\n"
+            f"SL {pos.stop_loss:.2f} (−{donchian_slot.LIVE_STOP_PCT:g}%) · "
+            f"TP {pos.take_profit:.2f} (+{donchian_slot.LIVE_TP_PCT:g}%)")
+        logger.info(f"[DONCHIAN LIVE] {slot.slot_id} ENTRY LONG {symbol} {filled} @ {fill:.2f} "
+                    f"| SL {pos.stop_loss:.2f} id={pos.sl_order_id} | TP {pos.take_profit:.2f} id={pos.tp_order_id}")
+        return True
+
+    def _donchian_ratchet_live_stop(self, slot, symbol: str, pos, ref_price: float):
+        new_sl = donchian_slot.ratchet_stop(pos.stop_loss, ref_price)
+        if new_sl <= (pos.stop_loss or 0.0) + 1e-9:
+            return
+        if not pos.sl_order_id or pos.sl_order_id == "software":
+            pos.stop_loss = new_sl          # the heal places it at the new level
+            slot.risk._save_state()
+            return
+        try:
+            nid = self.exchange.move_stop_loss(symbol, "long", pos.amount, new_sl, pos.sl_order_id)
+        except Exception as e:
+            logger.warning(f"[DONCHIAN LIVE] {slot.slot_id} stop ratchet to {new_sl:.2f} failed: {e} "
+                           f"— old stop {pos.stop_loss:.2f} still resting")
+            return
+        pos.sl_order_id = nid
+        pos.stop_loss = new_sl
+        slot.risk._save_state()
+        logger.info(f"[DONCHIAN LIVE] {slot.slot_id} stop ratcheted to {new_sl:.2f} (id={nid})")
+
+    def _donchian_heal_protection(self, slot, symbol: str, min_interval_s: float = 300.0):
+        """Every ~5 min: a live position must have BOTH a resting SL and TP.
+        If either is missing and the exchange still shows the position, cancel
+        the symbol's orders and re-rest both at the recorded levels."""
+        if slot.paper_mode:
+            return
+        pos = slot.risk.positions.get(symbol)
+        if pos is None:
+            return
+        heal_at = getattr(self, "_donchian_heal_at", None)
+        if heal_at is None:
+            heal_at = self._donchian_heal_at = {}
+        missing_id = (not pos.sl_order_id or pos.sl_order_id == "software" or not pos.tp_order_id)
+        if not missing_id and time.time() - heal_at.get(symbol, 0.0) < min_interval_s:
+            return
+        heal_at[symbol] = time.time()
+        sl_ok = (pos.sl_order_id not in (None, "software")
+                 and self.exchange.verify_sl_order(symbol, pos.sl_order_id))
+        tp_ok = (pos.tp_order_id is not None
+                 and self.exchange.verify_sl_order(symbol, pos.tp_order_id))
+        if sl_ok and tp_ok:
+            return
+        open_pos = self.exchange.get_open_positions()
+        if open_pos is None or not any(p.get("symbol") == symbol for p in open_pos):
+            return   # position gone/unknown — the exchange-close sync books it; never rest orders naked
+        self.exchange.cancel_open_orders(symbol)
+        res = self.exchange.place_sl_tp(symbol, "long", pos.amount, pos.stop_loss, pos.take_profit) or {}
+        pos.sl_order_id = res.get("sl_order_id") or "software"
+        pos.tp_order_id = res.get("tp_order_id")
+        slot.risk._save_state()
+        logger.warning(f"[DONCHIAN LIVE] {slot.slot_id} protection healed: SL id={pos.sl_order_id} "
+                       f"TP id={pos.tp_order_id}")
+        if pos.sl_order_id == "software":
+            self._donchian_notify_once(f"nosl_{symbol}",
+                                       f"🚨 <b>{slot.slot_id}</b> LIVE {symbol}: resting stop could not "
+                                       f"be placed — retrying every 5 min")
 
     # ── informed_flow_btc_alt_cascade_v2 (2026-09-20) — paper-only orchestration ──
     # Pre-registered closed-bar slot. Signal/exit math + sidecar IO live in

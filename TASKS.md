@@ -34,3 +34,21 @@ DEAD_LIST 112 / SURVIVORS / LESSONS by hand.
 - Verification: full suite `1 failed, 1222 passed` (the 1 = known ordering-only `test_isolation_never_imports_live_bot_modules`, passes alone); `node --check` both workflows OK; kb_check `[]`; compile check OK; no live sentinels written by the suite. Two independent review agents: APPROVE / APPROVE.
 - Not touched: bot.py, .env, state files, sentinels, launchd. No restart needed; maint/adjudicator/code-health are launchd jobs that read fresh code at their next run (6:00 / 6:30 / 7:30 AM PT).
 - Lesson: the auto-backup job commits+pushes the whole tree at :17 every hour — commit per task BEFORE :17 or expect a sweep.
+
+## 2026-09-28 — DONCHIAN_ETH LIVE (owner: "go live tonight")
+Owner decisions (9/27–9/28):
+- ETH only.
+- Size = 2x the rule's size, relative to account equity (notional = 2 × w × equity), floored to whole 0.01 ETH lots.
+- Exchange leverage 2x isolated.
+- Resting disaster stop 15% below entry, ratcheted up daily to 15% below the latest close (never down).
+- Resting take-profit at +25% (owner chose compliance with the broker-side TP+SL directive).
+- Kill line: account −30% → back to paper. loss_cap_usdt −26 ≈ 30% of $87.
+- No new capital. BTC stays paper.
+- [ ] donchian_slot: live constants + live_target_lots() + ratchet_stop() (pure, tested)
+- [ ] bot: _donchian_adjust_live (lots delta; halt defers up-size; merge guard; 2x leverage before order; market entry; save state BEFORE SL/TP; place_sl_tp; Telegram card)
+- [ ] bot: daily stop ratchet on hold; per-cycle SL/TP heal (above enabled gate)
+- [ ] bot: _donchian_locks_symbol wired into main + live-slot entry paths
+- [ ] bot: promote sentinel clears ETH last_eval_utc_date → evaluates next cycle
+- [ ] slot config: DONCHIAN_ETH loss_cap_usdt −26.0
+- [ ] dashboard/TREND + Telegram reflect LIVE vs PAPER
+- [ ] tests green, review agent, /pre-restart-audit, owner GO → restart → .promote_DONCHIAN_ETH

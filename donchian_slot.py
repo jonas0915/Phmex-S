@@ -39,6 +39,7 @@ globs that prefix and would render them as phantom slots (same reasoning as
 eth_tsm_28_signal.json).
 """
 import json
+import math
 import os
 import datetime as _dt
 
@@ -59,6 +60,34 @@ REBALANCE_THRESHOLD = 0.20           # relative 20% on vol-only drift
 ANNUALIZATION = 365.0                # crypto trades every day
 OHLCV_LIMIT = 500                    # Phemex whitelist {5,10,50,100,500,1000}
 MIN_BARS = LOOKBACKS[-1] + VOL_WINDOW  # 450 complete closes = fully warm ensemble
+
+# ── LIVE execution (owner go-live 2026-09-28; TASKS.md) ────────────────────
+# Owner decisions: ETH only; notional = 2 x w x account equity floored to whole
+# lots; 2x isolated exchange leverage; resting disaster stop 15% under the latest
+# close (ratchets up, never down) + resting TP +25% from day one; kill line
+# ~30% of the ~$87 account. BTC stays paper (one lot ~$84 ~ the whole account).
+LIVE_SYMBOLS = ["ETH/USDT:USDT"]
+LIVE_LOT = {"ETH/USDT:USDT": 0.01}   # Phemex qtyStepSize (verified via load_markets 9/28)
+LIVE_EXPOSURE_MULT = 2.0             # x the rule's weight, relative to account equity
+LIVE_EXCHANGE_LEVERAGE = 2           # isolated
+LIVE_STOP_PCT = 15.0
+LIVE_TP_PCT = 25.0
+LIVE_LOSS_CAP_USDT = -26.0           # ~30% of $87 -> auto-demote to paper
+
+
+def live_target_lots(w: float, equity: float, price: float, lot: float = 0.01,
+                     mult: float = LIVE_EXPOSURE_MULT) -> int:
+    """Whole lots for notional = mult x w x equity (floored; 0 when below one lot)."""
+    if w <= 0 or equity <= 0 or price <= 0 or lot <= 0:
+        return 0
+    return int(math.floor(mult * w * equity / price / lot + 1e-9))
+
+
+def ratchet_stop(prev_stop, ref_price: float, pct: float = LIVE_STOP_PCT) -> float:
+    """Disaster stop pct% under ref_price, never below the previous stop."""
+    cand = ref_price * (1 - pct / 100.0)
+    return max(prev_stop or 0.0, cand)
+
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(_DIR, "donchian_slot_state.json")

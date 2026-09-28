@@ -358,10 +358,11 @@ def test_bot_slot_config_matches_rails_optout():
             if kw.get("slot_id", "").strip("'\"").startswith("DONCHIAN_"):
                 slots[kw["slot_id"].strip("'\"")] = kw
     assert set(slots) == {"DONCHIAN_BTC", "DONCHIAN_ETH"}
-    for kw in slots.values():
+    for sid, kw in slots.items():
         assert kw["strategy_name"].strip("'\"") == "donchian_ensemble"
         assert kw["paper_mode"] == "True"
-        assert kw["loss_cap_usdt"] == "-999.0"
+        # ETH carries the owner's live kill line (9/28); BTC stays rails-opt-out paper
+        assert kw["loss_cap_usdt"] == ("donchian_slot.LIVE_LOSS_CAP_USDT" if sid == "DONCHIAN_ETH" else "-999.0")
         assert kw["kelly_min_trades"] == "10 ** 9"
         assert kw["durable_trail_enabled"] == "False"
         assert kw["timeframe"].strip("'\"") == "1d"
@@ -550,7 +551,7 @@ def test_adjust_position_live_mode_places_no_orders(sandbox):
     b.exchange = FakeExchange()                           # any call would be a bug
     today = donchian_slot.utc_date_str()
     note = b._donchian_adjust_position(slot, BTC, 1.0, 100.0, False, today)
-    assert "LIVE mode unsupported" in note
+    assert "not enabled for live" in note     # BTC is paper-only; ETH live is tests/test_donchian_live.py
     assert b._donchian_live_warned["DONCHIAN_BTC"] == today
     assert b.exchange.calls == []
     assert BTC not in slot.risk.positions
