@@ -8,7 +8,7 @@
 - The honest caveat: over these 73 days, just holding the same average amount of BTC or ETH would have made more than the rule's own replica. It has only seen a bull run. The review can show the rule was run correctly, but it cannot yet prove the rule has an edge.
 - The 10/14 test is the one we agreed on 9/21: both books positive and fidelity clean → I offer the ETH-only one-lot live build. The extra tests in this plan are shown to you as evidence. Adding any of them to that test needs your approval.
 - ETH has already missed the fidelity rule by the letter, with six bad days, most of them caused by the shutdown. The fix is a written stop procedure, not a hardware change.
-- Tonight, separately: the Mac was on battery at 24%. Please plug it in and keep the lid open. Nothing outside the Mac would warn you if it went down.
+- Tonight, separately: the Mac was on battery (24%, down to 19%). It was plugged back into AC at about 6:12 PM PT (confirmed by pmset). Keep it on AC with the lid open. Nothing outside the Mac would warn you if it went down.
 
 ---
 
