@@ -172,8 +172,8 @@ def _pt(ts) -> str:
     return local.strftime("%-m/%-d %-I:%M %p") + " PT"
 
 
-def _book_card(sym: str, state, days, today: date = None) -> str:
-    title = f"DONCHIAN {sym} &mdash; TREND BOOK (PAPER)"
+def _book_card(sym: str, state, days, today: date = None, live: bool = False) -> str:
+    title = f"DONCHIAN {sym} &mdash; TREND BOOK ({'LIVE' if live else 'PAPER'})"
     if state is None:
         return f"<div class='panel' id=\"trend-{sym}\"><div class='ptitle'>{title}</div>no state file for {sym}</div>"
     last = days[-1] if days else None
@@ -203,6 +203,11 @@ def _book_card(sym: str, state, days, today: date = None) -> str:
         ("Exits", f"{s['n']} ({s['n_rebal']} rebalances, {s['n_stops']} stops) &middot; winners {wr}"),
         ("Kill line", f"&minus;$15.00 &middot; room {_usd(s['kill_room'], signed=False)}"),
     ]
+    if live:
+        lt = [t for t in state.get("closed_trades") or [] if t.get("mode") == "live"]
+        rows.insert(0, ("Live trades (real money)",
+                        f"<b>{len(lt)} closed</b> &middot; net {_usd(sum(t.get('net_pnl') or 0.0 for t in lt))} "
+                        f"&middot; kill line &minus;$26 &rarr; back to paper"))
     body = "".join(f"<tr><td class='dim'>{k}</td><td>{v}</td></tr>" for k, v in rows)
     recent = "".join(
         f"<tr><td>{_pt(t.get('closed_at'))}</td><td>{html.escape((t.get('exit_reason') or '').replace('donchian_', ''))}</td>"
@@ -279,16 +284,27 @@ def curves(states: dict, signals: dict) -> dict:
     return out
 
 
-def build_trend_content(states: dict, signals: dict, today: date) -> str:
+def _mode_line(live_ids) -> str:
+    live = [s for s in SYMBOLS if f"DONCHIAN_{s}" in live_ids]
+    if not live:
+        return "Both books are <b>PAPER</b> &mdash; no live orders, no money at risk."
+    paper = [s for s in SYMBOLS if s not in live]
+    return (f"{'/'.join(live)} is <b>LIVE</b> (real money: 2x the rule's size on account equity, "
+            f"2x isolated, resting stop &minus;15% ratcheting, TP +25%, kill line &minus;$26)"
+            + (f"; {'/'.join(paper)} is <b>PAPER</b>." if paper else "."))
+
+
+def build_trend_content(states: dict, signals: dict, today: date, live_ids=frozenset()) -> str:
     left = days_to_review(today)
     when = (f"{left} days away" if left > 0 else "today" if left == 0 else f"{-left} days ago")
     header = ("<div class='panel' id=\"trend-status\"><div class='ptitle'>Pivot status</div>"
               "<div>Target: a slow, long-or-flat trend follower on BTC and ETH only (plan: "
-              "docs/2026-09-27-pivot-plan.md). Both books are <b>PAPER</b> &mdash; no live orders, no money at risk. "
+              f"docs/2026-09-27-pivot-plan.md). {_mode_line(live_ids)} "
               f"Review: <b>Wed 10/14/2026</b> ({when}). Agreed test: both books positive and fidelity clean "
               "&rarr; the ETH-only one-lot live build is offered.</div>"
               "<div class='sig-desc'>Paper P&amp;L does not include funding. Measured 9/27 over the last 100 "
               "settlements: longs paid about 0.41% (BTC) and 0.35% (ETH) of the position per 30 days.</div></div>")
-    cards = "".join(_book_card(sym, states.get(sym), signals.get(sym) or [], today) for sym in SYMBOLS)
+    cards = "".join(_book_card(sym, states.get(sym), signals.get(sym) or [], today,
+                               live=f"DONCHIAN_{sym}" in live_ids) for sym in SYMBOLS)
     return (f"<div id=\"trend-grid\">{header}{cards}{_bench_panel(signals)}"
             f"{_fidelity_panel(states, signals)}</div>")

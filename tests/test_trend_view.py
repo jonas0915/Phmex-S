@@ -245,3 +245,26 @@ def test_real_open_positions_are_unlevered():
         st, _ = _real(sym)
         if st.get("positions"):
             assert round(tv.book_summary(st, None)["leverage"], 2) == 1.00, sym
+
+
+def test_live_book_is_labelled_live_and_shows_live_only_trades():
+    states, signals = _fixture_inputs()
+    eth = dict(states["ETH"])
+    eth["closed_trades"] = list(eth["closed_trades"]) + [
+        {"opened_at": 1, "closed_at": 2, "margin": 13.0, "net_pnl": -1.25, "fees_usdt": 0.02,
+         "exit_reason": "donchian_rebalance", "mode": "live", "entry_price": 1.0, "exit_price": 1.0}]
+    states = {"BTC": states["BTC"], "ETH": eth}
+    html = tv.build_trend_content(states, signals, today=date(2026, 9, 28), live_ids={"DONCHIAN_ETH"})
+    assert "DONCHIAN ETH &mdash; TREND BOOK (LIVE)" in html
+    assert "DONCHIAN BTC &mdash; TREND BOOK (PAPER)" in html
+    assert "Live trades (real money)" in html and "1 closed" in html and "-$1.25" in html
+    assert "ETH is <b>LIVE</b>" in html
+
+
+def test_signal_cards_show_live_when_the_slot_is_promoted(monkeypatch):
+    import web_dashboard as wd
+    monkeypatch.setattr(wd, "_live_slot_ids", lambda: {"DONCHIAN_ETH"})
+    html = wd._build_signals_section({"DONCHIAN_ETH": {"closed_trades": [], "positions": {}, "peak_balance": 0},
+                                      "DONCHIAN_BTC": {"closed_trades": [], "positions": {}, "peak_balance": 0}})
+    assert "DONCHIAN_ETH &mdash; TREND ENSEMBLE (LIVE)" in html
+    assert "DONCHIAN_BTC &mdash; TREND ENSEMBLE (PAPER)" in html

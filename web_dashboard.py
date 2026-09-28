@@ -1356,6 +1356,8 @@ def _build_signals_section(slot_states: dict = None) -> str:
 
     cards = ""
     for slot_id, title, desc in _SIGNAL_BOXES:
+        if slot_id in live_ids:
+            title = title.replace("(PAPER)", "(LIVE)")
         state = slot_states.get(slot_id) or {"closed_trades": [], "positions": {}}
         if slot_id == "5m_scalp":
             # The main box is the htf_l2_anticipation card: filter its stats to
@@ -2320,7 +2322,7 @@ def build_trend_payload() -> dict:
     """/api/trend body: the Donchian trend books, read fresh from their files."""
     states, signals = trend_view.load_inputs(PROJECT_DIR)
     today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
-    return {"content": trend_view.build_trend_content(states, signals, today),
+    return {"content": trend_view.build_trend_content(states, signals, today, live_ids=_live_slot_ids()),
             "curves": trend_view.curves(states, signals)}
 
 
