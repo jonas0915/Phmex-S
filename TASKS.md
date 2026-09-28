@@ -44,11 +44,17 @@ Owner decisions (9/27–9/28):
 - Resting take-profit at +25% (owner chose compliance with the broker-side TP+SL directive).
 - Kill line: account −30% → back to paper. loss_cap_usdt −26 ≈ 30% of $87.
 - No new capital. BTC stays paper.
-- [ ] donchian_slot: live constants + live_target_lots() + ratchet_stop() (pure, tested)
-- [ ] bot: _donchian_adjust_live (lots delta; halt defers up-size; merge guard; 2x leverage before order; market entry; save state BEFORE SL/TP; place_sl_tp; Telegram card)
-- [ ] bot: daily stop ratchet on hold; per-cycle SL/TP heal (above enabled gate)
-- [ ] bot: _donchian_locks_symbol wired into main + live-slot entry paths
-- [ ] bot: promote sentinel clears ETH last_eval_utc_date → evaluates next cycle
-- [ ] slot config: DONCHIAN_ETH loss_cap_usdt −26.0
-- [ ] dashboard/TREND + Telegram reflect LIVE vs PAPER
-- [ ] tests green, review agent, /pre-restart-audit, owner GO → restart → .promote_DONCHIAN_ETH
+- [x] donchian_slot: live constants + live_target_lots() + ratchet_stop() (pure, tested)
+- [x] bot: _donchian_adjust_live (lots delta; halt defers up-size; merge guard; 2x leverage before order; market entry; save state BEFORE SL/TP; place_sl_tp; Telegram card)
+- [x] bot: daily stop ratchet on hold; per-cycle SL/TP heal (above enabled gate)
+- [x] bot: _donchian_locks_symbol wired into main + live-slot entry paths
+- [x] bot: promote sentinel clears ETH last_eval_utc_date → evaluates next cycle
+- [x] slot config: DONCHIAN_ETH loss_cap_usdt −26.0
+- [x] dashboard/TREND + Telegram reflect LIVE vs PAPER
+- [x] tests green, review agent, /pre-restart-audit, owner GO → restart → .promote_DONCHIAN_ETH
+- **LIVE 9/28 3:19 PM PT** (restart PID 83192 on d15d921, then .promote_DONCHIAN_ETH):
+  - Fill: 0.01 ETH long @ 2673.41, 2x isolated (margin $13.38, liq ~1341).
+  - Resting stop 2272.40 (reduceOnly) and TP limit 3341.76 (reduceOnly). Verified on the exchange.
+  - The entry waited ~15 min: the soft-DD pause (15.9%) re-trips on every restart because its level is in-memory; it cleared itself.
+  - Three review rounds, 0 critical; all findings fixed with tests.
+  - Runbook: stop = .demote_DONCHIAN_ETH (closes, back to paper, restores 10x). A .kill_ alone does NOT restore leverage — also touch .demote_.
