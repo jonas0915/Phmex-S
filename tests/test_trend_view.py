@@ -213,3 +213,11 @@ def test_real_equity_curve_ends_at_book_net_plus_open_mark_on_9_27():
         c = tv.equity_curve(st, days)
         assert c["label"][0] == "7/16" and c["label"][-1] == "9/27"
         assert round(c["v"][-1], 2) == want, sym
+
+
+def test_roi_label_says_ytd_only_while_the_book_started_this_year():
+    states, signals = _fixture_inputs()                      # book starts 2026-07-01
+    html = tv.build_trend_content(states, signals, today=date(2026, 9, 27))
+    assert "Total ROI (since 7/1/2026 start &mdash; also 2026 YTD)" in html
+    html = tv.build_trend_content(states, signals, today=date(2027, 1, 5))
+    assert "Total ROI (since 7/1/2026 start)" in html and "YTD" not in html

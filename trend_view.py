@@ -167,7 +167,7 @@ def _pt(ts) -> str:
     return local.strftime("%-m/%-d %-I:%M %p") + " PT"
 
 
-def _book_card(sym: str, state, days) -> str:
+def _book_card(sym: str, state, days, today: date = None) -> str:
     title = f"DONCHIAN {sym} &mdash; TREND BOOK (PAPER)"
     if state is None:
         return f"<div class='panel' id=\"trend-{sym}\"><div class='ptitle'>{title}</div>no state file for {sym}</div>"
@@ -179,7 +179,7 @@ def _book_card(sym: str, state, days) -> str:
     curve = equity_curve(state, days)
     roi = s["roi_pct"]
     rows = [
-        ("Total ROI (closed, on the $100 base)",
+        (_roi_label(days, today),
          f"<b>{_pct(roi)}</b> &middot; incl. open position {_pct(s['roi_pct_incl_open'])}"),
         ("Win rate", (f"<b>{s['win_rate_pct']:.0f}%</b> ({s['wins']}/{s['n']} exits closed green; "
                       "most exits are rebalances of the same trend)") if s["n"] else "&mdash;"),
@@ -203,6 +203,18 @@ def _book_card(sym: str, state, days) -> str:
             f"<div class=\"trend-chart\" id=\"chart-{sym}\"></div>"
             f"<div class='sub'>Last {len(s['recent'])} exits (a rebalance resizes the same trend; it is not a new trade)</div>"
             f"<table><tr class='dim'><th>CLOSED</th><th>WHY</th><th>NET</th></tr>{recent}</table></div>")
+
+
+def _roi_label(days: list, today) -> str:
+    """Total ROI is since the book's first daily close; while that start is in the current
+    year it is also the year-to-date figure, so say so (drops off by itself next year)."""
+    if not days:
+        return "Total ROI (closed, on the $100 base)"
+    start = date.fromisoformat(days[0]["date"])
+    label = f"Total ROI (since {start.month}/{start.day}/{start.year} start"
+    if today is not None and today.year == start.year:
+        label += f" &mdash; also {today.year} YTD"
+    return label + ")"
 
 
 def _bench_panel(signals: dict) -> str:
@@ -266,6 +278,6 @@ def build_trend_content(states: dict, signals: dict, today: date) -> str:
               "&rarr; the ETH-only one-lot live build is offered.</div>"
               "<div class='sig-desc'>Paper P&amp;L does not include funding. Measured 9/27 over the last 100 "
               "settlements: longs paid about 0.41% (BTC) and 0.35% (ETH) of the position per 30 days.</div></div>")
-    cards = "".join(_book_card(sym, states.get(sym), signals.get(sym) or []) for sym in SYMBOLS)
+    cards = "".join(_book_card(sym, states.get(sym), signals.get(sym) or [], today) for sym in SYMBOLS)
     return (f"<div id=\"trend-grid\">{header}{cards}{_bench_panel(signals)}"
             f"{_fidelity_panel(states, signals)}</div>")
