@@ -180,7 +180,8 @@ def _book_card(sym: str, state, days, today: date = None) -> str:
     roi = s["roi_pct"]
     rows = [
         (_roi_label(days, today),
-         f"<b>{_pct(roi)}</b> &middot; incl. open position {_pct(s['roi_pct_incl_open'])}"),
+         f"<b>{_pct(roi)}</b> &middot; ${BASE_NOTIONAL:,.2f} &rarr; ${BASE_NOTIONAL + s['net']:,.2f} closed"
+         f" &middot; incl. open position {_pct(s['roi_pct_incl_open'])}"),
         ("Win rate", (f"<b>{s['win_rate_pct']:.0f}%</b> ({s['wins']}/{s['n']} exits closed green; "
                       "most exits are rebalances of the same trend)") if s["n"] else "&mdash;"),
         ("Max drawdown (daily closes)", _pct(-curve["max_dd_pct"]) if curve else "&mdash;"),
@@ -209,9 +210,9 @@ def _roi_label(days: list, today) -> str:
     """Total ROI is since the book's first daily close; while that start is in the current
     year it is also the year-to-date figure, so say so (drops off by itself next year)."""
     if not days:
-        return "Total ROI (closed, on the $100 base)"
+        return f"Total ROI on the ${BASE_NOTIONAL:,.0f} starting capital"
     start = date.fromisoformat(days[0]["date"])
-    label = f"Total ROI (since {start.month}/{start.day}/{start.year} start"
+    label = f"Total ROI on the ${BASE_NOTIONAL:,.0f} starting capital (since {start.month}/{start.day}/{start.year}"
     if today is not None and today.year == start.year:
         label += f" &mdash; also {today.year} YTD"
     return label + ")"
