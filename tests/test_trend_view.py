@@ -141,6 +141,7 @@ def test_trend_page_shell_has_nav_content_and_polls_its_own_endpoint():
     assert page.startswith("<!DOCTYPE html>")
     assert 'id="trend-grid"' in page and 'id="trend-content"' in page
     assert "fetch('/api/trend')" in page
+    assert "/static/uplot.iife.min.js" in page and "drawTrendCharts" in page
     assert 'href="/"' in page and 'href="/trend"' in page
 
 
@@ -153,7 +154,11 @@ def test_main_page_links_to_the_trend_tab():
 def test_api_trend_payload_is_the_trend_content():
     import web_dashboard as wd
     payload = wd.build_trend_payload()
-    assert set(payload) == {"content"} and 'id="trend-grid"' in payload["content"]
+    assert set(payload) == {"content", "curves"} and 'id="trend-grid"' in payload["content"]
+    for sym in ("BTC", "ETH"):
+        c = payload["curves"].get(sym)
+        if c is not None:
+            assert len(c["t"]) == len(c["v"]) == len(c["label"]) and c["t"] == sorted(c["t"])
 
 
 def test_times_render_in_pacific_regardless_of_host_timezone(monkeypatch):
@@ -166,3 +171,45 @@ def test_times_render_in_pacific_regardless_of_host_timezone(monkeypatch):
     finally:
         monkeypatch.delenv("TZ")
         _t.tzset()
+
+
+
+# ── performance: ROI %, win rate, equity curve ────────────────────────────
+def test_book_summary_reports_roi_pct_and_win_rate_pct():
+    st = {"closed_trades": [_trade(0, 1, 30, 1.00), _trade(1, 2, 30, -0.40), _trade(2, 3, 30, 0.90)],
+          "positions": {"X": {"opened_at": 5, "margin": 50.0, "entry_price": 100.0}}}
+    s = tv.book_summary(st, last_close=102.0)
+    assert s["roi_pct"] == pytest.approx(1.50)                   # closed net / $100 base
+    assert s["roi_pct_incl_open"] == pytest.approx(1.50 + 1.00)  # + open 50 x 2%
+    assert s["win_rate_pct"] == pytest.approx(200 / 3)
+    assert tv.book_summary({"closed_trades": [], "positions": {}}, None)["win_rate_pct"] is None
+
+
+def test_equity_curve_marks_closed_plus_open_at_each_daily_close():
+    o1, c1 = _ts("2026-07-02", 0.5), _ts("2026-07-04", 0.5)
+    st = {"closed_trades": [dict(_trade(o1, c1, 50.0, 2.0), entry_price=100.0)],
+          "positions": {"X": {"opened_at": _ts("2026-07-04", 0.5), "margin": 20.0, "entry_price": 110.0}}}
+    days = [{"date": "2026-07-01", "w": 0.5, "close": 100.0}, {"date": "2026-07-02", "w": 0.5, "close": 104.0},
+            {"date": "2026-07-03", "w": 0.2, "close": 110.0}, {"date": "2026-07-04", "w": 0.2, "close": 99.0}]
+    c = tv.equity_curve(st, days)
+    assert c["label"] == ["7/1", "7/2", "7/3", "7/4"]
+    # 7/1: 50 open at 100 -> 0; 7/2: 50 x 4% = 2.0; 7/3: closed +2.0, 20 open at 110 -> 0; 7/4: 2.0 + 20 x (-10%)
+    assert c["v"] == pytest.approx([0.0, 2.0, 2.0, 0.0])
+    assert c["t"][0] == pytest.approx(_ts("2026-07-02"))        # plotted at the close that ends the day
+    assert c["max_dd_pct"] == pytest.approx(2.0)
+    assert tv.equity_curve(st, []) is None
+
+
+def test_trend_content_shows_roi_win_rate_and_a_chart_per_book():
+    states, signals = _fixture_inputs()
+    html = tv.build_trend_content(states, signals, today=date(2026, 9, 27))
+    for needle in ("Total ROI", "Win rate", "Max drawdown", 'id="chart-BTC"', 'id="chart-ETH"'):
+        assert needle in html, needle
+
+
+def test_real_equity_curve_ends_at_book_net_plus_open_mark_on_9_27():
+    for sym, want in (("BTC", 6.49), ("ETH", 6.87)):
+        st, days = _real(sym)
+        c = tv.equity_curve(st, days)
+        assert c["label"][0] == "7/16" and c["label"][-1] == "9/27"
+        assert round(c["v"][-1], 2) == want, sym

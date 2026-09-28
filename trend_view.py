@@ -104,7 +104,39 @@ def book_summary(state: dict, last_close):
             "n_rebal": sum(1 for r in reasons if "rebalance" in r),
             "open_notional": open_notional, "open_upnl": upnl,
             "open_since": min((p.get("opened_at") or 0) for p in positions) if positions else None,
-            "kill_room": net - KILL_LINE, "recent": trades[-8:]}
+            "kill_room": net - KILL_LINE, "recent": trades[-8:],
+            "roi_pct": net / BASE_NOTIONAL * 100,
+            "roi_pct_incl_open": (net + (upnl or 0.0)) / BASE_NOTIONAL * 100,
+            "win_rate_pct": (sum(1 for t in trades if (t.get("net_pnl") or 0) > 0) / len(trades) * 100)
+                            if trades else None}
+
+
+def equity_curve(state: dict, days: list):
+    """Cumulative return on the $100 base at each daily close: closed net (after modelled
+    fees) booked by the sample time + every position held then, marked at that close.
+    Sampled like fidelity (6h after the roll that follows the signal date); plotted at
+    the 00:00 UTC close that ends the day."""
+    if not days:
+        return None
+    trades = state.get("closed_trades") or []
+    held = [(t.get("opened_at") or 0, t.get("closed_at") or 0, t.get("margin") or 0.0, t.get("entry_price"))
+            for t in trades]
+    held += [(p.get("opened_at") or 0, float("inf"), p.get("margin") or 0.0, p.get("entry_price"))
+             for p in (state.get("positions") or {}).values()]
+    t_out, v_out, labels = [], [], []
+    for d in days:
+        ts = _sample_ts(d["date"])
+        closed = sum(t.get("net_pnl") or 0.0 for t in trades if (t.get("closed_at") or 0) <= ts)
+        mark = sum(m * (d["close"] / e - 1) for a, b, m, e in held if a <= ts < b and e)
+        close_ts = datetime.fromisoformat(d["date"]).replace(tzinfo=timezone.utc) + timedelta(days=1)
+        t_out.append(close_ts.timestamp())
+        v_out.append((closed + mark) / BASE_NOTIONAL * 100)
+        labels.append(f"{int(d['date'][5:7])}/{int(d['date'][8:10])}")
+    peak, max_dd = float("-inf"), 0.0
+    for v in v_out:
+        peak = max(peak, v)
+        max_dd = max(max_dd, peak - v)
+    return {"t": t_out, "v": v_out, "label": labels, "max_dd_pct": max_dd}
 
 
 def days_to_review(today: date) -> int:
@@ -117,6 +149,14 @@ def _usd(x, signed=True) -> str:
         return "&mdash;"
     cls = "pos" if x > 0 else "neg" if x < 0 else ""
     txt = f"{'+' if signed and x > 0 else ''}{'-' if x < 0 else ''}${abs(x):,.2f}"
+    return f"<span class='{cls}'>{txt}</span>" if cls else txt
+
+
+def _pct(x) -> str:
+    if x is None:
+        return "&mdash;"
+    cls = "pos" if x > 0 else "neg" if x < 0 else ""
+    txt = f"{'+' if x > 0 else ''}{x:.2f}%"
     return f"<span class='{cls}'>{txt}</span>" if cls else txt
 
 
@@ -136,7 +176,14 @@ def _book_card(sym: str, state, days) -> str:
     wr = f"{s['wins']}/{s['n']}" if s["n"] else "&mdash;"
     rule_now = (f"{last['w']:.3f} ({last.get('n_long', '?')}/9 sub-models long) at the "
                 f"{last['date']} close ${last['close']:,.2f}") if last else "no signal file"
+    curve = equity_curve(state, days)
+    roi = s["roi_pct"]
     rows = [
+        ("Total ROI (closed, on the $100 base)",
+         f"<b>{_pct(roi)}</b> &middot; incl. open position {_pct(s['roi_pct_incl_open'])}"),
+        ("Win rate", (f"<b>{s['win_rate_pct']:.0f}%</b> ({s['wins']}/{s['n']} exits closed green; "
+                      "most exits are rebalances of the same trend)") if s["n"] else "&mdash;"),
+        ("Max drawdown (daily closes)", _pct(-curve["max_dd_pct"]) if curve else "&mdash;"),
         ("Position now", f"${s['open_notional']:,.2f} long (w {s['open_notional'] / BASE_NOTIONAL:.3f}), "
                          f"since {_pt(s['open_since'])}" if s["open_notional"] else "flat"),
         ("Open P&amp;L at last daily close", _usd(s["open_upnl"])),
@@ -151,6 +198,9 @@ def _book_card(sym: str, state, days) -> str:
         f"<td>{_usd(t.get('net_pnl'))}</td></tr>" for t in reversed(s["recent"]))
     return (f"<div class='panel' id=\"trend-{sym}\"><div class='ptitle'>{title}</div>"
             f"<table>{body}</table>"
+            f"<div class='sub'>Cumulative return on the $100 base at each daily close "
+            f"(after modelled fees, open position marked; excludes funding)</div>"
+            f"<div class=\"trend-chart\" id=\"chart-{sym}\"></div>"
             f"<div class='sub'>Last {len(s['recent'])} exits (a rebalance resizes the same trend; it is not a new trade)</div>"
             f"<table><tr class='dim'><th>CLOSED</th><th>WHY</th><th>NET</th></tr>{recent}</table></div>")
 
@@ -195,6 +245,15 @@ def _fidelity_panel(states: dict, signals: dict) -> str:
             "stopped with positions frozen.</div>"
             "<table><tr class='dim'><th></th><th>LAST 14D</th><th></th><th>ALL BREACH DAYS</th></tr>"
             f"{rows}</table></div>")
+
+
+def curves(states: dict, signals: dict) -> dict:
+    """{sym: {t, v, label, max_dd_pct}} for the per-book charts (absent when a file is missing)."""
+    out = {}
+    for sym in SYMBOLS:
+        if states.get(sym) is not None and signals.get(sym):
+            out[sym] = equity_curve(states[sym], signals[sym])
+    return out
 
 
 def build_trend_content(states: dict, signals: dict, today: date) -> str:

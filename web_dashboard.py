@@ -2320,19 +2320,24 @@ def build_trend_payload() -> dict:
     """/api/trend body: the Donchian trend books, read fresh from their files."""
     states, signals = trend_view.load_inputs(PROJECT_DIR)
     today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
-    return {"content": trend_view.build_trend_content(states, signals, today)}
+    return {"content": trend_view.build_trend_content(states, signals, today),
+            "curves": trend_view.curves(states, signals)}
 
 
 def build_trend_html() -> str:
     """TREND tab page: the pivot target's paper books. Polls /api/trend every 30s
     (the books change once a day at the 5:00 PM PT roll). Read-only, zero API calls."""
-    content = build_trend_payload()["content"]
+    payload = build_trend_payload()
+    content = payload["content"]
+    curves_json = json.dumps(payload["curves"]).replace("</", "<\\/")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PHMEX-S &mdash; Trend</title>
+<link rel="stylesheet" href="/static/uplot.min.css">
+<script src="/static/uplot.iife.min.js"></script>
 <style>
 :root {{
   --bg:#000204; --panel:#0a0e08; --border:#2d3a1e; --txt:#9eb89e;
@@ -2345,7 +2350,8 @@ body {{ background:var(--bg); color:var(--txt);
 #tabs a {{ color:var(--dim); text-decoration:none; padding:3px 12px; border:1px solid var(--border);
   border-bottom:none; letter-spacing:1.5px; font-size:10px; }}
 #tabs a.on {{ color:var(--amber); background:var(--panel); }}
-#trend-grid {{ display:grid; grid-template-columns:repeat(2,1fr); gap:3px; padding:3px; }}
+#trend-grid {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:3px; padding:3px; }}
+#trend-grid .panel {{ min-width:0; overflow-wrap:anywhere; }}
 #trend-status {{ grid-column:1 / -1; }}
 .panel {{ background:var(--panel); border:1px solid var(--border); padding:6px; }}
 .panel .ptitle {{ color:var(--amber); letter-spacing:1.5px; font-size:9px;
@@ -2356,6 +2362,10 @@ body {{ background:var(--bg); color:var(--txt);
 .panel td, .panel th {{ padding:2px 4px; text-align:left; border-bottom:1px solid #111a0c; vertical-align:top; }}
 .dim {{ color:var(--dim); }} .pos {{ color:var(--pos); }} .neg {{ color:var(--neg); }}
 .footer {{ color:var(--dim); font-size:9px; padding:4px 6px; }}
+.trend-chart {{ position:relative; min-height:170px; margin:2px 0 4px; }}
+.trend-tip {{ position:absolute; display:none; pointer-events:none; z-index:20;
+  background:#000; border:1px solid var(--border); color:var(--txt); padding:2px 6px;
+  font-size:10px; white-space:nowrap; }}
 @media (max-width: 800px) {{ #trend-grid {{ grid-template-columns:1fr; }} }}
 </style>
 </head>
@@ -2364,13 +2374,55 @@ body {{ background:var(--bg); color:var(--txt);
 <div id="trend-content">{content}</div>
 <div class="footer">PAPER books &middot; Auto-refresh 30s &middot; Read-only &middot; Zero API calls<span id="upd"></span></div>
 <script>
+const trendPlots = {{}};
+// One chart per book: cumulative return % on the $100 paper base at each daily close.
+// Single series (the card title names it), zero baseline, crosshair + tooltip on hover.
+function drawTrendCharts(curves) {{
+  if (typeof uPlot === 'undefined') return;
+  for (const sym of ['BTC', 'ETH']) {{
+    const node = document.getElementById('chart-' + sym);
+    const c = curves[sym];
+    if (trendPlots[sym]) {{ trendPlots[sym].destroy(); delete trendPlots[sym]; }}
+    if (!node) continue;
+    node.innerHTML = '';
+    if (!c || !c.t.length) {{ node.textContent = 'no data'; continue; }}
+    const zero = c.t.map(() => 0);
+    const opts = {{
+      width: node.clientWidth || 420, height: 170,
+      scales: {{ x: {{ time: true }} }},
+      series: [{{}},
+        {{ label: sym + ' return %', stroke: '#f0a500', width: 2, points: {{ show: false }} }},
+        {{ label: 'zero', stroke: '#2d3a1e', width: 1, points: {{ show: false }} }}],
+      axes: [{{ stroke: '#5a6b5a', grid: {{ stroke: '#1a2412' }} }},
+             {{ stroke: '#5a6b5a', grid: {{ stroke: '#1a2412' }}, values: (u, vs) => vs.map(v => v.toFixed(1) + '%') }}],
+      cursor: {{ drag: {{ x: false, y: false }}, points: {{ size: 8 }} }},
+      legend: {{ show: false }},
+    }};
+    const plot = new uPlot(opts, [c.t, c.v, zero], node);
+    trendPlots[sym] = plot;
+    const tip = document.createElement('div'); tip.className = 'trend-tip'; node.appendChild(tip);
+    plot.over.addEventListener('mousemove', () => {{
+      const i = plot.cursor.idx;
+      if (i == null) {{ tip.style.display = 'none'; return; }}
+      const v = c.v[i];
+      tip.innerHTML = c.label[i] + ' close &middot; <span class="' + (v >= 0 ? 'pos' : 'neg') + '">' +
+        (v > 0 ? '+' : '') + v.toFixed(2) + '%</span> ($' + v.toFixed(2) + ' on $100)';
+      tip.style.display = 'block';
+      tip.style.left = Math.min(plot.cursor.left + 14, Math.max(0, node.clientWidth - 200)) + 'px';
+      tip.style.top = (plot.cursor.top + 12) + 'px';
+    }});
+    plot.over.addEventListener('mouseleave', () => {{ tip.style.display = 'none'; }});
+  }}
+}}
 async function refreshTrend() {{
   try {{
     const r = await fetch('/api/trend'); const j = await r.json();
     document.getElementById('trend-content').innerHTML = j.content;
+    drawTrendCharts(j.curves);
     document.getElementById('upd').textContent = ' · updated ' + new Date().toLocaleTimeString();
   }} catch (e) {{ /* keep the last render */ }}
 }}
+drawTrendCharts({curves_json});
 setInterval(refreshTrend, 30000);
 </script>
 </body>
