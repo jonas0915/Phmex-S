@@ -50,6 +50,7 @@ class LiveExchange:
         self.price = price
         self.calls = []
         self.fail_sltp = False
+        self.fail_tp = False
 
     def get_equity(self, cur):
         return self.equity
@@ -77,6 +78,14 @@ class LiveExchange:
         if self.fail_sltp:
             return {"sl_order_id": None, "tp_order_id": None}
         return {"sl_order_id": "sl1", "tp_order_id": "tp1"}
+
+    def place_stop_loss(self, symbol, side, amount, sl):
+        self.calls.append(("place_stop_loss", symbol, side, amount, sl))
+        return "sl9"
+
+    def place_take_profit(self, symbol, side, amount, tp):
+        self.calls.append(("place_take_profit", symbol, side, amount, tp))
+        return None if self.fail_tp else "tp9"
 
     def move_stop_loss(self, symbol, side, amount, new_sl, sl_order_id):
         self.calls.append(("move_stop_loss", symbol, side, amount, new_sl, sl_order_id))
@@ -226,18 +235,6 @@ def test_lot_change_closes_then_reopens(live):
 
 
 # ── per-cycle protection heal ─────────────────────────────────────────────
-def test_heal_replaces_missing_protective_orders(live):
-    _open(live)
-    pos = live.slot.risk.positions[ETH]
-    pos.tp_order_id = "gone"
-    live.ex.open_positions = [{"symbol": ETH, "side": "long", "amount": 0.02}]
-    live.bot._donchian_heal_protection(live.slot, ETH)
-    n = live.ex.names()
-    assert n.index("cancel_open_orders") < n.index("place_sl_tp")
-    sltp = next(c for c in live.ex.calls if c[0] == "place_sl_tp")
-    assert sltp[4] == pytest.approx(pos.stop_loss) and sltp[5] == pytest.approx(pos.take_profit)
-
-
 def test_heal_is_quiet_when_both_orders_rest(live):
     _open(live)
     live.bot._donchian_heal_protection(live.slot, ETH)
@@ -302,3 +299,90 @@ def test_price_drift_alone_never_resizes_while_w_is_unchanged(live):
     note = live.bot._donchian_adjust_position(live.slot, ETH, 0.30, 3500.0, False, _today())
     assert "holding" in note                                 # would be 1 lot at 3500, but w didn't change
     assert "close_long" not in live.ex.names() and "open_long_market" not in live.ex.names()
+
+
+# ── review fixes (9/28) ───────────────────────────────────────────────────
+def test_hold_day_records_the_new_w_so_the_churn_gate_keeps_working(live):
+    _open(live, w=0.30, price=2600.0)                                    # 2 lots
+    live.bot._donchian_adjust_position(live.slot, ETH, 0.36, 2600.0, False, _today())  # still 2 lots
+    assert live.bot._donchian_state[ETH]["live_w"] == pytest.approx(0.36)
+    live.ex.calls.clear()
+    note = live.bot._donchian_adjust_position(live.slot, ETH, 0.36, 3500.0, False, _today())
+    assert "holding" in note and "close_long" not in live.ex.names()
+
+
+def test_resize_never_moves_the_stop_down(live):
+    _open(live, w=0.30, price=3000.0)                        # stop 2550
+    live.ex.price = 2800.0
+    live.bot._donchian_adjust_position(live.slot, ETH, 0.60, 2800.0, False, _today())
+    pos = live.slot.risk.positions[ETH]
+    assert pos.stop_loss == pytest.approx(2550.0)            # not 2800*0.85 = 2380
+    sltp = [c for c in live.ex.calls if c[0] == "place_sl_tp"][-1]
+    assert sltp[4] == pytest.approx(2550.0)
+
+
+def test_halt_does_not_spin_when_w_is_unchanged(live, sandbox):
+    _open(live, w=0.30, price=2600.0)
+    open(".pause_trading", "w").close()
+    note = live.bot._donchian_adjust_position(live.slot, ETH, 0.30, 2000.0, False, _today())
+    assert note and "holding" in note                        # not None (would retry every cycle)
+
+
+def test_leverage_flag_set_before_flip_and_restored_to_config_after_demote(live, monkeypatch):
+    import bot as botmod
+    live.bot._leverage_set = set()
+    _open(live)
+    assert live.bot._donchian_state[ETH]["leverage_2x_set"] is True
+    # demoted + flat -> restore to Config.LEVERAGE, clear flag, lock released
+    live.slot.risk.positions.pop(ETH)
+    live.slot.set_paper()
+    assert live.bot._donchian_locks_symbol(ETH)               # still locked: 2x not restored yet
+    live.bot._donchian_restore_leverage(ETH)
+    assert ("set_symbol_leverage", ETH, botmod.Config.LEVERAGE) in live.ex.calls
+    assert live.bot._donchian_state[ETH]["leverage_2x_set"] is False
+    assert ETH in live.bot._leverage_set
+    assert live.bot._donchian_locks_symbol(ETH) is None
+
+
+def test_leverage_not_restored_while_live(live):
+    _open(live)
+    live.ex.calls.clear()
+    live.bot._donchian_restore_leverage(ETH)
+    assert "set_symbol_leverage" not in live.ex.names()
+
+
+def test_heal_rests_only_the_missing_leg_and_never_cancels_the_good_one(live):
+    _open(live)
+    pos = live.slot.risk.positions[ETH]
+    pos.tp_order_id = "gone"
+    live.ex.open_positions = [{"symbol": ETH, "side": "long", "amount": 0.02}]
+    live.ex.calls.clear()
+    live.bot._donchian_heal_protection(live.slot, ETH)
+    n = live.ex.names()
+    assert "cancel_open_orders" not in n and "place_sl_tp" not in n
+    assert "place_take_profit" in n and "place_stop_loss" not in n
+    assert pos.tp_order_id == "tp9" and pos.sl_order_id == "sl1"
+
+
+def test_heal_missing_stop_retries_every_cycle_missing_tp_is_throttled(live):
+    _open(live)
+    pos = live.slot.risk.positions[ETH]
+    live.ex.open_positions = [{"symbol": ETH, "side": "long", "amount": 0.02}]
+    live.ex.fail_tp = True
+    pos.tp_order_id = None
+    live.bot._donchian_heal_protection(live.slot, ETH)
+    live.ex.calls.clear()
+    live.bot._donchian_heal_protection(live.slot, ETH)       # same minute: TP retry throttled
+    assert "place_take_profit" not in live.ex.names()
+    pos.sl_order_id = "software"
+    live.bot._donchian_heal_protection(live.slot, ETH)       # missing STOP: never throttled
+    assert "place_stop_loss" in live.ex.names()
+
+
+def test_demote_with_failed_close_stays_live_and_retries(live, monkeypatch):
+    _open(live)
+    live.ex.close_long = lambda *a, **k: None                # exchange refuses the close
+    live.bot._demote_slot(live.slot, "kill line")
+    assert live.slot.paper_mode is False                     # never flip to paper with a real position open
+    assert ETH in live.slot.risk.positions
+    assert live.bot._pending_demotes.get("DONCHIAN_ETH") == "kill line"

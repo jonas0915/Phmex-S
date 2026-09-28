@@ -1155,6 +1155,31 @@ class Exchange:
                     return None
         return None
 
+    def place_take_profit(self, symbol: str, side: str, amount: float, tp_price: float):
+        """Place ONLY a take-profit (the TP block of place_sl_tp: reduceOnly limit at the
+        TP trigger, market-trigger fallback). Used to re-rest a missing TP without
+        touching a healthy resting SL. Returns the order id or None."""
+        order_side = "sell" if side == "long" else "buy"
+        tp_price = self._round_price(symbol, tp_price)
+        amount = self._round_amount(symbol, amount)
+        if amount <= 0:
+            logger.error(f"place_take_profit skip: amount rounded to 0 for {symbol}")
+            return None
+        tp_trigger_dir = "ascending" if side == "long" else "descending"
+        params = {"reduceOnly": True, "triggerPrice": tp_price, "triggerDirection": tp_trigger_dir}
+        try:
+            o = self.client.create_order(symbol, "limit", order_side, amount, tp_price, params=params)
+            logger.info(f"TP-only order placed (LIMIT): {symbol} {order_side} trigger@{tp_price} (id={o.get('id')})")
+            return o.get("id")
+        except Exception as e:
+            try:
+                o = self.client.create_order(symbol, "market", order_side, amount, None, params=params)
+                logger.info(f"TP-only order placed (MARKET fallback): {symbol} trigger@{tp_price} (id={o.get('id')})")
+                return o.get("id")
+            except Exception as e2:
+                logger.error(f"Failed to place TP-only for {symbol}: {e} / {e2}")
+                return None
+
     def open_long_market(self, symbol: str, coin_amount: float) -> Optional[dict]:
         """Market (taker) entry for the ETH-TSM-28 30-minute maker-window fallback
         (pre-registered spec §7.2). Fixed coin amount, NOT margin-based. On an

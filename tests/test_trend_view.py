@@ -268,3 +268,21 @@ def test_signal_cards_show_live_when_the_slot_is_promoted(monkeypatch):
                                       "DONCHIAN_BTC": {"closed_trades": [], "positions": {}, "peak_balance": 0}})
     assert "DONCHIAN_ETH &mdash; TREND ENSEMBLE (LIVE)" in html
     assert "DONCHIAN_BTC &mdash; TREND ENSEMBLE (PAPER)" in html
+
+
+def test_live_card_uses_position_value_not_margin_and_the_live_kill_line():
+    days = [{"date": "2026-09-27", "w": 0.3, "close": 2600.0, "n_long": 6}]
+    st = {"closed_trades": [], "positions": {"ETH/USDT:USDT": {
+        "opened_at": 1, "margin": 13.0, "amount": 0.01, "entry_price": 2600.0}}}
+    html = tv.build_trend_content({"ETH": st}, {"ETH": days}, today=date(2026, 9, 28),
+                                  live_ids={"DONCHIAN_ETH"})
+    assert "$26.00 long" in html                               # 0.01 x 2600, not the $13 margin
+    assert "<b>2.00x</b>" in html                              # 26 / 13
+    assert "&minus;$26.00 (live" in html and "&minus;$15.00" not in html.split('id="trend-ETH"')[1].split("</table>")[0]
+
+
+def test_fidelity_for_a_live_book_covers_the_paper_period_only():
+    states, signals = _fixture_inputs()
+    html = tv.build_trend_content(states, signals, today=date(2026, 9, 28), live_ids={"DONCHIAN_ETH"},
+                                  promoted_at={"ETH": _ts("2026-07-02")})
+    assert "paper period only" in html

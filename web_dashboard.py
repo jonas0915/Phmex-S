@@ -848,8 +848,10 @@ _SIGNAL_BOXES = [
     ("DONCHIAN_ETH",   "DONCHIAN_ETH &mdash; TREND ENSEMBLE (PAPER)",
      "ETH-only twin of the BTC Donchian ensemble (same 9 lookbacks, stops, "
      "vol target; long/flat). OOS replay: ETH &minus;4.9% vs &minus;48% B&amp;H "
-     "through the bear. PAPER since 2026-07-16 7:39 PM PT. Same registered "
-     "lines: paper net &le; &minus;$15 = KILL; 90-day review 2026-10-14."),
+     "through the bear. PAPER since 2026-07-16 7:39 PM PT (paper kill line: net &le; "
+     "&minus;$15). When promoted LIVE (owner go-live 9/28): 2x the rule's size on account "
+     "equity, 2x isolated, resting stop &minus;15% ratcheting up, TP +25%, kill line "
+     "&minus;$26 realized &rarr; back to paper."),
     ("5m_mean_revert", "5M_MEAN_REVERT &mdash; LIVE FORWARD TEST",
      "Bollinger-Band mean-reversion scalp &mdash; fades lower-BB bounces / upper-BB "
      "rejections in ranging (low-ADX) markets. LIVE since 2026-06-12; running the "
@@ -2322,7 +2324,10 @@ def build_trend_payload() -> dict:
     """/api/trend body: the Donchian trend books, read fresh from their files."""
     states, signals = trend_view.load_inputs(PROJECT_DIR)
     today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
-    return {"content": trend_view.build_trend_content(states, signals, today, live_ids=_live_slot_ids()),
+    _modes = _slot_modes()
+    _promoted = {sym: (_modes.get(f"DONCHIAN_{sym}") or {}).get("promoted_at") for sym in trend_view.SYMBOLS}
+    return {"content": trend_view.build_trend_content(states, signals, today, live_ids=_live_slot_ids(),
+                                                      promoted_at=_promoted),
             "curves": trend_view.curves(states, signals)}
 
 

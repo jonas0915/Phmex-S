@@ -46,10 +46,18 @@ def load_inputs(project_dir: str) -> tuple[dict, dict]:
     return states, signals
 
 
+def _notional(p: dict) -> float:
+    """Position value. Paper books record margin AS the notional (1x); a live
+    position carries exchange margin (notional / leverage), so use amount x entry."""
+    if p.get("amount") and p.get("entry_price"):
+        return float(p["amount"]) * float(p["entry_price"])
+    return float(p.get("margin") or 0.0)
+
+
 def _intervals(state: dict) -> list:
-    out = [(t.get("opened_at") or 0, t.get("closed_at") or 0, t.get("margin") or 0.0)
+    out = [(t.get("opened_at") or 0, t.get("closed_at") or 0, _notional(t))
            for t in state.get("closed_trades") or []]
-    out += [(p.get("opened_at") or 0, float("inf"), p.get("margin") or 0.0)
+    out += [(p.get("opened_at") or 0, float("inf"), _notional(p))
             for p in (state.get("positions") or {}).values()]
     return out
 
@@ -94,10 +102,11 @@ def book_summary(state: dict, last_close):
     net = sum(t.get("net_pnl") or 0.0 for t in trades)
     reasons = [t.get("exit_reason") or t.get("reason") or "" for t in trades]
     positions = list((state.get("positions") or {}).values())
-    open_notional = sum(p.get("margin") or 0.0 for p in positions)
+    open_notional = sum(_notional(p) for p in positions)
+    open_margin = sum(p.get("margin") or 0.0 for p in positions)
     upnl = None
     if positions and last_close:
-        upnl = sum((p.get("margin") or 0.0) * (last_close / p["entry_price"] - 1)
+        upnl = sum(_notional(p) * (last_close / p["entry_price"] - 1)
                    for p in positions if p.get("entry_price"))
     return {"n": len(trades), "net": net, "fees": sum(t.get("fees_usdt") or 0.0 for t in trades),
             "wins": sum(1 for t in trades if (t.get("net_pnl") or 0) > 0),
@@ -106,8 +115,7 @@ def book_summary(state: dict, last_close):
             "open_notional": open_notional, "open_upnl": upnl,
             "open_since": min((p.get("opened_at") or 0) for p in positions) if positions else None,
             "kill_room": net - KILL_LINE, "recent": trades[-8:],
-            "leverage": (sum((p.get("amount") or 0.0) * (p.get("entry_price") or 0.0) for p in positions)
-                         / open_notional) if positions and open_notional else None,
+            "leverage": (open_notional / open_margin) if positions and open_margin else None,
             "exposure_x": sum((p.get("amount") or 0.0) * (p.get("entry_price") or 0.0) for p in positions)
                           / BASE_NOTIONAL,
             "roi_pct": net / BASE_NOTIONAL * 100,
@@ -124,9 +132,9 @@ def equity_curve(state: dict, days: list):
     if not days:
         return None
     trades = state.get("closed_trades") or []
-    held = [(t.get("opened_at") or 0, t.get("closed_at") or 0, t.get("margin") or 0.0, t.get("entry_price"))
+    held = [(t.get("opened_at") or 0, t.get("closed_at") or 0, _notional(t), t.get("entry_price"))
             for t in trades]
-    held += [(p.get("opened_at") or 0, float("inf"), p.get("margin") or 0.0, p.get("entry_price"))
+    held += [(p.get("opened_at") or 0, float("inf"), _notional(p), p.get("entry_price"))
              for p in (state.get("positions") or {}).values()]
     t_out, v_out, labels = [], [], []
     for d in days:
@@ -201,7 +209,8 @@ def _book_card(sym: str, state, days, today: date = None, live: bool = False) ->
         ("Rule wants", rule_now),
         ("Closed P&amp;L (after modelled fees)", f"{_usd(s['net'])} &middot; fees ${s['fees']:,.2f}"),
         ("Exits", f"{s['n']} ({s['n_rebal']} rebalances, {s['n_stops']} stops) &middot; winners {wr}"),
-        ("Kill line", f"&minus;$15.00 &middot; room {_usd(s['kill_room'], signed=False)}"),
+        (("Kill line", "&minus;$26.00 (live, realized since promotion) &rarr; back to paper") if live else
+         ("Kill line", f"&minus;$15.00 &middot; room {_usd(s['kill_room'], signed=False)}")),
     ]
     if live:
         lt = [t for t in state.get("closed_trades") or [] if t.get("mode") == "live"]
@@ -254,18 +263,26 @@ def _bench_panel(signals: dict) -> str:
             f"{rows}</table></div>")
 
 
-def _fidelity_panel(states: dict, signals: dict) -> str:
+def _fidelity_panel(states: dict, signals: dict, live_ids=frozenset(), promoted_at=None) -> str:
     rows = ""
     for sym in SYMBOLS:
         st, days = states.get(sym), signals.get(sym) or []
         if st is None or not days:
             rows += f"<tr><td>{sym}</td><td colspan='3'>no state file or no signal file</td></tr>"
             continue
+        live = f"DONCHIAN_{sym}" in live_ids
+        cut = (promoted_at or {}).get(sym)
+        if live:
+            # the live book is sized on account equity (2x), not the $100 base
+            st = dict(st, closed_trades=[t for t in st.get("closed_trades") or [] if t.get("mode") != "live"],
+                      positions={})
+            days = [d for d in days if cut is not None and _sample_ts(d["date"]) < cut]
         fr = fidelity_rows(st, days)
         last14 = breaches_last_14(fr)
         dates = ", ".join(r["date"][5:] for r in fr if r["breach"]) or "none"
         flag = "BUG (&gt;3 in 14d)" if last14 > FIDELITY_MAX_BREACHES else "ok"
-        rows += f"<tr><td>{sym}</td><td>{last14}</td><td>{flag}</td><td>{dates}</td></tr>"
+        tag = " (paper period only)" if live else ""
+        rows += f"<tr><td>{sym}{tag}</td><td>{last14}</td><td>{flag}</td><td>{dates}</td></tr>"
     return ("<div class='panel' id=\"trend-fidelity\"><div class='ptitle'>Fidelity &mdash; is the paper book "
             "following the rule?</div><div class='sig-desc'>Each day the paper position (6h after the 5:00 PM PT "
             "roll) is compared with what the rule wanted. A gap over 0.10 is a breach day; more than 3 in any "
@@ -294,7 +311,8 @@ def _mode_line(live_ids) -> str:
             + (f"; {'/'.join(paper)} is <b>PAPER</b>." if paper else "."))
 
 
-def build_trend_content(states: dict, signals: dict, today: date, live_ids=frozenset()) -> str:
+def build_trend_content(states: dict, signals: dict, today: date, live_ids=frozenset(),
+                        promoted_at=None) -> str:
     left = days_to_review(today)
     when = (f"{left} days away" if left > 0 else "today" if left == 0 else f"{-left} days ago")
     header = ("<div class='panel' id=\"trend-status\"><div class='ptitle'>Pivot status</div>"
@@ -307,4 +325,4 @@ def build_trend_content(states: dict, signals: dict, today: date, live_ids=froze
     cards = "".join(_book_card(sym, states.get(sym), signals.get(sym) or [], today,
                                live=f"DONCHIAN_{sym}" in live_ids) for sym in SYMBOLS)
     return (f"<div id=\"trend-grid\">{header}{cards}{_bench_panel(signals)}"
-            f"{_fidelity_panel(states, signals)}</div>")
+            f"{_fidelity_panel(states, signals, live_ids, promoted_at)}</div>")
