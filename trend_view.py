@@ -180,7 +180,7 @@ def _pt(ts) -> str:
     return local.strftime("%-m/%-d %-I:%M %p") + " PT"
 
 
-def _book_card(sym: str, state, days, today: date = None, live: bool = False) -> str:
+def _book_card(sym: str, state, days, today: date = None, live: bool = False, promoted_at=None) -> str:
     title = f"DONCHIAN {sym} &mdash; TREND BOOK ({'LIVE' if live else 'PAPER'})"
     if state is None:
         return f"<div class='panel' id=\"trend-{sym}\"><div class='ptitle'>{title}</div>no state file for {sym}</div>"
@@ -213,7 +213,8 @@ def _book_card(sym: str, state, days, today: date = None, live: bool = False) ->
          ("Kill line", f"&minus;$15.00 &middot; room {_usd(s['kill_room'], signed=False)}")),
     ]
     if live:
-        lt = [t for t in state.get("closed_trades") or [] if t.get("mode") == "live"]
+        lt = [t for t in state.get("closed_trades") or [] if t.get("mode") == "live"
+              and (promoted_at is None or (t.get("closed_at") or 0) >= promoted_at)]
         rows.insert(0, ("Live trades (real money)",
                         f"<b>{len(lt)} closed</b> &middot; net {_usd(sum(t.get('net_pnl') or 0.0 for t in lt))} "
                         f"&middot; kill line &minus;$26 &rarr; back to paper"))
@@ -323,6 +324,7 @@ def build_trend_content(states: dict, signals: dict, today: date, live_ids=froze
               "<div class='sig-desc'>Paper P&amp;L does not include funding. Measured 9/27 over the last 100 "
               "settlements: longs paid about 0.41% (BTC) and 0.35% (ETH) of the position per 30 days.</div></div>")
     cards = "".join(_book_card(sym, states.get(sym), signals.get(sym) or [], today,
-                               live=f"DONCHIAN_{sym}" in live_ids) for sym in SYMBOLS)
+                               live=f"DONCHIAN_{sym}" in live_ids,
+                               promoted_at=(promoted_at or {}).get(sym)) for sym in SYMBOLS)
     return (f"<div id=\"trend-grid\">{header}{cards}{_bench_panel(signals)}"
             f"{_fidelity_panel(states, signals, live_ids, promoted_at)}</div>")

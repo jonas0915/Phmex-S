@@ -911,7 +911,6 @@ class Phmex2Bot:
         self._donchian_live_warned: dict[str, str] = {}
         self._donchian_ownership_notified: dict[str, str] = {}   # live notify dedup, kind -> UTC date
         self._donchian_heal_at: dict[str, float] = {}            # symbol -> last protection check
-        self._pending_demotes: dict[str, str] = {}               # slot_id -> reason (close failed, retrying)
         # informed_flow_btc_alt_cascade_v2 runtime state: per-symbol persisted
         # bar stamp / bars_held + one-shot per-day dedup for the live warning.
         self._informed_flow_btc_alt_cascade_v2_state = informed_flow_btc_alt_cascade_v2_slot.load_state()
@@ -1627,17 +1626,31 @@ class Phmex2Bot:
                 pass
 
         # Demote: live → paper
+        self._process_demote_sentinels()
+
+    def _process_demote_sentinels(self):
+        """.demote_<slot> sentinels — written by the owner, or by _demote_slot
+        itself when a close failed. The file is the persisted retry record:
+        removed only once the demote completes (survives restarts)."""
+        import glob as _glob
         for path in _glob.glob(".demote_*"):
             slot_id = path.replace(".demote_", "")
+            reason = "manual sentinel"
+            try:
+                with open(path) as f:
+                    reason = (json.load(f) or {}).get("reason") or reason
+            except Exception:
+                pass
+            done = True
             for slot in self.slots:
                 if slot.slot_id == slot_id:
-                    # _demote_slot closes real positions, flips mode, and sends the Telegram alert
-                    self._demote_slot(slot, "manual sentinel")
+                    done = slot.paper_mode or self._demote_slot(slot, reason)
                     break
-            try:
-                os.remove(path)
-            except OSError:
-                pass
+            if done:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
 
     def _run_cycle(self):
         import time as _time_module
@@ -2972,10 +2985,6 @@ class Phmex2Bot:
         .halt_main_entries path can service slots
         and their exits identically to the normal end-of-cycle call. Exception handling
         and log levels are preserved verbatim from the original inline call sites."""
-        for _sid, _why in list((getattr(self, "_pending_demotes", None) or {}).items()):
-            _sl = next((x for x in self.slots if x.slot_id == _sid), None)
-            if _sl is not None and not _sl.paper_mode:
-                self._demote_slot(_sl, _why)
         try:
             self._evaluate_slots(self.active_pairs, prices)
         except Exception as e:
@@ -4344,9 +4353,12 @@ class Phmex2Bot:
         if demote:
             self._demote_slot(slot, reason)
 
-    def _demote_slot(self, slot, reason: str):
-        """Demote a live slot to paper: close its real positions at market, cancel
-        orders, flip mode. Never leaves a frozen position (DOGE-freeze lesson 2026-06-11)."""
+    def _demote_slot(self, slot, reason: str) -> bool:
+        """Demote a live slot to paper: close its real positions at market, THEN
+        cancel their resting orders, then flip mode. Never leaves a frozen position
+        (DOGE-freeze lesson 2026-06-11). If any close fails the slot stays LIVE with
+        its protective orders intact, and a .demote_<slot> file records the retry
+        (processed every cycle, survives restarts). Returns True when demoted."""
         logger.warning(f"[SLOT DEMOTE] {slot.slot_id} → paper ({reason})")
         _failed = []
         for symbol in list(slot.risk.positions.keys()):
@@ -4354,38 +4366,49 @@ class Phmex2Bot:
                 continue  # already closed by another path this cycle
             pos = slot.risk.positions[symbol]
             try:
-                self.exchange.cancel_open_orders(symbol)
                 order = (self.exchange.close_long(symbol, pos.amount) if pos.side == "long"
                          else self.exchange.close_short(symbol, pos.amount))
                 if order:
+                    self.exchange.cancel_open_orders(symbol)   # only after the close filled
                     fill = self._extract_fill_price(order, pos.entry_price, is_exit=True)
                     slot.risk.close_position(symbol, fill, "slot_demote", mode="live",
                                              fees_usdt=self.exchange.extract_order_fee(order, symbol))
                 else:
                     _failed.append(symbol)
-                    logger.error(f"[SLOT DEMOTE] {slot.slot_id} {symbol} close FAILED — staying live, retry next cycle")
+                    logger.error(f"[SLOT DEMOTE] {slot.slot_id} {symbol} close FAILED — staying live "
+                                 f"(protection kept), retrying every cycle")
             except Exception as e:
                 _failed.append(symbol)
                 logger.error(f"[SLOT DEMOTE] {slot.slot_id} {symbol} error: {e}")
-        pending = getattr(self, "_pending_demotes", None)
-        if pending is None:
-            pending = self._pending_demotes = {}
         if _failed:
             # Never flip to paper with a real position open: paper mode drops it from
             # the owner map and the next sync would orphan-adopt it into the main book.
-            pending[slot.slot_id] = reason
-            try:
-                notifier.send(f"🚨 Slot <b>{slot.slot_id}</b> demote BLOCKED — close failed for "
-                              f"{', '.join(_failed)}; staying live and retrying every cycle")
-            except Exception:
-                pass
-            return
-        pending.pop(slot.slot_id, None)
+            _path = f".demote_{slot.slot_id}"
+            if not os.path.exists(_path):
+                try:
+                    with open(_path, "w") as f:
+                        json.dump({"reason": reason}, f)
+                except OSError as e:
+                    logger.error(f"[SLOT DEMOTE] could not write {_path}: {e}")
+            _seen = getattr(self, "_demote_blocked_notified", None)
+            if _seen is None:
+                _seen = self._demote_blocked_notified = {}
+            _day = time.strftime("%Y-%m-%d", time.gmtime())
+            if _seen.get(slot.slot_id) != _day:
+                _seen[slot.slot_id] = _day
+                try:
+                    notifier.send(f"🚨 Slot <b>{slot.slot_id}</b> demote BLOCKED — close failed for "
+                                  f"{', '.join(_failed)}; staying live with its stop in place, "
+                                  f"retrying every cycle")
+                except Exception:
+                    pass
+            return False
         slot.set_paper()
         try:
             notifier.send(f"⬇️ Slot <b>{slot.slot_id}</b> demoted to paper — {reason}")
         except Exception:
             pass
+        return True
 
     def _ratchet_slot_durable_sl(self, slot, symbol, pos, price):
         """Durable trailing-stop ratchet for a LIVE slot position — mirror of the
@@ -5093,8 +5116,8 @@ class Phmex2Bot:
         if not st.get("leverage_2x_set"):
             return True
         slot = self._donchian_slot(donchian_slot.SLOT_IDS[symbol])
-        if slot is not None and (not slot.paper_mode or symbol in slot.risk.positions):
-            return False                                  # still live / still holding
+        if slot is not None and not slot.paper_mode:
+            return False                                  # still live (paper positions have no exchange footprint)
         try:
             self.exchange.set_symbol_leverage(symbol, Config.LEVERAGE)
         except Exception as e:
@@ -5144,7 +5167,7 @@ class Phmex2Bot:
         st = self._donchian_state.setdefault(symbol, donchian_slot.default_coin_state())
         # Resize only when the RULE rebalanced (w changed) — like the paper book.
         # Price/equity drift alone must not churn the position across lot edges.
-        if (pos is not None and target_lots > 0 and st.get("live_w") is not None
+        if (pos is not None and w > 0 and st.get("live_w") is not None
                 and abs(w - float(st["live_w"])) <= 1e-12):
             target_lots = cur_lots
 
@@ -5162,14 +5185,21 @@ class Phmex2Bot:
             self._donchian_ratchet_live_stop(slot, symbol, pos, price)
             return f"holding {cur_lots} lots ({pos.amount:.2f} {symbol.split('/')[0]}), stop {pos.stop_loss:.2f}"
 
-        prev_stop = pos.stop_loss if pos is not None else None
+        if pos is not None and target_lots > 0:
+            st["live_prev_stop"] = pos.stop_loss    # survives a close-ok / reopen-failed split
+            donchian_slot.save_state(self._donchian_state)
+        prev_stop = st.get("live_prev_stop")
         if pos is not None:
             reason = (("donchian_stop" if stop_fired else "signal_exit") if target_lots == 0
                       else "donchian_rebalance")
             if not self._close_slot_position(slot, symbol, pos, price, reason):
                 return None
             if target_lots == 0:
+                st.pop("live_prev_stop", None)
+                donchian_slot.save_state(self._donchian_state)
                 return f"closed ({reason})"
+        if os.path.exists(f".demote_{slot.slot_id}"):
+            return f"target {target_lots} lots but demote pending — no entry"
         if slot.paper_mode or not slot.is_active:
             return f"target {target_lots} lots but slot demoted/disabled — no entry"
         if not self._donchian_open_live(slot, symbol, target_lots, price, w, equity,
@@ -5224,7 +5254,9 @@ class Phmex2Bot:
         slot.risk._save_state()
         slot.total_entries += 1
         self._last_entry_time = time.time()
-        self._donchian_state.setdefault(symbol, donchian_slot.default_coin_state())["live_w"] = w
+        _st = self._donchian_state.setdefault(symbol, donchian_slot.default_coin_state())
+        _st["live_w"] = w
+        _st.pop("live_prev_stop", None)
         donchian_slot.save_state(self._donchian_state)
         if pos.sl_order_id == "software":
             notifier.send(f"🚨 <b>{slot.slot_id}</b> LIVE {symbol}: NO resting stop placed — "

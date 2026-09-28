@@ -286,3 +286,14 @@ def test_fidelity_for_a_live_book_covers_the_paper_period_only():
     html = tv.build_trend_content(states, signals, today=date(2026, 9, 28), live_ids={"DONCHIAN_ETH"},
                                   promoted_at={"ETH": _ts("2026-07-02")})
     assert "paper period only" in html
+
+
+def test_live_trades_row_counts_only_this_promotion():
+    days = [{"date": "2026-09-27", "w": 0.3, "close": 2600.0, "n_long": 6}]
+    st = {"closed_trades": [
+        {"opened_at": 1, "closed_at": 100, "margin": 13, "net_pnl": -5.0, "mode": "live", "exit_reason": "x"},
+        {"opened_at": 1, "closed_at": 300, "margin": 13, "net_pnl": 2.0, "mode": "live", "exit_reason": "x"}],
+        "positions": {}}
+    html = tv.build_trend_content({"ETH": st}, {"ETH": days}, today=date(2026, 9, 28),
+                                  live_ids={"DONCHIAN_ETH"}, promoted_at={"ETH": 200})
+    assert "1 closed" in html and "+$2.00" in html

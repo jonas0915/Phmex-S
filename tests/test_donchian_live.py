@@ -379,10 +379,68 @@ def test_heal_missing_stop_retries_every_cycle_missing_tp_is_throttled(live):
     assert "place_stop_loss" in live.ex.names()
 
 
-def test_demote_with_failed_close_stays_live_and_retries(live, monkeypatch):
+def test_demote_with_failed_close_keeps_protection_stays_live_and_persists_the_retry(live):
     _open(live)
+    live.ex.calls.clear()
     live.ex.close_long = lambda *a, **k: None                # exchange refuses the close
-    live.bot._demote_slot(live.slot, "kill line")
-    assert live.slot.paper_mode is False                     # never flip to paper with a real position open
-    assert ETH in live.slot.risk.positions
-    assert live.bot._pending_demotes.get("DONCHIAN_ETH") == "kill line"
+    ok = live.bot._demote_slot(live.slot, "loss cap")
+    assert ok is False
+    assert live.slot.paper_mode is False and ETH in live.slot.risk.positions
+    assert "cancel_open_orders" not in live.ex.names()       # resting SL/TP stay in place
+    assert os.path.exists(".demote_DONCHIAN_ETH")            # survives a restart; retried each cycle
+    # the Telegram alert is deduped: a second failed attempt the same day sends nothing new
+    n = len(live.sent)
+    live.bot._demote_slot(live.slot, "loss cap")
+    assert len(live.sent) == n
+
+
+def test_demote_success_closes_first_then_cancels_and_flips_to_paper(live):
+    _open(live)
+    live.ex.calls.clear()
+    assert live.bot._demote_slot(live.slot, "loss cap") is True
+    n = live.ex.names()
+    assert n.index("close_long") < n.index("cancel_open_orders")
+    assert live.slot.paper_mode is True and ETH not in live.slot.risk.positions
+
+
+def test_demote_sentinel_is_kept_until_the_close_succeeds(live):
+    _open(live)
+    open(".demote_DONCHIAN_ETH", "w").close()
+    live.ex.close_long = lambda *a, **k: None
+    live.bot._process_demote_sentinels()
+    assert os.path.exists(".demote_DONCHIAN_ETH") and live.slot.paper_mode is False
+    del live.ex.close_long                                   # exchange recovers
+    live.bot._process_demote_sentinels()
+    assert not os.path.exists(".demote_DONCHIAN_ETH") and live.slot.paper_mode is True
+
+
+def test_no_live_entry_while_a_demote_is_pending(live):
+    open(".demote_DONCHIAN_ETH", "w").close()
+    note = live.bot._donchian_adjust_position(live.slot, ETH, 0.30, 2600.0, False, _today())
+    assert "demote pending" in note and "open_long_market" not in live.ex.names()
+
+
+def test_split_resize_keeps_the_ratcheted_stop_across_a_failed_reopen(live):
+    _open(live, w=0.30, price=3000.0)                        # stop 2550
+    real_open = live.ex.open_long_market
+    live.ex.open_long_market = lambda *a, **k: None          # reopen fails after the close
+    assert live.bot._donchian_adjust_position(live.slot, ETH, 0.60, 2800.0, False, _today()) is None
+    assert ETH not in live.slot.risk.positions
+    live.ex.open_long_market = real_open
+    live.ex.price = 2800.0
+    assert live.bot._donchian_adjust_position(live.slot, ETH, 0.60, 2800.0, False, _today())
+    assert live.slot.risk.positions[ETH].stop_loss == pytest.approx(2550.0)
+
+
+def test_price_drift_to_below_one_lot_does_not_close_while_w_unchanged(live):
+    _open(live, w=0.30, price=2600.0)                        # 2 lots
+    note = live.bot._donchian_adjust_position(live.slot, ETH, 0.30, 9000.0, False, _today())
+    assert "holding" in note and "close_long" not in live.ex.names()
+
+
+def test_leverage_restore_not_blocked_by_a_paper_position(live):
+    _open(live)
+    live.slot.risk.positions.pop(ETH)
+    live.slot.set_paper()
+    live.slot.risk.positions[ETH] = SimpleNamespace(side="long", amount=0.01)   # paper book re-entered
+    assert live.bot._donchian_restore_leverage(ETH) is True
