@@ -222,3 +222,26 @@ def test_roi_label_says_ytd_only_while_the_book_started_this_year():
     assert "$100.00 &rarr; $100.90" in html                  # capital -> capital + closed net (+0.90)
     html = tv.build_trend_content(states, signals, today=date(2027, 1, 5))
     assert "Total ROI on the $100 starting capital (since 7/1/2026)" in html and "YTD" not in html
+
+
+def test_leverage_is_position_value_over_margin_and_exposure_is_over_the_capital():
+    st = {"closed_trades": [], "positions": {"X": {"opened_at": 1, "margin": 25.0, "amount": 0.5, "entry_price": 100.0}}}
+    s = tv.book_summary(st, last_close=100.0)
+    assert s["leverage"] == pytest.approx(2.0)                # $50 position on $25 margin
+    assert s["exposure_x"] == pytest.approx(0.50)             # $50 of the $100 capital
+    flat = tv.book_summary({"closed_trades": [], "positions": {}}, None)
+    assert flat["leverage"] is None and flat["exposure_x"] == 0.0
+
+
+def test_card_shows_leverage_row():
+    st = {"closed_trades": [], "positions": {"X": {"opened_at": 1, "margin": 30.0, "amount": 0.3, "entry_price": 100.0}}}
+    days = [{"date": "2026-07-01", "w": 0.3, "close": 100.0, "n_long": 3}]
+    html = tv.build_trend_content({"BTC": st}, {"BTC": days}, today=date(2026, 9, 27))
+    assert "Leverage" in html and "1.00x" in html and "0.30x of the $100 capital" in html and "max 2.0x" in html
+
+
+def test_real_open_positions_are_unlevered():
+    for sym in ("BTC", "ETH"):
+        st, _ = _real(sym)
+        if st.get("positions"):
+            assert round(tv.book_summary(st, None)["leverage"], 2) == 1.00, sym

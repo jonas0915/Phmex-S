@@ -22,6 +22,7 @@ SYMBOLS = ("BTC", "ETH")
 BASE_NOTIONAL = 100.0          # donchian_slot.BASE_NOTIONAL_USDT
 FIDELITY_TOL = 0.10            # spec: daily |bot w - replica w| > 0.10
 FIDELITY_MAX_BREACHES = 3      # spec: > 3 days in 14d -> BUG
+MAX_EXPOSURE = 2.0             # donchian_slot.VOL_CAP: w (position / $100 base) never exceeds 2.0
 KILL_LINE = -15.0              # spec: net <= -$15 on the $100 base -> retire
 REVIEW_DATE = date(2026, 10, 14)
 SAMPLE_HOURS = 6               # after the 00:00 UTC roll (5:00 PM PT)
@@ -105,6 +106,10 @@ def book_summary(state: dict, last_close):
             "open_notional": open_notional, "open_upnl": upnl,
             "open_since": min((p.get("opened_at") or 0) for p in positions) if positions else None,
             "kill_room": net - KILL_LINE, "recent": trades[-8:],
+            "leverage": (sum((p.get("amount") or 0.0) * (p.get("entry_price") or 0.0) for p in positions)
+                         / open_notional) if positions and open_notional else None,
+            "exposure_x": sum((p.get("amount") or 0.0) * (p.get("entry_price") or 0.0) for p in positions)
+                          / BASE_NOTIONAL,
             "roi_pct": net / BASE_NOTIONAL * 100,
             "roi_pct_incl_open": (net + (upnl or 0.0)) / BASE_NOTIONAL * 100,
             "win_rate_pct": (sum(1 for t in trades if (t.get("net_pnl") or 0) > 0) / len(trades) * 100)
@@ -185,6 +190,11 @@ def _book_card(sym: str, state, days, today: date = None) -> str:
         ("Win rate", (f"<b>{s['win_rate_pct']:.0f}%</b> ({s['wins']}/{s['n']} exits closed green; "
                       "most exits are rebalances of the same trend)") if s["n"] else "&mdash;"),
         ("Max drawdown (daily closes)", _pct(-curve["max_dd_pct"]) if curve else "&mdash;"),
+        ("Leverage",
+         (f"<b>{s['leverage']:.2f}x</b> (position value / margin) &middot; exposure "
+          f"{s['exposure_x']:.2f}x of the ${BASE_NOTIONAL:,.0f} capital (design max {MAX_EXPOSURE:.1f}x)")
+         if s["leverage"] is not None else
+         f"flat &middot; exposure 0.00x of the ${BASE_NOTIONAL:,.0f} capital (design max {MAX_EXPOSURE:.1f}x)"),
         ("Position now", f"${s['open_notional']:,.2f} long (w {s['open_notional'] / BASE_NOTIONAL:.3f}), "
                          f"since {_pt(s['open_since'])}" if s["open_notional"] else "flat"),
         ("Open P&amp;L at last daily close", _usd(s["open_upnl"])),
