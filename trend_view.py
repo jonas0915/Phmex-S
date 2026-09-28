@@ -1,0 +1,212 @@
+"""TREND tab for web_dashboard.py — the pivot target (docs/2026-09-27-pivot-plan.md):
+the Donchian BTC/ETH trend books, still PAPER until the 10/14/2026 review.
+
+Pure, file-driven, zero exchange calls. Every figure is computed from
+trading_state_DONCHIAN_<SYM>.json (the paper book) and donchian_signal_<SYM>.json
+(the rule's own daily replica). Methods match the 9/27 verification:
+- book weight = paper notional held (margin at 1x) / $100 base (donchian_slot.BASE_NOTIONAL_USDT)
+- fidelity = book w sampled 6h after the 00:00 UTC close that follows each signal date,
+  |book w - replica w| > 0.10 is a breach day (spec: > 3 breaches in 14 days = BUG)
+- benchmarks are BEFORE fees: replica = sum w_i x $100 x next-day return;
+  plain hold = the same average w held every day / bought once at the first close.
+"""
+from __future__ import annotations
+
+import html
+import json
+import os
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+SYMBOLS = ("BTC", "ETH")
+BASE_NOTIONAL = 100.0          # donchian_slot.BASE_NOTIONAL_USDT
+FIDELITY_TOL = 0.10            # spec: daily |bot w - replica w| > 0.10
+FIDELITY_MAX_BREACHES = 3      # spec: > 3 days in 14d -> BUG
+KILL_LINE = -15.0              # spec: net <= -$15 on the $100 base -> retire
+REVIEW_DATE = date(2026, 10, 14)
+SAMPLE_HOURS = 6               # after the 00:00 UTC roll (5:00 PM PT)
+PT = ZoneInfo("America/Los_Angeles")
+
+
+def load_inputs(project_dir: str) -> tuple[dict, dict]:
+    """({sym: state}, {sym: signal days}) — missing/unreadable files are simply absent."""
+    states, signals = {}, {}
+    for sym in SYMBOLS:
+        try:
+            with open(os.path.join(project_dir, f"trading_state_DONCHIAN_{sym}.json")) as f:
+                states[sym] = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            pass
+        try:
+            with open(os.path.join(project_dir, f"donchian_signal_{sym}.json")) as f:
+                signals[sym] = json.load(f).get("days") or []
+        except (OSError, json.JSONDecodeError):
+            pass
+    return states, signals
+
+
+def _intervals(state: dict) -> list:
+    out = [(t.get("opened_at") or 0, t.get("closed_at") or 0, t.get("margin") or 0.0)
+           for t in state.get("closed_trades") or []]
+    out += [(p.get("opened_at") or 0, float("inf"), p.get("margin") or 0.0)
+            for p in (state.get("positions") or {}).values()]
+    return out
+
+
+def book_weight_at(state: dict, ts: float) -> float:
+    return sum(m for a, b, m in _intervals(state) if a <= ts < b) / BASE_NOTIONAL
+
+
+def _sample_ts(day: str) -> float:
+    d = datetime.fromisoformat(day).replace(tzinfo=timezone.utc)
+    return (d + timedelta(days=1, hours=SAMPLE_HOURS)).timestamp()
+
+
+def fidelity_rows(state: dict, days: list) -> list:
+    rows = []
+    for d in days:
+        bw = book_weight_at(state, _sample_ts(d["date"]))
+        rows.append({"date": d["date"], "book_w": bw, "rule_w": d["w"],
+                     "breach": abs(bw - d["w"]) > FIDELITY_TOL + 1e-12})
+    return rows
+
+
+def breaches_last_14(rows: list) -> int:
+    return sum(1 for r in rows[-14:] if r["breach"])
+
+
+def benchmarks(days: list):
+    if len(days) < 2:
+        return None
+    steps = len(days) - 1
+    rets = [days[i + 1]["close"] / days[i]["close"] - 1 for i in range(steps)]
+    replica = sum(days[i]["w"] * BASE_NOTIONAL * rets[i] for i in range(steps))
+    avg_w = sum(d["w"] for d in days[:-1]) / steps
+    return {"steps": steps, "replica": replica, "avg_w": avg_w,
+            "hold_const_w": sum(avg_w * BASE_NOTIONAL * r for r in rets),
+            "static_buy": avg_w * BASE_NOTIONAL * (days[-1]["close"] / days[0]["close"] - 1),
+            "first": days[0]["date"], "last": days[-1]["date"]}
+
+
+def book_summary(state: dict, last_close):
+    trades = state.get("closed_trades") or []
+    net = sum(t.get("net_pnl") or 0.0 for t in trades)
+    reasons = [t.get("exit_reason") or t.get("reason") or "" for t in trades]
+    positions = list((state.get("positions") or {}).values())
+    open_notional = sum(p.get("margin") or 0.0 for p in positions)
+    upnl = None
+    if positions and last_close:
+        upnl = sum((p.get("margin") or 0.0) * (last_close / p["entry_price"] - 1)
+                   for p in positions if p.get("entry_price"))
+    return {"n": len(trades), "net": net, "fees": sum(t.get("fees_usdt") or 0.0 for t in trades),
+            "wins": sum(1 for t in trades if (t.get("net_pnl") or 0) > 0),
+            "n_stops": sum(1 for r in reasons if "stop" in r),
+            "n_rebal": sum(1 for r in reasons if "rebalance" in r),
+            "open_notional": open_notional, "open_upnl": upnl,
+            "open_since": min((p.get("opened_at") or 0) for p in positions) if positions else None,
+            "kill_room": net - KILL_LINE, "recent": trades[-8:]}
+
+
+def days_to_review(today: date) -> int:
+    return (REVIEW_DATE - today).days
+
+
+# ── HTML ──────────────────────────────────────────────────────────────────
+def _usd(x, signed=True) -> str:
+    if x is None:
+        return "&mdash;"
+    cls = "pos" if x > 0 else "neg" if x < 0 else ""
+    txt = f"{'+' if signed and x > 0 else ''}{'-' if x < 0 else ''}${abs(x):,.2f}"
+    return f"<span class='{cls}'>{txt}</span>" if cls else txt
+
+
+def _pt(ts) -> str:
+    if not ts:
+        return "&mdash;"
+    local = datetime.fromtimestamp(ts, tz=PT)          # owner reads times in PT, wherever the Mac is
+    return local.strftime("%-m/%-d %-I:%M %p") + " PT"
+
+
+def _book_card(sym: str, state, days) -> str:
+    title = f"DONCHIAN {sym} &mdash; TREND BOOK (PAPER)"
+    if state is None:
+        return f"<div class='panel' id=\"trend-{sym}\"><div class='ptitle'>{title}</div>no state file for {sym}</div>"
+    last = days[-1] if days else None
+    s = book_summary(state, last["close"] if last else None)
+    wr = f"{s['wins']}/{s['n']}" if s["n"] else "&mdash;"
+    rule_now = (f"{last['w']:.3f} ({last.get('n_long', '?')}/9 sub-models long) at the "
+                f"{last['date']} close ${last['close']:,.2f}") if last else "no signal file"
+    rows = [
+        ("Position now", f"${s['open_notional']:,.2f} long (w {s['open_notional'] / BASE_NOTIONAL:.3f}), "
+                         f"since {_pt(s['open_since'])}" if s["open_notional"] else "flat"),
+        ("Open P&amp;L at last daily close", _usd(s["open_upnl"])),
+        ("Rule wants", rule_now),
+        ("Closed P&amp;L (after modelled fees)", f"{_usd(s['net'])} &middot; fees ${s['fees']:,.2f}"),
+        ("Exits", f"{s['n']} ({s['n_rebal']} rebalances, {s['n_stops']} stops) &middot; winners {wr}"),
+        ("Kill line", f"&minus;$15.00 &middot; room {_usd(s['kill_room'], signed=False)}"),
+    ]
+    body = "".join(f"<tr><td class='dim'>{k}</td><td>{v}</td></tr>" for k, v in rows)
+    recent = "".join(
+        f"<tr><td>{_pt(t.get('closed_at'))}</td><td>{html.escape((t.get('exit_reason') or '').replace('donchian_', ''))}</td>"
+        f"<td>{_usd(t.get('net_pnl'))}</td></tr>" for t in reversed(s["recent"]))
+    return (f"<div class='panel' id=\"trend-{sym}\"><div class='ptitle'>{title}</div>"
+            f"<table>{body}</table>"
+            f"<div class='sub'>Last {len(s['recent'])} exits (a rebalance resizes the same trend; it is not a new trade)</div>"
+            f"<table><tr class='dim'><th>CLOSED</th><th>WHY</th><th>NET</th></tr>{recent}</table></div>")
+
+
+def _bench_panel(signals: dict) -> str:
+    rows = ""
+    for sym in SYMBOLS:
+        b = benchmarks(signals.get(sym) or [])
+        if not b:
+            rows += f"<tr><td>{sym}</td><td colspan='4'>no signal file</td></tr>"
+            continue
+        verdict = "rule ahead" if b["replica"] > b["hold_const_w"] else "plain hold ahead"
+        rows += (f"<tr><td>{sym}</td><td>{_usd(b['replica'])}</td><td>{_usd(b['hold_const_w'])}</td>"
+                 f"<td>{_usd(b['static_buy'])}</td><td>{verdict}</td></tr>")
+    first = next((benchmarks(signals[s]) for s in SYMBOLS if benchmarks(signals.get(s) or [])), None)
+    span = f"{first['first']} &rarr; {first['last']}, {first['steps']} daily steps" if first else ""
+    return ("<div class='panel' id=\"trend-bench\"><div class='ptitle'>Rule vs plain hold (before fees)</div>"
+            "<div class='sig-desc'>Does the trend rule's timing add anything? <b>Rule</b> = the rule's own daily "
+            "replica on the $100 base. <b>Hold</b> = holding the rule's AVERAGE position every day. "
+            "<b>Buy once</b> = that average position bought at the first close. If hold beats the rule, the "
+            f"timing has not earned anything yet. {span}.</div>"
+            "<table><tr class='dim'><th></th><th>RULE</th><th>HOLD</th><th>BUY ONCE</th><th></th></tr>"
+            f"{rows}</table></div>")
+
+
+def _fidelity_panel(states: dict, signals: dict) -> str:
+    rows = ""
+    for sym in SYMBOLS:
+        st, days = states.get(sym), signals.get(sym) or []
+        if st is None or not days:
+            rows += f"<tr><td>{sym}</td><td colspan='3'>no state file or no signal file</td></tr>"
+            continue
+        fr = fidelity_rows(st, days)
+        last14 = breaches_last_14(fr)
+        dates = ", ".join(r["date"][5:] for r in fr if r["breach"]) or "none"
+        flag = "BUG (&gt;3 in 14d)" if last14 > FIDELITY_MAX_BREACHES else "ok"
+        rows += f"<tr><td>{sym}</td><td>{last14}</td><td>{flag}</td><td>{dates}</td></tr>"
+    return ("<div class='panel' id=\"trend-fidelity\"><div class='ptitle'>Fidelity &mdash; is the paper book "
+            "following the rule?</div><div class='sig-desc'>Each day the paper position (6h after the 5:00 PM PT "
+            "roll) is compared with what the rule wanted. A gap over 0.10 is a breach day; more than 3 in any "
+            "14 days is a BUG under the spec. The 9/9&ndash;9/20 days are the wind-down, when the bot was "
+            "stopped with positions frozen.</div>"
+            "<table><tr class='dim'><th></th><th>LAST 14D</th><th></th><th>ALL BREACH DAYS</th></tr>"
+            f"{rows}</table></div>")
+
+
+def build_trend_content(states: dict, signals: dict, today: date) -> str:
+    left = days_to_review(today)
+    when = (f"{left} days away" if left > 0 else "today" if left == 0 else f"{-left} days ago")
+    header = ("<div class='panel' id=\"trend-status\"><div class='ptitle'>Pivot status</div>"
+              "<div>Target: a slow, long-or-flat trend follower on BTC and ETH only (plan: "
+              "docs/2026-09-27-pivot-plan.md). Both books are <b>PAPER</b> &mdash; no live orders, no money at risk. "
+              f"Review: <b>Wed 10/14/2026</b> ({when}). Agreed test: both books positive and fidelity clean "
+              "&rarr; the ETH-only one-lot live build is offered.</div>"
+              "<div class='sig-desc'>Paper P&amp;L does not include funding. Measured 9/27 over the last 100 "
+              "settlements: longs paid about 0.41% (BTC) and 0.35% (ETH) of the position per 30 days.</div></div>")
+    cards = "".join(_book_card(sym, states.get(sym), signals.get(sym) or []) for sym in SYMBOLS)
+    return (f"<div id=\"trend-grid\">{header}{cards}{_bench_panel(signals)}"
+            f"{_fidelity_panel(states, signals)}</div>")

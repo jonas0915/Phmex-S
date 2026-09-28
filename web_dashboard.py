@@ -37,6 +37,8 @@ from html import escape
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from http.cookies import SimpleCookie
 
+import trend_view
+
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE = os.path.join(PROJECT_DIR, "trading_state.json")
 LOG_FILE = os.path.join(PROJECT_DIR, "logs", "bot.log")
@@ -2306,6 +2308,75 @@ def build_content(lines: list = None, slot_states: dict = None, state: dict = No
 {signals_html}"""
 
 
+def _tabs_html(active: str) -> str:
+    """Top tab strip shared by the terminal page and the TREND page (pivot plan 9/27)."""
+    tabs = (("main", "/", "TERMINAL"), ("trend", "/trend", "TREND (PIVOT)"))
+    links = "".join(f'<a href="{href}" class="{"on" if key == active else ""}">{label}</a>'
+                    for key, href, label in tabs)
+    return f'<div id="tabs">{links}</div>'
+
+
+def build_trend_payload() -> dict:
+    """/api/trend body: the Donchian trend books, read fresh from their files."""
+    states, signals = trend_view.load_inputs(PROJECT_DIR)
+    today = datetime.now(ZoneInfo("America/Los_Angeles")).date()
+    return {"content": trend_view.build_trend_content(states, signals, today)}
+
+
+def build_trend_html() -> str:
+    """TREND tab page: the pivot target's paper books. Polls /api/trend every 30s
+    (the books change once a day at the 5:00 PM PT roll). Read-only, zero API calls."""
+    content = build_trend_payload()["content"]
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHMEX-S &mdash; Trend</title>
+<style>
+:root {{
+  --bg:#000204; --panel:#0a0e08; --border:#2d3a1e; --txt:#9eb89e;
+  --amber:#f0a500; --pos:#4af626; --neg:#ff5555; --dim:#5a6b5a;
+}}
+* {{ box-sizing:border-box; margin:0; padding:0; }}
+body {{ background:var(--bg); color:var(--txt);
+  font:11px/1.5 'SF Mono', Menlo, 'JetBrains Mono', monospace; }}
+#tabs {{ display:flex; gap:2px; padding:3px 3px 0; background:var(--bg); }}
+#tabs a {{ color:var(--dim); text-decoration:none; padding:3px 12px; border:1px solid var(--border);
+  border-bottom:none; letter-spacing:1.5px; font-size:10px; }}
+#tabs a.on {{ color:var(--amber); background:var(--panel); }}
+#trend-grid {{ display:grid; grid-template-columns:repeat(2,1fr); gap:3px; padding:3px; }}
+#trend-status {{ grid-column:1 / -1; }}
+.panel {{ background:var(--panel); border:1px solid var(--border); padding:6px; }}
+.panel .ptitle {{ color:var(--amber); letter-spacing:1.5px; font-size:9px;
+  text-transform:uppercase; border-bottom:1px solid #1a2412; padding-bottom:3px; margin-bottom:5px; }}
+.sig-desc {{ color:var(--dim); font-size:9px; line-height:1.35; margin:4px 0; }}
+.sub {{ color:var(--dim); font-size:9px; margin:6px 0 2px; }}
+.panel table {{ width:100%; border-collapse:collapse; font-size:10px; }}
+.panel td, .panel th {{ padding:2px 4px; text-align:left; border-bottom:1px solid #111a0c; vertical-align:top; }}
+.dim {{ color:var(--dim); }} .pos {{ color:var(--pos); }} .neg {{ color:var(--neg); }}
+.footer {{ color:var(--dim); font-size:9px; padding:4px 6px; }}
+@media (max-width: 800px) {{ #trend-grid {{ grid-template-columns:1fr; }} }}
+</style>
+</head>
+<body>
+{_tabs_html("trend")}
+<div id="trend-content">{content}</div>
+<div class="footer">PAPER books &middot; Auto-refresh 30s &middot; Read-only &middot; Zero API calls<span id="upd"></span></div>
+<script>
+async function refreshTrend() {{
+  try {{
+    const r = await fetch('/api/trend'); const j = await r.json();
+    document.getElementById('trend-content').innerHTML = j.content;
+    document.getElementById('upd').textContent = ' · updated ' + new Date().toLocaleTimeString();
+  }} catch (e) {{ /* keep the last render */ }}
+}}
+setInterval(refreshTrend, 30000);
+</script>
+</body>
+</html>"""
+
+
 def build_html() -> str:
     """Full HTML page shell — sticky ticker / swapped #content grid /
     static #equity-root (outside the swap) / #feed.
@@ -2332,6 +2403,10 @@ def build_html() -> str:
 * {{ box-sizing:border-box; margin:0; padding:0; }}
 body {{ background:var(--bg); color:var(--txt);
   font:11px/1.5 'SF Mono', Menlo, 'JetBrains Mono', monospace; }}
+#tabs {{ display:flex; gap:2px; padding:3px 3px 0; background:var(--bg); }}
+#tabs a {{ color:var(--dim); text-decoration:none; padding:3px 12px; border:1px solid var(--border);
+  border-bottom:none; letter-spacing:1.5px; font-size:10px; }}
+#tabs a.on {{ color:var(--amber); background:var(--panel); }}
 #ticker {{ position:sticky; top:0; z-index:10; background:var(--panel);
   color:var(--amber); border-bottom:1px solid var(--border);
   padding:5px 10px; white-space:nowrap; overflow:hidden; font-size:12px; }}
@@ -2389,6 +2464,7 @@ body {{ background:var(--bg); color:var(--txt);
 </style>
 </head>
 <body>
+{_tabs_html("main")}
 <div id="ticker">{ticker}</div>
 <div id="content">{content}</div><!-- /content -->
 <div class="panel" id="equity-root" style="margin:0 3px;">
@@ -2678,6 +2754,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "feed": build_feed(_lines),
             })
             data = payload.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(data)
+        elif _route == "/trend":
+            html = build_trend_html()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html.encode())))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Set-Cookie", f"dash_token={DASHBOARD_TOKEN}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Strict")
+            self.end_headers()
+            self.wfile.write(html.encode())
+        elif _route == "/api/trend":
+            data = json.dumps(build_trend_payload()).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
