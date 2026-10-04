@@ -1,0 +1,25 @@
+H=24 k=0.0 asia: n=3812 fade_gross_mean=-2.52 ci95=[-15.91,11.22] corr(r,fwd)=-0.006
+H=24 k=0.0 eu: n=3827 fade_gross_mean=15.24 ci95=[2.24,28.20] corr(r,fwd)=-0.014
+H=24 k=0.0 us: n=3831 fade_gross_mean=20.73 ci95=[6.65,35.60] corr(r,fwd)=-0.078
+H=24 k=1.0 asia: n=909 fade_gross_mean=-24.37 ci95=[-55.16,4.70] corr(r,fwd)=-0.019
+H=24 k=1.0 eu: n=1104 fade_gross_mean=-20.34 ci95=[-44.45,3.96] corr(r,fwd)=0.028
+H=24 k=1.0 us: n=1280 fade_gross_mean=30.50 ci95=[4.98,54.73] corr(r,fwd)=-0.130
+H=24 k=1.5 asia: n=389 fade_gross_mean=-4.19 ci95=[-48.87,39.95] corr(r,fwd)=-0.072
+H=24 k=1.5 eu: n=526 fade_gross_mean=-26.07 ci95=[-62.31,8.30] corr(r,fwd)=0.048
+H=24 k=1.5 us: n=683 fade_gross_mean=30.87 ci95=[-6.59,68.10] corr(r,fwd)=-0.143
+H=24 k=2.0 asia: n=171 fade_gross_mean=28.10 ci95=[-42.44,99.08] corr(r,fwd)=-0.127
+H=24 k=2.0 eu: n=228 fade_gross_mean=8.16 ci95=[-43.66,65.46] corr(r,fwd)=0.020
+H=24 k=2.0 us: n=373 fade_gross_mean=52.48 ci95=[-1.00,106.35] corr(r,fwd)=-0.177
+H=48 k=0.0 asia: n=3794 fade_gross_mean=-30.53 ci95=[-48.78,-10.72] corr(r,fwd)=0.048
+H=48 k=0.0 eu: n=3809 fade_gross_mean=-23.10 ci95=[-41.12,-5.75] corr(r,fwd)=0.070
+H=48 k=0.0 us: n=3813 fade_gross_mean=51.60 ci95=[30.94,71.46] corr(r,fwd)=-0.153
+H=48 k=1.0 asia: n=908 fade_gross_mean=-80.05 ci95=[-116.25,-42.73] corr(r,fwd)=0.087
+H=48 k=1.0 eu: n=1104 fade_gross_mean=-75.59 ci95=[-111.15,-38.61] corr(r,fwd)=0.141
+H=48 k=1.0 us: n=1280 fade_gross_mean=96.33 ci95=[58.83,134.67] corr(r,fwd)=-0.233
+H=48 k=1.5 asia: n=388 fade_gross_mean=-74.10 ci95=[-123.68,-22.31] corr(r,fwd)=0.091
+H=48 k=1.5 eu: n=526 fade_gross_mean=-108.07 ci95=[-161.33,-57.94] corr(r,fwd)=0.200
+H=48 k=1.5 us: n=683 fade_gross_mean=109.33 ci95=[60.51,160.24] corr(r,fwd)=-0.304
+H=48 k=2.0 asia: n=171 fade_gross_mean=-69.22 ci95=[-132.73,-9.74] corr(r,fwd)=0.121
+H=48 k=2.0 eu: n=228 fade_gross_mean=-105.85 ci95=[-181.33,-25.78] corr(r,fwd)=0.211
+H=48 k=2.0 us: n=373 fade_gross_mean=157.70 ci95=[88.96,228.37] corr(r,fwd)=-0.400
+train range: 2025-06-27 14:00:00+00:00 2026-04-21 21:00:00+00:00

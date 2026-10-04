@@ -1,0 +1,3 @@
+sl=100 max_concurrent=4 trades_per_week_ceiling=0.9230769230769231 time_to_verdict_weeks=54.166666666666664
+sl=150 max_concurrent=3 trades_per_week_ceiling=0.6923076923076923 time_to_verdict_weeks=72.22222222222223
+sl=200 max_concurrent=2 trades_per_week_ceiling=0.46153846153846156 time_to_verdict_weeks=108.33333333333333

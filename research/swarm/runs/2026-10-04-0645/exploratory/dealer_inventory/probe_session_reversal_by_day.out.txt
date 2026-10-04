@@ -1,0 +1,19 @@
+k=1.0 asia: days=152 day_mean=-16.7 ci95_day=[-106.8,75.6] day_hit=0.434 H1=-5.7 H2=-27.7
+k=1.0 eu: days=166 day_mean=10.4 ci95_day=[-85.5,102.9] day_hit=0.512 H1=11.9 H2=8.8
+k=1.0 us: days=170 day_mean=54.4 ci95_day=[-37.8,152.4] day_hit=0.529 H1=2.5 H2=106.4
+  us by month: {Period('2025-07', 'M'): {'count': 18, 'mean': -159.9}, Period('2025-08', 'M'): {'count': 18, 'mean': 107.2}, Period('2025-09', 'M'): {'count': 16, 'mean': -46.0}, Period('2025-10', 'M'): {'count': 18, 'mean': 376.9}, Period('2025-11', 'M'): {'count': 18, 'mean': -274.7}, Period('2025-12', 'M'): {'count': 17, 'mean': 231.8}, Period('2026-01', 'M'): {'count': 18, 'mean': -56.7}, Period('2026-02', 'M'): {'count': 16, 'mean': 470.6}, Period('2026-03', 'M'): {'count': 19, 'mean': -9.3}, Period('2026-04', 'M'): {'count': 12, 'mean': -97.6}}
+  us BTC: n=73 mean=6.7 ci=[-72.2,86.6]
+  us ETH: n=77 mean=34.1 ci=[-91.8,153.5]
+k=1.5 asia: days=93 day_mean=-95.5 ci95_day=[-227.5,32.2] day_hit=0.441 H1=-59.7 H2=-130.6
+k=1.5 eu: days=104 day_mean=-13.5 ci95_day=[-147.2,113.3] day_hit=0.519 H1=-60.7 H2=33.7
+k=1.5 us: days=110 day_mean=85.9 ci95_day=[-45.1,212.0] day_hit=0.509 H1=38.5 H2=133.3
+  us by month: {Period('2025-07', 'M'): {'count': 12, 'mean': -191.7}, Period('2025-08', 'M'): {'count': 12, 'mean': 40.6}, Period('2025-09', 'M'): {'count': 9, 'mean': -16.2}, Period('2025-10', 'M'): {'count': 14, 'mean': 513.4}, Period('2025-11', 'M'): {'count': 15, 'mean': -293.1}, Period('2025-12', 'M'): {'count': 12, 'mean': 276.1}, Period('2026-01', 'M'): {'count': 14, 'mean': -115.3}, Period('2026-02', 'M'): {'count': 8, 'mean': 362.2}, Period('2026-03', 'M'): {'count': 8, 'mean': 440.7}, Period('2026-04', 'M'): {'count': 6, 'mean': 83.1}}
+  us BTC: n=41 mean=-54.3 ci=[-151.5,39.6]
+  us ETH: n=44 mean=9.6 ci=[-135.7,161.7]
+k=2.0 asia: days=47 day_mean=-80.9 ci95_day=[-210.2,46.5] day_hit=0.426 H1=-123.9 H2=-39.7
+k=2.0 eu: days=63 day_mean=-62.8 ci95_day=[-219.3,102.4] day_hit=0.492 H1=-113.3 H2=-13.9
+k=2.0 us: days=76 day_mean=72.0 ci95_day=[-58.3,214.0] day_hit=0.487 H1=70.1 H2=73.9
+  us by month: {Period('2025-07', 'M'): {'count': 11, 'mean': -199.8}, Period('2025-08', 'M'): {'count': 6, 'mean': 16.5}, Period('2025-09', 'M'): {'count': 7, 'mean': -65.4}, Period('2025-10', 'M'): {'count': 6, 'mean': 900.4}, Period('2025-11', 'M'): {'count': 11, 'mean': -30.9}, Period('2025-12', 'M'): {'count': 9, 'mean': 282.4}, Period('2026-01', 'M'): {'count': 11, 'mean': -128.1}, Period('2026-02', 'M'): {'count': 5, 'mean': 95.9}, Period('2026-03', 'M'): {'count': 5, 'mean': 233.7}, Period('2026-04', 'M'): {'count': 5, 'mean': 37.4}}
+  us BTC: n=19 mean=-52.4 ci=[-216.7,125.9]
+  us ETH: n=24 mean=125.1 ci=[-86.5,332.2]
+us k1.5 up-session (short fade): 22.0 352  down-session (long fade): 200.1 309
