@@ -1,0 +1,50 @@
+# CRITIC — swarm run 2026-10-18-0300 (completeness critic)
+
+Verdict first: the report correctly states that the run had 0 theses, 0 screens and 0 committee votes, and nothing on disk contradicts that. The defects are one unsupported count ("dealer_inventory five"), a few counts and run-history claims with no file path, one claim ("web_budget_exhausted ... in the run context") that no file on disk backs up, five uncited script and launch artifacts, and the theses/ probe copy, which happened again. The report did not exist on disk when this critique was written (expected, since the runner saves it), but LESSONS 2026-10-04 (research/swarm/kb/LESSONS.md:52) requires REPORT.md to be saved before the critic runs.
+
+Run dir listing (`find research/swarm/runs/2026-10-18-0300 -type f | sort`, before this file was written):
+exploratory/cross_asset/NOTES.md, exploratory/dealer_inventory/sources_log.txt, exploratory/forced_flows/NOTES.md, exploratory/informed_flow/NOTES.md, exploratory/literature/NOTES.md, exploratory/literature/local_check_copy.py, exploratory/literature/local_check_output.txt, exploratory/owner-record/NOTES.md, exploratory/owner-record/owner_record_probe.json, exploratory/owner-record/probe.out.txt, exploratory/owner-record/probe.py, exploratory/session_calendar/NOTES.md, exploratory/session_calendar/probe_holiday_ttv.out.txt, exploratory/session_calendar/probe_holiday_ttv.py, exploratory/vol_structure/NOTES.md, launch_args.json, mandate.md, theses/owner_record_probe.json. There are no specs/, screens/, committee/, register/ or gate_rejections.json files.
+
+## a. Artifacts not cited in the report
+
+1. `research/swarm/runs/2026-10-18-0300/launch_args.json`: not cited. It is the only on-disk run-context file, and it has no `web_budget_exhausted` field (see b.1).
+2. `research/swarm/runs/2026-10-18-0300/exploratory/literature/local_check_copy.py`: not cited. It is the script behind the cited `local_check_output.txt`. The report should name it, because it is the file showing that the probe went through `load_data.load_ohlcv(..., era="train", dataset="mr_edge")` (line 16).
+3. `research/swarm/runs/2026-10-18-0300/exploratory/owner-record/probe.py`: not cited. It produces the cited `owner_record_probe.json` and its theses/ copy.
+4. `research/swarm/runs/2026-10-18-0300/exploratory/owner-record/probe.out.txt`: not cited.
+5. `research/swarm/runs/2026-10-18-0300/exploratory/session_calendar/probe_holiday_ttv.py`: not cited. It produces the cited `probe_holiday_ttv.out.txt`.
+6. screens/ and committee/ artifacts: none exist, so there is nothing to cite.
+
+## b. Numbers or counts in the report with no file path
+
+1. "`web_budget_exhausted` is false for all 8 lenses in the run context" (section "What was not done"). No file in the run dir has this field (`launch_args.json` has only run_id/now/today/judge_model/max_analysts/max_screens/dry_run/constraints_md/standards_md). The lens notes back it up for only 5 of 8 lenses: forced_flows, informed_flow and vol_structure say "budget NOT exhausted", and cross_asset and literature say searches were never refused. `exploratory/dealer_inventory/sources_log.txt`, `exploratory/session_calendar/NOTES.md` and `exploratory/owner-record/NOTES.md` do not state budget status (owner-record says it "Stopped early because the lens is dry").
+2. "dealer_inventory five" (empty runs in a row, under "Next run should"). No path is given, and the files do not support it. A dealer_inventory exploratory dir exists only in runs 2026-09-25-2036, 2026-09-27-0300, 2026-10-04-0645 and 2026-10-18-0300, which is 4 runs, all with no dealer_inventory thesis in theses/ or gate_*.json. Run 2026-09-20-0300/exploratory/ has no dealer_inventory dir. Run 2026-10-11-0311 has only `claude_stdout.log` ("API Error: Connection dropped (ECONNRESET)") and no lens output. The last dealer_inventory thesis is `research/swarm/runs/2026-09-19-1451/theses/dealer_inventory_gamma_flush.json`. On-disk support is "four", not "five".
+3. informed_flow "fourth empty run in a row" (lens bullet and "Next run should"). No path is given. `exploratory/informed_flow/NOTES.md` lists the prior runs that hit the same blockers but does not state a streak count. The files are consistent with four: `2026-09-20-0300/gate_kept.json` has `informed_flow_btc_alt_lag`, and there is no informed_flow thesis in 2026-09-25-2036, 2026-09-27-0300 or 2026-10-04-0645. The report should cite those paths.
+4. "cross_asset is also empty again (as in 2026-10-04-0645)". No path is given. It is correct per `research/swarm/runs/2026-10-04-0645/theses/`, which holds only owner_record_probe.json.
+5. "this is the third run that LESSONS has flagged". No path is given, and the wording is inaccurate. `research/swarm/kb/LESSONS.md` flags the theses/ probe copy in two lines, :44 (2026-09-27) and :52 (2026-10-04), so this run would be the third occurrence after two flags. On disk, `theses/owner_record_probe.json` also exists in runs 2026-09-17-2020, 2026-09-19-1451, 2026-09-20-0300 and 2026-09-25-2036, which is 7 runs including this one.
+6. session_calendar "fourth empty run in a row" is sourced (`exploratory/session_calendar/NOTES.md`, last paragraph). Noted for completeness only, not a defect.
+
+## c. Contradictions between artifacts and the report (files re-opened)
+
+1. gate_rejections.json, out.json, audit.json, committee/*.json and out.robust_*.json: none exist, as the report says. No register/<id>/universe_check.json exists either, so no dropped_symbols case applies.
+2. `theses/owner_record_probe.json` is byte-identical to `exploratory/owner-record/owner_record_probe.json` (`cmp` exit 0, re-run by this critic). This matches the report.
+3. Owner-record bullet, wording: "All profit ... comes from one contract on one morning". The probe shows the record's net profit (`equity_path.final_cum_realized_usd` 4857.2206) is driven by u100TRYBUSD (`tryb_detail.pnl_usd` 8128.0124) against the rest (`ex_tryb.pnl_usd` -3270.7918). But gross winning trades exist outside TRYB (`concentration.total_positive_pnl_usd` 12899.2021; `ex_tryb_top20_winners` lists XRPUSD/uBTCUSD/SOLUSD winners), so "all profit" should read "all net profit". "One morning" is true only in UTC (04:47 to 08:44 UTC, `tryb_detail.first_open`/`last_close`). The PT times the report gives (8:47 PM to 12:44 AM) are evening into night.
+4. Literature bullet, wording: "pooled BTC-to-alt next-5m-bar effect" leaves out the conditioning. The tested set is alt next-bar open-to-close after top-decile |BTC 5m return| bars (threshold ~18.7 bps), signed by the BTC move (`exploratory/literature/local_check_output.txt`, TEST1 header). The numbers quoted (mean 0.79, CI95 [0.48, 1.11], n 66496, hit-rate 0.459) match the file exactly.
+5. All other per-lens numbers and counts were checked against the NOTES and probe files and match: the forced_flows 8/4/3, informed_flow 7/3/2+403, dealer_inventory 10/3/3, session_calendar 9/4/2, vol_structure 10 (header says 9)/3/3, cross_asset 9/2/2 and literature 8/6 counts; the 59.09/78.79/118.18/236.36 ttv values; the -39.67/-13.23 and about -1.18 bps CIs; and `research/swarm/runs/2026-09-25-2036/gate_rejections.json`, which contains `owner_record_delist_peg_dislocation_fade`.
+
+## d. Theses with empty nearest_dead_rows, generic why_different, or numberless evidence
+
+1. There are no real thesis files. The only file in theses/ is `research/swarm/runs/2026-10-18-0300/theses/owner_record_probe.json`, whose `_label` is "EXPLORATORY PROBE - not a screen, not a thesis, not evidence for any verdict". It has no `nearest_dead_rows`, `why_different` or `evidence` field (its top-level keys are _label, source_file, n_rows, fields_used, date_range_utc, equity_path, concentration, win_rate, payoff_ratio, median_hold_seconds, totals_usd, symbols, side_split, time_of_day_utc_by_open, behaviour_after_loss, behaviour_field, tryb_detail, ex_tryb, stress_event_windows, ex_tryb_by_hold, ex_tryb_top20_winners, ex_tryb_top20_share_of_ex_tryb_positive). Any stage that globs theses/*.json reads a file with all three fields empty. This repeats LESSONS 2026-09-27 (kb/LESSONS.md:44) and 2026-10-04 (kb/LESSONS.md:52).
+
+## e. Holdout access (grep)
+
+1. One grep hit: `research/swarm/runs/2026-10-18-0300/mandate.md:72`, which reads: "**Holdout is NEVER read in this run.** Do not use era="holdout" or "all", ...". This is the mandate's own prohibition text, not a data access. It matches the grep pattern, so it is recorded here per the rule. No probe, script or output file matched. The only market-data load in the run is `exploratory/literature/local_check_copy.py:16`, `load_data.load_ohlcv(s,"5m",era="train",dataset="mr_edge")`, and the BTC range it printed ends 2026-08-10 11:55 UTC (`local_check_output.txt:1`). No long_1h thesis exists, so the STANDARDS #6 cross-dataset rule is not engaged. No `fetch_ohlcv_ccxt` call appears in the run dir.
+
+## f. Frozen spec / signal.py sha verification
+
+1. none. `registrar.verify` over `research/swarm/runs/2026-10-18-0300/specs/*.frozen.json` returned `{}`. There are no frozen specs and no screens/<id>/signal.py.
+
+## g. Daily-ROI targets or hand-computed statistics in the report
+
+1. Daily-ROI target in the report: none. Outside the report, `research/swarm/runs/2026-10-18-0300/mandate.md:11` repeats the owner aspiration "+10% account ROI per day". It is explicitly framed as "never a bar that a thesis is judged against", and mandate.md:20 says "No daily-ROI target applies". This is informational, since the hard rule says "anywhere".
+2. Hand-computed statistics in the report prose: none found. Every CI, ttv and p* value is quoted from a lib-produced file.
+3. Informational, upstream of the report: the quoted hit-rate 0.459 is a raw pandas proportion `(allsgn>0).mean()` at `exploratory/literature/local_check_copy.py:44`, not a `research.swarm.lib` call. The session_calendar event rate `11 * mc / 52.0` at `exploratory/session_calendar/probe_holiday_ttv.py:8` is a hand-typed ASSUMED CEILING input. The ttv itself comes from `fee_math.time_to_verdict_weeks`, and the input is labelled as an assumption per LESSONS 2026-10-04.

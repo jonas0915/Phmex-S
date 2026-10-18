@@ -1,0 +1,75 @@
+symbols ['1000PEPE', '1000SHIB', 'AAVE', 'ADA', 'ALLO', 'ARB', 'AVAX', 'BCH', 'BICO', 'BNB', 'BTC', 'DEXE', 'DOGE', 'EIGEN', 'ENA', 'ETH', 'GIGGLE', 'HYPE', 'INJ', 'LINK', 'LIT', 'LTC', 'ONDO', 'PUMP', 'RENDER', 'SOL', 'SUI', 'TAO', 'UNI', 'WIF', 'WLD', 'XLM', 'XRP', 'ZAMA', 'ZEC'] BTC range 2026-06-01 00:00:00+00:00 2026-08-10 11:55:00+00:00 20304
+
+TEST1 BTC 5m return -> alt NEXT-bar open-to-close (bps), top-decile |BTC ret| threshold ~ 18.7 bps
+     alt  corr(BTC_t,alt_oc_t+1)  n_big(top10%|BTCret|)  mean_signed_next_oc_bps  ci95_lo  ci95_hi
+1000PEPE                  0.0167                   2031                     1.05    -0.58     2.55
+1000SHIB                  0.0153                   2031                     0.81    -0.45     2.00
+    AAVE                  0.0001                   2031                     0.37    -1.29     1.95
+     ADA                  0.0120                   2031                     0.09    -1.47     1.53
+    ALLO                  0.0081                   1607                     0.88    -3.78     5.57
+     ARB                  0.0229                   2031                     1.14    -0.51     2.85
+    AVAX                  0.0202                   2031                     0.58    -0.77     1.96
+     BCH                  0.0194                   2031                     1.37    -0.14     2.85
+    BICO                 -0.0014                    633                     2.57    -1.89     7.01
+     BNB                 -0.0010                   2031                    -0.09    -1.02     0.79
+    DEXE                 -0.0021                   1306                    -0.94    -4.12     2.19
+    DOGE                  0.0129                   2031                     0.60    -0.63     1.77
+   EIGEN                  0.0052                   1460                     0.58    -2.11     3.29
+     ENA                  0.0064                   2031                     1.08    -1.32     3.38
+     ETH                 -0.0054                   2031                    -0.28    -1.47     0.92
+  GIGGLE                  0.0003                   1458                    -0.14    -2.43     1.98
+    HYPE                  0.0303                   2031                     1.05    -0.58     2.65
+     INJ                  0.0054                   1694                     0.74    -1.40     2.93
+    LINK                  0.0075                   2031                     0.22    -1.13     1.45
+     LIT                  0.0063                   2031                     1.32    -1.67     4.24
+     LTC                  0.0117                   2031                     0.65    -0.48     1.66
+    ONDO                  0.0096                   2031                     1.14    -0.93     3.12
+    PUMP                  0.0237                   2031                     1.95    -0.30     4.10
+  RENDER                  0.0218                   2031                     1.48    -0.45     3.28
+     SOL                  0.0111                   2031                     0.24    -1.13     1.51
+     SUI                  0.0021                   2031                     0.27    -1.33     1.78
+     TAO                  0.0118                   2031                     1.53    -0.07     3.12
+     UNI                  0.0118                   2031                     0.13    -1.33     1.57
+     WIF                  0.0210                   1458                     1.36    -0.94     3.81
+     WLD                 -0.0121                   1542                    -0.19    -3.73     3.30
+     XLM                  0.0172                   2031                     0.89    -0.91     2.56
+     XRP                  0.0187                   2031                     0.43    -0.69     1.54
+    ZAMA                  0.0269                   1458                     1.31    -0.48     3.15
+     ZEC                  0.0073                   2031                     1.89    -1.11     5.08
+pooled signed next-bar alt OC: mean 0.79 bps, bootstrap ci95 [0.48, 1.11] (mean_ci n_boot=500), n 66496, hit-rate 0.459
+
+TEST2 pooled alt 5m log-return by minutes-since-funding-stamp (bar START time; bar 475 = last bar before stamp, bar 0 = first bar after)
+     mean_bps     n  ci95_lo  ci95_hi
+m                                    
+455     -0.18  6584    -0.93     0.54
+460      0.50  6584    -0.20     1.13
+465     -1.41  6584    -2.17    -0.70
+470      0.07  6584    -0.66     0.84
+475      0.66  6584    -0.10     1.46
+0        0.74  6584    -0.17     1.70
+5        1.31  6618     0.33     2.28
+10       2.52  6617     1.57     3.38
+15      -1.61  6617    -2.61    -0.56
+20      -2.81  6616    -3.61    -1.98
+25       1.29  6616     0.46     2.10
+all-bar mean -0.041 bps (n 633700; no CI: too large for in-memory bootstrap)
+BTC only:
+     mean  count
+m               
+465  0.23    211
+470  0.53    211
+475 -0.07    211
+0   -0.10    211
+5    0.01    212
+10   1.36    212
+
+TEST3 pooled alt 5m return: bars starting at :00/:15/:30/:45 (True) vs other (False)
+       mean_bps       n
+q                      
+False     0.093  422487
+True     -0.309  211213
+     mean   count
+o                
+0  -0.309  211213
+5  -0.123  211244
+10  0.309  211243

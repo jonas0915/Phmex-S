@@ -1,0 +1,4 @@
+sl=100 max_concurrent=4 per_week_ASSUMED_CEILING=0.846 time_to_verdict_weeks(n=50)=59.09
+sl=150 max_concurrent=3 per_week_ASSUMED_CEILING=0.635 time_to_verdict_weeks(n=50)=78.79
+sl=200 max_concurrent=2 per_week_ASSUMED_CEILING=0.423 time_to_verdict_weeks(n=50)=118.18
+sl=300 max_concurrent=1 per_week_ASSUMED_CEILING=0.212 time_to_verdict_weeks(n=50)=236.36

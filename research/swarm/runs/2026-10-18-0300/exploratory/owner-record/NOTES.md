@@ -1,0 +1,17 @@
+# owner-record lens — run 2026-10-18-0300 (EXPLORATORY, not evidence)
+
+Probe: `research/swarm/runs/2026-10-18-0300/exploratory/owner-record/probe.py` (the 2026-10-04-0645 probe with the run id changed by sed; same logic) -> `research/swarm/runs/2026-10-18-0300/exploratory/owner-record/owner_record_probe.json` (canonical). The task text for this run again told the lens to write `theses/owner_record_probe.json`, so the probe writes a byte-identical copy there (checked with `cmp`), and that copy carries the `_label` "EXPLORATORY PROBE - not a screen, not a thesis, not evidence". This conflicts with LESSONS 2026-09-27 and 2026-10-04 (the orchestrator task text should stop asking for the theses/ copy). stdout: `probe.out.txt`.
+Reads only research/swarm/kb/owner_trades/{api_closed_pnl,api_deposit_list_full,api_withdraw_list_full}.json. No market data, no holdout, no load_data call.
+
+## Result: 0 theses (same as runs 2026-09-27-0300 and 2026-10-04-0645)
+- All key numbers match the 2026-10-04-0645 probe exactly (final cumulative realized PnL +$4,857.22; u100TRYBUSD n=33 +$8,128.01; ex-TRYB n=786 -$3,270.79, bootstrap mean CI95 [-5.96, -2.49] USD/trade). Source: owner_record_probe.json keys equity_path, tryb_detail, ex_tryb.
+- Concentration: largest single trade = 0.0845 of total positive PnL, top-5 = 0.2951 (owner_record_probe.json:concentration). The top-5 are all TRYB trades, so the whole profitable subset is one contract on one morning, 2022-11-10 4:47 AM to 8:44 AM UTC (2022-11-09 8:47 PM to 2022-11-10 12:44 AM PT).
+- No ex-TRYB hold bucket, side, or stress window is positive. The <1h bucket's directional move has a fully negative CI, [-39.67, -13.23] bps (owner_record_probe.json:ex_tryb_by_hold).
+- Why no thesis: (1) the only profitable mechanism, a venue-stress or index-contamination dislocation on a thin contract, was already filed as owner_record_delist_peg_dislocation_fade and gate-rejected as not screenable (time-to-verdict, research/swarm/runs/2026-09-25-2036/gate_rejections.json). (2) This run's new sources confirm the shape but not the frequency. The 21Shares page shows a 2025-10-10 Binance USDe dislocation down to $0.65 that resolved in about 40 minutes. That is shorter than any bar the bot can act on, and these events happen a few times per decade. Neither mr_edge nor long_1h contains such an event on a pegged asset. (3) The only screenable generalization, fading wicks after market makers withdraw, relabels DEAD_LIST rows 6, 104, 110 and 114. Fading the owner's own short-hold retail flow is not computable from the bot's data, since there is no counterparty-type flow.
+
+## Fetch log (every URL attempted, with status)
+Searches (2): "perpetual futures price dislocation index exchange withdrawal freeze 2025 depeg arbitrage study"; "retail high leverage crypto futures traders short holding period losses study 2024 2025".
+Fetches:
+1. https://www.21shares.com//research/why-did-ethenas-stablecoin-remain-stable-onchain-but-depegged-on-binance — OK. 2025-10-10: USDe fell to $0.65 on Binance spot and resolved "within about 40 minutes". The page attributes this to market makers pulling back and to liquidation engines marking against venue-specific spot. BTC fell 13% and ETH over 16% that day.
+2. https://arxiv.org/abs/2212.06888 — OK. He, Manela, Ross, von Wachter, "Fundamentals of Perpetual Futures", v7 dated 2026-09-17. The abstract is qualitative only, with no numbers on the page, so no statistic is cited from it.
+Readable: 2 of 2. Stopped early because the lens is dry, as the task allows.
