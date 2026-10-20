@@ -113,3 +113,18 @@ def test_win_rate_uses_full_ledger_not_rendered_rows():
     # Full ledger: 5/35 = 14%. Rendered-only would say 100%.
     assert "14%" in html
     assert "100%" not in html
+
+
+def test_chips_show_net_dollars_next_to_win_rate():
+    """Owner request 2026-10-19: a 62% chip on a losing book read as 'winning'.
+    Each chip shows full-ledger net $ beside the win rate, same row filter."""
+    states = _states({
+        "5m_scalp": [_trade("stratA", 0.5), _trade("stratA", 0.5),
+                     _trade("stratA", 0.5), _trade("stratA", -2.0),   # 75% but -$0.50
+                     _trade("stratA", 9.0, reason="min_margin_skip")],
+        "SLOT_X": [_trade("stratB", 1.25)],
+    })
+    html = wd._build_blotter_panel(slot_states=states)
+    assert "75% &middot; <span class='neg'>-$0.50</span>" in html  # stratA
+    assert "100% &middot; <span class='pos'>+$1.25</span>" in html  # stratB
+    assert "80% &middot; <span class='pos'>+$0.75</span>" in html   # ALL, skip excluded

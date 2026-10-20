@@ -1974,7 +1974,12 @@ def _build_blotter_panel(limit: int = 100, slot_states: dict = None) -> str:
         if not real:
             return ""
         wins = sum(1 for r in real if r["net"] > 0)
-        return f" &middot; {wins / len(real) * 100:.0f}%"
+        # Net $ beside the win rate (owner request 2026-10-19): a 62% chip on
+        # a book whose stops outweigh its wins read as "winning". Same rows.
+        net = sum(r["net"] for r in real)
+        cls, sign = ("pos", "+") if net >= 0 else ("neg", "-")
+        return (f" &middot; {wins / len(real) * 100:.0f}% &middot; "
+                f"<span class='{cls}'>{sign}${abs(net):.2f}</span>")
 
     # Strategy filter chips — strategies present in the rendered window PLUS
     # any strategy that traded within 30 days of the newest row (2026-08-09:
